@@ -1,0 +1,193 @@
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = 'https://iymzthjkucvhyjnxpslg.supabase.co';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml5bXp0aGprdWN2aHlqbnhwc2xnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA5NjU3NDQsImV4cCI6MjA4NjU0MTc0NH0.85nnxqaNsfSfzuz-twBh_S5WlqE18UWa3Q-c6RlSoaE';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+const sql = `
+CREATE OR REPLACE FUNCTION public.seed_school_data(p_school_id uuid)
+ RETURNS void
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'auth'
+AS $function$
+DECLARE
+    v_ay_id UUID;
+    v_school_type TEXT;
+BEGIN
+    SELECT COALESCE(school_type, 'CLASSIC') INTO v_school_type FROM public.schools WHERE id = p_school_id;
+
+    INSERT INTO public.academic_years (school_id, label, is_active, status, start_date, end_date)
+    VALUES (p_school_id, '2026-2027', true, 'ACTIVE', '2026-09-01', '2027-06-30')
+    ON CONFLICT (school_id, label) DO NOTHING
+    RETURNING id INTO v_ay_id;
+
+    IF v_ay_id IS NULL THEN
+        SELECT id INTO v_ay_id FROM public.academic_years 
+        WHERE school_id = p_school_id AND label = '2026-2027' LIMIT 1;
+    END IF;
+
+    UPDATE public.schools
+    SET global_settings = jsonb_build_object(
+        'currency', 'HTG',
+        'school_name', name,
+        'academic_year_id', v_ay_id
+    )
+    WHERE id = p_school_id;
+
+    -- Seed data based on school type
+    IF v_school_type = 'UNIVERSITY' THEN
+        INSERT INTO public.classes (school_id, name, level)
+        VALUES 
+            (p_school_id, 'Licence 1 - Informatique', 'LICENCE'),
+            (p_school_id, 'Licence 2 - Informatique', 'LICENCE'),
+            (p_school_id, 'Licence 3 - Informatique', 'LICENCE'),
+            (p_school_id, 'Licence 1 - Sciences Comptables', 'LICENCE'),
+            (p_school_id, 'Licence 2 - Sciences Comptables', 'LICENCE'),
+            (p_school_id, 'Licence 3 - Sciences Comptables', 'LICENCE'),
+            (p_school_id, 'Licence 1 - Gestion des Affaires', 'LICENCE'),
+            (p_school_id, 'Licence 2 - Gestion des Affaires', 'LICENCE'),
+            (p_school_id, 'Licence 3 - Gestion des Affaires', 'LICENCE'),
+            (p_school_id, 'Master 1 - Informatique', 'MASTER'),
+            (p_school_id, 'Master 2 - Informatique', 'MASTER')
+        ON CONFLICT (school_id, name) DO NOTHING;
+
+        INSERT INTO public.subjects (school_id, name, code, category)
+        VALUES 
+            (p_school_id, 'Algorithmique et Programmation', 'ALGO101', 'TECH'),
+            (p_school_id, 'Bases de Données', 'DBD201', 'TECH'),
+            (p_school_id, 'Analyse Mathématique', 'MAT101', 'SCIENCE'),
+            (p_school_id, 'Comptabilité Générale', 'COMP101', 'GENERAL'),
+            (p_school_id, 'Économie', 'ECO101', 'GENERAL'),
+            (p_school_id, 'Management', 'MNG101', 'GENERAL'),
+            (p_school_id, 'Anglais Technique', 'ANG101', 'LANGUAGES'),
+            (p_school_id, 'Communication', 'COM101', 'LANGUAGES')
+        ON CONFLICT (school_id, code) DO NOTHING;
+
+    ELSIF v_school_type = 'PROFESSIONAL' THEN
+        INSERT INTO public.classes (school_id, name, level)
+        VALUES 
+            (p_school_id, 'Comptabilité Informatisée & Fiscalité I', 'DIPLOME'),
+            (p_school_id, 'Comptabilité Informatisée & Fiscalité II', 'DIPLOME'),
+            (p_school_id, 'Technique Douanière & Transit I', 'DIPLOME'),
+            (p_school_id, 'Technique Douanière & Transit II', 'DIPLOME'),
+            (p_school_id, 'Secrétariat Médical & Gestion I', 'DIPLOME'),
+            (p_school_id, 'Secrétariat Médical & Gestion II', 'DIPLOME'),
+            (p_school_id, 'Marketing & Vente Professionnelle I', 'DIPLOME'),
+            (p_school_id, 'Marketing & Vente Professionnelle II', 'DIPLOME'),
+            (p_school_id, 'Informatique de Bureau & Administration I', 'CERTIFICAT'),
+            (p_school_id, 'Assistance Administrative & Bilingue I', 'CERTIFICAT'),
+            (p_school_id, 'Maintenance Informatique & Réseaux I', 'DIPLOME'),
+            (p_school_id, 'Maintenance Informatique & Réseaux II', 'DIPLOME'),
+            (p_school_id, 'Graphisme & Design Multimédia I', 'CERTIFICAT'),
+            (p_school_id, 'Développement Web & Applications I', 'DIPLOME'),
+            (p_school_id, 'Développement Web & Applications II', 'DIPLOME'),
+            (p_school_id, 'Électricité du Bâtiment & Solaire I', 'CERTIFICAT'),
+            (p_school_id, 'Plomberie & Sanitaire Moderne I', 'CERTIFICAT'),
+            (p_school_id, 'Climatisation, Froid & Réfrigération I', 'DIPLOME'),
+            (p_school_id, 'Climatisation, Froid & Réfrigération II', 'DIPLOME'),
+            (p_school_id, 'Mécanique Automobile & Diagnostic I', 'DIPLOME'),
+            (p_school_id, 'Mécanique Automobile & Diagnostic II', 'DIPLOME'),
+            (p_school_id, 'Soudure & Fabrication Industrielle I', 'CERTIFICAT'),
+            (p_school_id, 'Cuisine, Restauration & Traiteur I', 'DIPLOME'),
+            (p_school_id, 'Cuisine, Restauration & Traiteur II', 'DIPLOME'),
+            (p_school_id, 'Pâtisserie & Boulangerie Artisanale I', 'CERTIFICAT'),
+            (p_school_id, 'Gestion Hôtelière & Touristique I', 'DIPLOME'),
+            (p_school_id, 'Gestion Hôtelière & Touristique II', 'DIPLOME'),
+            (p_school_id, 'Couture, Stylisme & Modélisme I', 'DIPLOME'),
+            (p_school_id, 'Couture, Stylisme & Modélisme II', 'DIPLOME'),
+            (p_school_id, 'Esthétique, Cosmétique & Maquillage I', 'CERTIFICAT'),
+            (p_school_id, 'Coiffure Professionnelle & Visagisme I', 'CERTIFICAT'),
+            (p_school_id, 'Secourisme, Hygiène & Soins d''Urgence I', 'CERTIFICAT')
+        ON CONFLICT (school_id, name) DO NOTHING;
+
+        -- Matières professionnelles génériques
+        INSERT INTO public.subjects (school_id, name, code, category)
+        VALUES 
+            (p_school_id, 'Éthique Professionnelle', 'ETH-PRO', 'GENERAL'),
+            (p_school_id, 'Entreprenariat', 'ENTREP-PRO', 'GENERAL'),
+            (p_school_id, 'Français Professionnel', 'FRA-PRO', 'LANGUAGES'),
+            (p_school_id, 'Anglais Technique', 'ANG-TECH', 'LANGUAGES'),
+            (p_school_id, 'Informatique de Base', 'INFO-BASE', 'TECH'),
+            (p_school_id, 'Pratique Atelier I', 'ATELIER-1', 'TECH'),
+            (p_school_id, 'Pratique Atelier II', 'ATELIER-2', 'TECH')
+        ON CONFLICT (school_id, code) DO NOTHING;
+
+    ELSE
+        -- Default to 'CLASSIC' mapping
+        INSERT INTO public.classes (school_id, name, level)
+        VALUES 
+            (p_school_id, 'Petite Section', 'MATERNELLE'),
+            (p_school_id, 'Moyenne Section', 'MATERNELLE'),
+            (p_school_id, 'Grande Section', 'MATERNELLE'),
+            (p_school_id, '1ère AF', 'FONDAMENTALE'),
+            (p_school_id, '2ème AF', 'FONDAMENTALE'),
+            (p_school_id, '3ème AF', 'FONDAMENTALE'),
+            (p_school_id, '4ème AF', 'FONDAMENTALE'),
+            (p_school_id, '5ème AF', 'FONDAMENTALE'),
+            (p_school_id, '6ème AF', 'FONDAMENTALE'),
+            (p_school_id, '7ème AF', 'FONDAMENTALE'),
+            (p_school_id, '8ème AF', 'FONDAMENTALE'),
+            (p_school_id, '9ème AF', 'FONDAMENTALE'),
+            (p_school_id, 'NS1', 'SECONDAIRE'),
+            (p_school_id, 'NS2', 'SECONDAIRE'),
+            (p_school_id, 'NS3', 'SECONDAIRE'),
+            (p_school_id, 'NS4', 'SECONDAIRE')
+        ON CONFLICT (school_id, name) DO NOTHING;
+
+        INSERT INTO public.subjects (school_id, name, code, category)
+        VALUES 
+            (p_school_id, 'Français', 'FRA', 'LANGUAGES'),
+            (p_school_id, 'Mathématiques', 'MAT', 'SCIENCE'),
+            (p_school_id, 'Créole', 'CRE', 'LANGUAGES'),
+            (p_school_id, 'Anglais', 'ANG', 'LANGUAGES'),
+            (p_school_id, 'Sciences Sociales', 'SS', 'GENERAL'),
+            (p_school_id, 'Sciences Physiques', 'SP', 'SCIENCE'),
+            (p_school_id, 'Biologie', 'BIO', 'SCIENCE'),
+            (p_school_id, 'Chimie', 'CHI', 'SCIENCE'),
+            (p_school_id, 'Informatique', 'INF', 'TECH')
+        ON CONFLICT (school_id, code) DO NOTHING;
+
+        -- Seed standard fee plans for classic classes
+        INSERT INTO public.fee_plans (school_id, academic_year_id, class_id, inscription_fee, tuition_fee)
+        SELECT 
+            c.school_id,
+            v_ay_id as academic_year_id,
+            c.id as class_id,
+            CASE 
+                WHEN c.level = 'MATERNELLE' THEN 5000
+                WHEN c.level = 'FONDAMENTALE' THEN 7500
+                WHEN c.level = 'SECONDAIRE' THEN 10000
+                ELSE 5000
+            END as inscription_fee,
+            CASE 
+                WHEN c.level = 'MATERNELLE' THEN 25000
+                WHEN c.level = 'FONDAMENTALE' THEN 35000
+                WHEN c.level = 'SECONDAIRE' THEN 50000
+                ELSE 20000
+            END as tuition_fee
+        FROM public.classes c
+        WHERE c.school_id = p_school_id
+        ON CONFLICT (academic_year_id, class_id) DO NOTHING;
+
+        -- Seed supply catalog for classic
+        INSERT INTO public.supply_catalog (school_id, label, unit_price, category)
+        VALUES 
+            (p_school_id, 'Kit Uniforme Complet (3 pièces)', 4500, 'Uniforme'),
+            (p_school_id, 'Polo de l''école', 1500, 'Uniforme'),
+            (p_school_id, 'Pack Livres Fondamentale 1-6', 12500, 'Manuel'),
+            (p_school_id, 'Pack Livres Secondaire', 15000, 'Manuel'),
+            (p_school_id, 'Carnet de Correspondance Officiel', 750, 'Fourniture'),
+            (p_school_id, 'Ecusson de l''école', 250, 'Fourniture')
+        ON CONFLICT DO NOTHING;
+
+    END IF;
+
+END; $function$;
+`;
+
+async function apply() {
+    const { error } = await supabase.rpc('apply_ddl', { v_sql: sql });
+    console.log("Error:", error);
+}
+apply();

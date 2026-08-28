@@ -1,0 +1,1 @@
+ALTER TABLE public.payments DROP CONSTRAINT IF EXISTS payments_student_id_fkey;

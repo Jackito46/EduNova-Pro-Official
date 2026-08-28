@@ -1,0 +1,47 @@
+          <div className="space-y-2">
+            <label className="text-sm font-semibold text-gray-700">Motif de l'annulation</label>
+            <textarea 
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all min-h-[80px]"
+              placeholder="Ex: Erreur de saisie du montant, doublon, chèque sans provision..."
+              value={cancelReason}
+              onChange={(e) => setCancelReason(e.target.value)}
+              disabled={isProcessing}
+            />
+          </div>
+
+          {cancellingTransaction?.originalMethod !== 'Portefeuille' && (
+            <label className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+              <input
+                type="checkbox"
+                className="w-5 h-5 text-rose-600 rounded focus:ring-rose-500 border-gray-300"
+                checked={refundToWallet}
+                onChange={(e) => setRefundToWallet(e.target.checked)}
+                disabled={isProcessing}
+              />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
+                  <Wallet size={16} className="text-blue-600" />
+                  Rembourser sous forme de crédit Portefeuille
+                </span>
+                <span className="text-xs text-gray-500">
+                  Forcer l'argent à aller dans le Wallet de l'étudiant plutôt que de simplement annuler la transaction.
+                </span>
+              </div>
+            </label>
+          )}
+
+          {cancellingTransaction?.originalMethod === 'Portefeuille' && (
+            <div className="flex items-start gap-3 p-4 border border-blue-200 rounded-xl bg-blue-50">
+              <Wallet size={18} className="text-blue-600 mt-0.5 shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-sm font-bold text-blue-900">
+                  Remboursement automatique vers le Portefeuille
+                </span>
+                <span className="text-xs text-blue-700/80">
+                  Comme ce paiement a été effectué via le Portefeuille de l'étudiant, le montant sera automatiquement re-crédité.
+                </span>
+              </div>
+            </div>
+          )}
+
+          <div className="border-t border-slate-100 pt-5 space-y-4">

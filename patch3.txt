@@ -1,0 +1,4 @@
+                          <option value="MonCash">MonCash</option>
+                          <option value="Chèque">Chèque</option>
+                          {feeType !== 'CREDIT_PORTEFEUILLE' && ((currency === 'USD' ? selectedStudent?.wallet_balance_usd : selectedStudent?.wallet_balance_htg) || 0) > 0 && (
+                            <option value="Portefeuille">Portefeuille (Solde: {currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0)} {currency})</option>

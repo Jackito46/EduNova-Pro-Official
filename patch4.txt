@@ -1,0 +1,12 @@
+      if (data) {
+        if (paymentMethod === 'Portefeuille') {
+          const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
+          const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+          const newBalance = walletBalance - amount;
+          await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+        } else if (feeType === 'CREDIT_PORTEFEUILLE') {
+          const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
+          const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+          const newBalance = walletBalance + amount;
+          await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+        }

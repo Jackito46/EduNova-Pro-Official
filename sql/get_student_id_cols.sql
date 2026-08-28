@@ -1,0 +1,1 @@
+SELECT c.table_name, c.column_name FROM information_schema.columns c WHERE c.column_name = 'student_id' AND c.table_schema = 'public';

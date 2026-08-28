@@ -1,0 +1,20 @@
+      if (error) throw error;
+      
+      // Auto-refund Wallet if the payment was made with Portefeuille
+      if (cancellingTransaction.originalMethod === 'Portefeuille' && cancellingTransaction.studentId && cancellingTransaction.amount) {
+        const { data: studentData, error: studentError } = await supabase
+          .from('students')
+          .select('wallet_balance_htg, wallet_balance_usd')
+          .eq('id', cancellingTransaction.studentId)
+          .single();
+          
+        if (!studentError && studentData) {
+          const updateField = cancellingTransaction.currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
+          const currentBalance = Number(cancellingTransaction.currency === 'USD' ? (studentData.wallet_balance_usd || 0) : (studentData.wallet_balance_htg || 0));
+          const newBalance = currentBalance + Number(cancellingTransaction.amount);
+          
+          await supabase.from('students').update({ [updateField]: newBalance }).eq('id', cancellingTransaction.studentId);
+        }
+      }
+
+      // Log audit

@@ -1,0 +1,11 @@
+                            <option value="INSCRIPTION">
+                              {selectedStudent && selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) && selectedStudent.inscriptionDue > 0 
+                                ? 'Réinscription' 
+                                : 'Inscription'}
+                            </option>
+                            <option value="SCOLARITE">{terminology.tuition}</option>
+                            <option value="DIVERS">Frais Divers</option>
+                            <option value="CREDIT_PORTEFEUILLE">Alimenter Portefeuille</option>
+                            {selectedStudent?.adHocCampaigns?.map((c: any) => (
+                               <option key={c.id} value={`ADHOC_${c.id}`}>Campagne: {c.name}</option>
+                            ))}

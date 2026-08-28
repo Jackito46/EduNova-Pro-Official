@@ -1,0 +1,1 @@
+SELECT constraint_name, table_name, delete_rule FROM information_schema.referential_constraints JOIN information_schema.key_column_usage USING (constraint_name) WHERE column_name = 'student_id';

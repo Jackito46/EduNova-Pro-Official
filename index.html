@@ -1,0 +1,105 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#2563eb">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EduNova Pro">
+    <meta name="application-name" content="EduNova Pro">
+    <meta name="msapplication-TileColor" content="#0b132b">
+    <meta name="msapplication-TileImage" content="/pwa-144x144.png?v=4.0">
+    <meta name="msapplication-config" content="/browserconfig.xml">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
+    <title>EduNova Pro - Système de Gestion Scolaire</title>
+    <link rel="manifest" href="/manifest.webmanifest?v=4.0">
+    
+    <!-- Primary Icons & Multi-Resolution Windows / Desktop Favicon -->
+    <link rel="shortcut icon" href="/favicon.ico?v=4.0">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=4.0">
+    <link rel="icon" type="image/png" sizes="256x256" href="/pwa-256x256.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="128x128" href="/pwa-128x128.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="96x96" href="/pwa-96x96.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=4.0">
+    <link rel="icon" type="image/png" sizes="512x512" href="/pwa-512x512.png?v=4.0">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png?v=4.0">
+    <link rel="apple-touch-icon" sizes="192x192" href="/pwa-192x192.png?v=4.0">
+    <link rel="apple-touch-icon" sizes="512x512" href="/pwa-512x512.png?v=4.0">
+    
+    <!-- iOS PWA Startup / Splash Screens -->
+    <link rel="apple-touch-startup-image" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3)" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)" href="/pwa-512x512.png?v=3.0">
+    <link rel="apple-touch-startup-image" media="(min-device-width: 768px) and (max-device-width: 1024px)" href="/pwa-512x512.png?v=3.0">
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EduNova Pro">
+    <script>
+      // Capture PWA installation prompt event as early as possible
+      window.__edunova_deferred_prompt = null;
+      window.addEventListener('beforeinstallprompt', function(e) {
+        e.preventDefault();
+        window.__edunova_deferred_prompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-captured'));
+      });
+      window.addEventListener('appinstalled', function() {
+        window.__edunova_deferred_prompt = null;
+        try { localStorage.setItem('edunova_pwa_installed', 'true'); } catch(e) {}
+      });
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous">
+    <style>
+      body {
+        background-color: #0b132b;
+        margin: 0;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      }
+      @keyframes pulseGlow {
+        0% { transform: scale(0.9); opacity: 0.45; }
+        100% { transform: scale(1.2); opacity: 0.9; }
+      }
+      @keyframes splashLoad {
+        0% { transform: translateX(-100%); }
+        50% { transform: translateX(60%); }
+        100% { transform: translateX(220%); }
+      }
+    </style>
+</head>
+<body style="background-color: #0b132b; color: #ffffff;">
+    <div id="root">
+      <div id="edunova-pwa-splash" style="position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #0b132b; color: #ffffff; z-index: 99999; font-family: 'Inter', system-ui, -apple-system, sans-serif;">
+        <div style="position: relative; margin-bottom: 22px; display: flex; align-items: center; justify-content: center;">
+          <div style="position: absolute; width: 140px; height: 140px; border-radius: 28px; background: radial-gradient(circle, rgba(37,99,235,0.45) 0%, rgba(11,19,43,0) 70%); filter: blur(14px); animation: pulseGlow 1.8s ease-in-out infinite alternate;"></div>
+          <img src="/logo.png" alt="EduNova Pro" style="width: 84px; height: 84px; border-radius: 20px; object-fit: contain; box-shadow: 0 20px 40px -10px rgba(0,0,0,0.6); position: relative; z-index: 2; border: 1px solid rgba(255,255,255,0.12);" />
+        </div>
+        <div style="font-size: 26px; font-weight: 900; letter-spacing: -0.03em; margin-bottom: 6px; color: #ffffff;">
+          EduNova <span style="color: #60a5fa; font-weight: 500;">Pro</span>
+        </div>
+        <div style="font-size: 11px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.22em; margin-bottom: 30px;">
+          Système Intégré de Gestion Scolaire
+        </div>
+        <div style="width: 140px; height: 4px; background: rgba(255,255,255,0.1); border-radius: 999px; overflow: hidden; position: relative;">
+          <div style="position: absolute; top: 0; left: 0; height: 100%; width: 50%; background: linear-gradient(90deg, #2563eb, #38bdf8); border-radius: 999px; animation: splashLoad 1.3s cubic-bezier(0.4, 0, 0.2, 1) infinite;"></div>
+        </div>
+      </div>
+    </div>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

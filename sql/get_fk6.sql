@@ -1,0 +1,1 @@
+SELECT constraint_name FROM information_schema.key_column_usage WHERE table_name = 'payments' AND column_name = 'student_id';

@@ -1,0 +1,9 @@
+-- Script pour ajouter les rôles manquants à l'enum user_role
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'DIRECTOR';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'SECRETARY';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'ACCOUNTANT';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'TEACHER';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'SUPERVISOR';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'LIBRARIAN';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'STUDENT';
+ALTER TYPE public.user_role ADD VALUE IF NOT EXISTS 'PARENT';

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cahier des Charges - EduNova</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .page { max-width: 210mm; min-height: 297mm; margin: 0 auto; background: white; padding: 20mm; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); margin-bottom: 20mm; }
+        h1, h2, h3 { page-break-after: avoid; }
+        table, figure, .prevent-break { page-break-inside: avoid; }
+        
+        @media print {
+            body { background-color: white; }
+            .page { border: none; box-shadow: none; margin: 0; padding: 15mm; min-height: auto; max-width: 100%; page-break-after: always;}
+            .no-print { display: none !important; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body class="py-8 text-slate-800">
+    
+    <button onclick="window.print()" class="no-print fixed bottom-8 right-8 bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-full shadow-2xl font-bold flex items-center gap-3 transition-all z-50">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Sauvegarder en PDF
+    </button>
+
+    <!-- PAGE 1: Couverture -->
+    <div class="page rounded-xl relative flex flex-col justify-center items-center text-center">
+        <div class="absolute top-0 left-0 w-full h-8 bg-gradient-to-r from-blue-700 to-indigo-600"></div>
+        <div class="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-r from-blue-700 to-indigo-600"></div>
+        
+        <h3 class="text-blue-600 font-bold uppercase tracking-[0.3em] mb-8">Spécifications Techniques et Fonctionnelles</h3>
+        <h1 class="text-7xl font-black text-slate-900 tracking-tight mb-6">
+            <span class="text-blue-600">Edu</span>Nova
+        </h1>
+        <p class="text-2xl text-slate-500 font-medium mb-12 max-w-lg leading-relaxed">
+            Le système intégré de gestion de l'information académique et financière.
+        </p>
+
+        <div class="w-24 h-1 bg-slate-200 mb-12"></div>
+
+        <div class="text-left w-full max-w-md bg-slate-50 p-8 rounded-2xl border border-slate-100">
+            <p class="text-sm text-slate-500 uppercase tracking-widest font-bold mb-2">Détails du Document</p>
+            <table class="w-full text-sm">
+                <tr><td class="py-2 text-slate-500">Version:</td><td class="py-2 font-bold text-slate-900 text-right">1.0.0</td></tr>
+                <tr><td class="py-2 text-slate-500">Modèles:</td><td class="py-2 font-bold text-slate-900 text-right">Local (Intranet) & SaaS (Cloud)</td></tr>
+                <tr><td class="py-2 text-slate-500">Date:</td><td class="py-2 font-bold text-slate-900 text-right" id="currentDate"></td></tr>
+            </table>
+        </div>
+    </div>
+
+    <!-- PAGE 2: Contenu -->
+    <div class="page rounded-xl">
+        <h2 class="text-3xl font-black text-slate-900 border-b-2 border-slate-100 pb-4 mb-8">1. Contexte & Objectifs</h2>
+        <p class="mb-4 leading-relaxed text-justify">
+            Le présent document définit les spécifications pour la mise en place, le déploiement et l'utilisation de la plateforme <strong>EduNova</strong>. EduNova est conçu pour numériser, sécuriser et fluidifier la gestion globale d'un établissement d'enseignement (Écoles classiques, Universités, Centres professionnels).
+        </p>
+        <p class="mb-8 leading-relaxed text-justify">
+            <strong>Objectif principal :</strong> Fournir une solution robuste capable d'éliminer les erreurs manuelles, de centraliser la gestion financière et d'améliorer la communication avec les parents et apprenants, qu'il y ait ou non un accès internet dans l'établissement.
+        </p>
+
+        <h2 class="text-3xl font-black text-slate-900 border-b-2 border-slate-100 pb-4 mb-8">2. Périmètre Fonctionnel (Modules)</h2>
+        
+        <div class="grid grid-cols-2 gap-6 mb-8">
+            <div class="bg-indigo-50/50 p-6 rounded-xl border border-indigo-100 prevent-break">
+                <h3 class="font-bold text-lg text-indigo-900 mb-2">🎓 Gestion Académique</h3>
+                <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                    <li>Inscription et base de données des étudiants.</li>
+                    <li>Gestion des classes, matières et professeurs.</li>
+                    <li>Saisie des notes et génération automatique des bulletins.</li>
+                    <li>Emploi du temps et pointage/signature des cours.</li>
+                </ul>
+            </div>
+            
+            <div class="bg-emerald-50/50 p-6 rounded-xl border border-emerald-100 prevent-break">
+                <h3 class="font-bold text-lg text-emerald-900 mb-2">💰 Gestion Financière</h3>
+                <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                    <li>Paiements de scolarité (Caisse) & reçus imprimables.</li>
+                    <li>Suivi des dettes et balances étudiantes en temps réel.</li>
+                    <li>Relevés de comptes et rapports financiers périodiques.</li>
+                    <li>Gestion des dépenses et budgets de l'établissement.</li>
+                </ul>
+            </div>
+
+            <div class="bg-blue-50/50 p-6 rounded-xl border border-blue-100 prevent-break">
+                <h3 class="font-bold text-lg text-blue-900 mb-2">📢 Communication</h3>
+                <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                    <li>Module de messagerie SMS d'urgence (bulletins, absences).</li>
+                    <li>Diffusion par Emailing en masse aux parents/étudiants.</li>
+                    <li>Historique complet des communications envoyées.</li>
+                </ul>
+            </div>
+
+            <div class="bg-amber-50/50 p-6 rounded-xl border border-amber-100 prevent-break">
+                <h3 class="font-bold text-lg text-amber-900 mb-2">⚙️ Super-Administration</h3>
+                <ul class="list-disc pl-5 text-sm text-slate-700 space-y-1">
+                    <li>Architecture Multi-Tenant (Données cloisonnées par école).</li>
+                    <li>Audit Logs de toutes les actions (Anti-fraude).</li>
+                    <li>Outils de réparation système et de gestion de cache.</li>
+                </ul>
+            </div>
+        </div>
+
+        <h2 class="text-3xl font-black text-slate-900 border-b-2 border-slate-100 pb-4 mb-8">3. Exigences Techniques (Les Ventes)</h2>
+        
+        <h3 class="text-xl font-bold text-slate-800 mb-4">Option A : Mode Local (Intranet / On-Premise)</h3>
+        <p class="text-sm text-slate-600 mb-4 line-clamp-3 leading-relaxed">
+            Destiné aux zones sans connectivité. L'application est installée sur un Serveur local. Tous les terminaux (Secrétariat, Caisse, Direction) accèdent au système via un réseau Wi-Fi local sans besoin d'Internet.
+        </p>
+        <ul class="list-square pl-6 text-sm text-slate-700 space-y-2 mb-6">
+            <li><strong>Serveur Requis :</strong> PC/Serveur Intel Core i5/i7, 16Go RAM DDR4, SSD 512Go avec onduleur (UPS) autonome.</li>
+            <li><strong>Réseau :</strong> Routeur Gigabit local performant pour interconnecter les postes de travail.</li>
+            <li><strong>Sauvegarde (Backup) :</strong> Disque dur externe chiffré. Exports locaux hebdomadaires gérés par la direction.</li>
+        </ul>
+
+        <h3 class="text-xl font-bold text-slate-800 mb-4 mt-8">Option B : Mode SaaS (Cloud)</h3>
+        <p class="text-sm text-slate-600 mb-4 leading-relaxed">
+            Accès global en ligne (24/7). Hébergement géré sur serveurs sécurisés (Google Cloud / AWS). Modèle par abonnement.
+        </p>
+        <ul class="list-square pl-6 text-sm text-slate-700 space-y-2 mb-8">
+            <li><strong>Sécurité :</strong> Base de données PostgreSQL avec RLS (Row Level Security). Chiffrement SSL/TLS de bout en bout.</li>
+            <li><strong>Accessibilité :</strong> Accessible depuis n'importe quel navigateur web (PC, Tablette, Mobile) 99.9% Uptime.</li>
+            <li><strong>Backups :</strong> Sauvegardes automatisées quotidiennes sur Cloud distribué.</li>
+        </ul>
+
+        <div class="mt-12 pt-8 border-t border-slate-200 grid grid-cols-2 gap-8 text-sm pt-20">
+            <div>
+                <p class="font-bold text-slate-500 uppercase tracking-widest text-xs mb-8">Pour EduNova Systems</p>
+                <div class="border-b border-slate-300 w-48 mb-2"></div>
+                <p class="text-slate-600 font-medium">Signature & Tampon</p>
+            </div>
+            <div>
+                <p class="font-bold text-slate-500 uppercase tracking-widest text-xs mb-8">Pour l'Établissement Client</p>
+                <div class="border-b border-slate-300 w-48 mb-2"></div>
+                <p class="text-slate-600 font-medium">Signature & Date</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('fr-FR');
+    </script>
+</body>
+</html>

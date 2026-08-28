@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proposition Commerciale - EduNova</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+        .page { max-width: 210mm; min-height: 297mm; margin: 0 auto; background: white; padding: 20mm; box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1); }
+        @media print {
+            body { background-color: white; }
+            .page { border: none; box-shadow: none; margin: 0; padding: 10mm; min-height: auto; max-width: 100%; }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+            * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+        }
+    </style>
+</head>
+<body class="py-8">
+    
+    <button onclick="window.print()" class="no-print fixed bottom-8 right-8 bg-indigo-600 hover:bg-indigo-700 text-white px-8 py-4 rounded-full shadow-2xl font-bold flex items-center gap-3 transition-all z-50">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+        Sauvegarder en PDF
+    </button>
+
+    <div class="page rounded-xl relative overflow-hidden">
+        <!-- Decoration -->
+        <div class="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-indigo-600 to-blue-500"></div>
+        
+        <!-- Header -->
+        <div class="flex justify-between items-end mb-12 mt-4">
+            <div>
+                <h1 class="text-5xl font-black text-slate-900 tracking-tight flex items-center gap-3">
+                    <span class="text-indigo-600">Edu</span>Nova
+                </h1>
+                <p class="text-slate-500 font-bold uppercase tracking-widest text-sm mt-2">Dossier d'Évaluation Commerciale</p>
+            </div>
+            <div class="text-right text-sm text-slate-500 font-medium leading-relaxed">
+                <p>Date : <span id="currentDate"></span></p>
+                <p>Document Confidentiel</p>
+            </div>
+        </div>
+
+        <!-- Sens EduNova -->
+        <div class="bg-slate-50 rounded-2xl p-8 mb-12 border border-slate-100">
+            <h2 class="text-2xl font-bold text-slate-900 mb-6 flex items-center gap-3">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-500"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" fill="#f59e0b"/></svg>
+                L'âme d'EduNova
+            </h2>
+            <p class="text-slate-700 leading-relaxed mb-6 font-medium">
+                Le nom <strong>EduNova</strong> n'a pas été choisi au hasard. C'est une fusion puissante de deux concepts qui définissent l'essence même de ce système :
+            </p>
+            <div class="grid grid-cols-1 gap-6 mb-6">
+                <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center font-black shrink-0">1</div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-900">"Edu" (Éducation)</h3>
+                        <p class="text-slate-600">Le cœur de métier. Cela représente l'apprentissage, les élèves, les enseignants et toute la structure académique à gérer.</p>
+                    </div>
+                </div>
+                <div class="flex gap-4">
+                    <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-black shrink-0">2</div>
+                    <div>
+                        <h3 class="font-bold text-lg text-slate-900">"Nova" (Nouveau / Étoile)</h3>
+                        <p class="text-slate-600">En latin signifiant "Nouveau". En astronomie, c'est une étoile qui devient soudainement très brillante. C'est l'intelligence et la clarté apportée au système.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-6 pt-6 border-t border-slate-200">
+                <div>
+                    <h4 class="font-black text-slate-800 mb-2">🚀 L'Innovation</h4>
+                    <p class="text-sm text-slate-600">Une nouvelle façon technologique de gérer l'école. Finis les registres papier, place au numérique fluide.</p>
+                </div>
+                <div>
+                    <h4 class="font-black text-slate-800 mb-2">✨ La Clarté</h4>
+                    <p class="text-sm text-slate-600">Visibilité totale sur les finances, suivis académiques et ressources. Rien ne reste dans l'ombre.</p>
+                </div>
+                <div>
+                    <h4 class="font-black text-slate-800 mb-2">🌱 Le Renouveau</h4>
+                    <p class="text-sm text-slate-600">Le symbole du passage vers le futur de l'éducation en Haïti et au-delà, avec standardisation et sécurité.</p>
+                </div>
+            </div>
+        </div>
+
+        <h2 class="text-2xl font-black text-slate-900 mb-6 border-b-2 border-slate-100 pb-4">Stratégie Tarifaire & Négociation</h2>
+        <p class="text-slate-600 mb-8 leading-relaxed">
+            EduNova propose deux modèles de déploiement adaptés aux capacités financières et à l'infrastructure technologique de l'établissement cible.
+        </p>
+
+        <!-- Pricing Option 1 -->
+        <div class="border-2 border-indigo-100 rounded-2xl overflow-hidden mb-8">
+            <div class="bg-indigo-50/80 p-6 border-b border-indigo-100 flex justify-between items-center">
+                <div>
+                    <h3 class="text-xl font-bold text-indigo-900 flex items-center gap-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-indigo-600"><path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z"/></svg>
+                        Option A : Modèle SaaS (En Ligne / Cloud)
+                    </h3>
+                    <p class="text-sm text-indigo-700/80 font-medium mt-1">Idéal pour les écoles disposant d'une connexion internet stable. Paiement mensuel ou annuel.</p>
+                </div>
+                <div class="text-right">
+                    <span class="bg-indigo-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider">Modèle Recommandé</span>
+                </div>
+            </div>
+            <div class="p-6 bg-white">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-xs text-slate-500 uppercase tracking-widest border-b border-slate-100">
+                            <th class="pb-3 font-bold">Concept</th>
+                            <th class="pb-3 font-bold">Fourchette de Prix Estimée</th>
+                            <th class="pb-3 font-bold">Note de Négociation</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr class="border-b border-slate-50">
+                            <td class="py-4 font-bold text-slate-800">Frais d'Activation (Setup)</td>
+                            <td class="py-4 text-indigo-600 font-bold">250$ - 500$ USD</td>
+                            <td class="py-4 text-slate-600">Peut être offert si contrat de 2 ans.</td>
+                        </tr>
+                        <tr class="border-b border-slate-50">
+                            <td class="py-4 font-bold text-slate-800">Abonnement Mensuel (Forfait)</td>
+                            <td class="py-4 text-indigo-600 font-bold">150$ - 300$ USD / mois</td>
+                            <td class="py-4 text-slate-600">Base: 100-250 élèves. Modulable selon la taille.</td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 font-bold text-slate-800 italic">Alternative: Paiement par élève</td>
+                            <td class="py-4 text-indigo-600 font-bold">2$ - 3$ USD / élève / an</td>
+                            <td class="py-4 text-slate-600">Très attractif pour les grandes écoles (>1000).</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mt-4 bg-slate-50 p-4 rounded-xl text-xs text-slate-600">
+                    <strong>Avantage commercial :</strong> Le client n'a aucun serveur physique à acheter ni à maintenir. Mises à jour automatisées, sauvegardes gérées par nos soins.
+                </div>
+            </div>
+        </div>
+
+        <!-- Pricing Option 2 -->
+        <div class="border-2 border-slate-200 rounded-2xl overflow-hidden mb-8">
+            <div class="bg-slate-100 p-6 border-b border-slate-200">
+                <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-slate-600"><rect width="20" height="8" x="2" y="2" rx="2" ry="2"/><rect width="20" height="8" x="2" y="14" rx="2" ry="2"/><line x1="6" x2="6.01" y1="6" y2="6"/><line x1="6" x2="6.01" y1="18" y2="18"/></svg>
+                    Option B : Modèle Local (On-Premise / Intranet)
+                </h3>
+                <p class="text-sm text-slate-600 font-medium mt-1">Idéal pour les zones à faible connectivité. Le système tourne sur un serveur physique dans l'école.</p>
+            </div>
+            <div class="p-6 bg-white">
+                <table class="w-full text-left">
+                    <thead>
+                        <tr class="text-xs text-slate-500 uppercase tracking-widest border-b border-slate-100">
+                            <th class="pb-3 font-bold">Concept</th>
+                            <th class="pb-3 font-bold">Fourchette de Prix Estimée</th>
+                            <th class="pb-3 font-bold">Note de Négociation</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm">
+                        <tr class="border-b border-slate-50">
+                            <td class="py-4 font-bold text-slate-800">Licence Logiciel (Achat Unique)</td>
+                            <td class="py-4 text-slate-900 font-bold">3,500$ - 6,000$ USD</td>
+                            <td class="py-4 text-slate-600">Cash-flow immédiat. Prix selon taille de l'école.</td>
+                        </tr>
+                        <tr class="border-b border-slate-50">
+                            <td class="py-4 font-bold text-slate-800">Installation Serveur & Réseau</td>
+                            <td class="py-4 text-slate-900 font-bold">Sur devis (ex: 800$ USD)</td>
+                            <td class="py-4 text-slate-600">N'inclut pas le prix du matériel (PC/Routeur).</td>
+                        </tr>
+                        <tr class="border-b border-slate-50">
+                            <td class="py-4 font-bold text-slate-800">Formation du personnel</td>
+                            <td class="py-4 text-slate-900 font-bold">500$ USD</td>
+                            <td class="py-4 text-slate-600">Formation sur site de 2 jours.</td>
+                        </tr>
+                        <tr>
+                            <td class="py-4 font-bold text-slate-800 text-amber-600">Maintenance & Support Annuel</td>
+                            <td class="py-4 text-amber-600 font-bold">800$ - 1,200$ USD / an</td>
+                            <td class="py-4 text-slate-600">Obligatoire pour garantir la pérennité du système.</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <div class="mt-4 bg-amber-50 p-4 rounded-xl text-xs text-amber-800 border border-amber-100">
+                    <strong>Avantage commercial :</strong> Parfait pour le contexte Haïtien sans internet. Le client "possède" sa licence. Le contrat de maintenance garantit des revenus récurrents.
+                </div>
+            </div>
+        </div>
+
+        <div class="text-sm text-slate-500 text-center mt-12 pt-8 border-t border-slate-100">
+            Proposition Générée par EduNova Systems &copy; <span id="year"></span>
+        </div>
+    </div>
+    <script>
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('fr-FR');
+        document.getElementById('year').textContent = new Date().getFullYear();
+    </script>
+</body>
+</html>

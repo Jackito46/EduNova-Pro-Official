@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.onrender.edunova_9fgv.twa",
+    "sha256_cert_fingerprints": [
+      "E0:89:2C:88:7B:F4:92:41:EF:B0:AD:B1:F2:68:75:0A:B1:2E:1F:F4:B4:29:E2:F6:8A:99:82:32:51:7A:9D:F6"
+    ]
+  }
+}]

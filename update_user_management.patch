@@ -1,0 +1,66 @@
+--- components/UserManagementView.tsx
++++ components/UserManagementView.tsx
+@@ -36,7 +36,8 @@
+     isOpen: boolean;
+     userId: string;
+     fullName: string;
+     newPassword: string;
++    forceChange: boolean;
+-  }>({ isOpen: false, userId: '', fullName: '', newPassword: '' });
++  }>({ isOpen: false, userId: '', fullName: '', newPassword: '', forceChange: true });
+   const [editModal, setEditModal] = useState<{
+     isOpen: boolean;
+     userId: string;
+@@ -265,11 +266,11 @@
+       const { error } = await supabase.rpc('admin_reset_password', {
+         p_user_id: userId,
+         p_new_password: newPassword
+       });
+       if (error) throw error;
+       
+-      // Explicitly set force_password_change to true in the profile
++      // Update force_password_change in the profile based on admin selection
+       await supabase
+         .from('profiles')
+-        .update({ force_password_change: true })
++        .update({ force_password_change: resetModal.forceChange })
+         .eq('id', userId)
+         .eq('school_id', currentUser.school_id);
+ 
+-      setResetModal({ ...resetModal, isOpen: false, newPassword: '' });
++      setResetModal({ ...resetModal, isOpen: false, newPassword: '', forceChange: true });
+       showAlert('Succès', `Le mot de passe de ${fullName} a été réinitialisé avec succès.`);
+@@ -588,7 +589,7 @@
+                             <button
+                               onClick={(e) => {
+                                 e.stopPropagation();
+-                                setResetModal({ isOpen: true, userId: u.id, fullName: u.full_name, newPassword: '' });
++                                setResetModal({ isOpen: true, userId: u.id, fullName: u.full_name, newPassword: '', forceChange: true });
+                               }}
+                               className="p-2 text-amber-600 hover:bg-amber-50 rounded-xl transition-colors"
+@@ -808,12 +809,17 @@
+                     onChange={e => setResetModal({ ...resetModal, newPassword: e.target.value })}
+                   />
+                 </div>
+-                <div className="p-3 bg-blue-50 rounded-xl border border-blue-100 flex items-start gap-3">
+-                  <AlertCircle size={16} className="text-blue-600 mt-0.5 shrink-0" />
+-                  <p className="text-[10px] font-medium text-blue-800 leading-relaxed">
+-                    L'utilisateur sera forcé de changer ce mot de passe lors de sa prochaine connexion.
+-                  </p>
+-                </div>
++                
++                <label className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors">
++                  <div className="pt-0.5">
++                    <input 
++                      type="checkbox" 
++                      className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
++                      checked={resetModal.forceChange}
++                      onChange={(e) => setResetModal({ ...resetModal, forceChange: e.target.checked })}
++                    />
++                  </div>
++                  <div className="flex-1 text-[10px] font-medium text-slate-600 leading-relaxed">
++                    Forcer le changement de mot de passe à la prochaine connexion. Décochez cette case si vous attribuez un mot de passe définitif.
++                  </div>
++                </label>
+               </div>
+               <div className="p-4 bg-gray-50 border-t border-gray-100 flex justify-end gap-3">
