@@ -429,9 +429,7 @@ const App: React.FC = () => {
         const profile = data as UserProfile;
         if (isRecovery) {
           profile.force_password_change = true;
-        }
-        
-        if (profile.is_active === false && profile.role !== 'SUPER_ADMIN' && !profile.is_super_admin) {
+        } else if (profile.is_active === false && profile.role !== 'SUPER_ADMIN' && !profile.is_super_admin) {
           console.warn("Compte désactivé. Déconnexion forcée.");
           try { await supabase.auth.signOut(); } catch (e) {}
           try { window.localStorage.removeItem('edunova_user_profile'); } catch (err) {}

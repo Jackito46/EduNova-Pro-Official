@@ -59,12 +59,25 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({ user, 
         throw new Error("Session expirée. Veuillez vous déconnecter et vous reconnecter avec votre mot de passe temporaire.");
       }
 
-      // 2. Update password in Supabase Auth
+      // 2. Update password in Supabase Auth & DB via secure RPC (reactivates account and clears lockout)
+      let rpcSuccess = false;
+      try {
+        const { data: rpcData, error: rpcError } = await supabase.rpc('self_unlock_and_change_password', {
+          p_new_password: newPassword
+        });
+        if (!rpcError && rpcData?.success) {
+          rpcSuccess = true;
+        }
+      } catch (rpcErr) {
+        console.warn("self_unlock_and_change_password notice:", rpcErr);
+      }
+
+      // Also update via standard Supabase Auth updateUser
       const { error: authError } = await supabase.auth.updateUser({ 
         password: newPassword 
       });
       
-      if (authError) {
+      if (authError && !rpcSuccess) {
         console.error("Auth updateUser error:", authError);
         const rawMsg = (authError.message || '').toLowerCase();
         if (rawMsg.includes('same as') || rawMsg.includes('different')) {
@@ -79,6 +92,9 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({ user, 
       const { error: profileError } = await supabase
         .from('profiles')
         .update({ 
+          is_active: true,
+          failed_login_attempts: 0,
+          failed_attempts: 0,
           force_password_change: false,
           last_password_changed_at: new Date().toISOString()
         })

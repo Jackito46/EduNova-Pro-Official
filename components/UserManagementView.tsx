@@ -164,9 +164,19 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     isOpen: boolean;
     userId: string;
     fullName: string;
+    email: string;
     newPassword: string;
     forceChange: boolean;
-  }>({ isOpen: false, userId: '', fullName: '', newPassword: '', forceChange: true });
+    activeTab: 'email' | 'manual';
+  }>({ 
+    isOpen: false, 
+    userId: '', 
+    fullName: '', 
+    email: '', 
+    newPassword: '', 
+    forceChange: true, 
+    activeTab: 'email' 
+  });
 
   const [editRoleModal, setEditRoleModal] = useState<{
     isOpen: boolean;
@@ -387,6 +397,71 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     setIsSubmitting(false);
   };
 
+  const handleSendPasswordResetEmail = async (targetUser: { id: string; full_name?: string; email: string }) => {
+    if (!targetUser.email) {
+      showAlert("Erreur", "Cet utilisateur ne possède pas d'adresse email valide.");
+      return;
+    }
+
+    if (!navigator.onLine) {
+      showAlert("Erreur", "Action impossible hors-ligne.");
+      return;
+    }
+
+    const targetEmail = normalizeIdentifier(targetUser.email);
+    setIsSubmitting(true);
+    try {
+      // 1. Automatically reactivate account and clear failed attempts in database
+      try {
+        await supabase.rpc('reset_failed_login', { p_email: targetEmail });
+        await supabase
+          .from('profiles')
+          .update({ 
+            is_active: true, 
+            failed_login_attempts: 0, 
+            failed_attempts: 0,
+            force_password_change: true
+          })
+          .eq('id', targetUser.id);
+      } catch (dbErr) {
+        console.warn("Notice during user unlock in DB:", dbErr);
+      }
+
+      // 2. Send Supabase Auth recovery email with redirect
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}${window.location.pathname}#/` 
+        : undefined;
+
+      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: redirectUrl,
+      });
+
+      if (error) throw error;
+
+      // 3. Log audit event
+      await AuditLogger.log({
+        school_id: currentUser.school_id,
+        user_id: currentUser.id,
+        action: 'PASSWORD_RESET_EMAIL_SENT',
+        entity_type: 'user',
+        entity_id: targetUser.id,
+        details: { target_user: targetUser.full_name, email: targetEmail }
+      });
+
+      setResetModal(prev => ({ ...prev, isOpen: false }));
+      showAlert(
+        'Email de récupération envoyé !',
+        `Un lien de réinitialisation et de déblocage sécurisé a été transmis à ${targetEmail}.\n\nL'utilisateur pourra cliquer sur ce lien pour débloquer immédiatement son compte et choisir son nouveau mot de passe.`
+      );
+      fetchUsersAndStaff();
+    } catch (err: any) {
+      console.error('Erreur envoi email réinitialisation:', err);
+      showAlert('Erreur', err.message || "Impossible d'envoyer l'email de réinitialisation.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleResetPassword = async () => {
     const { userId, fullName, newPassword } = resetModal;
     
@@ -408,7 +483,12 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       
       await supabase
         .from('profiles')
-        .update({ force_password_change: resetModal.forceChange })
+        .update({ 
+          is_active: true,
+          failed_login_attempts: 0,
+          failed_attempts: 0,
+          force_password_change: resetModal.forceChange 
+        })
         .eq('id', userId)
         .eq('school_id', currentUser.school_id);
 
@@ -422,6 +502,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
         entity_id: userId,
         details: { target_user: fullName, forceChange: resetModal.forceChange }
       });
+      fetchUsersAndStaff();
     } catch (err: any) {
       console.error('Erreur réinitialisation:', err);
       showAlert('Erreur', err.message || 'Impossible de réinitialiser le mot de passe.');
@@ -1129,13 +1210,37 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                                 {!isInactive ? <PowerOff size={15} /> : <Power size={15} />}
                               </button>
 
+                              {(currentUser.is_super_admin || currentUser.role === UserRole.SCHOOL_ADMIN || currentUser.role === UserRole.DIRECTOR) && u.email && (
+                                <button 
+                                  onClick={() => {
+                                    showConfirm(
+                                      "Envoyer l'email de réinitialisation",
+                                      `Voulez-vous envoyer un lien sécurisé de réinitialisation et de déblocage par email à ${u.full_name || u.email} (${u.email}) ?`,
+                                      () => handleSendPasswordResetEmail(u)
+                                    );
+                                  }}
+                                  className="p-2 text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                  title="Envoyer un email de réinitialisation / déblocage"
+                                >
+                                  <Mail size={15} />
+                                </button>
+                              )}
+
                               {(currentUser.is_super_admin || currentUser.role === UserRole.SCHOOL_ADMIN || currentUser.role === UserRole.DIRECTOR) && (
                                 <button 
-                                  onClick={() => setResetModal({ isOpen: true, userId: u.id, fullName: u.full_name || '', newPassword: '', forceChange: true })}
-                                  className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                  onClick={() => setResetModal({ 
+                                    isOpen: true, 
+                                    userId: u.id, 
+                                    fullName: u.full_name || '', 
+                                    email: u.email || '',
+                                    newPassword: '', 
+                                    forceChange: true,
+                                    activeTab: u.email ? 'email' : 'manual'
+                                  })}
+                                  className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-100 rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
                                   title="Réinitialiser le mot de passe"
                                 >
-                                  <Lock size={15} />
+                                  <KeyRound size={15} />
                                 </button>
                               )}
 
@@ -1418,62 +1523,144 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden border border-slate-200"
+              className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden border border-slate-200"
             >
-              <div className="p-6 bg-amber-500 text-white flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Lock size={22} />
-                  <h3 className="text-base font-black">Réinitialiser le mot de passe</h3>
+              <div className="p-6 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800">
+                <div className="flex items-center gap-3.5">
+                  <div className="w-11 h-11 bg-amber-500 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-md">
+                    <KeyRound size={22} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-black text-white">Réinitialiser l'Accès & Mot de passe</h3>
+                    <p className="text-xs text-slate-300 font-medium">Pour {formatFullName(resetModal.fullName || resetModal.email)}</p>
+                  </div>
                 </div>
-                <button onClick={() => setResetModal({ ...resetModal, isOpen: false })} className="text-white/80 hover:text-white p-1">
+                <button onClick={() => setResetModal({ ...resetModal, isOpen: false })} className="text-slate-400 hover:text-white p-1.5 rounded-xl hover:bg-slate-800 transition-colors">
                   <X size={20} />
                 </button>
               </div>
 
-              <div className="p-6 space-y-4">
-                <p className="text-xs font-bold text-slate-700">
-                  Réinitialisation du compte de <span className="text-amber-700 font-black">{resetModal.fullName}</span>.
-                </p>
+              {/* Mode Tabs */}
+              <div className="flex border-b border-slate-200 bg-slate-50/80 p-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setResetModal({ ...resetModal, activeTab: 'email' })}
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    resetModal.activeTab === 'email'
+                      ? 'bg-white text-blue-700 shadow-sm border border-slate-200/80 font-black'
+                      : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <Mail size={15} className={resetModal.activeTab === 'email' ? 'text-blue-600' : ''} />
+                  <span>1. Envoi par Email (Recommandé)</span>
+                </button>
 
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nouveau mot de passe temporaire</label>
-                  <input 
-                    type="text" 
-                    autoFocus
-                    className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-amber-500 transition-all"
-                    placeholder="Min. 6 caractères"
-                    value={resetModal.newPassword}
-                    onChange={e => setResetModal({ ...resetModal, newPassword: e.target.value })}
-                  />
-                </div>
-
-                <label className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
-                  <input 
-                    type="checkbox" 
-                    className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 mt-0.5"
-                    checked={resetModal.forceChange}
-                    onChange={(e) => setResetModal({ ...resetModal, forceChange: e.target.checked })}
-                  />
-                  <span className="text-[11px] font-semibold text-slate-600 leading-relaxed">
-                    Exiger le changement obligatoire de ce mot de passe à la prochaine ouverture de session.
-                  </span>
-                </label>
+                <button
+                  type="button"
+                  onClick={() => setResetModal({ ...resetModal, activeTab: 'manual' })}
+                  className={`flex-1 py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                    resetModal.activeTab === 'manual'
+                      ? 'bg-white text-amber-700 shadow-sm border border-slate-200/80 font-black'
+                      : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                  }`}
+                >
+                  <Lock size={15} className={resetModal.activeTab === 'manual' ? 'text-amber-600' : ''} />
+                  <span>2. Saisie Manuelle</span>
+                </button>
               </div>
 
-              <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end gap-3">
+              <div className="p-6 space-y-5">
+                {resetModal.activeTab === 'email' ? (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-indigo-50 border border-indigo-100 rounded-2xl">
+                      <div className="flex items-center gap-2.5 text-indigo-950 font-bold text-xs mb-1.5">
+                        <ShieldCheck size={18} className="text-indigo-600 shrink-0" />
+                        <span>Procédure de déblocage autonome</span>
+                      </div>
+                      <p className="text-xs text-indigo-800/90 leading-relaxed">
+                        Un lien de réinitialisation sécurisé Supabase Auth sera immédiatement envoyé à l'adresse de l'utilisateur :
+                      </p>
+                      <div className="mt-2.5 px-3 py-2 bg-white rounded-xl border border-indigo-200 font-mono text-xs font-bold text-indigo-900 flex items-center justify-between">
+                        <span>{resetModal.email || 'Aucune adresse email configurée'}</span>
+                        <span className="text-[10px] font-black uppercase text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">Destinataire</span>
+                      </div>
+                      <p className="text-[11px] text-indigo-600/90 mt-2">
+                        💡 L'envoi de ce lien réinitialise le compteur d'échecs et débloque le compte dès que l'utilisateur valide son nouveau mot de passe.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSendPasswordResetEmail({
+                        id: resetModal.userId,
+                        full_name: resetModal.fullName,
+                        email: resetModal.email
+                      })}
+                      disabled={isSubmitting || !resetModal.email}
+                      className="w-full py-3.5 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black text-xs uppercase tracking-wider shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <>
+                          <Mail size={16} />
+                          <span>Envoyer le lien de récupération par email</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <p className="text-xs font-bold text-slate-700">
+                      Définir manuellement un mot de passe temporaire pour <span className="text-amber-700 font-black">{resetModal.fullName}</span>.
+                    </p>
+
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Nouveau mot de passe temporaire</label>
+                      <input 
+                        type="text" 
+                        autoFocus
+                        className="w-full px-4 py-3 bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-amber-500 transition-all"
+                        placeholder="Min. 6 caractères"
+                        value={resetModal.newPassword}
+                        onChange={e => setResetModal({ ...resetModal, newPassword: e.target.value })}
+                      />
+                    </div>
+
+                    <label className="flex items-start gap-3 p-3 bg-slate-50 rounded-xl border border-slate-200 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        className="w-4 h-4 rounded text-amber-600 focus:ring-amber-500 border-slate-300 mt-0.5"
+                        checked={resetModal.forceChange}
+                        onChange={(e) => setResetModal({ ...resetModal, forceChange: e.target.checked })}
+                      />
+                      <span className="text-[11px] font-semibold text-slate-600 leading-relaxed">
+                        Exiger le changement obligatoire de ce mot de passe à la prochaine ouverture de session.
+                      </span>
+                    </label>
+
+                    <div className="pt-2 flex justify-end gap-2">
+                      <button
+                        type="button"
+                        onClick={handleResetPassword}
+                        disabled={isSubmitting || resetModal.newPassword.length < 6}
+                        className="w-full py-3.5 px-5 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 rounded-2xl shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                      >
+                        {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                        <span>Appliquer le mot de passe temporaire</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="p-4 bg-slate-50 border-t border-slate-200 flex justify-end">
                 <button
+                  type="button"
                   onClick={() => setResetModal({ ...resetModal, isOpen: false })}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all"
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
                 >
-                  Annuler
-                </button>
-                <button
-                  onClick={handleResetPassword}
-                  disabled={isSubmitting || resetModal.newPassword.length < 6}
-                  className="px-5 py-2.5 text-xs font-black text-white bg-amber-600 hover:bg-amber-700 rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
-                >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-                  Confirmer
+                  Fermer
                 </button>
               </div>
             </motion.div>
@@ -1648,7 +1835,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                 )}
               </div>
 
-              <div className="p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <div className="p-5 bg-slate-50 border-t border-slate-200 flex flex-wrap items-center justify-between gap-2 shrink-0">
                 <button
                   onClick={() => setSelectedUserModal(null)}
                   className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
@@ -1657,20 +1844,61 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                 </button>
 
                 {canManageUser(selectedUserModal) && (
-                  <button
-                    onClick={() => {
-                      const currentStat = selectedUserModal.is_active !== false;
-                      handleToggleStatus(selectedUserModal.id, selectedUserModal.full_name || '', currentStat);
-                    }}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 cursor-pointer ${
-                      selectedUserModal.is_active !== false 
-                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-800' 
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                    }`}
-                  >
-                    {selectedUserModal.is_active !== false ? <PowerOff size={14} /> : <Power size={14} />}
-                    <span>{selectedUserModal.is_active !== false ? 'Désactiver le Compte' : 'Réactiver le Compte'}</span>
-                  </button>
+                  <div className="flex flex-wrap items-center gap-2">
+                    {selectedUserModal.email && (
+                      <button
+                        onClick={() => {
+                          const target = selectedUserModal;
+                          setSelectedUserModal(null);
+                          showConfirm(
+                            "Envoyer l'email de réinitialisation",
+                            `Voulez-vous envoyer un lien sécurisé de réinitialisation et de déblocage par email à ${target.full_name || target.email} (${target.email}) ?`,
+                            () => handleSendPasswordResetEmail(target)
+                          );
+                        }}
+                        className="px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Envoyer un email de déblocage et de réinitialisation"
+                      >
+                        <Mail size={14} />
+                        <span>Email de déblocage</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        const target = selectedUserModal;
+                        setSelectedUserModal(null);
+                        setResetModal({
+                          isOpen: true,
+                          userId: target.id,
+                          fullName: target.full_name || '',
+                          email: target.email || '',
+                          newPassword: '',
+                          forceChange: true,
+                          activeTab: target.email ? 'email' : 'manual'
+                        });
+                      }}
+                      className="px-3.5 py-2 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <KeyRound size={14} />
+                      <span>Réinitialiser</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        const currentStat = selectedUserModal.is_active !== false;
+                        handleToggleStatus(selectedUserModal.id, selectedUserModal.full_name || '', currentStat);
+                      }}
+                      className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer ${
+                        selectedUserModal.is_active !== false 
+                          ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200' 
+                          : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                      }`}
+                    >
+                      {selectedUserModal.is_active !== false ? <PowerOff size={14} /> : <Power size={14} />}
+                      <span>{selectedUserModal.is_active !== false ? 'Désactiver' : 'Réactiver'}</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </motion.div>

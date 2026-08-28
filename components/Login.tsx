@@ -7,6 +7,7 @@ import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, ArrowRight, ShieldCheck,
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
+import { toast } from 'sonner';
 import edunovaLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
 
 interface LoginProps {
@@ -140,22 +141,41 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
     } catch (e) {}
   };
 
-  const handleResetPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email) {
+  const handleResetPassword = async (e?: React.FormEvent, customTargetEmail?: string) => {
+    if (e) e.preventDefault();
+    const rawEmail = customTargetEmail || email;
+    if (!rawEmail) {
       setError("Veuillez saisir votre adresse email ou identifiant.");
       return;
     }
-    const targetEmail = normalizeIdentifier(email);
+    const targetEmail = normalizeIdentifier(rawEmail);
     setIsSubmitting(true);
     setError(null);
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(targetEmail, {
-        redirectTo: window.location.origin,
+      // Clear local rate-limit / failed counter
+      clearFailedAttempts(targetEmail);
+      clearFailedAttempts(rawEmail);
+
+      const redirectUrl = typeof window !== 'undefined' 
+        ? `${window.location.origin}${window.location.pathname}#/` 
+        : undefined;
+
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(targetEmail, {
+        redirectTo: redirectUrl,
       });
-      if (error) throw error;
+
+      if (resetErr) {
+        throw resetErr;
+      }
+
       setResetSent(true);
+      setIsForgotPassword(true);
+      toast.success("Lien de récupération envoyé !", {
+        description: `Un email a été envoyé à ${targetEmail}. Cliquez sur le lien pour débloquer votre compte et définir votre mot de passe.`,
+        duration: 8000,
+      });
     } catch (err: any) {
+      console.error("Password reset error:", err);
       setError(err.message || "Erreur lors de l'envoi de l'email de réinitialisation.");
     } finally {
       setIsSubmitting(false);
@@ -467,8 +487,25 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                       <div className="flex-1">
                         <p className="text-rose-700 text-xs font-bold leading-normal">{error}</p>
                         
-                        <div className="flex flex-wrap gap-2 mt-2.5">
+                        <div className="flex flex-wrap items-center gap-2 mt-2.5">
+                          {/* Auto-Unlock / Reset password by Email Button */}
                           <button 
+                            type="button"
+                            onClick={() => {
+                              setIsForgotPassword(true);
+                              setError(null);
+                              if (email) {
+                                handleResetPassword(undefined, email);
+                              }
+                            }}
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
+                          >
+                            <Mail size={13} />
+                            <span>Débloquer par email</span>
+                          </button>
+
+                          <button 
+                            type="button"
                             onClick={async () => {
                               try {
                                 clearFailedAttempts(email);
@@ -482,24 +519,26 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                                 window.localStorage.removeItem(getAttemptsKey(email));
                               } catch(e) {}
                             }}
-                            className="text-[10px] uppercase tracking-widest font-black text-rose-800 hover:text-rose-900 bg-white/60 px-2 py-1 rounded-md cursor-pointer transition-colors"
+                            className="text-[10px] uppercase tracking-widest font-black text-rose-800 hover:text-rose-900 bg-white/70 px-2 py-1 rounded-md cursor-pointer transition-colors"
                           >
                             Réinitialiser
                           </button>
                           
                           {isRefreshTokenError(error) && (
                             <button 
+                              type="button"
                               onClick={() => { clearAuthStorage(); window.location.reload(); }}
-                              className="text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/60 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                              className="text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/70 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
                             >
                               Réparer Session
                             </button>
                           )}
 
                           <button 
+                            type="button"
                             onClick={testConnection}
                             disabled={isTestingConnection}
-                            className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/60 px-2.5 py-1 rounded-md disabled:opacity-50 cursor-pointer transition-colors"
+                            className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/70 px-2.5 py-1 rounded-md disabled:opacity-50 cursor-pointer transition-colors"
                           >
                             {isTestingConnection ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
                             Tester
@@ -521,50 +560,62 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
               >
                 {resetSent ? (
                   <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 text-center">
-                    <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center mx-auto mb-3">
-                      <Mail size={20} />
+                    <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3 shadow-sm">
+                      <Mail size={24} />
                     </div>
-                    <h3 className="text-emerald-900 font-bold text-sm mb-1 tracking-tight">Email envoyé !</h3>
-                    <p className="text-emerald-700/80 text-xs leading-relaxed mb-4">Un lien de réinitialisation vous a été envoyé. Vérifiez votre boîte de réception.</p>
+                    <h3 className="text-emerald-900 font-bold text-sm mb-1 tracking-tight">Lien de réinitialisation envoyé !</h3>
+                    <p className="text-emerald-700/90 text-xs leading-relaxed mb-4">
+                      Un email sécurisé Supabase a été transmis à <strong className="font-semibold text-emerald-900">{normalizeIdentifier(email)}</strong>. Cliquez sur le lien pour déverrouiller automatiquement votre compte et définir votre mot de passe.
+                    </p>
                     <button 
                       type="button"
                       onClick={() => { setIsForgotPassword(false); setResetSent(false); }}
-                      className="w-full py-3 bg-white border border-emerald-200 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-50 transition-all flex items-center justify-center gap-1.5"
+                      className="w-full py-3 bg-white border border-emerald-200 text-emerald-700 rounded-xl font-bold text-xs uppercase tracking-wider hover:bg-emerald-50 transition-all flex items-center justify-center gap-1.5 shadow-xs"
                     >
-                      <ChevronLeft size={16} /> Retour
+                      <ChevronLeft size={16} /> Retour à la connexion
                     </button>
                   </div>
                 ) : (
                   <>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-slate-700 ml-1">Email professionnel</label>
-                  <div className="relative group">
-                    <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={17} />
-                    <input 
-                      type="email" 
-                      className="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/15 transition-all font-medium"
-                      placeholder="votre@email.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                    />
-                  </div>
-                </div>
-                
-                <button 
-                  type="submit" 
-                  disabled={isSubmitting}
-                  className="w-full bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white py-3.5 rounded-xl font-bold text-sm shadow-md shadow-blue-900/15 hover:shadow-lg hover:from-blue-800 hover:to-indigo-950 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><span>Envoyer le lien</span> <ArrowRight size={17} /></>}
-                </button>
+                    <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-left mb-1">
+                      <div className="flex items-center gap-2 text-blue-900 font-bold text-xs">
+                        <ShieldCheck size={16} className="text-blue-600 shrink-0" />
+                        <span>Récupération Sécurisée de Compte</span>
+                      </div>
+                      <p className="text-[11px] text-blue-700 mt-1 leading-snug">
+                        Saisissez votre adresse email. Un lien de réinitialisation sécurisé vous sera envoyé immédiatement pour débloquer votre accès.
+                      </p>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 ml-1">Email du compte</label>
+                      <div className="relative group">
+                        <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={17} />
+                        <input 
+                          type="email" 
+                          className="w-full pl-10 pr-4 py-3 bg-slate-50/50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-blue-600 focus:ring-2 focus:ring-blue-500/15 transition-all font-medium"
+                          placeholder="ex: jackito46@gmail.com"
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          required
+                        />
+                      </div>
+                    </div>
+                    
+                    <button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="w-full bg-gradient-to-r from-blue-700 via-blue-800 to-indigo-900 text-white py-3.5 rounded-xl font-bold text-sm shadow-md shadow-blue-900/15 hover:shadow-lg hover:from-blue-800 hover:to-indigo-950 transition-all flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer"
+                    >
+                      {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <><span>Envoyer le lien de déblocage</span> <ArrowRight size={17} /></>}
+                    </button>
 
                     <button 
                       type="button"
                       onClick={() => { setIsForgotPassword(false); setError(null); }}
-                      className="w-full text-slate-400 hover:text-slate-700 text-xs font-bold transition-colors py-1.5"
+                      className="w-full text-slate-400 hover:text-slate-700 text-xs font-bold transition-colors py-1.5 cursor-pointer"
                     >
-                      Annuler
+                      Annuler et revenir
                     </button>
                   </>
                 )}
