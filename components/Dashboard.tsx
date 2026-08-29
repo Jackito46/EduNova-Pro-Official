@@ -1642,7 +1642,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button 
                 onClick={() => fetchDashboardStats()}
                 disabled={loading}
-                className="inline-flex items-center justify-center px-3 py-2.5 min-h-[44px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs transition-all duration-200 disabled:opacity-50 group shrink-0 active:scale-95"
+                className="inline-flex items-center justify-center px-3 py-2.5 min-h-[44px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none group shrink-0 active:scale-95 cursor-pointer"
                 title="Rafraîchir les données et statistiques du tableau de bord"
               >
                 <RefreshCcw size={16} className={`stroke-[2.2] transition-transform duration-500 ${loading ? 'animate-spin text-indigo-600' : 'group-hover:rotate-180'}`} />
