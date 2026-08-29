@@ -1661,9 +1661,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Stats Grid */}
       {canViewFinances ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1.1fr_1.3fr_0.95fr_0.65fr] gap-4 xl:gap-4">
           {/* Card 1: Recettes Effectives */}
-          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col relative group">
+          <div className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col relative group">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 sm:p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100/60 shadow-xs shrink-0">
@@ -1685,7 +1685,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <div className="mt-auto pt-1">
               <div className="flex items-baseline justify-between gap-1.5 mb-1.5 flex-nowrap min-w-0">
-                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.collected.toLocaleString()}>
+                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.collected.toLocaleString()}>
                   {stats.collected.toLocaleString()}
                 </p>
                 <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
@@ -1773,7 +1773,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Card 2: Objectif Annuel & Taux de Recouvrement */}
-          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
+          <div className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
                 <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100/60 shadow-xs shrink-0">
@@ -1791,7 +1791,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <div className="mt-auto pt-1">
               <div className="flex items-baseline justify-between gap-1.5 mb-1.5 flex-nowrap min-w-0">
-                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.expected.toLocaleString()}>
+                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.expected.toLocaleString()}>
                   {stats.expected.toLocaleString()}
                 </p>
                 <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
@@ -1854,7 +1854,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Card 3: Charges Mensuelles */}
           <div 
             onClick={() => setIsPayrollModalOpen(true)}
-            className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-rose-200/80 hover:shadow-md transition-all duration-300 flex flex-col cursor-pointer group"
+            className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-rose-200/80 hover:shadow-md transition-all duration-300 flex flex-col cursor-pointer group"
           >
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
@@ -1873,7 +1873,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <div className="mt-auto pt-1">
               <div className="flex items-baseline justify-between gap-1.5 mb-1 flex-nowrap min-w-0">
-                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={`${stats.payroll.toLocaleString()} HTG`}>
+                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={`${stats.payroll.toLocaleString()} HTG`}>
                   {stats.payroll.toLocaleString()}
                 </p>
                 <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
@@ -1970,18 +1970,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
 
           {/* Card 4: Paiements & Activité du Jour */}
-          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
+          <div className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
             <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 sm:p-2.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100/60 shadow-xs shrink-0">
-                  <Receipt size={19} className="stroke-[2.2]" />
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100/60 shadow-xs shrink-0">
+                  <Receipt size={18} className="stroke-[2.2]" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Caisse du Jour</h3>
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reçus émis</p>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">Caisse du Jour</h3>
+                  <p className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">Reçus émis</p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 Direct
               </span>
@@ -1989,22 +1989,22 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <div className="mt-auto pt-1">
               <div className="flex items-baseline justify-between gap-1.5 mb-1 flex-nowrap min-w-0">
-                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums">
+                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums">
                   {stats.todayPaymentsCount}
                 </p>
-                <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">transaction{stats.todayPaymentsCount > 1 ? 's' : ''}</span>
+                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">tx{stats.todayPaymentsCount > 1 ? 's' : ''}</span>
               </div>
-              <p className="text-[11px] font-medium text-slate-400 mb-3 truncate">Encaissés aujourd'hui</p>
+              <p className="text-[10px] font-medium text-slate-400 mb-3 truncate">Aujourd'hui</p>
 
-              <div className="pt-2.5 border-t border-slate-100/80 flex flex-col gap-1.5">
+              <div className="pt-2.5 border-t border-slate-100/80 flex flex-col gap-1">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Montant :</span>
-                  <span className="font-black text-emerald-600 truncate text-right">{stats.todayTotalAmountHTG.toLocaleString()} G</span>
+                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Montant :</span>
+                  <span className="font-black text-emerald-600 truncate text-right text-[11px] sm:text-xs">{stats.todayTotalAmountHTG.toLocaleString()} G</span>
                 </div>
                 {stats.todayTotalAmountUSD > 0 && (
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Devise USD :</span>
-                    <span className="font-black text-blue-600 truncate text-right">${stats.todayTotalAmountUSD.toLocaleString()}</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">USD :</span>
+                    <span className="font-black text-blue-600 truncate text-right text-[11px] sm:text-xs">${stats.todayTotalAmountUSD.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -2013,7 +2013,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           {/* Director/Admin Specific Section */}
           {(user.role === UserRole.DIRECTOR || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.SUPER_ADMIN || user.is_super_admin) && (
-            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+            <div className="sm:col-span-2 xl:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
               {/* Daily Staff Attendance */}
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div>
