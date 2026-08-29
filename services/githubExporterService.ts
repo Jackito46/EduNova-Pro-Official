@@ -1,31 +1,36 @@
 import fs from 'fs';
 import path from 'path';
+import crypto from 'crypto';
 
 interface ExportProgressCallback {
   (step: string, percent: number): void;
 }
 
+const ALLOWED_ROOT_FILES = new Set([
+  'App.tsx', 'index.tsx', 'index.html', 'index.css', 'types.ts', 'supabase.ts', 'server.ts',
+  'vite.config.ts', 'tsconfig.json', 'package.json', 'package-lock.json', 'Dockerfile',
+  '.gitignore', '.npmrc', '.dockerignore', 'metadata.json', 'nginx.conf.template', 'render.yaml',
+  'GUIDE_DEPLOIEMENT_VPS.md', 'GUIDE_TECHNIQUE_LOCAL.md', 'GUIDE_UTILISATEUR.md', 'README_LOCAL.md', 'README.md'
+]);
+
+const ALLOWED_DIRS = new Set([
+  'components', 'contexts', 'hooks', 'lib', 'public', 'scripts', 'services', 'src', 'utils', 'sql'
+]);
+
 const EXCLUDE_DIRS = new Set([
-  'node_modules',
-  '.git',
-  'dist',
-  '.cache',
-  'temp_repo',
-  '.temp_repo',
-  '.local',
-  '.config',
-  '.npm'
+  'node_modules', '.git', 'dist', '.cache', 'temp_repo', '.temp_repo', '.local', '.config', '.npm', 'app', 'data', 'backups'
 ]);
 
 const EXCLUDE_EXTENSIONS = new Set([
-  '.zip',
-  '.tar.gz',
-  '.tgz',
-  '.log',
-  '.map'
+  '.zip', '.tar.gz', '.tgz', '.log', '.map', '.bak', '.tmp', '.patch'
 ]);
 
-function getAllFiles(dir: string, base: string = ''): { relPath: string; fullPath: string; isBinary: boolean; size: number }[] {
+function computeGitBlobSha(buffer: Buffer): string {
+  const header = Buffer.from(`blob ${buffer.length}\0`);
+  return crypto.createHash('sha1').update(Buffer.concat([header, buffer])).digest('hex');
+}
+
+function getProjectFiles(dir: string, base: string = ''): { relPath: string; fullPath: string; isBinary: boolean; size: number }[] {
   let results: { relPath: string; fullPath: string; isBinary: boolean; size: number }[] = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -35,14 +40,17 @@ function getAllFiles(dir: string, base: string = ''): { relPath: string; fullPat
     const relPath = base ? `${base}/${entry.name}` : entry.name;
 
     if (entry.isDirectory()) {
-      results = results.concat(getAllFiles(fullPath, relPath));
+      if (!base && !ALLOWED_DIRS.has(entry.name)) continue;
+      results = results.concat(getProjectFiles(fullPath, relPath));
     } else if (entry.isFile()) {
+      if (!base && !ALLOWED_ROOT_FILES.has(entry.name)) continue;
+
       const ext = path.extname(entry.name).toLowerCase();
       if (EXCLUDE_EXTENSIONS.has(ext)) continue;
       
-      // Exclude giant temporary files > 10MB
       const stat = fs.statSync(fullPath);
-      if (stat.size > 15 * 1024 * 1024) continue;
+      // Skip large temporary files (> 10MB)
+      if (stat.size > 10 * 1024 * 1024) continue;
 
       const isBinary = [
         '.png', '.jpg', '.jpeg', '.gif', '.webp', '.ico', '.pdf', '.woff', '.woff2', '.ttf', '.eot', '.mp3', '.wav', '.ogg'
@@ -73,121 +81,155 @@ export async function exportProjectToGitHub(
     'User-Agent': 'EduNova-GitHub-Exporter'
   };
 
-  onProgress?.('Analyse des fichiers locaux...', 5);
+  onProgress?.('Analyse des fichiers du projet...', 5);
 
-  const localFiles = getAllFiles(process.cwd());
+  const localFiles = getProjectFiles(process.cwd());
   if (localFiles.length === 0) {
     throw new Error('Aucun fichier à exporter trouvé dans le répertoire.');
   }
 
-  // 1. Get reference commit
-  onProgress?.(`Récupération de la branche "${branch}" sur ${owner}/${repo}...`, 10);
+  // 1. Get reference commit and existing tree
+  onProgress?.(`Vérification de la branche "${branch}" sur GitHub...`, 10);
   let parentCommitSha: string | null = null;
-  let baseTreeSha: string | null = null;
+  const remoteTreeMap = new Map<string, string>();
 
   try {
     const refRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`, { headers });
     if (refRes.ok) {
       const refData = await refRes.json();
-      parentCommitSha = refData.object.sha;
+      parentCommitSha = refData.object?.sha || null;
       
-      // Get commit object to extract base tree
-      const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${parentCommitSha}`, { headers });
-      if (commitRes.ok) {
-        const commitData = await commitRes.json();
-        baseTreeSha = commitData.tree.sha;
+      if (parentCommitSha) {
+        // Fetch remote tree recursively to enable zero-upload diffing
+        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${parentCommitSha}?recursive=1`, { headers });
+        if (treeRes.ok) {
+          const treeData = await treeRes.json();
+          if (Array.isArray(treeData.tree)) {
+            for (const item of treeData.tree) {
+              if (item.type === 'blob' && item.path && item.sha) {
+                remoteTreeMap.set(item.path, item.sha);
+              }
+            }
+          }
+        }
       }
     }
   } catch (err) {
-    console.warn('Could not fetch existing ref, creating new branch/commit if possible:', err);
+    console.warn('Could not fetch existing remote ref:', err);
   }
 
-  // 2. Upload blobs for files
-  onProgress?.(`Création des objets de fichiers (0/${localFiles.length})...`, 15);
-  
+  // 2. Identify which files actually changed
+  onProgress?.('Calcul des deltas et empreintes Git...', 20);
+
+  interface FileToUpload {
+    relPath: string;
+    contentBase64: string;
+    sha: string;
+  }
+
+  const filesToUpload: FileToUpload[] = [];
   const treeItems: { path: string; mode: string; type: string; sha: string }[] = [];
-  const BATCH_SIZE = 4;
 
-  const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
-  async function uploadBlobWithRetry(file: typeof localFiles[0], retries = 4): Promise<string> {
-    let contentBase64: string;
+  for (const file of localFiles) {
     const fileBuffer = fs.readFileSync(file.fullPath);
-    
+    let finalBuffer: Buffer;
+
     if (file.isBinary) {
-      contentBase64 = fileBuffer.toString('base64');
+      finalBuffer = fileBuffer;
     } else {
       let textContent = fileBuffer.toString('utf-8');
-      // Sanitize any personal access token patterns to prevent GitHub Secret Scanning 422 block
+      // Protect any accidental token pattern from GitHub Secret Scanning
       textContent = textContent.replace(/ghp_[a-zA-Z0-9]{20,}/g, 'ghp_TOKEN_PROTECTED');
-      contentBase64 = Buffer.from(textContent, 'utf-8').toString('base64');
+      finalBuffer = Buffer.from(textContent, 'utf-8');
     }
 
-    for (let attempt = 1; attempt <= retries; attempt++) {
-      try {
-        const blobRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            content: contentBase64,
-            encoding: 'base64'
-          })
-        });
+    const localSha = computeGitBlobSha(finalBuffer);
+    const remoteSha = remoteTreeMap.get(file.relPath);
 
-        if (blobRes.ok) {
-          const blobData = await blobRes.json();
-          return blobData.sha;
-        }
-
-        const errText = await blobRes.text();
-        // If secondary rate limit or 429, back off and retry
-        if ((blobRes.status === 403 || blobRes.status === 429) && attempt < retries) {
-          console.warn(`[GitHub Exporter] Rate limit hit for ${file.relPath}, waiting before retry (attempt ${attempt}/${retries})...`);
-          await delay(2000 * attempt);
-          continue;
-        }
-
-        throw new Error(`Échec de création du blob pour ${file.relPath}: ${errText}`);
-      } catch (err: any) {
-        if (attempt === retries) throw err;
-        await delay(1500 * attempt);
-      }
-    }
-    throw new Error(`Échec de création du blob pour ${file.relPath} après ${retries} tentatives.`);
-  }
-  
-  for (let i = 0; i < localFiles.length; i += BATCH_SIZE) {
-    const batch = localFiles.slice(i, i + BATCH_SIZE);
-    
-    const results = await Promise.all(batch.map(async (file) => {
-      const sha = await uploadBlobWithRetry(file);
-      return {
+    if (remoteSha && remoteSha === localSha) {
+      // File is identical on GitHub, reuse existing sha without uploading!
+      treeItems.push({
         path: file.relPath,
         mode: '100644',
         type: 'blob',
-        sha
-      };
-    }));
-
-    treeItems.push(...results);
-
-    // Small breathing pause between batches to respect GitHub secondary rate limits
-    await delay(120);
-
-    const percent = Math.min(85, 15 + Math.round(((i + batch.length) / localFiles.length) * 70));
-    onProgress?.(`Transfert des fichiers (${Math.min(i + batch.length, localFiles.length)}/${localFiles.length})...`, percent);
+        sha: localSha
+      });
+    } else {
+      // File is new or changed, schedule upload
+      filesToUpload.push({
+        relPath: file.relPath,
+        contentBase64: finalBuffer.toString('base64'),
+        sha: localSha
+      });
+    }
   }
 
-  // 3. Create Tree
-  onProgress?.('Construction de l\'arborescence Git...', 88);
-  const treeBody: any = {
-    tree: treeItems
-  };
+  // 3. Upload only modified/new files in fast concurrent batches
+  if (filesToUpload.length > 0) {
+    onProgress?.(`Transfert rapide des deltas (${filesToUpload.length} fichier(s) modifié(s))...`, 30);
 
+    const BATCH_SIZE = 6;
+    const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+    for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {
+      const batch = filesToUpload.slice(i, i + BATCH_SIZE);
+
+      const batchResults = await Promise.all(batch.map(async (file) => {
+        for (let attempt = 1; attempt <= 3; attempt++) {
+          try {
+            const blobRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/blobs`, {
+              method: 'POST',
+              headers,
+              body: JSON.stringify({
+                content: file.contentBase64,
+                encoding: 'base64'
+              })
+            });
+
+            if (blobRes.ok) {
+              const blobData = await blobRes.json();
+              return {
+                path: file.relPath,
+                mode: '100644',
+                type: 'blob',
+                sha: blobData.sha || file.sha
+              };
+            }
+
+            const errText = await blobRes.text();
+            if ((blobRes.status === 403 || blobRes.status === 429) && attempt < 3) {
+              await delay(1500 * attempt);
+              continue;
+            }
+            throw new Error(`Erreur blob pour ${file.relPath}: ${errText}`);
+          } catch (err) {
+            if (attempt === 3) throw err;
+            await delay(1000 * attempt);
+          }
+        }
+        return {
+          path: file.relPath,
+          mode: '100644',
+          type: 'blob',
+          sha: file.sha
+        };
+      }));
+
+      treeItems.push(...batchResults);
+
+      const percent = Math.min(85, 30 + Math.round(((i + batch.length) / filesToUpload.length) * 55));
+      onProgress?.(`Envoi des modifications (${Math.min(i + batch.length, filesToUpload.length)}/${filesToUpload.length})...`, percent);
+    }
+  } else {
+    onProgress?.('Tous les fichiers sont déjà à jour sur GitHub !', 85);
+  }
+
+  // 4. Create Tree
+  onProgress?.('Construction de l\'arborescence Git...', 88);
   const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(treeBody)
+    body: JSON.stringify({ tree: treeItems })
   });
 
   if (!treeRes.ok) {
@@ -197,18 +239,16 @@ export async function exportProjectToGitHub(
 
   const treeData = await treeRes.json();
 
-  // 4. Create Commit
+  // 5. Create Commit
   onProgress?.('Création du commit GitHub...', 92);
-  const commitBody: any = {
-    message: commitMessage,
-    tree: treeData.sha,
-    parents: parentCommitSha ? [parentCommitSha] : []
-  };
-
   const newCommitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
     method: 'POST',
     headers,
-    body: JSON.stringify(commitBody)
+    body: JSON.stringify({
+      message: commitMessage,
+      tree: treeData.sha,
+      parents: parentCommitSha ? [parentCommitSha] : []
+    })
   });
 
   if (!newCommitRes.ok) {
@@ -218,8 +258,8 @@ export async function exportProjectToGitHub(
 
   const newCommitData = await newCommitRes.json();
 
-  // 5. Update Ref
-  onProgress?.('Mise à jour de la branche...', 96);
+  // 6. Update Branch Ref
+  onProgress?.('Finalisation de la branche...', 96);
   const updateRefRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
     method: 'PATCH',
     headers,
@@ -230,7 +270,6 @@ export async function exportProjectToGitHub(
   });
 
   if (!updateRefRes.ok) {
-    // Maybe branch ref doesn't exist yet, try creating it
     const createRefRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs`, {
       method: 'POST',
       headers,
@@ -246,12 +285,13 @@ export async function exportProjectToGitHub(
     }
   }
 
-  onProgress?.('Exportation terminée avec succès !', 100);
+  onProgress?.('Exportation ultra-rapide terminée !', 100);
 
   return {
     success: true,
     commitSha: newCommitData.sha,
     filesCount: localFiles.length,
+    modifiedFilesCount: filesToUpload.length,
     repoUrl: `https://github.com/${owner}/${repo}`,
     commitUrl: `https://github.com/${owner}/${repo}/commit/${newCommitData.sha}`
   };

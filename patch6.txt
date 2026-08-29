@@ -1,3 +1,0 @@
-  const [cancellingTransaction, setCancellingTransaction] = useState<{id: string, ref: string, source: string, originalMethod?: string, amount?: number, currency?: string, studentId?: string} | null>(null);
-  const [cancelReason, setCancelReason] = useState('');
-  const [refundToWallet, setRefundToWallet] = useState(false);

@@ -1555,20 +1555,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
   return (
     <div className="max-w-7xl mx-auto space-y-8 pb-20">
-     <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
       <div>
        <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Configuration Système</h2>
        <p className="text-slate-700 mt-2 font-medium text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
       </div>
       <div className="flex items-center gap-3">
-       <button
-        onClick={() => setIsGitHubModalOpen(true)}
-        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
-        title="Exporter l'ensemble du projet vers votre dépôt GitHub"
-       >
-        <GitBranch size={15} className="text-emerald-400" />
-        <span>Exporter vers GitHub</span>
-       </button>
+       {isSuperAdmin && (
+        <button
+         onClick={() => setIsGitHubModalOpen(true)}
+         className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+         title="Exporter l'ensemble du projet vers votre dépôt GitHub (Super Admin uniquement)"
+        >
+         <GitBranch size={15} className="text-emerald-400" />
+         <span>Exporter vers GitHub</span>
+        </button>
+       )}
        <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
         <span>Synchro Cloud Automatique</span>
@@ -1598,29 +1600,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         ))}
        </div>
 
-       {/* GitHub Quick Access Card */}
-       <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 p-5 rounded-2xl text-white shadow-md border border-slate-800 space-y-3">
-         <div className="flex items-center gap-3">
-           <div className="w-9 h-9 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center shrink-0 border border-white/10">
-             <GitBranch size={18} />
+       {/* GitHub Quick Access Card (Super Admin Exclusive) */}
+       {isSuperAdmin && (
+         <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 p-5 rounded-2xl text-white shadow-md border border-slate-800 space-y-3">
+           <div className="flex items-center justify-between">
+             <div className="flex items-center gap-3">
+               <div className="w-9 h-9 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center shrink-0 border border-white/10">
+                 <GitBranch size={18} />
+               </div>
+               <div>
+                 <h4 className="text-xs font-bold text-white tracking-tight">Dépôt GitHub</h4>
+                 <p className="text-[11px] text-slate-400 font-mono">Jackito46 / EduNova...</p>
+               </div>
+             </div>
+             <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[9px] font-black uppercase tracking-wider">
+               Super Admin
+             </span>
            </div>
-           <div>
-             <h4 className="text-xs font-bold text-white tracking-tight">Dépôt GitHub</h4>
-             <p className="text-[11px] text-slate-400 font-mono">Jackito46 / EduNova...</p>
-           </div>
+           <p className="text-[11px] text-slate-300 leading-relaxed">
+             Transférer et synchroniser les modifications du poste vers GitHub en 1 clic.
+           </p>
+           <button
+             type="button"
+             onClick={() => setIsGitHubModalOpen(true)}
+             className="w-full py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+           >
+             <GitPullRequest size={14} />
+             <span>Exporter vers GitHub</span>
+           </button>
          </div>
-         <p className="text-[11px] text-slate-300 leading-relaxed">
-           Transférer et synchroniser les modifications du poste vers GitHub.
-         </p>
-         <button
-           type="button"
-           onClick={() => setIsGitHubModalOpen(true)}
-           className="w-full py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
-         >
-           <GitPullRequest size={14} />
-           <span>Exporter vers GitHub</span>
-         </button>
-       </div>
+       )}
       </div>
 
       <div className="lg:col-span-8">
@@ -4151,50 +4160,52 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
         {activeTab === 'security' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-500">
-            {/* Exporter vers GitHub (En Premier) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/10 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-white/10">
-                    <GitBranch size={20} />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">Synchronisation & Export GitHub</h3>
-                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-bold">
-                        Prêt
-                      </span>
+            {/* Exporter vers GitHub (Super Admin Uniquement) */}
+            {isSuperAdmin && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-white/10 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-white/10">
+                      <GitBranch size={20} />
                     </div>
-                    <p className="text-xs text-slate-300 font-medium">
-                      Sauvegarder et publier directement les codes sources du projet sur votre dépôt GitHub officiel
-                    </p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">Synchronisation & Export GitHub</h3>
+                        <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-bold">
+                          Super Admin / Développeur
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-300 font-medium">
+                        Sauvegarder et publier directement les codes sources du projet sur votre dépôt GitHub officiel
+                      </p>
+                    </div>
                   </div>
+                  
+                  <button 
+                    onClick={() => setIsGitHubModalOpen(true)}
+                    className="px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
+                  >
+                    <GitPullRequest size={15} />
+                    Exporter vers GitHub
+                  </button>
                 </div>
                 
-                <button 
-                  onClick={() => setIsGitHubModalOpen(true)}
-                  className="px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
-                >
-                  <GitPullRequest size={15} />
-                  Exporter vers GitHub
-                </button>
-              </div>
-              
-              <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-                <div className="flex items-center gap-2 font-medium">
-                  <Code2 size={14} className="text-slate-400" />
-                  <span>Dépôt cible configuré : <strong className="font-mono text-slate-900">{githubOwner}/{githubRepo}</strong> (branche <span className="font-mono text-indigo-600 font-bold">{githubBranch}</span>)</span>
+                <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+                  <div className="flex items-center gap-2 font-medium">
+                    <Code2 size={14} className="text-slate-400" />
+                    <span>Dépôt cible configuré : <strong className="font-mono text-slate-900">{githubOwner}/{githubRepo}</strong> (branche <span className="font-mono text-indigo-600 font-bold">{githubBranch}</span>)</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsGitHubModalOpen(true)}
+                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                  >
+                    <span>Ouvrir l'assistant d'export</span>
+                    <ExternalLink size={12} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsGitHubModalOpen(true)}
-                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
-                >
-                  <span>Ouvrir l'assistant d'export</span>
-                  <ExternalLink size={12} />
-                </button>
               </div>
-            </div>
+            )}
 
             {!canManageAllCampuses && (
               <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800">
@@ -4866,12 +4877,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             <div className="space-y-1">
               <h4 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
                 <span>Exportation Directe via API GitHub</span>
+                <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-bold">
+                  Super Admin / Dev
+                </span>
                 <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-bold">
-                  API v3
+                  Synchro Rapide (Delta)
                 </span>
               </h4>
               <p className="text-xs text-slate-300 leading-relaxed font-normal">
-                Cette fonctionnalité va analyser tous les fichiers sources du projet, générer les objets Git correspondants et pousser un commit propre sur votre dépôt officiel.
+                Analyse les sources du projet, calcule instantanément les différences et synchronise votre dépôt officiel en quelques secondes.
               </p>
             </div>
           </div>
@@ -4985,8 +4999,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 </div>
                 <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700">
                   <div className="bg-white p-2.5 rounded-lg border border-emerald-100">
-                    <span className="text-slate-600 block text-[10px] uppercase font-bold">Fichiers transférés</span>
-                    <strong className="text-xs text-slate-900">{githubExportResult.filesCount} fichiers</strong>
+                    <span className="text-slate-600 block text-[10px] uppercase font-bold">Fichiers synchronisés</span>
+                    <strong className="text-xs text-slate-900">
+                      {githubExportResult.modifiedFilesCount !== undefined ? `${githubExportResult.modifiedFilesCount} modifié(s) / ` : ''}{githubExportResult.filesCount} total
+                    </strong>
                   </div>
                   <div className="bg-white p-2.5 rounded-lg border border-emerald-100">
                     <span className="text-slate-600 block text-[10px] uppercase font-bold">Commit SHA</span>
