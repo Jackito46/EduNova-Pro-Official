@@ -165,7 +165,7 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
   };
 
   return (
-    <div className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${className}`} ref={containerRef}>
+    <div className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${isOpen ? 'z-[60]' : 'z-10'} ${className}`} ref={containerRef}>
       <button
         type="button"
         disabled={disabled}
@@ -246,7 +246,7 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
       {/* Modern Floating Dropdown Menu */}
       {isOpen && (academicYears.length > 0 || allowAll) && (
         <div 
-          className={`absolute ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-slate-200/90 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150`}
+          className={`absolute ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-[100] animate-in fade-in zoom-in-95 duration-150`}
         >
           {/* Dropdown Header */}
           <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1 flex items-center justify-between">

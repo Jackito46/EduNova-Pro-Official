@@ -20,6 +20,7 @@ import { getStudentAgeStatus } from '../utils/academicPath';
 import { ModernRegistrySkeleton, SkeletonTable, FluidLoadingState } from './SkeletonLoader';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
 import { 
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments, 
@@ -499,9 +500,9 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-      <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 relative z-30">
         {/* Onglets Cycles / Formations */}
-        <div className="flex border-b border-slate-100 overflow-x-auto custom-scrollbar bg-slate-50/40">
+        <div className="flex border-b border-slate-100 overflow-x-auto custom-scrollbar bg-slate-50/40 rounded-t-3xl">
           {(school?.school_type === 'UNIVERSITY' ? [
             { id: 'ALL', label: 'Toutes les disciplines', icon: Layers },
             { id: 'DIPLOME', label: 'Diplôme', icon: GraduationCap },
@@ -611,18 +612,21 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
                 dropdownAlign="left"
               />
 
-              {/* Sélecteur de Classe / Option */}
-              <div className="flex items-center gap-2 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl px-3 py-1.5 shadow-2xs">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap">{terminology.option} :</span>
-                <select 
-                  className="bg-transparent text-slate-800 text-xs font-bold focus:outline-none cursor-pointer pr-1 max-w-[200px] truncate"
-                  value={selectedClassId}
-                  onChange={(e) => {setSelectedClassId(e.target.value); setCurrentPage(1);}}
-                >
-                  <option value="all">Toutes ({activeCycle === 'ALL' ? 'Total' : activeCycle})</option>
-                  {classesForCycle.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+              {/* Sélecteur de Classe / Option Interactif et Fluide */}
+              <ClassSelectorPill 
+                classes={classesForCycle}
+                selectedClassId={selectedClassId}
+                onSelectClass={(classId) => {
+                  setSelectedClassId(classId);
+                  setCurrentPage(1);
+                }}
+                activeCycle={activeCycle}
+                labelPrefix={`${terminology.option} :`}
+                allLabel={`Toutes (${activeCycle === 'ALL' ? 'Total' : activeCycle})`}
+                size="sm"
+                colorScheme="blue"
+                dropdownAlign="left"
+              />
 
               {/* Bouton Réinitialiser si un filtre est actif */}
               {(searchTerm || selectedClassId !== 'all' || docFilter !== 'ALL' || activeCycle !== 'ALL' || (academicYears.find(y => y.status === 'ACTIVE') && selectedYearId !== academicYears.find(y => y.status === 'ACTIVE')?.id)) && (
