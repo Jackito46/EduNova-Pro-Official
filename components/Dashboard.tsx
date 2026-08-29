@@ -49,6 +49,8 @@ import {
   PackageX,
   PackageCheck,
   Download,
+  ChevronDown,
+  Check,
   X
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -61,6 +63,7 @@ import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatStudentName } from '../utils/formatters';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ModernDashboardSkeleton } from './SkeletonLoader';
+import { AcademicSessionPill } from './AcademicSessionPill';
 import Logo from './Logo';
 import edunovaLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
 
@@ -1521,57 +1524,53 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Header Section */}
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center overflow-hidden shrink-0">
+        <div className="flex items-center gap-4 sm:gap-5">
+          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
             {schoolInfo.logo_url ? (
-              <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-2" />
+              <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5 sm:p-2" />
             ) : (
-              <School size={28} className="text-gray-400" />
+              <School size={28} className="text-slate-400" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-gray-900 break-words flex flex-wrap items-center gap-x-3 gap-y-1.5" title={schoolInfo.name}>
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 break-words flex flex-wrap items-center gap-x-3 gap-y-1.5" title={schoolInfo.name}>
               <span>{schoolInfo.name}</span>
             </h1>
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-              <span className="flex items-center text-xs sm:text-sm font-medium text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-2 flex-shrink-0"></span>
-                <span className="truncate max-w-[150px] sm:max-w-none">{user.full_name}</span> 
-                <span className="mx-1.5">•</span>
-                <span className="capitalize truncate max-w-[120px] sm:max-w-none">{roleLabels[user.role] || user.role.replace(/_/g, ' ')}</span>
-              </span>
+            
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {/* User Identity Pill */}
+              <div className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                </span>
+                <span className="text-xs font-bold text-slate-800 truncate max-w-[130px] sm:max-w-[180px]">
+                  {user.full_name}
+                </span> 
+                <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+                  {roleLabels[user.role] || user.role.replace(/_/g, ' ')}
+                </span>
+              </div>
 
-              {academicYears.length > 1 && (
-                <div className="flex items-center gap-1.5 bg-indigo-50/50 hover:bg-indigo-50 border border-indigo-100 rounded-full px-3 py-1 transition-all max-w-full overflow-hidden">
-                  <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 flex-shrink-0"></span>
-                  <span className="text-[10px] sm:text-xs text-indigo-700 font-bold uppercase tracking-wider whitespace-nowrap">Session :</span>
-                  <select
-                    value={selectedYearId}
-                    onChange={(e) => setSelectedYearId(e.target.value)}
-                    className="bg-transparent text-[10px] sm:text-xs font-black text-indigo-900 focus:outline-none cursor-pointer pr-1 truncate min-w-[120px] sm:min-w-0"
-                  >
-                    {academicYears.map((y) => {
-                      const isAct = y.is_active || y.status === 'ACTIVE';
-                      const isFut = y.status === 'FUTURE';
-                      const statusSuffix = isAct ? '🟢 [Active]' : isFut ? '🟡 [En prép.]' : '🔴 [Archivée]';
-                      const typeStr = y.session_type === 'INTENSIVE' ? ' (Int.)' : y.session_type === 'SPECIAL' ? ' (Spé.)' : '';
-                      return (
-                        <option key={y.id} value={y.id} className="text-slate-800 bg-white">
-                          {y.label}{typeStr} — {statusSuffix}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </div>
+              {/* Modern Academic Session Dropdown Selector */}
+              {academicYears.length > 0 && (
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={selectedYearId}
+                  onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                  size="sm"
+                  colorScheme="indigo"
+                />
               )}
 
+              {/* Refresh Button */}
               <button 
                 onClick={() => fetchDashboardStats()}
                 disabled={loading}
-                className="p-1.5 sm:p-2 text-slate-500 hover:text-blue-600 bg-white border border-slate-200 hover:bg-blue-50 hover:border-blue-200 shadow-sm rounded-lg transition-all disabled:opacity-50 flex-shrink-0 ml-auto sm:ml-0"
-                title="Rafraîchir les données"
+                className="p-1.5 text-slate-500 hover:text-indigo-600 bg-white hover:bg-indigo-50/50 border border-slate-200/90 hover:border-indigo-200 shadow-2xs rounded-xl transition-all duration-200 disabled:opacity-50 shrink-0"
+                title="Rafraîchir les données du tableau de bord"
               >
-                <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                <RefreshCcw size={14} className={`stroke-[2.2] ${loading ? 'animate-spin text-indigo-600' : ''}`} />
               </button>
             </div>
           </div>
@@ -1662,13 +1661,13 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Stats Grid */}
       {canViewFinances ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-10 gap-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 gap-4 xl:gap-5">
           {/* Card 1: Recettes Effectives */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col sm:col-span-2 lg:col-span-3 relative group">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col relative group">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100/60 shadow-xs">
-                  <TrendingUp size={20} className="stroke-[2.2]" />
+                <div className="p-2 sm:p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100/60 shadow-xs shrink-0">
+                  <TrendingUp size={19} className="stroke-[2.2]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800 tracking-tight">Recettes Effectives</h3>
@@ -1677,29 +1676,29 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
               <button 
                 onClick={() => setShowRevenueModal(true)}
-                className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-xl transition-all border border-transparent hover:border-indigo-100/80"
+                className="p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-xl transition-all border border-transparent hover:border-indigo-100/80 shrink-0"
                 title="Voir détails par classe"
               >
                 <Layers size={16} />
               </button>
             </div>
 
-            <div className="mt-auto pt-2">
-              <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
-                <p className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight leading-none">
+            <div className="mt-auto pt-1">
+              <div className="flex items-baseline justify-between gap-1.5 mb-1.5 flex-nowrap min-w-0">
+                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.collected.toLocaleString()}>
                   {stats.collected.toLocaleString()}
                 </p>
-                <span className="text-xs font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-2 py-0.5 rounded-lg border border-slate-200/50">
+                <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
                   HTG{(stats.collectedUSD > 0 || stats.expectedUSD > 0) ? " eq." : ""}
                 </span>
               </div>
 
               {(stats.collectedUSD > 0 || stats.expectedUSD > 0) && (
-                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-4 flex-wrap">
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400 mb-3 flex-wrap">
+                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100/50 whitespace-nowrap">
                     {stats.collectedHTG.toLocaleString()} HTG
                   </span>
-                  <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100/50">
+                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100/50 whitespace-nowrap">
                     ${stats.collectedUSD.toLocaleString()} USD
                   </span>
                 </div>
@@ -1707,7 +1706,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* Visual mini breakdown bar */}
               {stats.collected > 0 && (
-                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex my-3 shadow-inner">
+                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex my-2.5 shadow-inner">
                   <div 
                     className="bg-emerald-500 h-full transition-all duration-500" 
                     style={{ width: `${Math.min(100, (stats.collectedInscription / stats.collected) * 100)}%` }} 
@@ -1726,9 +1725,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               )}
 
-              <div className="flex flex-col gap-2 pt-1 border-t border-slate-100/80">
+              <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100/80">
                 <div className="flex justify-between items-baseline gap-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                  <div className="flex items-center gap-1.5 text-slate-500 font-medium whitespace-nowrap shrink-0">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
                     <span>Inscription :</span>
                   </div>
@@ -1741,7 +1740,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div className="flex justify-between items-baseline gap-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                  <div className="flex items-center gap-1.5 text-slate-500 font-medium whitespace-nowrap shrink-0">
                     <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
                     <span>Scolarité :</span>
                   </div>
@@ -1754,9 +1753,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div className="flex justify-between items-baseline gap-2 text-xs">
-                  <div className="flex items-center gap-1.5 text-slate-500 font-medium">
+                  <div className="flex items-center gap-1.5 text-slate-500 font-medium whitespace-nowrap shrink-0">
                     <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                    <span>{hasLargeSpace ? "Divers & Fournitures :" : "Fournitures & Div. :"}</span>
+                    <span>Fournitures & Div. :</span>
                   </div>
                   <div className="text-right flex flex-col items-end min-w-0">
                     <span className="font-bold text-slate-800">
@@ -1774,49 +1773,49 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Card 2: Objectif Annuel & Taux de Recouvrement */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col sm:col-span-1 lg:col-span-3">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100/60 shadow-xs">
-                  <CreditCard size={20} className="stroke-[2.2]" />
+                <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100/60 shadow-xs shrink-0">
+                  <CreditCard size={19} className="stroke-[2.2]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800 tracking-tight">Objectif Annuel</h3>
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Prévisionnel global</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/60">
+              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/60 shrink-0">
                 Budget
               </span>
             </div>
 
-            <div className="mt-auto pt-2">
-              <div className="flex items-baseline gap-2 mb-1.5 flex-wrap">
-                <p className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight leading-none break-words">
+            <div className="mt-auto pt-1">
+              <div className="flex items-baseline justify-between gap-1.5 mb-1.5 flex-nowrap min-w-0">
+                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.expected.toLocaleString()}>
                   {stats.expected.toLocaleString()}
                 </p>
-                <span className="text-xs font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-2 py-0.5 rounded-lg border border-slate-200/50">
+                <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
                   HTG{(stats.collectedUSD > 0 || stats.expectedUSD > 0) ? " eq." : ""}
                 </span>
               </div>
 
               {(stats.collectedUSD > 0 || stats.expectedUSD > 0) && (
-                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-4 flex-wrap">
-                  <span className="text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100/50">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400 mb-3 flex-wrap">
+                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100/50 whitespace-nowrap">
                     {stats.expectedHTG.toLocaleString()} HTG
                   </span>
-                  <span className="text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100/50">
+                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100/50 whitespace-nowrap">
                     ${stats.expectedUSD.toLocaleString()} USD
                   </span>
                 </div>
               )}
 
               {/* Recovery Progress Gauge */}
-              <div className="space-y-3 pt-2 border-t border-slate-100/80">
+              <div className="space-y-2.5 pt-2 border-t border-slate-100/80">
                 <div>
-                  <div className="flex justify-between items-center text-xs mb-1.5">
+                  <div className="flex justify-between items-center text-xs mb-1">
                     <span className="font-semibold text-slate-600 flex items-center gap-1">
-                      <ArrowUpRight size={14} className="text-blue-600" />
+                      <ArrowUpRight size={13} className="text-blue-600" />
                       Taux de Recouvrement
                     </span>
                     <span className="font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md text-[11px] border border-blue-100/50">
@@ -1832,9 +1831,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center text-xs mb-1.5">
+                  <div className="flex justify-between items-center text-xs mb-1">
                     <span className="font-semibold text-slate-600 flex items-center gap-1">
-                      <ShoppingCart size={13} className="text-emerald-600" />
+                      <ShoppingCart size={12} className="text-emerald-600" />
                       Pénétration Économat
                     </span>
                     <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-[11px] border border-emerald-100/50">
@@ -1855,31 +1854,39 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Card 3: Charges Mensuelles */}
           <div 
             onClick={() => setIsPayrollModalOpen(true)}
-            className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:border-rose-200/80 hover:shadow-md transition-all duration-300 flex flex-col sm:col-span-1 lg:col-span-2 cursor-pointer group"
+            className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-rose-200/80 hover:shadow-md transition-all duration-300 flex flex-col cursor-pointer group"
           >
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100/60 shadow-xs group-hover:scale-105 transition-transform">
-                  <TrendingDown size={20} className="stroke-[2.2]" />
+                <div className="p-2 sm:p-2.5 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100/60 shadow-xs group-hover:scale-105 transition-transform shrink-0">
+                  <TrendingDown size={19} className="stroke-[2.2]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800 tracking-tight">Charges</h3>
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Masse salariale</p>
                 </div>
               </div>
+              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100/60 shrink-0">
+                Mensuel
+              </span>
             </div>
 
-            <div className="mt-auto pt-2">
-              <p className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight leading-none mb-1">
-                {stats.payroll.toLocaleString()} <span className="text-sm font-semibold text-slate-400">HTG</span>
-              </p>
-              <p className="text-[11px] font-medium text-slate-400 mb-4">Charges mensuelles estimées</p>
-
-              <div className="pt-3 border-t border-slate-100/80 flex items-center justify-between">
-                <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-100/60 group-hover:bg-rose-100 transition-colors flex items-center gap-1">
-                  Voir détails <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform" />
+            <div className="mt-auto pt-1">
+              <div className="flex items-baseline justify-between gap-1.5 mb-1 flex-nowrap min-w-0">
+                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={`${stats.payroll.toLocaleString()} HTG`}>
+                  {stats.payroll.toLocaleString()}
+                </p>
+                <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
+                  HTG
                 </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Payroll actif</span>
+              </div>
+              <p className="text-[11px] font-medium text-slate-400 mb-3 truncate" title="Charges mensuelles estimées">Charges mensuelles estimées</p>
+
+              <div className="pt-2.5 border-t border-slate-100/80 flex items-center justify-between gap-1.5">
+                <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-100/60 group-hover:bg-rose-100 transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap">
+                  Voir détails <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform shrink-0" />
+                </span>
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 whitespace-nowrap">Payroll actif</span>
               </div>
             </div>
           </div>
@@ -1963,41 +1970,41 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
 
           {/* Card 4: Paiements & Activité du Jour */}
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col sm:col-span-2 lg:col-span-2">
-            <div className="flex items-center justify-between mb-4">
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
+            <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2.5">
-                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100/60 shadow-xs">
-                  <Receipt size={20} className="stroke-[2.2]" />
+                <div className="p-2 sm:p-2.5 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100/60 shadow-xs shrink-0">
+                  <Receipt size={19} className="stroke-[2.2]" />
                 </div>
                 <div>
                   <h3 className="text-sm font-black text-slate-800 tracking-tight">Caisse du Jour</h3>
                   <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Reçus émis</p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100">
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 Direct
               </span>
             </div>
 
-            <div className="mt-auto pt-2">
-              <div className="flex items-baseline gap-2 mb-1">
-                <p className="text-2xl xl:text-3xl font-black text-slate-900 tracking-tight leading-none">
+            <div className="mt-auto pt-1">
+              <div className="flex items-baseline justify-between gap-1.5 mb-1 flex-nowrap min-w-0">
+                <p className="text-xl sm:text-2xl 2xl:text-[1.65rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums">
                   {stats.todayPaymentsCount}
                 </p>
-                <span className="text-xs font-semibold text-slate-400">transaction{stats.todayPaymentsCount > 1 ? 's' : ''}</span>
+                <span className="text-xs font-semibold text-slate-400 whitespace-nowrap">transaction{stats.todayPaymentsCount > 1 ? 's' : ''}</span>
               </div>
-              <p className="text-[11px] font-medium text-slate-400 mb-3">Encaissés aujourd'hui</p>
+              <p className="text-[11px] font-medium text-slate-400 mb-3 truncate">Encaissés aujourd'hui</p>
 
               <div className="pt-2.5 border-t border-slate-100/80 flex flex-col gap-1.5">
                 <div className="flex justify-between items-center text-xs">
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Montant :</span>
-                  <span className="font-black text-emerald-600">{stats.todayTotalAmountHTG.toLocaleString()} G</span>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Montant :</span>
+                  <span className="font-black text-emerald-600 truncate text-right">{stats.todayTotalAmountHTG.toLocaleString()} G</span>
                 </div>
                 {stats.todayTotalAmountUSD > 0 && (
                   <div className="flex justify-between items-center text-xs">
-                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Devise USD :</span>
-                    <span className="font-black text-blue-600">${stats.todayTotalAmountUSD.toLocaleString()}</span>
+                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Devise USD :</span>
+                    <span className="font-black text-blue-600 truncate text-right">${stats.todayTotalAmountUSD.toLocaleString()}</span>
                   </div>
                 )}
               </div>
@@ -2006,7 +2013,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           {/* Director/Admin Specific Section */}
           {(user.role === UserRole.DIRECTOR || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.SUPER_ADMIN || user.is_super_admin) && (
-            <div className="sm:col-span-2 lg:col-span-10 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+            <div className="sm:col-span-2 lg:col-span-2 xl:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
               {/* Daily Staff Attendance */}
               <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
                 <div>

@@ -43,6 +43,7 @@ import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { tuitionPaymentSchema } from '../utils/validation';
+import { AcademicSessionPill } from './AcademicSessionPill';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig, PaymentMethodConfig } from '../lib/paymentMethods';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
 
@@ -2201,27 +2202,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="space-y-5">
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Session de Destination</label>
-                  <div className="relative">
-                    <CalendarCheck className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                    <select 
-                      className="w-full pl-11 pr-10 py-3 rounded-2xl text-sm outline-none border border-slate-200 bg-slate-50/70 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 appearance-none cursor-pointer transition-all font-medium"
-                      value={targetYearId}
-                      onChange={(e) => {
-                        const newYr = e.target.value;
-                        setTargetYearId(newYr);
-                        if (selectedStudent) {
-                          loadStudentDetails(selectedStudent.id, newYr);
-                        }
-                      }}
-                    >
-                      {academicYears.map(y => (
-                        <option key={y.id} value={y.id}>
-                          {y.label} {y.status === 'ACTIVE' ? '(ACTIVE)' : y.status === 'FUTURE' ? '(PRÉPARATION)' : ''}
-                        </option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                  </div>
+                  <AcademicSessionPill
+                    academicYears={academicYears}
+                    selectedYearId={targetYearId}
+                    onSelectYear={(newYr) => {
+                      setTargetYearId(newYr);
+                      if (selectedStudent) {
+                        loadStudentDetails(selectedStudent.id, newYr);
+                      }
+                    }}
+                    variant="field"
+                    size="md"
+                    colorScheme="blue"
+                  />
                 </div>
 
                   <div className="space-y-4">

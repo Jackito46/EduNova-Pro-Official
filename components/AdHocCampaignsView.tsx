@@ -12,6 +12,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { AuditLogger } from '../utils/auditLogger';
 import { FluidLoadingState, SkeletonCard, SkeletonTable } from './SkeletonLoader';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig } from '../lib/paymentMethods';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 interface AcademicYear {
   id: string;
@@ -546,29 +547,13 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
         
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-          <select 
-            className="bg-slate-50 px-4 py-2.5 border border-slate-200 rounded-xl text-xs font-extrabold text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm" 
-            value={selectedYearId} 
-            onChange={(e) => setSelectedYearId(e.target.value)}
-          >
-            {academicYears.map(ay => {
-              let suffix = '';
-              if (ay.is_active || ay.status === 'ACTIVE') {
-                suffix = ' (Active)';
-              } else if (ay.status === 'PAST') {
-                suffix = ' (Archivée)';
-              } else if (ay.status === 'PREPARATION') {
-                suffix = ' (En Préparation)';
-              } else if (ay.status === 'FUTURE') {
-                suffix = ' (Future)';
-              }
-              return (
-                <option key={ay.id} value={ay.id} className="font-semibold text-gray-700">
-                  {ay.label}{suffix}
-                </option>
-              );
-            })}
-          </select>
+          <AcademicSessionPill
+            academicYears={academicYears}
+            selectedYearId={selectedYearId}
+            onSelectYear={(yearId) => setSelectedYearId(yearId)}
+            size="md"
+            colorScheme="indigo"
+          />
           <button 
             disabled={isYearArchived}
             onClick={() => { setFormData({ id: '', name: '', description: '', amount: '', currency: 'HTG', due_date: '', type: 'AUTRE', duration_days: '', start_date: '', end_date: '', campus_id: user.campus_id || currentCampusId || '', class_id: '', status: 'DRAFT' }); setShowForm(true); }} 

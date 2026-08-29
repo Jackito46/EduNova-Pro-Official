@@ -13,6 +13,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { AuditLogger } from '../utils/auditLogger';
 import FeeHistoryModal from './FeeHistoryModal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 interface AcademicYear {
   id: string;
@@ -1280,19 +1281,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto flex-wrap">
           {/* SÉLECTEUR D'ANNÉE ACADÉMIQUE */}
-          <div className="bg-slate-50 px-3.5 py-2 rounded-xl flex items-center gap-2 border border-slate-200 w-full sm:w-auto shadow-2xs">
-             <CalendarDays size={18} className={currentYearObj?.status === 'FUTURE' ? "text-amber-500 shrink-0" : "text-blue-500 shrink-0"} />
-             <select className="bg-transparent font-bold text-sm text-slate-900 outline-none cursor-pointer w-full" value={selectedYearId} onChange={(e) => setSelectedYearId(e.target.value)}>
-                {academicYears.map(ay => <option key={ay.id} value={ay.id}>{ay.label} {ay.is_active ? '(Active)' : ay.status === 'FUTURE' ? '(Préparation)' : ''}</option>)}
-             </select>
-             {currentYearObj && (
-               <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-md shrink-0 ${
-                 currentYearObj.status === 'FUTURE' ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-               }`}>
-                 {currentYearObj.status === 'FUTURE' ? 'Préparation' : 'Active'}
-               </span>
-             )}
-          </div>
+          <AcademicSessionPill
+            academicYears={academicYears}
+            selectedYearId={selectedYearId}
+            onSelectYear={(yearId) => setSelectedYearId(yearId)}
+            size="md"
+            colorScheme="blue"
+          />
           
           {/* CAS 1 : SESSION SANS AUCUNE PLANIFICATION (0 TARIF) */}
           {user.role !== UserRole.SECRETARY && plans.length === 0 && (

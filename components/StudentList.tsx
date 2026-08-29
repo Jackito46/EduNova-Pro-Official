@@ -19,6 +19,7 @@ import { RetryableError } from './RetryableError';
 import { getStudentAgeStatus } from '../utils/academicPath';
 import { ModernRegistrySkeleton, SkeletonTable, FluidLoadingState } from './SkeletonLoader';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';
+import { AcademicSessionPill } from './AcademicSessionPill';
 import { 
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments, 
@@ -595,22 +596,20 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Rangée 2 : Filtres Session & Classe / Option + Compteur et Réinitialisation */}
           <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
             <div className="flex flex-wrap items-center gap-2.5">
-              {/* Sélecteur de Session */}
-              <div className="flex items-center gap-2 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl px-3 py-1.5 shadow-2xs">
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 whitespace-nowrap">Session :</span>
-                <select 
-                  className="bg-transparent text-slate-800 text-xs font-bold focus:outline-none cursor-pointer pr-1"
-                  value={selectedYearId}
-                  onChange={(e) => {setSelectedYearId(e.target.value); setCurrentPage(1);}}
-                >
-                  <option value="all">Toutes les sessions</option>
-                  {academicYears.map(y => (
-                    <option key={y.id} value={y.id}>
-                      {y.label} {y.status === 'ACTIVE' ? '(ACTIVE)' : y.status === 'FUTURE' ? '(PRÉPARATION)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Sélecteur de Session Interactif et Fluide */}
+              <AcademicSessionPill 
+                academicYears={academicYears}
+                selectedYearId={selectedYearId}
+                onSelectYear={(yearId) => {
+                  setSelectedYearId(yearId);
+                  setCurrentPage(1);
+                }}
+                allowAll={true}
+                allLabel="Toutes les sessions"
+                size="sm"
+                colorScheme="indigo"
+                dropdownAlign="left"
+              />
 
               {/* Sélecteur de Classe / Option */}
               <div className="flex items-center gap-2 bg-slate-50/70 hover:bg-slate-50 border border-slate-200/80 rounded-2xl px-3 py-1.5 shadow-2xs">

@@ -43,6 +43,7 @@ import * as XLSX from "xlsx";
 import { supabase } from "../supabase";
 import { useSchool } from "../contexts/SchoolContext";
 import { UserProfile } from "../types";
+import { AcademicSessionPill } from "./AcademicSessionPill";
 import Modal from "./Modal";
 import { AuditLogger } from "../utils/auditLogger";
 import { getExamsListForClass } from "../lib/evaluations";
@@ -1391,17 +1392,14 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <Calendar size={12} className="text-blue-500" />
               <span>Année Académique</span>
             </label>
-            <select
-              value={selectedYearId}
-              onChange={(e) => setSelectedYearId(e.target.value)}
-              className="w-full bg-slate-50/80 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all"
-            >
-              {academicYears.map((y) => (
-                <option key={y.id} value={y.id}>
-                  {y.label} {y.status === "ACTIVE" || y.is_active ? "(Active)" : `(${y.status || "Clôturée"})`}
-                </option>
-              ))}
-            </select>
+            <AcademicSessionPill
+              academicYears={academicYears}
+              selectedYearId={selectedYearId}
+              onSelectYear={(yearId) => setSelectedYearId(yearId)}
+              variant="field"
+              size="sm"
+              colorScheme="blue"
+            />
           </div>
 
           {/* Classe */}

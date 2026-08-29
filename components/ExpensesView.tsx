@@ -28,6 +28,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { supabase, isValidUuid } from '../supabase';
 import Modal from './Modal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
+import { AcademicSessionPill } from './AcademicSessionPill';
 import { AuditLogger } from '../utils/auditLogger';
 
 import { UserProfile } from '../types';
@@ -457,22 +458,16 @@ const ExpensesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100">
               <div className="flex flex-wrap items-center gap-3">
                 {/* Filtre Session */}
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Session:</span>
-                  <div className="relative">
-                    <select 
-                      className="pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none appearance-none cursor-pointer focus:border-rose-500 shadow-2xs"
-                      value={selectedYearId}
-                      onChange={(e) => setSelectedYearId(e.target.value)}
-                    >
-                      <option value="all">Toutes les Sessions</option>
-                      {academicYears.map(y => (
-                        <option key={y.id} value={y.id}>{y.label} {y.is_active ? '(ACTIVE)' : ''}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                  </div>
-                </div>
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={selectedYearId}
+                  onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                  allowAll={true}
+                  allLabel="Toutes les sessions"
+                  size="sm"
+                  colorScheme="rose"
+                  dropdownAlign="left"
+                />
 
                 {/* Filtre Mois */}
                 <div className="flex items-center gap-2">

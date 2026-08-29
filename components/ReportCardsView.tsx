@@ -41,6 +41,7 @@ import { getExamsListForClass } from '../lib/evaluations';
 import { ReportCardItem, getMention, getDecision } from './report-cards/ReportCardItem';
 import { PalmaresView } from './report-cards/PalmaresView';
 import { ReportCardStudent, ReportCardOptions } from './report-cards/types';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { ipAddress } = useSecurity();
@@ -952,20 +953,14 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <Calendar size={13} className="text-indigo-600" />
                 {terminology.academicYear || 'Année Académique'}
               </label>
-              <div className="relative">
-                <select
-                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-semibold text-xs text-slate-800 cursor-pointer appearance-none transition-all"
-                  value={selectedYearId}
-                  onChange={e => setSelectedYearId(e.target.value)}
-                >
-                  {academicYears.map(y => (
-                    <option key={y.id} value={y.id}>
-                      {y.label} {y.is_active ? '(Active)' : ''}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-              </div>
+              <AcademicSessionPill
+                academicYears={academicYears}
+                selectedYearId={selectedYearId}
+                onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                variant="field"
+                size="md"
+                colorScheme="indigo"
+              />
             </div>
 
             {/* Class */}

@@ -42,6 +42,7 @@ import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile } from '../types';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 const getFeeRowDetails = (
   nativeHTG: number,
@@ -922,22 +923,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         <div className="flex-1 w-full flex flex-col md:flex-row items-center gap-4 relative">
-          <div className="relative group min-w-[240px]">
-            <CalendarDays className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500" size={18} />
-            <select 
-              className="w-full pl-12 pr-10 py-3 rounded-lg text-sm font-medium outline-none border border-gray-300 bg-white text-gray-900 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 appearance-none cursor-pointer"
-              value={selectedYearId}
-              onChange={(e) => setSelectedYearId(e.target.value)}
-            >
-              {academicYears.map(y => {
-                let statusText = '';
-                if (y.status === 'ACTIVE') statusText = ' (Active)';
-                else if (y.status === 'FUTURE') statusText = ' (Future)';
-                else if (y.status === 'ARCHIVED' || y.status === 'INACTIVE') statusText = ' (Archivée)';
-                return <option key={y.id} value={y.id}>{y.label || y.name}{statusText}</option>;
-              })}
-            </select>
-            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+          <div className="min-w-[240px] w-full md:w-auto">
+            <AcademicSessionPill
+              academicYears={academicYears}
+              selectedYearId={selectedYearId}
+              onSelectYear={(yearId) => setSelectedYearId(yearId)}
+              variant="field"
+              size="md"
+              colorScheme="blue"
+            />
           </div>
 
           {!selectedStudent ? (

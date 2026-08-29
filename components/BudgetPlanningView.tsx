@@ -9,6 +9,7 @@ import { supabase, isValidUuid } from '../supabase';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 interface Budget {
   id: string;
@@ -174,21 +175,19 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         <div className="flex items-center gap-3">
-          <select 
-            value={selectedYearId}
-            onChange={(e) => setSelectedYearId(e.target.value)}
-            className="px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-bold shadow-sm outline-none focus:ring-2 focus:ring-indigo-600"
-          >
-            {academicYears.map(y => (
-              <option key={y.id} value={y.id}>{y.label}</option>
-            ))}
-          </select>
+          <AcademicSessionPill
+            academicYears={academicYears}
+            selectedYearId={selectedYearId}
+            onSelectYear={(yearId) => setSelectedYearId(yearId)}
+            size="md"
+            colorScheme="indigo"
+          />
           <button 
             onClick={() => {
               setFormData({ id: '', category: '', planned_amount: '' });
               setShowModal(true);
             }}
-            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95"
+            className="flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-95 cursor-pointer"
           >
             <Plus size={18} /> Nouveau Budget
           </button>

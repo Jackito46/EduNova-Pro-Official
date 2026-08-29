@@ -40,6 +40,7 @@ import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
 import { PrintPreviewModal } from './PrintPreviewModal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
+import { AcademicSessionPill } from './AcademicSessionPill';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useSecurity } from './SecurityGuard';
@@ -1135,22 +1136,14 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5">
                   <Calendar size={12} className="text-indigo-600" /> {terminology.academicYear}
                 </label>
-                <div className="relative group">
-                  <select 
-                    className="w-full px-4 py-3 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all appearance-none cursor-pointer shadow-2xs"
-                    value={selectedYear}
-                    onChange={(e) => setSelectedYear(e.target.value)}
-                  >
-                    {academicYears.map(y => {
-                      let statusText = '';
-                      if (y.status === 'ACTIVE') statusText = ' (Active)';
-                      else if (y.status === 'FUTURE') statusText = ' (Future)';
-                      else if (y.status === 'ARCHIVED' || y.status === 'INACTIVE') statusText = ' (Archivée)';
-                      return <option key={y.id} value={y.id} className="text-slate-900 font-bold">{y.label || y.name}{statusText}</option>;
-                    })}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-600 pointer-events-none transition-colors" size={16} />
-                </div>
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={selectedYear}
+                  onSelectYear={(yearId) => setSelectedYear(yearId)}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -1784,22 +1777,14 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5">
                   <Calendar size={12} className="text-indigo-600" /> 1. {terminology.academicYear}
                 </label>
-                <div className="relative group">
-                  <select 
-                    className="w-full px-4 py-3 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all appearance-none cursor-pointer shadow-2xs"
-                    value={genYear}
-                    onChange={(e) => setGenYear(e.target.value)}
-                  >
-                    {academicYears.map(y => {
-                      let statusText = '';
-                      if (y.status === 'ACTIVE') statusText = ' (Active)';
-                      else if (y.status === 'FUTURE') statusText = ' (Future)';
-                      else if (y.status === 'ARCHIVED' || y.status === 'INACTIVE') statusText = ' (Archivée)';
-                      return <option key={y.id} value={y.id} className="text-slate-900 font-bold">{y.label || y.name}{statusText}</option>;
-                    })}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-600 pointer-events-none transition-colors" size={16} />
-                </div>
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={genYear}
+                  onSelectYear={(yearId) => setGenYear(yearId)}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                />
               </div>
 
               <div className="space-y-1.5">

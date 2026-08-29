@@ -25,6 +25,7 @@ import { InventoryAdjustmentModal } from './InventoryAdjustmentModal';
 import { PrintableInventoryModal } from './PrintableInventoryModal';
 import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 interface CatalogItem {
   id: string;
@@ -2574,16 +2575,14 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* SECONDE LIGNE FILTRES DATES ET ANNEE ACADEMIQUE */}
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 pt-2 border-t border-slate-100 items-center">
-              <div className="md:col-span-4 relative">
-                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <select 
-                  value={selectedYearId} 
-                  onChange={(e) => setSelectedYearId(e.target.value)} 
-                  className="w-full pl-11 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold outline-none appearance-none cursor-pointer focus:border-slate-900 transition-all"
-                >
-                  {academicYears.map(y => <option key={y.id} value={y.id} className="text-gray-900">{y.label}{(y.is_active || y.status === 'ACTIVE') ? ' (Session Active)' : ' (Archive)'}</option>)}
-                </select>
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+              <div className="md:col-span-4">
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={selectedYearId}
+                  onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                  size="sm"
+                  colorScheme="slate"
+                />
               </div>
 
               <div className="md:col-span-3">
@@ -2829,17 +2828,13 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
                </div>
 
-               <div className="relative">
-                 <Calendar className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                 <select 
-                   value={selectedYearId} 
-                   onChange={(e) => setSelectedYearId(e.target.value)} 
-                   className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold outline-none appearance-none cursor-pointer focus:border-slate-900 transition-all"
-                 >
-                   {academicYears.map(y => <option key={y.id} value={y.id}>{y.label}{(y.is_active || y.status === 'ACTIVE') ? ' (Active)' : ''}</option>)}
-                 </select>
-                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-               </div>
+               <AcademicSessionPill
+                 academicYears={academicYears}
+                 selectedYearId={selectedYearId}
+                 onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                 size="sm"
+                 colorScheme="slate"
+               />
              </div>
            </div>
 

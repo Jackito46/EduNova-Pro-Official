@@ -824,13 +824,15 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div>
-              <div className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 font-mono tracking-tight leading-none" title={totalCollectedTuition.toLocaleString()}>
+              <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={totalCollectedTuition.toLocaleString()}>
                 {loading ? (
                   <RefreshCcw className="animate-spin text-slate-400" size={20} />
                 ) : (
                   <>
-                    {totalCollectedTuition.toLocaleString()}{' '}
-                    <span className="text-xs font-sans font-bold text-slate-500 tracking-normal">
+                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-slate-900 font-mono tracking-tight leading-none truncate">
+                      {totalCollectedTuition.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-slate-500 tracking-normal shrink-0 whitespace-nowrap bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50">
                       HTG{(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}
                     </span>
                   </>
@@ -838,11 +840,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11px]">
-                  <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md border border-emerald-100">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[10px] sm:text-[11px]">
+                  <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md border border-emerald-100 whitespace-nowrap">
                     {totalCollectedTuitionHTG.toLocaleString()} HTG
                   </span>
-                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-100">
+                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-100 whitespace-nowrap">
                     {totalCollectedTuitionUSD.toLocaleString()} USD
                   </span>
                 </div>
@@ -862,13 +864,15 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div>
-              <div className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 font-mono tracking-tight leading-none" title={totalCollectedSupplies.toLocaleString()}>
+              <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={totalCollectedSupplies.toLocaleString()}>
                 {loading ? (
                   <RefreshCcw className="animate-spin text-slate-400" size={20} />
                 ) : (
                   <>
-                    {totalCollectedSupplies.toLocaleString()}{' '}
-                    <span className="text-xs font-sans font-bold text-slate-500 tracking-normal">
+                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-slate-900 font-mono tracking-tight leading-none truncate">
+                      {totalCollectedSupplies.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-slate-500 tracking-normal shrink-0 whitespace-nowrap bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50">
                       HTG{(totalCollectedSuppliesUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}
                     </span>
                   </>
@@ -876,11 +880,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && (totalCollectedSuppliesUSD > 0 || totalExpectedUSD > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[11px]">
-                  <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md border border-emerald-100">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[10px] sm:text-[11px]">
+                  <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md border border-emerald-100 whitespace-nowrap">
                     {totalCollectedSuppliesHTG.toLocaleString()} HTG
                   </span>
-                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-100">
+                  <span className="px-1.5 py-0.5 bg-blue-50 text-blue-700 font-bold rounded-md border border-blue-100 whitespace-nowrap">
                     {totalCollectedSuppliesUSD.toLocaleString()} USD
                   </span>
                 </div>
@@ -900,13 +904,15 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div>
-              <div className="text-xl sm:text-2xl lg:text-3xl font-black text-white font-mono tracking-tight leading-none" title={(totalCollectedTuition + totalCollectedSupplies).toLocaleString()}>
+              <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={(totalCollectedTuition + totalCollectedSupplies).toLocaleString()}>
                 {loading ? (
                   <RefreshCcw className="animate-spin text-slate-400" size={20} />
                 ) : (
                   <>
-                    {(totalCollectedTuition + totalCollectedSupplies).toLocaleString()}{' '}
-                    <span className="text-xs font-sans font-bold text-slate-400 tracking-normal">
+                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-white font-mono tracking-tight leading-none truncate">
+                      {(totalCollectedTuition + totalCollectedSupplies).toLocaleString()}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-slate-400 tracking-normal shrink-0 whitespace-nowrap bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-700">
                       HTG{((totalCollectedTuitionUSD + totalCollectedSuppliesUSD) > 0 || totalExpectedUSD > 0) ? " eq." : ""}
                     </span>
                   </>
@@ -914,11 +920,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && ((totalCollectedTuitionUSD + totalCollectedSuppliesUSD) > 0 || totalExpectedUSD > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-800 text-[11px]">
-                  <span className="px-1.5 py-0.5 bg-slate-800 text-emerald-300 font-bold rounded-md border border-slate-700">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-800 text-[10px] sm:text-[11px]">
+                  <span className="px-1.5 py-0.5 bg-slate-800 text-emerald-300 font-bold rounded-md border border-slate-700 whitespace-nowrap">
                     {(totalCollectedTuitionHTG + totalCollectedSuppliesHTG).toLocaleString()} HTG
                   </span>
-                  <span className="px-1.5 py-0.5 bg-slate-800 text-blue-300 font-bold rounded-md border border-slate-700">
+                  <span className="px-1.5 py-0.5 bg-slate-800 text-blue-300 font-bold rounded-md border border-slate-700 whitespace-nowrap">
                     {(totalCollectedTuitionUSD + totalCollectedSuppliesUSD).toLocaleString()} USD
                   </span>
                 </div>
@@ -939,13 +945,15 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div className="relative z-10">
-              <div className="text-xl sm:text-2xl lg:text-3xl font-black text-white font-mono tracking-tight leading-none" title={todayCollectionHTG.toLocaleString()}>
+              <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={todayCollectionHTG.toLocaleString()}>
                 {loading ? (
                   <RefreshCcw className="animate-spin text-white" size={20} />
                 ) : (
                   <>
-                    {todayCollectionHTG.toLocaleString()}{' '}
-                    <span className="text-xs font-sans font-bold text-emerald-200 tracking-normal">
+                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-white font-mono tracking-tight leading-none truncate">
+                      {todayCollectionHTG.toLocaleString()}
+                    </span>
+                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-emerald-200 tracking-normal shrink-0 whitespace-nowrap bg-white/10 px-1.5 py-0.5 rounded-md border border-white/20">
                       HTG
                     </span>
                   </>
@@ -953,8 +961,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && (
-                <div className="mt-2.5 pt-2.5 border-t border-white/20 text-[11px] font-bold text-emerald-100">
-                  <span className="px-2 py-0.5 bg-white/15 rounded-md border border-white/20 inline-block font-mono">
+                <div className="mt-2.5 pt-2.5 border-t border-white/20 text-[10px] sm:text-[11px] font-bold text-emerald-100">
+                  <span className="px-2 py-0.5 bg-white/15 rounded-md border border-white/20 inline-block font-mono whitespace-nowrap truncate max-w-full">
                     + {todayCollectionUSD.toLocaleString()} USD (Encaissement Jour)
                   </span>
                 </div>

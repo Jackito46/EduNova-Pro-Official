@@ -25,6 +25,7 @@ import { formatStudentName } from '../utils/formatters';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ModernRegistrySkeleton, FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { PrintPreviewModal } from './PrintPreviewModal';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 const DATE_FILTERS = ['Toutes les dates', "Aujourd'hui", 'Cette semaine', 'Ce mois'];
 
@@ -276,16 +277,14 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200/60 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 print:hidden items-end">
             <div className="space-y-2.5">
               <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</label>
-              <div className="relative group">
-                <select 
-                  className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none cursor-pointer"
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                >
-                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.label || y.name}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" size={16} />
-              </div>
+              <AcademicSessionPill
+                academicYears={academicYears}
+                selectedYearId={selectedYear}
+                onSelectYear={(yearId) => setSelectedYear(yearId)}
+                variant="field"
+                size="md"
+                colorScheme="indigo"
+              />
             </div>
 
             <div className="space-y-2.5">

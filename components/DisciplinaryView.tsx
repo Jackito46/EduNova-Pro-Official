@@ -19,6 +19,7 @@ import { formatStudentName, getDefiniteArticle } from '../utils/formatters';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 interface DisciplinaryRecord {
   id: string;
@@ -847,21 +848,14 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
           
           <div className="flex flex-wrap items-center gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
             {/* Session switcher */}
-            {academicYears.length > 1 && (
-              <div className="relative flex-1 sm:flex-initial">
-                <select
-                  aria-label="Sélectionner la session académique"
-                  value={selectedYearId || ''}
-                  onChange={(e) => setSelectedYearId(e.target.value)}
-                  className="w-full sm:w-auto px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-black text-slate-700 outline-none focus:ring-2 focus:ring-rose-500 transition-all cursor-pointer"
-                >
-                  {academicYears.map(y => (
-                    <option key={y.id} value={y.id}>
-                      {y.label} {y.is_active ? '★ (Active)' : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {academicYears.length > 0 && (
+              <AcademicSessionPill
+                academicYears={academicYears}
+                selectedYearId={selectedYearId || ''}
+                onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                size="sm"
+                colorScheme="rose"
+              />
             )}
 
             {isAdmin && (

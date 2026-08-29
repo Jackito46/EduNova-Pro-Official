@@ -32,6 +32,7 @@ import {
   AdministrativeDispensation, 
   AcademicEvaluationStatus 
 } from './ReenrollmentEligibilityCard';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 const InfoTooltip = ({ content, title }: { content: string; title?: string }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -992,21 +993,13 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             
             <div className="flex flex-wrap items-center gap-3 mt-1.5">
               {/* Academic Year Selector */}
-              <div className="relative inline-flex items-center">
-                <CalendarCheck className="absolute left-2.5 top-1/2 -translate-y-1/2 text-indigo-600 pointer-events-none" size={13} />
-                <select 
-                  value={targetYearId} 
-                  onChange={(e) => setTargetYearId(e.target.value)}
-                  className="pl-7 pr-7 py-1.5 bg-white hover:bg-slate-50 text-slate-900 border border-slate-300 rounded-lg text-xs font-bold outline-none appearance-none cursor-pointer transition-colors shadow-2xs focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600"
-                >
-                  {academicYears.map(y => (
-                    <option key={y.id} value={y.id} className="bg-white text-slate-900 font-medium">
-                      {y.label} {y.status === 'ACTIVE' ? '(Active)' : y.status === 'FUTURE' ? '(Rentrée / Préparation)' : ''}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={12} />
-              </div>
+              <AcademicSessionPill
+                academicYears={academicYears}
+                selectedYearId={targetYearId}
+                onSelectYear={(yearId) => setTargetYearId(yearId)}
+                size="sm"
+                colorScheme="indigo"
+              />
 
               {/* Multi-Campus / Annexe Badge if exists */}
               {campuses && campuses.length > 1 && (
