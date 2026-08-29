@@ -54,7 +54,11 @@ import {
   Landmark,
   XCircle,
   ToggleLeft,
-  ToggleRight
+  ToggleRight,
+  GitBranch,
+  GitCommit,
+  GitPullRequest,
+  Code2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabase';
@@ -163,6 +167,25 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   const [backupCustomDesc, setBackupCustomDesc] = useState('');
   const [isTestingStorage, setIsTestingStorage] = useState(false);
   const [storageStatusInfo, setStorageStatusInfo] = useState<{ checked: boolean; available: boolean; message: string } | null>(null);
+
+  // States for GitHub Export
+  const [isGitHubModalOpen, setIsGitHubModalOpen] = useState(false);
+  const [githubToken, setGithubToken] = useState(() => {
+    return localStorage.getItem('edunova_github_pat') || '';
+  });
+  const [githubOwner, setGithubOwner] = useState('Jackito46');
+  const [githubRepo, setGithubRepo] = useState('EduNova-Pro-Official');
+  const [githubBranch, setGithubBranch] = useState('main');
+  const [githubCommitMsg, setGithubCommitMsg] = useState('');
+  const [isExportingGitHub, setIsExportingGitHub] = useState(false);
+  const [githubExportProgress, setGithubExportProgress] = useState<{ step: string; percent: number } | null>(null);
+  const [githubExportResult, setGithubExportResult] = useState<{
+    success: boolean;
+    commitSha?: string;
+    filesCount?: number;
+    repoUrl?: string;
+    commitUrl?: string;
+  } | null>(null);
 
   // States for clearing school data
   const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
@@ -1438,6 +1461,79 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     }
   };
 
+  const handleExportToGitHub = async () => {
+    if (!githubToken.trim()) {
+      toast.error("Veuillez renseigner votre token d'accès personnel GitHub (Personal Access Token).");
+      return;
+    }
+    if (!githubOwner.trim() || !githubRepo.trim()) {
+      toast.error("Veuillez spécifier le propriétaire et le nom du dépôt GitHub.");
+      return;
+    }
+
+    try {
+      localStorage.setItem('edunova_github_pat', githubToken.trim());
+    } catch (e) {}
+
+    setIsExportingGitHub(true);
+    setGithubExportProgress({ step: "Initialisation de l'exportation...", percent: 5 });
+    setGithubExportResult(null);
+
+    try {
+      const response = await fetch('/api/export-github', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
+        },
+        body: JSON.stringify({
+          token: githubToken.trim(),
+          owner: githubOwner.trim(),
+          repo: githubRepo.trim(),
+          branch: githubBranch.trim() || 'main',
+          commitMessage: githubCommitMsg.trim() || `Exportation synchronisée depuis EduNova Pro (${new Date().toLocaleString('fr-FR')})`
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Une erreur est survenue lors de l'exportation vers GitHub.");
+      }
+
+      setGithubExportResult({
+        success: true,
+        commitSha: data.commitSha,
+        filesCount: data.filesCount,
+        repoUrl: data.repoUrl,
+        commitUrl: data.commitUrl
+      });
+
+      setGithubExportProgress({ step: "Exportation terminée avec succès !", percent: 100 });
+      toast.success(`Projet exporté avec succès vers ${githubOwner}/${githubRepo} (${data.filesCount} fichiers) !`);
+
+      await AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'UPDATE',
+        entity_type: 'settings',
+        details: { 
+          action: 'GITHUB_EXPORT',
+          repo: `${githubOwner}/${githubRepo}`,
+          branch: githubBranch,
+          commitSha: data.commitSha,
+          filesCount: data.filesCount
+        }
+      });
+    } catch (err: any) {
+      console.error("GitHub Export Error:", err);
+      toast.error(err.message || "Erreur lors de l'exportation vers GitHub");
+      setGithubExportProgress(null);
+    } finally {
+      setIsExportingGitHub(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -1465,6 +1561,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        <p className="text-slate-700 mt-2 font-medium text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
       </div>
       <div className="flex items-center gap-3">
+       <button
+        onClick={() => setIsGitHubModalOpen(true)}
+        className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
+        title="Exporter l'ensemble du projet vers votre dépôt GitHub"
+       >
+        <GitBranch size={15} className="text-emerald-400" />
+        <span>Exporter vers GitHub</span>
+       </button>
        <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
         <span>Synchro Cloud Automatique</span>
@@ -1492,6 +1596,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           {item.label}
          </button>
         ))}
+       </div>
+
+       {/* GitHub Quick Access Card */}
+       <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 p-5 rounded-2xl text-white shadow-md border border-slate-800 space-y-3">
+         <div className="flex items-center gap-3">
+           <div className="w-9 h-9 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center shrink-0 border border-white/10">
+             <GitBranch size={18} />
+           </div>
+           <div>
+             <h4 className="text-xs font-bold text-white tracking-tight">Dépôt GitHub</h4>
+             <p className="text-[11px] text-slate-400 font-mono">Jackito46 / EduNova...</p>
+           </div>
+         </div>
+         <p className="text-[11px] text-slate-300 leading-relaxed">
+           Transférer et synchroniser les modifications du poste vers GitHub.
+         </p>
+         <button
+           type="button"
+           onClick={() => setIsGitHubModalOpen(true)}
+           className="w-full py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+         >
+           <GitPullRequest size={14} />
+           <span>Exporter vers GitHub</span>
+         </button>
        </div>
       </div>
 
@@ -4023,6 +4151,51 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
         {activeTab === 'security' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-500">
+            {/* Exporter vers GitHub (En Premier) */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+              <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white/10 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-white/10">
+                    <GitBranch size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">Synchronisation & Export GitHub</h3>
+                      <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-bold">
+                        Prêt
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 font-medium">
+                      Sauvegarder et publier directement les codes sources du projet sur votre dépôt GitHub officiel
+                    </p>
+                  </div>
+                </div>
+                
+                <button 
+                  onClick={() => setIsGitHubModalOpen(true)}
+                  className="px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
+                >
+                  <GitPullRequest size={15} />
+                  Exporter vers GitHub
+                </button>
+              </div>
+              
+              <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
+                <div className="flex items-center gap-2 font-medium">
+                  <Code2 size={14} className="text-slate-400" />
+                  <span>Dépôt cible configuré : <strong className="font-mono text-slate-900">{githubOwner}/{githubRepo}</strong> (branche <span className="font-mono text-indigo-600 font-bold">{githubBranch}</span>)</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsGitHubModalOpen(true)}
+                  className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
+                >
+                  <span>Ouvrir l'assistant d'export</span>
+                  <ExternalLink size={12} />
+                </button>
+              </div>
+            </div>
+
             {!canManageAllCampuses && (
               <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800">
                 <div className="flex items-center gap-2.5">
@@ -4676,6 +4849,195 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           </Modal>
         </>
       )}
+
+      {/* Modal - Exportation du Projet vers GitHub */}
+      <Modal
+        isOpen={isGitHubModalOpen}
+        onClose={() => !isExportingGitHub && setIsGitHubModalOpen(false)}
+        title="Exporter et Synchroniser vers GitHub"
+        hideDefaultActions={true}
+        containerClassName="max-w-lg sm:max-w-xl"
+      >
+        <div className="space-y-4">
+          <div className="bg-slate-900 text-white p-4 rounded-2xl flex items-start gap-3 shadow-md">
+            <div className="p-2.5 bg-white/10 text-white rounded-xl shrink-0 mt-0.5 border border-white/10">
+              <GitBranch size={20} />
+            </div>
+            <div className="space-y-1">
+              <h4 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
+                <span>Exportation Directe via API GitHub</span>
+                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-bold">
+                  API v3
+                </span>
+              </h4>
+              <p className="text-xs text-slate-300 leading-relaxed font-normal">
+                Cette fonctionnalité va analyser tous les fichiers sources du projet, générer les objets Git correspondants et pousser un commit propre sur votre dépôt officiel.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3.5">
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block flex items-center justify-between">
+                <span>Token d'accès personnel GitHub (PAT)</span>
+                <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">Configuré</span>
+              </label>
+              <div className="relative">
+                <input
+                  type="password"
+                  value={githubToken}
+                  onChange={e => setGithubToken(e.target.value)}
+                  placeholder="ghp_..."
+                  disabled={isExportingGitHub}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                />
+              </div>
+              <p className="text-[10px] text-slate-600">
+                Token GitHub Classic avec autorisations <strong>repo</strong> (lecture/écriture).
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
+                  Propriétaire / Utilisateur
+                </label>
+                <input
+                  type="text"
+                  value={githubOwner}
+                  onChange={e => setGithubOwner(e.target.value)}
+                  placeholder="Ex: Jackito46"
+                  disabled={isExportingGitHub}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
+                  Nom du Dépôt
+                </label>
+                <input
+                  type="text"
+                  value={githubRepo}
+                  onChange={e => setGithubRepo(e.target.value)}
+                  placeholder="Ex: EduNova-Pro-Official"
+                  disabled={isExportingGitHub}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5 sm:col-span-1">
+                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
+                  Branche Cible
+                </label>
+                <input
+                  type="text"
+                  value={githubBranch}
+                  onChange={e => setGithubBranch(e.target.value)}
+                  placeholder="main"
+                  disabled={isExportingGitHub}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                />
+              </div>
+
+              <div className="space-y-1.5 sm:col-span-2">
+                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
+                  Message du Commit (Optionnel)
+                </label>
+                <input
+                  type="text"
+                  value={githubCommitMsg}
+                  onChange={e => setGithubCommitMsg(e.target.value)}
+                  placeholder="Mise à jour synchronisée depuis EduNova..."
+                  disabled={isExportingGitHub}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                />
+              </div>
+            </div>
+
+            {/* Progress Status */}
+            {isExportingGitHub && githubExportProgress && (
+              <div className="bg-slate-900 text-white p-4 rounded-xl space-y-2.5 animate-fadeIn">
+                <div className="flex items-center justify-between text-xs font-bold text-slate-200">
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={14} className="animate-spin text-indigo-400" />
+                    {githubExportProgress.step}
+                  </span>
+                  <span className="font-mono text-indigo-300">{githubExportProgress.percent}%</span>
+                </div>
+                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-300"
+                    style={{ width: `${githubExportProgress.percent}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Success Card */}
+            {githubExportResult?.success && (
+              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl space-y-3 animate-fadeIn">
+                <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
+                  <CheckCircle2 size={16} className="text-emerald-600" />
+                  <span>Dépôt GitHub mis à jour avec succès !</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700">
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-100">
+                    <span className="text-slate-600 block text-[10px] uppercase font-bold">Fichiers transférés</span>
+                    <strong className="text-xs text-slate-900">{githubExportResult.filesCount} fichiers</strong>
+                  </div>
+                  <div className="bg-white p-2.5 rounded-lg border border-emerald-100">
+                    <span className="text-slate-600 block text-[10px] uppercase font-bold">Commit SHA</span>
+                    <strong className="text-xs font-mono text-slate-900">{githubExportResult.commitSha?.slice(0, 8)}...</strong>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 pt-1">
+                  <a
+                    href={githubExportResult.commitUrl || githubExportResult.repoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                  >
+                    <span>Voir le commit sur GitHub</span>
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsGitHubModalOpen(false)}
+              disabled={isExportingGitHub}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all disabled:opacity-50"
+            >
+              Fermer
+            </button>
+            <button
+              type="button"
+              onClick={handleExportToGitHub}
+              disabled={isExportingGitHub || !githubToken.trim() || !githubOwner.trim() || !githubRepo.trim()}
+              className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+            >
+              {isExportingGitHub ? (
+                <>
+                  <Loader2 size={14} className="animate-spin text-white" />
+                  <span>Exportation en cours...</span>
+                </>
+              ) : (
+                <>
+                  <GitPullRequest size={14} />
+                  <span>Lancer l'exportation GitHub</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         isOpen={!!sessionToDelete}

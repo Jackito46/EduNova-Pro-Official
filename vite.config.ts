@@ -330,7 +330,7 @@ export default defineConfig(({ mode }) => {
             globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}']
           },
           devOptions: {
-            enabled: true,
+            enabled: false,
             type: 'module'
           }
         })

@@ -8,7 +8,7 @@ import { isRefreshTokenError, clearAuthStorage } from './supabase';
 
 import { registerSW } from 'virtual:pwa-register';
 
-if ('serviceWorker' in navigator) {
+if ('serviceWorker' in navigator && (import.meta.env.PROD || !window.location.hostname.includes('run.app'))) {
   let isRefreshing = false;
 
   // Forcer le rechargement automatique dès que le nouveau Service Worker prend le contrôle
@@ -50,15 +50,11 @@ if ('serviceWorker' in navigator) {
         }
       },
       onRegisterError(error) {
-        console.warn('SW registerSW fallback to direct /sw.js:', error);
-        navigator.serviceWorker.register('/sw.js').catch(err => {
-          console.debug('Fallback SW registration error:', err);
-        });
+        console.debug('SW registration notice:', error);
       }
     });
   } catch (err) {
-    console.warn('Vite PWA registerSW failed, fallback to native /sw.js registration:', err);
-    navigator.serviceWorker.register('/sw.js').catch(() => {});
+    console.debug('SW registration skipped:', err);
   }
 }
 

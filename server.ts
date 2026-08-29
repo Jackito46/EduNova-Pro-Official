@@ -9,6 +9,7 @@ import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { GoogleGenAI } from '@google/genai';
 import { BackupBackendService } from './services/backupBackendService';
+import { exportProjectToGitHub } from './services/githubExporterService';
 
 dotenv.config();
 
@@ -1164,6 +1165,39 @@ async function startServer() {
       } catch (e) {}
     }
   }, 10 * 60 * 1000); // Check every 10 minutes
+
+  // API Endpoint for Exporting Project to GitHub
+  app.post('/api/export-github', async (req, res) => {
+    const { token, owner, repo, branch, commitMessage } = req.body;
+
+    if (!token) {
+      return res.status(400).json({ error: 'Le token GitHub personnel est requis.' });
+    }
+
+    const targetOwner = (owner || 'Jackito46').trim();
+    const targetRepo = (repo || 'EduNova-Pro-Official').trim();
+    const targetBranch = (branch || 'main').trim();
+    const targetMessage = commitMessage || `Exportation synchronisée depuis EduNova Pro (${new Date().toLocaleString('fr-FR')})`;
+
+    try {
+      console.log(`[GitHub Export] Starting export to ${targetOwner}/${targetRepo} on branch ${targetBranch}...`);
+      const result = await exportProjectToGitHub(
+        token,
+        targetOwner,
+        targetRepo,
+        targetBranch,
+        targetMessage,
+        (step, percent) => {
+          console.log(`[GitHub Export Progress] ${percent}% - ${step}`);
+        }
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error('[GitHub Export Error]:', error);
+      res.status(500).json({ error: error.message || 'Échec de l\'exportation vers GitHub' });
+    }
+  });
 
   // Explicit routes for favicon.ico, favicon.png, and logo.png to ensure they don't fall back to SPA index.html
   app.get('/favicon.ico', (req, res) => {
