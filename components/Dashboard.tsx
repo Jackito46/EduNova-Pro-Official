@@ -1562,21 +1562,11 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                   colorScheme="indigo"
                 />
               )}
-
-              {/* Refresh Button */}
-              <button 
-                onClick={() => fetchDashboardStats()}
-                disabled={loading}
-                className="p-1.5 text-slate-500 hover:text-indigo-600 bg-white hover:bg-indigo-50/50 border border-slate-200/90 hover:border-indigo-200 shadow-2xs rounded-xl transition-all duration-200 disabled:opacity-50 shrink-0"
-                title="Rafraîchir les données du tableau de bord"
-              >
-                <RefreshCcw size={14} className={`stroke-[2.2] ${loading ? 'animate-spin text-indigo-600' : ''}`} />
-              </button>
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
           {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR, UserRole.ACCOUNTANT].includes(user.role) && (
             <>
               <div className="relative flex-1 lg:max-w-64 group">
@@ -1647,6 +1637,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 )}
               </div>
+
+              {/* Bouton Rafraîchir Moderne & Fluide */}
+              <button 
+                onClick={() => fetchDashboardStats()}
+                disabled={loading}
+                className="inline-flex items-center justify-center px-3 py-2.5 min-h-[44px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs transition-all duration-200 disabled:opacity-50 group shrink-0 active:scale-95"
+                title="Rafraîchir les données et statistiques du tableau de bord"
+              >
+                <RefreshCcw size={16} className={`stroke-[2.2] transition-transform duration-500 ${loading ? 'animate-spin text-indigo-600' : 'group-hover:rotate-180'}`} />
+                <span className="hidden xl:inline-block ml-2 text-xs font-bold text-slate-700 group-hover:text-indigo-600">Actualiser</span>
+              </button>
+
               <button 
                 onClick={() => navigate('/eleves/ajouter')}
                 className="inline-flex items-center justify-center px-4 py-3 min-h-[44px] border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap lg:w-auto"
