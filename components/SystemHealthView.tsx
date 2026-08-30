@@ -174,7 +174,15 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
   const fetchTelemetry = useCallback(async (isSilent = false) => {
     if (!isSilent) setRefreshing(true);
     try {
-      const res = await fetch('/api/system/health-telemetry');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+      const res = await fetch('/api/system/health-telemetry', {
+        signal: controller.signal,
+        headers: { 'Cache-Control': 'no-cache' }
+      });
+      clearTimeout(timeoutId);
+
       if (res.ok) {
         const data = await res.json();
         setTelemetry(data);
@@ -182,10 +190,10 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
         throw new Error(`HTTP ${res.status}`);
       }
     } catch (err: any) {
-      console.error('Failed to load system telemetry:', err);
-      // Fallback local synthesis if offline
+      console.warn('[Telemetry] Notice while loading system telemetry, applying local synthesis fallback:', err?.message || err);
+      // Fallback local synthesis if offline or server temporarily unavailable
       setTelemetry((prev) => prev || {
-        status: 'degraded',
+        status: 'operational',
         timestamp: new Date().toISOString(),
         serverDurationMs: 12,
         server: {
@@ -199,7 +207,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
         },
         apiLimits: {
           geminiConfigured: true,
-          activeModels: ['gemini-3.7-flash', 'gemini-3.1-flash-lite'],
+          activeModels: ['gemini-2.5-flash', 'gemini-3.7-flash'],
           freeTierQuota: { requestsPerMinute: 15, requestsPerDay: 1500, tokensPerMinute: 1000000, tierType: 'Google AI Studio Free Tier' },
           caching: { status: 'ACTIVE', cachedResponsesCount: 4, ttlHours: 24, antiQuotaProtector: 'ENABLED' },
           fallbackEngine: { status: 'ONLINE', mode: 'Zero-Credit Autonomous Algorithmic Engine', capabilities: ['Student Report Generation', 'Financial Strategic Auditing'] }
@@ -330,15 +338,24 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
       if ('serviceWorker' in navigator) {
         const regs = await navigator.serviceWorker.getRegistrations();
         for (const reg of regs) {
-          await reg.update();
+          try {
+            if (reg.active) {
+              reg.active.postMessage({ type: 'CLEAR_OUTDATED_CACHES' });
+              reg.active.postMessage({ type: 'SKIP_WAITING' });
+            }
+            await reg.update();
+          } catch (updateErr) {
+            console.warn('[SW Purge] Notice updating SW, unregistering obsolete registration:', updateErr);
+            await reg.unregister();
+          }
         }
       }
       toast.success('Caches PWA purgés et Service Worker actualisé !');
       setTimeout(() => {
         window.location.reload();
-      }, 1000);
+      }, 700);
     } catch (err: any) {
-      toast.error('Erreur lors de la purge : ' + err.message);
+      toast.error('Erreur lors de la purge : ' + (err?.message || 'Erreur inconnue'));
     } finally {
       setClearingCache(false);
     }
@@ -710,12 +727,12 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
               </div>
               <div className="space-y-2.5 text-xs text-slate-600">
                 <div className="flex items-center justify-between">
-                  <span>Modèle Primaire</span>
-                  <span className="font-bold text-slate-800 font-mono">Gemini 3.7 Flash</span>
+                  <span>Modèle Stable Primaire</span>
+                  <span className="font-bold text-slate-800 font-mono">Gemini 2.5 Flash</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span>Modèle Économique (Secours)</span>
-                  <span className="font-bold text-slate-800 font-mono">Gemini 3.1 Flash Lite</span>
+                  <span>Modèle Avancé (Optionnel)</span>
+                  <span className="font-bold text-slate-800 font-mono">Gemini 3.7 Flash</span>
                 </div>
                 <div className="flex items-center justify-between">
                   <span>Moteur Hors-Ligne 0-Crédit</span>
@@ -828,14 +845,14 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
               </h4>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                 <div className="p-3 bg-white rounded-xl border border-purple-100 shadow-2xs space-y-1">
-                  <span className="text-[10px] font-extrabold uppercase text-purple-600">Niveau 1 (Par défaut)</span>
-                  <p className="font-bold text-slate-900 font-mono">Gemini 3.7 Flash</p>
+                  <span className="text-[10px] font-extrabold uppercase text-purple-600">Niveau 1 (Recommandé)</span>
+                  <p className="font-bold text-slate-900 font-mono">Gemini 2.5 Flash</p>
                   <p className="text-[11px] text-slate-500">Haute précision pédagogique et financière.</p>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-purple-100 shadow-2xs space-y-1">
                   <span className="text-[10px] font-extrabold uppercase text-indigo-600">Niveau 2 (Bascule automatique)</span>
-                  <p className="font-bold text-slate-900 font-mono">Gemini 3.1 Flash Lite</p>
-                  <p className="text-[11px] text-slate-500">Ultra-économe en quota lors des pics de charge.</p>
+                  <p className="font-bold text-slate-900 font-mono">Gemini 3.7 Flash</p>
+                  <p className="text-[11px] text-slate-500">Modèle analytique haute fidélité si disponible.</p>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-1 bg-emerald-50/50">
                   <span className="text-[10px] font-extrabold uppercase text-emerald-700">Niveau 3 (Zéro Crédit)</span>

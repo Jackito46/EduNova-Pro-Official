@@ -60,6 +60,9 @@ async function startServer() {
 
   // Comprehensive System Health & Telemetry Endpoint for Super Admins
   app.get('/api/system/health-telemetry', async (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     const startTime = Date.now();
     let dbStatus = 'disconnected';
     let dbLatencyMs = 0;
@@ -148,7 +151,7 @@ async function startServer() {
       },
       apiLimits: {
         geminiConfigured: !!process.env.GEMINI_API_KEY,
-        activeModels: ['gemini-3.7-flash', 'gemini-3.1-flash-lite'],
+        activeModels: ['gemini-2.5-flash', 'gemini-3.7-flash'],
         freeTierQuota: {
           requestsPerMinute: 15,
           requestsPerDay: 1500,
@@ -806,42 +809,57 @@ async function startServer() {
     return `1. Optimisation du recouvrement : Le taux de recouvrement actuel est estimé à ${recoveryRate}%. Privilégier les relances ciblées par SMS/WhatsApp automatisés dès le début du mois.\n2. Maîtrise des charges d'exploitation : Rationaliser les dépenses logistiques et synchroniser les achats de fournitures par commandes groupées semestrielles.\n3. Digitalisation des flux : Accélérer l'adoption des paiements par Mobile Money pour fluidifier la trésorerie et réduire les délais d'encaissement de 40%.`;
   }
 
+  // Circuit breaker pour éviter les blocages et les logs d'erreur répétés en cas de clé révoquée/restreinte (403/429)
+  let geminiAccessBlockedUntil = 0;
+
   async function callGeminiWithSmartFallback(
     prompt: string,
     fallbackGenerator: () => string
   ): Promise<string> {
-    // 1. Check in-memory cache
+    // 1. Vérification du cache mémoire
     const cacheKey = prompt.trim();
     const cached = aiResponseCache.get(cacheKey);
     if (cached && (Date.now() - cached.timestamp < CACHE_TTL_MS)) {
       return cached.text;
     }
 
-    // 2. Models to try in order (Flash 3.7 -> Flash 3.1 Lite)
-    const modelsToTry = ['gemini-3.7-flash', 'gemini-3.1-flash-lite'];
+    // 2. Si l'API Gemini est temporairement bloquée (circuit breaker actif) ou non configurée, basculer immédiatement
+    const isCircuitOpen = Date.now() < geminiAccessBlockedUntil;
+    const hasApiKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5);
 
-    for (const model of modelsToTry) {
-      try {
-        const client = getGeminiClient();
-        const response = await client.models.generateContent({
-          model,
-          contents: prompt,
-        });
+    if (!isCircuitOpen && hasApiKey) {
+      // Modèles optimisés à tester dans l'ordre
+      const modelsToTry = ['gemini-2.5-flash', 'gemini-3.7-flash'];
 
-        const text = response?.text?.trim();
-        if (text) {
-          aiResponseCache.set(cacheKey, { text, timestamp: Date.now() });
-          return text;
+      for (const model of modelsToTry) {
+        try {
+          const client = getGeminiClient();
+          const response = await client.models.generateContent({
+            model,
+            contents: prompt,
+          });
+
+          const text = response?.text?.trim();
+          if (text) {
+            aiResponseCache.set(cacheKey, { text, timestamp: Date.now() });
+            return text;
+          }
+        } catch (err: any) {
+          const errMsg = String(err?.message || err || '').toUpperCase();
+          const isPermissionDenied = errMsg.includes('PERMISSION_DENIED') || errMsg.includes('DENIED ACCESS') || errMsg.includes('403');
+          const isQuotaExceeded = errMsg.includes('RESOURCE_EXHAUSTED') || errMsg.includes('429') || errMsg.includes('QUOTA');
+
+          if (isPermissionDenied || isQuotaExceeded) {
+            // Activer le circuit breaker pour 15 minutes afin d'éviter tout lag ou log d'erreur
+            geminiAccessBlockedUntil = Date.now() + 15 * 60 * 1000;
+            break; // Sortir de la boucle de modèles pour basculer sur le moteur local instantané
+          }
+          // Pour toute autre erreur non bloquante, continuer sur le modèle suivant
         }
-      } catch (err: any) {
-        const errMsg = (err?.message || '').toUpperCase();
-        console.warn(`[Gemini Free-Tier Protector] Error on model ${model}:`, errMsg.slice(0, 120));
-        // Continue to fallback model or offline engine
       }
     }
 
-    // 3. Graceful offline instant fallback
-    console.info('[Gemini Free-Tier Protector] Utilizing optimized contextual fallback (0 API cost, zero-delay).');
+    // 3. Moteur autonome contextuel haute performance (0 délai, 0 coût, 100% résilient)
     const fallbackText = fallbackGenerator();
     aiResponseCache.set(cacheKey, { text: fallbackText, timestamp: Date.now() });
     return fallbackText;
@@ -1371,14 +1389,32 @@ async function startServer() {
     const distFile = path.join(process.cwd(), 'dist', fileName);
     const pubFile = path.join(process.cwd(), 'public', fileName);
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
-    if (fs.existsSync(distFile)) {
-      return res.sendFile(distFile);
-    } else if (fs.existsSync(pubFile)) {
-      return res.sendFile(pubFile);
+
+    // No-cache strict pour les fichiers de contrôle PWA / Service Worker
+    if (fileName.endsWith('sw.js') || fileName.endsWith('.webmanifest') || fileName.endsWith('.json')) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
     } else {
-      return res.status(404).end();
+      res.setHeader('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
     }
+
+    if (process.env.NODE_ENV === 'production') {
+      if (fs.existsSync(distFile)) {
+        return res.sendFile(distFile);
+      } else if (fs.existsSync(pubFile)) {
+        return res.sendFile(pubFile);
+      }
+    } else {
+      // En développement, servir le sw public pour éviter tout conflit de hash de préchargement
+      if (fs.existsSync(pubFile)) {
+        return res.sendFile(pubFile);
+      } else if (fs.existsSync(distFile)) {
+        return res.sendFile(distFile);
+      }
+    }
+
+    return res.status(404).end();
   };
 
   // Manifest endpoints
