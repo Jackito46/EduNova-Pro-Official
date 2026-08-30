@@ -1330,7 +1330,7 @@ async function startServer() {
     }
   }, 10 * 60 * 1000); // Check every 10 minutes
 
-  // API Endpoint for Exporting Project to GitHub
+  // API Endpoint for Exporting Project to GitHub with Real-time Progress Streaming
   app.post('/api/export-github', async (req, res) => {
     const { token, owner, repo, branch, commitMessage } = req.body;
 
@@ -1343,23 +1343,56 @@ async function startServer() {
     const targetBranch = (branch || 'main').trim();
     const targetMessage = commitMessage || `Exportation synchronisée depuis EduNova Pro (${new Date().toLocaleString('fr-FR')})`;
 
-    try {
-      console.log(`[GitHub Export] Starting export to ${targetOwner}/${targetRepo} on branch ${targetBranch}...`);
-      const result = await exportProjectToGitHub(
-        token,
-        targetOwner,
-        targetRepo,
-        targetBranch,
-        targetMessage,
-        (step, percent) => {
-          console.log(`[GitHub Export Progress] ${percent}% - ${step}`);
-        }
-      );
+    // Check if client prefers NDJSON streaming
+    const acceptsStreaming = req.headers['accept']?.includes('application/x-ndjson') || req.headers['accept']?.includes('text/event-stream') || true;
 
-      res.json(result);
-    } catch (error: any) {
-      console.error('[GitHub Export Error]:', error);
-      res.status(500).json({ error: error.message || 'Échec de l\'exportation vers GitHub' });
+    if (acceptsStreaming) {
+      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache, no-transform');
+      res.setHeader('Connection', 'keep-alive');
+
+      const sendChunk = (data: any) => {
+        try {
+          res.write(JSON.stringify(data) + '\n');
+        } catch (e) {}
+      };
+
+      try {
+        console.log(`[GitHub Export] Starting export to ${targetOwner}/${targetRepo} on branch ${targetBranch}...`);
+        sendChunk({ type: 'progress', step: "Initialisation de l'exportation des sources...", percent: 5 });
+
+        const result = await exportProjectToGitHub(
+          token,
+          targetOwner,
+          targetRepo,
+          targetBranch,
+          targetMessage,
+          (step, percent) => {
+            sendChunk({ type: 'progress', step, percent });
+            console.log(`[GitHub Export Progress] ${percent}% - ${step}`);
+          }
+        );
+
+        sendChunk({ type: 'result', success: true, ...result });
+        res.end();
+      } catch (error: any) {
+        console.error('[GitHub Export Error]:', error);
+        sendChunk({ type: 'error', error: error.message || 'Échec de l\'exportation vers GitHub' });
+        res.end();
+      }
+    } else {
+      try {
+        const result = await exportProjectToGitHub(
+          token,
+          targetOwner,
+          targetRepo,
+          targetBranch,
+          targetMessage
+        );
+        res.json(result);
+      } catch (error: any) {
+        res.status(500).json({ error: error.message || 'Échec de l\'exportation vers GitHub' });
+      }
     }
   });
 

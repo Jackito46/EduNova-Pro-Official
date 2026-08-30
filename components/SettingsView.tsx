@@ -1495,7 +1495,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     } catch (e) {}
 
     setIsExportingGitHub(true);
-    setGithubExportProgress({ step: "Initialisation de l'exportation...", percent: 5 });
+    setGithubExportProgress({ step: "Connexion et analyse des sources du projet...", percent: 5 });
     setGithubExportResult(null);
 
     try {
@@ -1503,6 +1503,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/x-ndjson, application/json',
           'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token || ''}`
         },
         body: JSON.stringify({
@@ -1514,22 +1515,84 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         })
       });
 
-      const data = await response.json();
+      if (!response.ok && !response.body) {
+        let errMessage = "Une erreur est survenue lors de l'exportation vers GitHub.";
+        try {
+          const errData = await response.json();
+          errMessage = errData.error || errMessage;
+        } catch (e) {}
+        throw new Error(errMessage);
+      }
 
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || "Une erreur est survenue lors de l'exportation vers GitHub.");
+      let exportFinalResult: any = null;
+
+      if (response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed) continue;
+            try {
+              const payload = JSON.parse(trimmed);
+              if (payload.type === 'progress') {
+                setGithubExportProgress({ step: payload.step, percent: payload.percent });
+              } else if (payload.type === 'result' || payload.success) {
+                exportFinalResult = payload;
+              } else if (payload.type === 'error' || payload.error) {
+                throw new Error(payload.error || "Erreur lors de l'exportation vers GitHub.");
+              }
+            } catch (jsonErr: any) {
+              if (jsonErr.message && !jsonErr.message.includes('JSON')) {
+                throw jsonErr;
+              }
+            }
+          }
+        }
+
+        // Process any remaining text in buffer
+        if (buffer.trim()) {
+          try {
+            const payload = JSON.parse(buffer.trim());
+            if (payload.type === 'result' || payload.success) {
+              exportFinalResult = payload;
+            } else if (payload.type === 'error' || payload.error) {
+              throw new Error(payload.error || "Erreur lors de l'exportation vers GitHub.");
+            }
+          } catch (e) {}
+        }
+      } else {
+        const data = await response.json();
+        if (!data.success) {
+          throw new Error(data.error || "Une erreur est survenue lors de l'exportation vers GitHub.");
+        }
+        exportFinalResult = data;
+      }
+
+      if (!exportFinalResult || !exportFinalResult.success) {
+        throw new Error(exportFinalResult?.error || "L'exportation n'a pas pu être validée.");
       }
 
       setGithubExportResult({
         success: true,
-        commitSha: data.commitSha,
-        filesCount: data.filesCount,
-        repoUrl: data.repoUrl,
-        commitUrl: data.commitUrl
+        commitSha: exportFinalResult.commitSha,
+        filesCount: exportFinalResult.filesCount,
+        modifiedFilesCount: exportFinalResult.modifiedFilesCount,
+        repoUrl: exportFinalResult.repoUrl,
+        commitUrl: exportFinalResult.commitUrl
       });
 
-      setGithubExportProgress({ step: "Exportation terminée avec succès !", percent: 100 });
-      toast.success(`Projet exporté avec succès vers ${githubOwner}/${githubRepo} (${data.filesCount} fichiers) !`);
+      setGithubExportProgress({ step: "Exportation des sources terminée avec succès !", percent: 100 });
+      toast.success(`Projet exporté avec succès vers ${githubOwner}/${githubRepo} (${exportFinalResult.filesCount} fichiers) !`);
 
       await AuditLogger.log({
         school_id: user.school_id,
@@ -1540,8 +1603,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           action: 'GITHUB_EXPORT',
           repo: `${githubOwner}/${githubRepo}`,
           branch: githubBranch,
-          commitSha: data.commitSha,
-          filesCount: data.filesCount
+          commitSha: exportFinalResult.commitSha,
+          filesCount: exportFinalResult.filesCount
         }
       });
     } catch (err: any) {
@@ -1641,11 +1704,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
            </p>
            <button
              type="button"
+             id="btn-github-export-sidebar"
              onClick={() => setIsGitHubModalOpen(true)}
-             className="w-full py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer"
+             disabled={isExportingGitHub}
+             className="w-full py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-85"
            >
-             <GitPullRequest size={14} />
-             <span>Exporter vers GitHub</span>
+             {isExportingGitHub ? (
+               <>
+                 <Loader2 size={14} className="animate-spin text-indigo-600 shrink-0" />
+                 <span>Envoi GitHub ({githubExportProgress?.percent || 0}%)...</span>
+               </>
+             ) : (
+               <>
+                 <GitPullRequest size={14} />
+                 <span>Exporter vers GitHub</span>
+               </>
+             )}
            </button>
          </div>
        )}
@@ -4201,11 +4275,23 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   </div>
                   
                   <button 
+                    type="button"
+                    id="btn-github-export-security-tab"
                     onClick={() => setIsGitHubModalOpen(true)}
-                    className="px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap cursor-pointer"
+                    disabled={isExportingGitHub}
+                    className="px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-85"
                   >
-                    <GitPullRequest size={15} />
-                    Exporter vers GitHub
+                    {isExportingGitHub ? (
+                      <>
+                        <Loader2 size={15} className="animate-spin text-indigo-600 shrink-0" />
+                        <span>Envoi en cours ({githubExportProgress?.percent || 0}%)...</span>
+                      </>
+                    ) : (
+                      <>
+                        <GitPullRequest size={15} />
+                        <span>Exporter vers GitHub</span>
+                      </>
+                    )}
                   </button>
                 </div>
                 
@@ -4990,21 +5076,45 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
             </div>
 
-            {/* Progress Status */}
+            {/* Progress Status Card with Step Tracker */}
             {isExportingGitHub && githubExportProgress && (
-              <div className="bg-slate-900 text-white p-4 rounded-xl space-y-2.5 animate-fadeIn">
+              <div className="bg-slate-900 border border-indigo-900/50 text-white p-4 rounded-xl space-y-3 animate-fadeIn shadow-lg shadow-indigo-950/20">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-200">
-                  <span className="flex items-center gap-2">
-                    <Loader2 size={14} className="animate-spin text-indigo-400" />
-                    {githubExportProgress.step}
+                  <span className="flex items-center gap-2.5">
+                    <Loader2 size={15} className="animate-spin text-indigo-400 shrink-0" />
+                    <span className="truncate max-w-[280px] sm:max-w-xs">{githubExportProgress.step}</span>
                   </span>
-                  <span className="font-mono text-indigo-300">{githubExportProgress.percent}%</span>
+                  <span className="font-mono text-xs bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 rounded text-indigo-300 font-bold shrink-0">
+                    {githubExportProgress.percent}%
+                  </span>
                 </div>
-                <div className="w-full h-2 bg-slate-800 rounded-full overflow-hidden">
+
+                {/* Animated Progress Bar */}
+                <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
                   <div 
-                    className="h-full bg-gradient-to-r from-indigo-500 to-emerald-400 rounded-full transition-all duration-300"
-                    style={{ width: `${githubExportProgress.percent}%` }}
+                    className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-emerald-400 rounded-full transition-all duration-300 ease-out"
+                    style={{ width: `${Math.max(5, githubExportProgress.percent)}%` }}
                   />
+                </div>
+
+                {/* Step checkpoints */}
+                <div className="grid grid-cols-4 gap-1 text-[10px] text-slate-400 pt-0.5 border-t border-slate-800/80">
+                  <div className={`flex items-center gap-1 ${githubExportProgress.percent >= 10 ? 'text-indigo-300 font-bold' : ''}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${githubExportProgress.percent >= 10 ? 'bg-indigo-400' : 'bg-slate-700'}`} />
+                    <span>Analyse</span>
+                  </div>
+                  <div className={`flex items-center gap-1 ${githubExportProgress.percent >= 30 ? 'text-indigo-300 font-bold' : ''}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${githubExportProgress.percent >= 30 ? 'bg-indigo-400' : 'bg-slate-700'}`} />
+                    <span>Deltas</span>
+                  </div>
+                  <div className={`flex items-center gap-1 ${githubExportProgress.percent >= 80 ? 'text-indigo-300 font-bold' : ''}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${githubExportProgress.percent >= 80 ? 'bg-indigo-400' : 'bg-slate-700'}`} />
+                    <span>Blobs</span>
+                  </div>
+                  <div className={`flex items-center gap-1 ${githubExportProgress.percent >= 95 ? 'text-emerald-300 font-bold' : ''}`}>
+                    <span className={`w-1.5 h-1.5 rounded-full ${githubExportProgress.percent >= 95 ? 'bg-emerald-400' : 'bg-slate-700'}`} />
+                    <span>Commit</span>
+                  </div>
                 </div>
               </div>
             )}
@@ -5046,29 +5156,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
             <button
               type="button"
+              id="btn-github-modal-close"
               onClick={() => setIsGitHubModalOpen(false)}
               disabled={isExportingGitHub}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all disabled:opacity-50"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer"
             >
               Fermer
             </button>
             <button
               type="button"
+              id="btn-github-export-modal"
               onClick={handleExportToGitHub}
               disabled={isExportingGitHub || !githubToken.trim() || !githubOwner.trim() || !githubRepo.trim()}
-              className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed active:scale-95"
+              className="relative overflow-hidden px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 group min-w-[200px]"
             >
-              {isExportingGitHub ? (
-                <>
-                  <Loader2 size={14} className="animate-spin text-white" />
-                  <span>Exportation en cours...</span>
-                </>
-              ) : (
-                <>
-                  <GitPullRequest size={14} />
-                  <span>Lancer l'exportation GitHub</span>
-                </>
+              {isExportingGitHub && (
+                <div 
+                  className="absolute inset-0 bg-indigo-600/40 transition-all duration-300 ease-out pointer-events-none"
+                  style={{ width: `${Math.max(5, githubExportProgress?.percent || 0)}%` }}
+                />
               )}
+              <span className="relative z-10 flex items-center gap-2">
+                {isExportingGitHub ? (
+                  <>
+                    <Loader2 size={15} className="animate-spin text-indigo-300 shrink-0" />
+                    <span>
+                      {githubExportProgress?.percent !== undefined
+                        ? `Envoi des sources (${githubExportProgress.percent}%)...`
+                        : "Envoi des sources en cours..."}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <GitPullRequest size={15} className="text-white group-hover:scale-110 transition-transform" />
+                    <span>Lancer l'exportation GitHub</span>
+                  </>
+                )}
+              </span>
             </button>
           </div>
         </div>

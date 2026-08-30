@@ -354,44 +354,117 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
 
   const fetchSchools = useCallback(async () => {
     setLoading(true);
-    const { data, error } = await supabase
-      .from('v_schools_with_counts')
-      .select('*')
-      .order('created_at', { ascending: false });
-      
-    if (error) {
-      console.error("Erreur CRITIQUE lors de la récupération des écoles:", error);
-      setError(error.message || "Erreur de chargement des établissements.");
-      toast.error("Erreur de chargement des écoles : " + error.message);
-    }
-      
-    if (!error && data) {
-      try {
-        const { data: campusesData, error: campusesError } = await supabase
-          .from('school_campuses')
-          .select('id, school_id');
-        
-        if (!campusesError && campusesData) {
-          const campusCountsMap: Record<string, number> = {};
-          campusesData.forEach((c: any) => {
-            if (c.school_id) {
-              campusCountsMap[c.school_id] = (campusCountsMap[c.school_id] || 0) + 1;
-            }
-          });
-          const schoolsWithAnnexCount = data.map((school: any) => ({
-            ...school,
-            annex_count: campusCountsMap[school.id] || 0
-          }));
-          setSchools(schoolsWithAnnexCount);
-        } else {
-          setSchools(data);
+    setError(null);
+    let resolvedSchools: any[] | null = null;
+
+    try {
+      // Stratégie 1: Vue SQL optimisée avec décomptes
+      const { data: viewData, error: viewError } = await supabase
+        .from('v_schools_with_counts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (!viewError && Array.isArray(viewData) && viewData.length > 0) {
+        resolvedSchools = viewData;
+      } else {
+        if (viewError) {
+          console.warn("[SuperAdmin] Notice vue 'v_schools_with_counts', bascule vers la table 'schools':", viewError?.message || viewError);
         }
-      } catch (err) {
-        console.error("Erreur lors du comptage des annexes:", err);
-        setSchools(data);
+        // Stratégie 2: Requête directe sur la table schools
+        const { data: tableData, error: tableError } = await supabase
+          .from('schools')
+          .select('*')
+          .order('created_at', { ascending: false });
+
+        if (!tableError && Array.isArray(tableData)) {
+          // Enrichissement optionnel avec le décompte des profils si possible
+          try {
+            const { data: profilesSample } = await supabase.from('profiles').select('school_id');
+            const profileCounts: Record<string, number> = {};
+            if (profilesSample) {
+              profilesSample.forEach((p: any) => {
+                if (p.school_id) profileCounts[p.school_id] = (profileCounts[p.school_id] || 0) + 1;
+              });
+            }
+            resolvedSchools = tableData.map((s: any) => ({
+              ...s,
+              profiles_count: profileCounts[s.id] || 0
+            }));
+          } catch {
+            resolvedSchools = tableData;
+          }
+        } else if (tableError) {
+          throw tableError;
+        }
       }
+
+      if (resolvedSchools && Array.isArray(resolvedSchools)) {
+        // Comptage optionnel des annexes multi-campus
+        try {
+          const { data: campusesData, error: campusesError } = await supabase
+            .from('school_campuses')
+            .select('id, school_id');
+
+          if (!campusesError && campusesData) {
+            const campusCountsMap: Record<string, number> = {};
+            campusesData.forEach((c: any) => {
+              if (c.school_id) {
+                campusCountsMap[c.school_id] = (campusCountsMap[c.school_id] || 0) + 1;
+              }
+            });
+            resolvedSchools = resolvedSchools.map((school: any) => ({
+              ...school,
+              annex_count: campusCountsMap[school.id] || 0
+            }));
+          }
+        } catch (campusErr) {
+          console.warn("[SuperAdmin] Comptage des annexes non bloquant:", campusErr);
+        }
+
+        setSchools(resolvedSchools);
+        setError(null);
+        // Mise en cache locale pour résilience hors-ligne
+        try {
+          window.localStorage.setItem('edunova_cached_schools_superadmin', JSON.stringify(resolvedSchools));
+        } catch {}
+      } else {
+        // Fallback local cache si le serveur renvoie une liste vide en état d'erreur
+        const localCached = window.localStorage.getItem('edunova_cached_schools_superadmin');
+        if (localCached) {
+          const parsed = JSON.parse(localCached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSchools(parsed);
+            setError(null);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.warn("[SuperAdmin] Récupération réseau des écoles indisponible:", err?.message || err);
+      // Tentative de récupération depuis le cache local avant d'afficher une erreur
+      let cacheLoaded = false;
+      try {
+        const localCached = window.localStorage.getItem('edunova_cached_schools_superadmin');
+        if (localCached) {
+          const parsed = JSON.parse(localCached);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setSchools(parsed);
+            setError(null);
+            cacheLoaded = true;
+            toast.info("Mode hors-ligne : données des établissements chargées depuis le cache local.");
+          }
+        }
+      } catch {}
+
+      if (!cacheLoaded) {
+        const isNetwork = err?.message?.includes('fetch') || err?.code === 'NETWORK_ERROR' || !navigator.onLine;
+        const msg = isNetwork
+          ? "Connexion réseau instable : impossible de synchroniser les établissements en direct."
+          : (err?.message || "Erreur de chargement des établissements.");
+        setError(msg);
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   const handleAnonymizeStudents = async (force = false) => {
