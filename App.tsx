@@ -61,6 +61,7 @@ import { OfflineDashboard } from './components/OfflineDashboard';
 import Login from './components/Login';
 import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { SuperAdminRoute } from './components/SuperAdminRoute';
+import { SystemHealthView } from './components/SystemHealthView';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { UserProfile, UserRole } from './types';
 import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken } from './supabase';
@@ -223,6 +224,21 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
               <Route path="/super-admin" element={
                 <SuperAdminRoute user={user}>
                   <SuperAdminDashboard user={user} />
+                </SuperAdminRoute>
+              } />
+              <Route path="/super-admin/system-health" element={
+                <SuperAdminRoute user={user}>
+                  <SystemHealthView user={user} />
+                </SuperAdminRoute>
+              } />
+              <Route path="/super-admin/sante-systeme" element={
+                <SuperAdminRoute user={user}>
+                  <SystemHealthView user={user} />
+                </SuperAdminRoute>
+              } />
+              <Route path="/system-health" element={
+                <SuperAdminRoute user={user}>
+                  <SystemHealthView user={user} />
                 </SuperAdminRoute>
               } />
 

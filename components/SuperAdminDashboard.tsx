@@ -18,6 +18,7 @@ import { UserProfile, SchoolType } from '../types';
 import { RetryableError } from './RetryableError';
 import { SystemAlertsView } from './SystemAlertsView';
 import { BackupManagementView } from './BackupManagementView';
+import { SystemHealthView } from './SystemHealthView';
 
 interface SuperAdminDashboardProps {
   user: UserProfile;
@@ -181,7 +182,7 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
   }>({ isOpen: false, schoolId: '', name: '', email: '', director_name: '', phone: '', address: '', has_multi_campus: false });
 
   // View State
-  const [activeView, setActiveView] = useState<'schools' | 'users' | 'logs' | 'alerts' | 'config' | 'system' | 'sessions' | 'backups'>('schools');
+  const [activeView, setActiveView] = useState<'schools' | 'health' | 'users' | 'logs' | 'alerts' | 'config' | 'system' | 'sessions' | 'backups'>('schools');
   const [filterExpired, setFilterExpired] = useState(false);
   const [schoolFilterTab, setSchoolFilterTab] = useState<'ALL' | 'ACTIVE' | 'EXPIRED' | 'MULTI_CAMPUS' | 'PROTECTED'>('ALL');
   const [schoolViewMode, setSchoolViewMode] = useState<'table' | 'grid'>('table');
@@ -1995,6 +1996,7 @@ const handleDeleteSchool = async () => {
           <div className="flex flex-wrap items-center gap-2">
             {[
               { id: 'schools', label: 'Établissements', icon: Building2, badge: stats.totalSchools },
+              { id: 'health', label: 'Santé Système & Quotas', icon: Activity },
               { id: 'backups', label: 'Sauvegardes & Restauration', icon: Archive },
               { id: 'sessions', label: 'Sessions & Sécurité', icon: KeyRound, actionExtra: fetchSecuritySessions },
               { id: 'alerts', label: 'Alertes Temps Réel', icon: ShieldAlert },
@@ -2349,6 +2351,7 @@ const handleDeleteSchool = async () => {
 
       {/* Main Content Area */}
       <div className="space-y-6">
+        {activeView === 'health' && <SystemHealthView user={user} />}
         {activeView === 'backups' && <BackupManagementView user={user} schools={schools} />}
         {activeView === 'alerts' && <SystemAlertsView user={user} />}
         {activeView === 'schools' && (() => {

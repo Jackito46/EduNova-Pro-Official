@@ -43,7 +43,8 @@ import {
   TrendingUp,
   KeyRound,
   Sparkles,
-  Building2
+  Building2,
+  Activity
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { motion } from 'framer-motion';
@@ -401,8 +402,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
           )}
 
           {user.is_super_admin && (
-            <div className="mt-8 pt-4 border-t border-slate-200">
+            <div className="mt-8 pt-4 border-t border-slate-200 space-y-1">
               <NavLink item={{ name: 'Super Administrateur', path: '/super-admin', icon: ShieldAlert }} />
+              <NavLink item={{ name: 'Santé Système & Quotas', path: '/super-admin/system-health', icon: Activity }} />
             </div>
           )}
         </nav>

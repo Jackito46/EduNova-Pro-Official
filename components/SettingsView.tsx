@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   School, 
   Calendar, 
@@ -93,6 +93,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   const canManageAllCampuses = !user.campus_id || userBelongsToSiege;
   const isSuperAdmin = Boolean(user.is_super_admin || (user.role as any) === UserRole.SUPER_ADMIN || (user.role as any) === 'SUPER_ADMIN');
 
+  // Détection du poste de développement (l'export/synchronisation GitHub est strictement réservé au poste de dev)
+  const isDevWorkstation = useMemo(() => {
+    if (import.meta.env.DEV) return true;
+    if (typeof window !== 'undefined') {
+      const host = window.location.hostname;
+      const port = window.location.port;
+      return (
+        host === 'localhost' ||
+        host === '127.0.0.1' ||
+        host.includes('ais-dev-') ||
+        host.includes('.local') ||
+        port === '3000' ||
+        port === '5173'
+      );
+    }
+    return false;
+  }, []);
+
   const [activeTab, setActiveTab] = useState<SettingsTab>('school');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -183,6 +201,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     success: boolean;
     commitSha?: string;
     filesCount?: number;
+    modifiedFilesCount?: number;
     repoUrl?: string;
     commitUrl?: string;
   } | null>(null);
@@ -1561,11 +1580,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        <p className="text-slate-700 mt-2 font-medium text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
       </div>
       <div className="flex items-center gap-3">
-       {isSuperAdmin && (
+       {isSuperAdmin && isDevWorkstation && (
         <button
          onClick={() => setIsGitHubModalOpen(true)}
          className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
-         title="Exporter l'ensemble du projet vers votre dépôt GitHub (Super Admin uniquement)"
+         title="Exporter l'ensemble du projet vers votre dépôt GitHub (Super Admin sur poste de développement uniquement)"
         >
          <GitBranch size={15} className="text-emerald-400" />
          <span>Exporter vers GitHub</span>
@@ -1600,8 +1619,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         ))}
        </div>
 
-       {/* GitHub Quick Access Card (Super Admin Exclusive) */}
-       {isSuperAdmin && (
+       {/* GitHub Quick Access Card (Super Admin Exclusive on Dev Workstation) */}
+       {isSuperAdmin && isDevWorkstation && (
          <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 p-5 rounded-2xl text-white shadow-md border border-slate-800 space-y-3">
            <div className="flex items-center justify-between">
              <div className="flex items-center gap-3">
@@ -1614,7 +1633,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                </div>
              </div>
              <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[9px] font-black uppercase tracking-wider">
-               Super Admin
+               Dev Only
              </span>
            </div>
            <p className="text-[11px] text-slate-300 leading-relaxed">
@@ -4160,8 +4179,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
         {activeTab === 'security' && (
           <div className="space-y-4 animate-in slide-in-from-right duration-500">
-            {/* Exporter vers GitHub (Super Admin Uniquement) */}
-            {isSuperAdmin && (
+            {/* Exporter vers GitHub (Super Admin Uniquement sur poste de développement) */}
+            {isSuperAdmin && isDevWorkstation && (
               <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
                 <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white">
                   <div className="flex items-center gap-3">

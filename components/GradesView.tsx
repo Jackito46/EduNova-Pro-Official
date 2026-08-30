@@ -33,6 +33,7 @@ import {
   FileDown,
   Maximize2,
   Minimize2,
+  Keyboard,
   Sliders,
   Expand,
   Shrink,
@@ -1330,7 +1331,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
             <p className="text-slate-500 font-medium text-xs">
-              Saisie fluide, scellage sécurisé et calcul automatique des moyennes
+              Calcul automatique et scellage sécurisé des notes
             </p>
           </div>
         </div>
@@ -1562,21 +1563,21 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {/* 4. BARRE D'OUTILS, COMMANDES D'AFFICHAGE & RECHERCHE */}
-      <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2 flex-1 min-w-[240px]">
-          <div className="relative flex-1 max-w-xs">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2 flex-1 min-w-[180px]">
+          <div className="relative flex-1 min-w-[140px] sm:min-w-[220px] max-w-sm sm:max-w-md">
             <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher un élève par nom ou matricule..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden"
+              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all"
             />
           </div>
 
           {/* Sélecteur de Hauteur de Vue */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 text-[11px] font-medium text-slate-600">
+          <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 text-[11px] font-medium text-slate-600 shrink-0">
             <span className="px-1.5 text-slate-400 font-bold text-[10px] uppercase">Hauteur:</span>
             <button
               type="button"
@@ -1628,42 +1629,30 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </button>
           </div>
 
-          {/* Sélecteur de Densité */}
-          <div className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 text-[11px] font-medium text-slate-600">
-            <span className="px-1.5 text-slate-400 font-bold text-[10px] uppercase">Densité:</span>
+          {/* Aide Navigation Raccourcis Clavier Compacte */}
+          <div className="relative group shrink-0">
             <button
               type="button"
-              onClick={() => setDensity("compact")}
-              className={`px-2 py-0.5 rounded transition-all ${
-                density === "compact"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
-              }`}
+              className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 text-xs font-medium transition-all"
+              title="Touches rapides de navigation clavier"
             >
-              Compact
+              <Keyboard size={13} className="text-blue-600 shrink-0" />
+              <span className="text-[11px]">Raccourcis</span>
             </button>
-            <button
-              type="button"
-              onClick={() => setDensity("comfortable")}
-              className={`px-2 py-0.5 rounded transition-all ${
-                density === "comfortable"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
-              }`}
-            >
-              Confort
-            </button>
-          </div>
-
-          <div className="hidden xl:flex items-center gap-1.5 text-[11px] text-slate-500 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-100">
-            <span className="font-bold text-blue-600">Navigation :</span>
-            <span><kbd className="px-1 py-0.2 bg-white border border-slate-200 rounded text-[10px]">Entrée/↓</kbd> Ligne suiv.</span>
-            <span>•</span>
-            <span><kbd className="px-1 py-0.2 bg-white border border-slate-200 rounded text-[10px]">Tab/→</kbd> Matière suiv.</span>
+            <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:flex group-focus-within:flex flex-col z-30 bg-slate-900 text-white text-[11px] p-2.5 rounded-lg shadow-xl border border-slate-800 whitespace-nowrap min-w-[210px] pointer-events-none">
+              <span className="font-bold text-blue-400 mb-1 flex items-center gap-1">
+                <Keyboard size={12} /> Navigation clavier :
+              </span>
+              <div className="space-y-1 text-slate-300">
+                <div><kbd className="px-1 py-0.2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white">Entrée</kbd> / <kbd className="px-1 py-0.2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white">↓</kbd> Ligne suiv.</div>
+                <div><kbd className="px-1 py-0.2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white">Tab</kbd> / <kbd className="px-1 py-0.2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white">→</kbd> Matière suiv.</div>
+                <div><kbd className="px-1 py-0.2 bg-slate-800 border border-slate-700 rounded text-[10px] text-white">Ctrl+S</kbd> Sceller les notes</div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {unsavedCount > 0 && (
             <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-200 animate-pulse">
               <AlertCircle size={12} />
@@ -1735,26 +1724,6 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   placeholder="Rechercher élève..."
                   className="pl-7 pr-2.5 py-1 bg-slate-800 border border-slate-700 rounded-lg text-xs font-medium text-slate-200 focus:bg-slate-900 focus:outline-hidden focus:border-blue-500"
                 />
-              </div>
-
-              {/* Densité en Plein écran */}
-              <div className="flex items-center gap-1 bg-slate-800 border border-slate-700 rounded-lg p-0.5 text-xs text-slate-300">
-                <button
-                  onClick={() => setDensity("compact")}
-                  className={`px-2 py-0.5 rounded text-[11px] ${
-                    density === "compact" ? "bg-blue-600 text-white font-bold" : "hover:text-white"
-                  }`}
-                >
-                  Compact
-                </button>
-                <button
-                  onClick={() => setDensity("comfortable")}
-                  className={`px-2 py-0.5 rounded text-[11px] ${
-                    density === "comfortable" ? "bg-blue-600 text-white font-bold" : "hover:text-white"
-                  }`}
-                >
-                  Confort
-                </button>
               </div>
 
               {unsavedCount > 0 && (

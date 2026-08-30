@@ -1,9 +1,10 @@
 /**
  * EduNova Pro - Service Worker
- * Version: 2.5.0
+ * Version: 3.2.0
  */
 
-const CACHE_NAME = 'edunova-pwa-v2.5.0';
+const CACHE_VERSION = 'v3.2';
+const CACHE_NAME = `edunova-pwa-${CACHE_VERSION}`;
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -30,20 +31,21 @@ self.addEventListener('install', (event) => {
   );
 });
 
+// Suppression automatique et agressive de tous les anciens caches lors de chaque montée de version
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    Promise.all([
-      self.clients.claim(),
-      caches.keys().then((keys) => {
-        return Promise.all(
-          keys.map((key) => {
-            if (key !== CACHE_NAME && key.startsWith('edunova-')) {
-              return caches.delete(key);
-            }
-          })
-        );
-      })
-    ])
+    (async () => {
+      const keys = await caches.keys();
+      await Promise.all(
+        keys.map((key) => {
+          if (key !== CACHE_NAME) {
+            console.log(`[EduNova SW Fallback] 🧹 Suppression ancien cache : ${key}`);
+            return caches.delete(key);
+          }
+        })
+      );
+      await self.clients.claim();
+    })()
   );
 });
 
