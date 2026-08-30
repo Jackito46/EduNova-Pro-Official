@@ -369,6 +369,7 @@ const App: React.FC = () => {
       return false;
     }
   });
+  const [loadingStage, setLoadingStage] = useState<1 | 2 | 3>(1);
   const [isExiting, setIsExiting] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [maintenanceMode, setMaintenanceMode] = useState(false);
@@ -592,6 +593,7 @@ const App: React.FC = () => {
     }, 2500);
 
     const initializeAuth = async (retryCount = 0) => {
+      setLoadingStage(1);
       const isLoggedOut = window.localStorage.getItem('edunova_logged_out') === 'true';
       const hasToken = hasStoredAuthToken();
 
@@ -619,6 +621,7 @@ const App: React.FC = () => {
       }
 
       console.log(`App.tsx: Starting initializeAuth (Attempt ${retryCount + 1})`);
+      setLoadingStage(2);
       let sessionTimeoutId: NodeJS.Timeout;
       try {
         const sessionPromise = supabase.auth.getSession();
@@ -650,6 +653,7 @@ const App: React.FC = () => {
         }
 
         if (session?.user && mounted) {
+          setLoadingStage(3);
           window.sessionStorage.setItem('edunova_session_active', 'true');
           const isRecoveryFlow = window.location.hash.includes('type=recovery') || window.location.search.includes('type=recovery');
           if (isRecoveryFlow) {
@@ -1172,9 +1176,28 @@ const App: React.FC = () => {
   }
 
   if (loading) {
-    console.log("App.tsx: Rendering AppLoadingScreen with explicit steps and memos");
+    console.log("App.tsx: Rendering AppLoadingScreen with dynamic stages and session hydration");
+    const cachedProfile = (() => {
+      try {
+        const raw = window.localStorage.getItem('edunova_user_profile');
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        return null;
+      }
+    })();
+
     return (
       <AppLoadingScreen
+        currentStage={loadingStage}
+        cachedUserName={cachedProfile?.full_name || cachedProfile?.email}
+        cachedUserRole={cachedProfile?.role}
+        isOffline={!navigator.onLine}
+        onContinueOffline={() => {
+          if (cachedProfile) {
+            setUser(cachedProfile);
+            setLoading(false);
+          }
+        }}
         onSkipToLogin={() => {
           setLoading(false);
           setUser(null);

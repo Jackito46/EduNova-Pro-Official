@@ -38,6 +38,8 @@ import {
   Expand,
   Shrink,
   ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
@@ -45,6 +47,8 @@ import { supabase } from "../supabase";
 import { useSchool } from "../contexts/SchoolContext";
 import { UserProfile } from "../types";
 import { AcademicSessionPill } from "./AcademicSessionPill";
+import { ClassSelectorPill } from "./ClassSelectorPill";
+import { SubjectSelectorPill } from "./SubjectSelectorPill";
 import Modal from "./Modal";
 import { AuditLogger } from "../utils/auditLogger";
 import { getExamsListForClass } from "../lib/evaluations";
@@ -202,6 +206,8 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [tableHeightMode, setTableHeightMode] = useState<"adaptive" | "fixed-500" | "fixed-750" | "full">("adaptive");
   const [density, setDensity] = useState<"compact" | "comfortable">("compact");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number | "ALL">(25);
 
   // Modale de nettoyage & Modale d'attribution massive
   const [isClearModalOpen, setIsClearModalOpen] = useState(false);
@@ -1012,6 +1018,34 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     });
   }, [students, searchTerm]);
 
+  // Réinitialiser la page courante quand la recherche, la classe ou la matière change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedClassId, selectedSubjectId, itemsPerPage]);
+
+  // PAGINATION DES ÉLÈVES
+  const totalPages = useMemo(() => {
+    if (itemsPerPage === "ALL" || filteredStudents.length === 0) return 1;
+    return Math.ceil(filteredStudents.length / itemsPerPage);
+  }, [filteredStudents.length, itemsPerPage]);
+
+  const paginatedStudents = useMemo(() => {
+    if (itemsPerPage === "ALL") return filteredStudents;
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredStudents.slice(start, start + itemsPerPage);
+  }, [filteredStudents, currentPage, itemsPerPage]);
+
+  const startIndex = useMemo(() => {
+    if (filteredStudents.length === 0) return 0;
+    if (itemsPerPage === "ALL") return 1;
+    return (currentPage - 1) * itemsPerPage + 1;
+  }, [filteredStudents.length, currentPage, itemsPerPage]);
+
+  const endIndex = useMemo(() => {
+    if (itemsPerPage === "ALL") return filteredStudents.length;
+    return Math.min(currentPage * itemsPerPage, filteredStudents.length);
+  }, [filteredStudents.length, currentPage, itemsPerPage]);
+
   // FILTRAGE DES COLONNES SELON MATIÈRE SÉLECTIONNÉE
   const activeColumns = useMemo(() => {
     if (selectedSubjectId === "ALL") {
@@ -1416,21 +1450,16 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </span>
               )}
             </div>
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              className="w-full bg-slate-50/80 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all"
-            >
-              {classes.length === 0 ? (
-                <option value="">Aucune classe disponible</option>
-              ) : (
-                classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {c.level ? `(${c.level})` : ""}
-                  </option>
-                ))
-              )}
-            </select>
+            <ClassSelectorPill
+              classes={classes}
+              selectedClassId={selectedClassId}
+              onSelectClass={(classId) => setSelectedClassId(classId === "all" ? (classes[0]?.id || "") : classId)}
+              allowAll={false}
+              labelPrefix=""
+              variant="field"
+              size="sm"
+              colorScheme="blue"
+            />
           </div>
 
           {/* Matière */}
@@ -1444,18 +1473,16 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 {subjects.length} assignée(s)
               </span>
             </div>
-            <select
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(e.target.value)}
-              className="w-full bg-slate-50/80 border border-slate-200 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all"
-            >
-              <option value="ALL">✨ Toutes les matières ({subjects.length})</option>
-              {subjects.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name} (Coef: {s.coefficient} • Sur {s.maxScore})
-                </option>
-              ))}
-            </select>
+            <SubjectSelectorPill
+              subjects={subjects}
+              selectedSubjectId={selectedSubjectId}
+              onSelectSubject={(subjectId) => setSelectedSubjectId(subjectId)}
+              allLabel={`✨ Toutes les matières (${subjects.length})`}
+              labelPrefix=""
+              variant="field"
+              size="sm"
+              colorScheme="blue"
+            />
           </div>
         </div>
 
@@ -1574,6 +1601,36 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               placeholder="Rechercher un élève par nom ou matricule..."
               className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all"
             />
+          </div>
+
+          {/* Sélecteur de pagination par page */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 text-[11px] font-medium text-slate-600 shrink-0">
+            <span className="px-1.5 text-slate-400 font-bold text-[10px] uppercase">Par page:</span>
+            {[15, 25, 50].map((num) => (
+              <button
+                key={num}
+                type="button"
+                onClick={() => setItemsPerPage(num)}
+                className={`px-2 py-0.5 rounded transition-all ${
+                  itemsPerPage === num
+                    ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
+                    : "hover:text-slate-900"
+                }`}
+              >
+                {num}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setItemsPerPage("ALL")}
+              className={`px-2 py-0.5 rounded transition-all ${
+                itemsPerPage === "ALL"
+                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
+                  : "hover:text-slate-900"
+              }`}
+            >
+              Tous
+            </button>
           </div>
 
           {/* Sélecteur de Hauteur de Vue */}
@@ -1853,7 +1910,8 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* CORPS DE LA GRILLE */}
               <tbody className="divide-y divide-slate-100 bg-white">
-                {filteredStudents.map((student, sIdx) => {
+                {paginatedStudents.map((student, sIdx) => {
+                  const globalIndex = startIndex + sIdx;
                   // Calculer la moyenne en direct de cet élève
                   let totalPoints = 0;
                   let totalCoef = 0;
@@ -1893,7 +1951,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               : "bg-slate-50 text-slate-400"
                         }`}
                       >
-                        {sIdx + 1}
+                        {globalIndex}
                       </td>
 
                       {/* Nom & Prénom + Matricule (Sticky Left) */}
@@ -2021,6 +2079,75 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 })}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* BARRE DE CONTRÔLE DE PAGINATION */}
+        {filteredStudents.length > 0 && itemsPerPage !== "ALL" && totalPages > 1 && (
+          <div className="bg-white px-4 py-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
+            <div className="text-xs text-slate-600 font-medium">
+              Affichage des élèves <span className="font-bold text-slate-900">{startIndex}</span> à{" "}
+              <span className="font-bold text-slate-900">{endIndex}</span> sur{" "}
+              <span className="font-bold text-slate-900">{filteredStudents.length}</span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+              >
+                <ChevronLeft size={13} />
+                <span className="hidden sm:inline">Précédent</span>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => {
+                  // Show current, first, last, and immediate neighbors
+                  if (
+                    page === 1 ||
+                    page === totalPages ||
+                    (page >= currentPage - 1 && page <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={page}
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
+                          currentPage === page
+                            ? "bg-blue-600 text-white shadow-xs"
+                            : "text-slate-600 hover:bg-slate-100 border border-slate-200"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    );
+                  } else if (
+                    (page === currentPage - 2 && page > 1) ||
+                    (page === currentPage + 2 && page < totalPages)
+                  ) {
+                    return (
+                      <span key={page} className="px-1 text-slate-400 text-xs">
+                        ...
+                      </span>
+                    );
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+              >
+                <span className="hidden sm:inline">Suivant</span>
+                <ChevronRight size={13} />
+              </button>
+            </div>
           </div>
         )}
 

@@ -338,7 +338,35 @@ export default defineConfig(({ mode }) => {
       resolve: {
         alias: {
           '@': path.resolve(__dirname, '.'),
-        }
+          'react': path.resolve(__dirname, 'node_modules/react'),
+          'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
+          'react-router-dom': path.resolve(__dirname, 'node_modules/react-router-dom'),
+        },
+        dedupe: [
+          'react',
+          'react-dom',
+          'react-dom/client',
+          'react-router-dom',
+          'framer-motion',
+          'recharts',
+          'lucide-react',
+          'sonner'
+        ],
+      },
+      optimizeDeps: {
+        include: [
+          'react',
+          'react-dom',
+          'react-dom/client',
+          'react-router-dom',
+          'framer-motion',
+          'recharts',
+          'lucide-react',
+          'sonner',
+          '@supabase/supabase-js',
+          'clsx',
+          'tailwind-merge'
+        ],
       }
     };
 });

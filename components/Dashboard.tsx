@@ -1663,44 +1663,44 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Stats Grid */}
       {canViewFinances ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-[1.1fr_1.3fr_0.95fr_0.65fr] gap-4 xl:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-[1.42fr_1.16fr_0.82fr_0.6fr] 2xl:grid-cols-[1.3fr_1.15fr_0.88fr_0.67fr] min-[1920px]:grid-cols-4 gap-3.5 sm:gap-4 xl:gap-3.5 2xl:gap-4.5 min-[1920px]:gap-6">
           {/* Card 1: Recettes Effectives */}
-          <div className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col relative group">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 sm:p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100/60 shadow-xs shrink-0">
-                  <TrendingUp size={19} className="stroke-[2.2]" />
+          <div className="bg-white rounded-3xl p-4 sm:p-4.5 xl:p-4 2xl:p-5 min-[1920px]:p-6 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col justify-between relative group min-w-0">
+            <div className="flex items-center justify-between mb-2.5 min-[1920px]:mb-4">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-[1920px]:gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 min-[1920px]:p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100/60 shadow-xs shrink-0">
+                  <TrendingUp size={18} className="stroke-[2.2] min-[1920px]:w-5 min-[1920px]:h-5" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Recettes Effectives</h3>
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Encaissements réels</p>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm min-[1920px]:text-base font-black text-slate-800 tracking-tight truncate">Recettes Effectives</h3>
+                  <p className="text-[9px] sm:text-[10px] min-[1920px]:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Encaissements réels</p>
                 </div>
               </div>
               <button 
                 onClick={() => setShowRevenueModal(true)}
-                className="p-1.5 sm:p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-xl transition-all border border-transparent hover:border-indigo-100/80 shrink-0"
+                className="p-1.5 sm:p-2 min-[1920px]:p-2.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50/70 rounded-xl transition-all border border-transparent hover:border-indigo-100/80 shrink-0 cursor-pointer"
                 title="Voir détails par classe"
               >
-                <Layers size={16} />
+                <Layers size={15} className="min-[1920px]:w-4.5 min-[1920px]:h-4.5" />
               </button>
             </div>
 
-            <div className="mt-auto pt-1">
-              <div className="flex items-baseline justify-between gap-1.5 mb-1.5 flex-nowrap min-w-0">
-                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.collected.toLocaleString()}>
+            <div className="mt-auto pt-0.5">
+              <div className="flex items-baseline justify-between gap-1.5 mb-1.5 min-[1920px]:mb-2.5 flex-nowrap min-w-0">
+                <p className="text-lg sm:text-xl xl:text-xl 2xl:text-2xl min-[1920px]:text-[1.85rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.collected.toLocaleString()}>
                   {stats.collected.toLocaleString()}
                 </p>
-                <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
+                <span className="text-[9px] sm:text-[10px] 2xl:text-[11px] min-[1920px]:text-xs font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
                   HTG{(stats.collectedUSD > 0 || stats.expectedUSD > 0) ? " eq." : ""}
                 </span>
               </div>
 
               {(stats.collectedUSD > 0 || stats.expectedUSD > 0) && (
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400 mb-3 flex-wrap">
-                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100/50 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] min-[1920px]:text-xs font-bold text-slate-400 mb-2.5 min-[1920px]:mb-3.5 flex-wrap">
+                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-emerald-100/50 whitespace-nowrap">
                     {stats.collectedHTG.toLocaleString()} HTG
                   </span>
-                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100/50 whitespace-nowrap">
+                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-blue-100/50 whitespace-nowrap">
                     ${stats.collectedUSD.toLocaleString()} USD
                   </span>
                 </div>
@@ -1708,7 +1708,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* Visual mini breakdown bar */}
               {stats.collected > 0 && (
-                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden flex my-2.5 shadow-inner">
+                <div className="w-full h-1.5 min-[1920px]:h-2 bg-slate-100 rounded-full overflow-hidden flex my-2 min-[1920px]:my-3 shadow-inner">
                   <div 
                     className="bg-emerald-500 h-full transition-all duration-500" 
                     style={{ width: `${Math.min(100, (stats.collectedInscription / stats.collected) * 100)}%` }} 
@@ -1727,46 +1727,50 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               )}
 
-              <div className="flex flex-col gap-1.5 pt-1 border-t border-slate-100/80">
-                <div className="flex justify-between items-baseline gap-2 text-xs">
+              <div className="flex flex-col gap-1 min-[1920px]:gap-1.5 pt-1.5 min-[1920px]:pt-2.5 border-t border-slate-100/80">
+                <div className="flex justify-between items-baseline gap-1.5 text-xs min-[1920px]:text-sm">
                   <div className="flex items-center gap-1.5 text-slate-500 font-medium whitespace-nowrap shrink-0">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
-                    <span>Inscription :</span>
+                    <span className="text-[11px] sm:text-xs min-[1920px]:text-sm">Inscription :</span>
                   </div>
-                  <div className="text-right flex flex-col items-end min-w-0">
-                    <span className="font-bold text-slate-800">{stats.collectedInscription.toLocaleString()} G</span>
-                    {(stats.collectedInscriptionUSD > 0 || stats.collectedInscriptionHTG > 0) && (
-                       <span className="text-[10px] text-slate-400 font-mono">({stats.collectedInscriptionHTG.toLocaleString()} G | ${stats.collectedInscriptionUSD.toLocaleString()})</span>
+                  <div className="text-right flex items-baseline gap-1 justify-end min-w-0">
+                    <span className="font-bold text-slate-800 text-[11px] sm:text-xs min-[1920px]:text-sm whitespace-nowrap">{stats.collectedInscription.toLocaleString()} G</span>
+                    {stats.collectedInscriptionUSD > 0 && (
+                      <span className="text-[9.5px] min-[1920px]:text-xs text-slate-400 font-mono whitespace-nowrap">
+                        (${stats.collectedInscriptionUSD.toLocaleString()})
+                      </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex justify-between items-baseline gap-2 text-xs">
+                <div className="flex justify-between items-baseline gap-1.5 text-xs min-[1920px]:text-sm">
                   <div className="flex items-center gap-1.5 text-slate-500 font-medium whitespace-nowrap shrink-0">
                     <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0"></span>
-                    <span>Scolarité :</span>
+                    <span className="text-[11px] sm:text-xs min-[1920px]:text-sm">Scolarité :</span>
                   </div>
-                  <div className="text-right flex flex-col items-end min-w-0">
-                    <span className="font-bold text-slate-800">{stats.collectedScolarite.toLocaleString()} G</span>
-                    {(stats.collectedScolariteUSD > 0 || stats.collectedScolariteHTG > 0) && (
-                       <span className="text-[10px] text-slate-400 font-mono">({stats.collectedScolariteHTG.toLocaleString()} G | ${stats.collectedScolariteUSD.toLocaleString()})</span>
+                  <div className="text-right flex items-baseline gap-1 justify-end min-w-0">
+                    <span className="font-bold text-slate-800 text-[11px] sm:text-xs min-[1920px]:text-sm whitespace-nowrap">{stats.collectedScolarite.toLocaleString()} G</span>
+                    {stats.collectedScolariteUSD > 0 && (
+                      <span className="text-[9.5px] min-[1920px]:text-xs text-slate-400 font-mono whitespace-nowrap">
+                        (${stats.collectedScolariteUSD.toLocaleString()})
+                      </span>
                     )}
                   </div>
                 </div>
 
-                <div className="flex justify-between items-baseline gap-2 text-xs">
+                <div className="flex justify-between items-baseline gap-1.5 text-xs min-[1920px]:text-sm">
                   <div className="flex items-center gap-1.5 text-slate-500 font-medium whitespace-nowrap shrink-0">
                     <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
-                    <span>Fournitures & Div. :</span>
+                    <span className="text-[11px] sm:text-xs min-[1920px]:text-sm">Fournitures & Div. :</span>
                   </div>
-                  <div className="text-right flex flex-col items-end min-w-0">
-                    <span className="font-bold text-slate-800">
+                  <div className="text-right flex items-baseline gap-1 justify-end min-w-0">
+                    <span className="font-bold text-slate-800 text-[11px] sm:text-xs min-[1920px]:text-sm whitespace-nowrap">
                       {(stats.collectedDivers + stats.collectedSupplies).toLocaleString()} G
                     </span>
-                    {(stats.collectedDiversUSD > 0 || stats.collectedSuppliesUSD > 0 || stats.collectedDiversHTG > 0 || stats.collectedSuppliesHTG > 0) && (
-                       <span className="text-[10px] text-slate-400 font-mono">
-                         ({(stats.collectedDiversHTG + stats.collectedSuppliesHTG).toLocaleString()} G | ${(stats.collectedDiversUSD + stats.collectedSuppliesUSD).toLocaleString()})
-                       </span>
+                    {(stats.collectedDiversUSD > 0 || stats.collectedSuppliesUSD > 0) && (
+                      <span className="text-[9.5px] min-[1920px]:text-xs text-slate-400 font-mono whitespace-nowrap">
+                        ({(stats.collectedDiversHTG + stats.collectedSuppliesHTG).toLocaleString()} G • ${(stats.collectedDiversUSD + stats.collectedSuppliesUSD).toLocaleString()})
+                      </span>
                     )}
                   </div>
                 </div>
@@ -1775,56 +1779,56 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Card 2: Objectif Annuel & Taux de Recouvrement */}
-          <div className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100/60 shadow-xs shrink-0">
-                  <CreditCard size={19} className="stroke-[2.2]" />
+          <div className="bg-white rounded-3xl p-4 sm:p-4.5 xl:p-4 2xl:p-5 min-[1920px]:p-6 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col justify-between min-w-0">
+            <div className="flex items-center justify-between mb-2.5 min-[1920px]:mb-4">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-[1920px]:gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 min-[1920px]:p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100/60 shadow-xs shrink-0">
+                  <CreditCard size={18} className="stroke-[2.2] min-[1920px]:w-5 min-[1920px]:h-5" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Objectif Annuel</h3>
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Prévisionnel global</p>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm min-[1920px]:text-base font-black text-slate-800 tracking-tight truncate">Objectif Annuel</h3>
+                  <p className="text-[9px] sm:text-[10px] min-[1920px]:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Prévisionnel global</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100/60 shrink-0">
+              <span className="text-[9px] sm:text-[10px] min-[1920px]:text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 min-[1920px]:px-2.5 min-[1920px]:py-1 rounded-full border border-blue-100/60 shrink-0">
                 Budget
               </span>
             </div>
 
-            <div className="mt-auto pt-1">
-              <div className="flex items-baseline justify-between gap-1.5 mb-1.5 flex-nowrap min-w-0">
-                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.expected.toLocaleString()}>
+            <div className="mt-auto pt-0.5">
+              <div className="flex items-baseline justify-between gap-1.5 mb-1.5 min-[1920px]:mb-2.5 flex-nowrap min-w-0">
+                <p className="text-lg sm:text-xl xl:text-xl 2xl:text-2xl min-[1920px]:text-[1.85rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={stats.expected.toLocaleString()}>
                   {stats.expected.toLocaleString()}
                 </p>
-                <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
+                <span className="text-[9px] sm:text-[10px] 2xl:text-[11px] min-[1920px]:text-xs font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
                   HTG{(stats.collectedUSD > 0 || stats.expectedUSD > 0) ? " eq." : ""}
                 </span>
               </div>
 
               {(stats.collectedUSD > 0 || stats.expectedUSD > 0) && (
-                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-bold text-slate-400 mb-3 flex-wrap">
-                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-100/50 whitespace-nowrap">
+                <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] min-[1920px]:text-xs font-bold text-slate-400 mb-2.5 min-[1920px]:mb-3.5 flex-wrap">
+                  <span className="text-emerald-700 bg-emerald-50 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-emerald-100/50 whitespace-nowrap">
                     {stats.expectedHTG.toLocaleString()} HTG
                   </span>
-                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100/50 whitespace-nowrap">
+                  <span className="text-blue-700 bg-blue-50 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-blue-100/50 whitespace-nowrap">
                     ${stats.expectedUSD.toLocaleString()} USD
                   </span>
                 </div>
               )}
 
               {/* Recovery Progress Gauge */}
-              <div className="space-y-2.5 pt-2 border-t border-slate-100/80">
+              <div className="space-y-2 min-[1920px]:space-y-3 pt-1.5 min-[1920px]:pt-2.5 border-t border-slate-100/80">
                 <div>
-                  <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="font-semibold text-slate-600 flex items-center gap-1">
-                      <ArrowUpRight size={13} className="text-blue-600" />
-                      Taux de Recouvrement
+                  <div className="flex justify-between items-center text-xs min-[1920px]:text-sm mb-1">
+                    <span className="font-semibold text-slate-600 flex items-center gap-1 text-[11px] sm:text-xs min-[1920px]:text-sm">
+                      <ArrowUpRight size={13} className="text-blue-600 shrink-0 min-[1920px]:w-4 min-[1920px]:h-4" />
+                      <span className="truncate">Taux de Recouvrement</span>
                     </span>
-                    <span className="font-black text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md text-[11px] border border-blue-100/50">
+                    <span className="font-black text-blue-700 bg-blue-50 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md text-[10px] sm:text-[11px] min-[1920px]:text-xs border border-blue-100/50 shrink-0">
                       {stats.expected > 0 ? ((stats.collectedTuition/stats.expected)*100).toFixed(1) : 0}%
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 sm:h-2 min-[1920px]:h-2.5 overflow-hidden shadow-inner">
                     <div 
                       className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 transition-all duration-700"
                       style={{ width: `${Math.min(100, stats.expected > 0 ? (stats.collectedTuition/stats.expected)*100 : 0)}%` }}
@@ -1833,16 +1837,16 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center text-xs mb-1">
-                    <span className="font-semibold text-slate-600 flex items-center gap-1">
-                      <ShoppingCart size={12} className="text-emerald-600" />
-                      Pénétration Économat
+                  <div className="flex justify-between items-center text-xs min-[1920px]:text-sm mb-1">
+                    <span className="font-semibold text-slate-600 flex items-center gap-1 text-[11px] sm:text-xs min-[1920px]:text-sm">
+                      <ShoppingCart size={12} className="text-emerald-600 shrink-0 min-[1920px]:w-3.5 min-[1920px]:h-3.5" />
+                      <span className="truncate">Pénétration Économat</span>
                     </span>
-                    <span className="font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md text-[11px] border border-emerald-100/50">
+                    <span className="font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md text-[10px] sm:text-[11px] min-[1920px]:text-xs border border-emerald-100/50 shrink-0">
                       {stats.economatPenetration.toFixed(1)}%
                     </span>
                   </div>
-                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden shadow-inner">
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 sm:h-2 min-[1920px]:h-2.5 overflow-hidden shadow-inner">
                     <div 
                       className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500 transition-all duration-700"
                       style={{ width: `${Math.min(100, stats.economatPenetration)}%` }}
@@ -1856,39 +1860,39 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Card 3: Charges Mensuelles */}
           <div 
             onClick={() => setIsPayrollModalOpen(true)}
-            className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-rose-200/80 hover:shadow-md transition-all duration-300 flex flex-col cursor-pointer group"
+            className="bg-white rounded-3xl p-4 sm:p-4.5 xl:p-4 2xl:p-5 min-[1920px]:p-6 shadow-sm border border-slate-100 hover:border-rose-200/80 hover:shadow-md transition-all duration-300 flex flex-col justify-between cursor-pointer group min-w-0"
           >
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2.5">
-                <div className="p-2 sm:p-2.5 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100/60 shadow-xs group-hover:scale-105 transition-transform shrink-0">
-                  <TrendingDown size={19} className="stroke-[2.2]" />
+            <div className="flex items-center justify-between mb-2.5 min-[1920px]:mb-4">
+              <div className="flex items-center gap-2 sm:gap-2.5 min-[1920px]:gap-3 min-w-0">
+                <div className="p-2 sm:p-2.5 min-[1920px]:p-3 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100/60 shadow-xs group-hover:scale-105 transition-transform shrink-0">
+                  <TrendingDown size={18} className="stroke-[2.2] min-[1920px]:w-5 min-[1920px]:h-5" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-black text-slate-800 tracking-tight">Charges</h3>
-                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Masse salariale</p>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm min-[1920px]:text-base font-black text-slate-800 tracking-tight truncate">Charges</h3>
+                  <p className="text-[9px] sm:text-[10px] min-[1920px]:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Masse salariale</p>
                 </div>
               </div>
-              <span className="text-[10px] font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-100/60 shrink-0">
+              <span className="text-[9px] sm:text-[10px] min-[1920px]:text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 min-[1920px]:px-2.5 min-[1920px]:py-1 rounded-full border border-rose-100/60 shrink-0">
                 Mensuel
               </span>
             </div>
 
-            <div className="mt-auto pt-1">
+            <div className="mt-auto pt-0.5">
               <div className="flex items-baseline justify-between gap-1.5 mb-1 flex-nowrap min-w-0">
-                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={`${stats.payroll.toLocaleString()} HTG`}>
+                <p className="text-lg sm:text-xl xl:text-xl 2xl:text-2xl min-[1920px]:text-[1.85rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums" title={`${stats.payroll.toLocaleString()} HTG`}>
                   {stats.payroll.toLocaleString()}
                 </p>
-                <span className="text-[10px] sm:text-[11px] font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
+                <span className="text-[9px] sm:text-[10px] 2xl:text-[11px] min-[1920px]:text-xs font-black text-slate-500 uppercase tracking-wider bg-slate-100/80 px-1.5 py-0.5 min-[1920px]:px-2 min-[1920px]:py-1 rounded-md border border-slate-200/50 shrink-0 whitespace-nowrap">
                   HTG
                 </span>
               </div>
-              <p className="text-[11px] font-medium text-slate-400 mb-3 truncate" title="Charges mensuelles estimées">Charges mensuelles estimées</p>
+              <p className="text-[10px] sm:text-[11px] min-[1920px]:text-xs font-medium text-slate-400 mb-2.5 min-[1920px]:mb-3.5 truncate" title="Charges mensuelles estimées">Charges mensuelles estimées</p>
 
-              <div className="pt-2.5 border-t border-slate-100/80 flex items-center justify-between gap-1.5">
-                <span className="text-[11px] font-bold text-rose-600 bg-rose-50 px-2.5 py-1 rounded-xl border border-rose-100/60 group-hover:bg-rose-100 transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap">
-                  Voir détails <ChevronRight size={12} className="group-hover:translate-x-0.5 transition-transform shrink-0" />
+              <div className="pt-2 min-[1920px]:pt-2.5 border-t border-slate-100/80 flex items-center justify-between gap-1">
+                <span className="text-[10px] sm:text-[11px] min-[1920px]:text-xs font-bold text-rose-600 bg-rose-50 px-2 sm:px-2.5 min-[1920px]:px-3 py-0.5 sm:py-1 rounded-xl border border-rose-100/60 group-hover:bg-rose-100 transition-colors flex items-center gap-1 shrink-0 whitespace-nowrap">
+                  Voir détails <ChevronRight size={11} className="group-hover:translate-x-0.5 transition-transform shrink-0 min-[1920px]:w-3.5 min-[1920px]:h-3.5" />
                 </span>
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0 whitespace-nowrap">Payroll actif</span>
+                <span className="text-[9px] sm:text-[10px] min-[1920px]:text-xs font-bold text-slate-400 uppercase tracking-wider shrink-0 whitespace-nowrap">Payroll actif</span>
               </div>
             </div>
           </div>
@@ -1972,41 +1976,41 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
 
           {/* Card 4: Paiements & Activité du Jour */}
-          <div className="bg-white rounded-3xl p-4.5 xl:p-5 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col">
-            <div className="flex items-center justify-between mb-3">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100/60 shadow-xs shrink-0">
-                  <Receipt size={18} className="stroke-[2.2]" />
+          <div className="bg-white rounded-3xl p-3.5 sm:p-4 xl:p-3.5 2xl:p-4.5 min-[1920px]:p-6 shadow-sm border border-slate-100 hover:border-slate-200/80 hover:shadow-md transition-all duration-300 flex flex-col justify-between min-w-0">
+            <div className="flex items-center justify-between mb-2 min-[1920px]:mb-4">
+              <div className="flex items-center gap-1.5 sm:gap-2 min-[1920px]:gap-3 min-w-0">
+                <div className="p-1.5 sm:p-2 min-[1920px]:p-3 bg-amber-50 text-amber-600 rounded-xl border border-amber-100/60 shadow-xs shrink-0">
+                  <Receipt size={16} className="stroke-[2.2] min-[1920px]:w-5 min-[1920px]:h-5" />
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-xs sm:text-sm font-black text-slate-800 tracking-tight truncate">Caisse du Jour</h3>
-                  <p className="text-[9px] sm:text-[10px] font-semibold text-slate-400 uppercase tracking-wider truncate">Reçus émis</p>
+                  <h3 className="text-xs min-[1920px]:text-base font-black text-slate-800 tracking-tight truncate">Caisse du Jour</h3>
+                  <p className="text-[9px] min-[1920px]:text-xs font-semibold text-slate-400 uppercase tracking-wider truncate">Reçus émis</p>
                 </div>
               </div>
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-black bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 min-[1920px]:px-2.5 min-[1920px]:py-1 rounded-full text-[8.5px] sm:text-[9px] min-[1920px]:text-xs font-black bg-emerald-50 text-emerald-700 border border-emerald-100 shrink-0">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                 Direct
               </span>
             </div>
 
-            <div className="mt-auto pt-1">
-              <div className="flex items-baseline justify-between gap-1.5 mb-1 flex-nowrap min-w-0">
-                <p className="text-lg sm:text-xl xl:text-2xl 2xl:text-[1.55rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums">
+            <div className="mt-auto pt-0.5">
+              <div className="flex items-baseline justify-between gap-1 mb-0.5 min-[1920px]:mb-1.5 flex-nowrap min-w-0">
+                <p className="text-lg sm:text-xl xl:text-xl 2xl:text-2xl min-[1920px]:text-[1.85rem] font-black text-slate-900 tracking-tight leading-none truncate tabular-nums">
                   {stats.todayPaymentsCount}
                 </p>
-                <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">tx{stats.todayPaymentsCount > 1 ? 's' : ''}</span>
+                <span className="text-[10px] sm:text-[11px] min-[1920px]:text-xs font-semibold text-slate-400 whitespace-nowrap">tx{stats.todayPaymentsCount > 1 ? 's' : ''}</span>
               </div>
-              <p className="text-[10px] font-medium text-slate-400 mb-3 truncate">Aujourd'hui</p>
+              <p className="text-[9.5px] sm:text-[10px] min-[1920px]:text-xs font-medium text-slate-400 mb-2 min-[1920px]:mb-3.5 truncate">Aujourd'hui</p>
 
-              <div className="pt-2.5 border-t border-slate-100/80 flex flex-col gap-1">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Montant :</span>
-                  <span className="font-black text-emerald-600 truncate text-right text-[11px] sm:text-xs">{stats.todayTotalAmountHTG.toLocaleString()} G</span>
+              <div className="pt-2 min-[1920px]:pt-2.5 border-t border-slate-100/80 flex flex-col gap-1 min-[1920px]:gap-1.5">
+                <div className="flex justify-between items-center text-xs min-[1920px]:text-sm">
+                  <span className="text-[9px] min-[1920px]:text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">Montant :</span>
+                  <span className="font-black text-emerald-600 truncate text-right text-[11px] sm:text-xs min-[1920px]:text-sm tabular-nums">{stats.todayTotalAmountHTG.toLocaleString()} G</span>
                 </div>
                 {stats.todayTotalAmountUSD > 0 && (
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">USD :</span>
-                    <span className="font-black text-blue-600 truncate text-right text-[11px] sm:text-xs">${stats.todayTotalAmountUSD.toLocaleString()}</span>
+                  <div className="flex justify-between items-center text-xs min-[1920px]:text-sm">
+                    <span className="text-[9px] min-[1920px]:text-xs font-bold text-slate-400 uppercase tracking-wider whitespace-nowrap">USD :</span>
+                    <span className="font-black text-blue-600 truncate text-right text-[11px] sm:text-xs min-[1920px]:text-sm tabular-nums">${stats.todayTotalAmountUSD.toLocaleString()}</span>
                   </div>
                 )}
               </div>

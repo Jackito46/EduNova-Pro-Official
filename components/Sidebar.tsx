@@ -67,6 +67,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const { school, terminology, campuses, currentCampusId, setCurrentCampusId } = useSchool();
   const isPresencesEnabled = school?.global_settings?.modules?.presences ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isDisciplineEnabled = school?.global_settings?.modules?.discipline ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
+  const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === UserRole.SUPER_ADMIN || (user?.role as any) === 'SUPER_ADMIN');
 
   const { isInstallable, isInstalled, installPwa } = usePwaInstall();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -401,7 +402,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             </div>
           )}
 
-          {user.is_super_admin && (
+          {isSuperAdmin && (
             <div className="mt-8 pt-4 border-t border-slate-200 space-y-1">
               <NavLink item={{ name: 'Super Administrateur', path: '/super-admin', icon: ShieldAlert }} />
               <NavLink item={{ name: 'Santé Système & Quotas', path: '/super-admin/system-health', icon: Activity }} />

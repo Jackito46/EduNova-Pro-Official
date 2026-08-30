@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 
 interface SuperAdminRouteProps {
   user: UserProfile | null;
@@ -9,7 +9,8 @@ interface SuperAdminRouteProps {
 
 export const SuperAdminRoute: React.FC<SuperAdminRouteProps> = ({ user, children }) => {
   if (!user) return <Navigate to="/login" replace />;
-  if (!user.is_super_admin) return <Navigate to="/" replace />; // Redirect to home if not super admin
+  const isSuperAdmin = Boolean(user.is_super_admin || (user.role as any) === 'SUPER_ADMIN' || (user.role as any) === UserRole.SUPER_ADMIN);
+  if (!isSuperAdmin) return <Navigate to="/" replace />; // Redirect to home if not super admin
   
   return <>{children}</>;
 };

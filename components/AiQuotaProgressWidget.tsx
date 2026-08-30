@@ -81,11 +81,11 @@ export const AiQuotaProgressWidget: React.FC<AiQuotaProgressWidgetProps> = ({
   // Stroke offset : 0 = 0% plein, circumference = 100% plein
   const strokeDashoffset = circumference - (quota.usagePercent / 100) * circumference;
 
-  // Détermination de la couleur selon le niveau de consommation
+  // Détermination de la couleur selon le niveau de consommation (seuils 80% et 95%)
   const getStatusColor = (percent: number) => {
-    if (percent >= 90) return { bg: 'bg-rose-500', text: 'text-rose-600', ring: '#f43f5e', border: 'border-rose-200', lightBg: 'bg-rose-50' };
-    if (percent >= 75) return { bg: 'bg-amber-500', text: 'text-amber-600', ring: '#f59e0b', border: 'border-amber-200', lightBg: 'bg-amber-50' };
-    return { bg: 'bg-emerald-500', text: 'text-emerald-600', ring: '#10b981', border: 'border-emerald-200', lightBg: 'bg-emerald-50' };
+    if (percent >= 95) return { bg: 'bg-rose-500', text: 'text-rose-600', ring: '#f43f5e', border: 'border-rose-200', lightBg: 'bg-rose-50', badge: '🚨 Seuil Critique 95%' };
+    if (percent >= 80) return { bg: 'bg-amber-500', text: 'text-amber-600', ring: '#f59e0b', border: 'border-amber-200', lightBg: 'bg-amber-50', badge: '⚠️ Alerte 80%' };
+    return { bg: 'bg-emerald-500', text: 'text-emerald-600', ring: '#10b981', border: 'border-emerald-200', lightBg: 'bg-emerald-50', badge: '✅ Quota Nominal' };
   };
 
   const statusTheme = getStatusColor(quota.usagePercent);
@@ -387,6 +387,104 @@ export const AiQuotaProgressWidget: React.FC<AiQuotaProgressWidgetProps> = ({
             </span>
           </div>
           <span className="text-[10px] text-slate-400 block mt-0.5">Dernière : {quota.lastSyncTime}</span>
+        </div>
+      </div>
+
+      {/* SEUILS D'ALERTES PROACTIVES (80% & 95%) & CONTRÔLE SUPER ADMIN */}
+      <div className="p-4 bg-slate-100/70 border border-slate-200/90 rounded-2xl space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 pb-2.5">
+          <div className="flex items-center gap-2">
+            <AlertTriangle size={16} className="text-amber-600" />
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+              Paliers d'Alerte Proactive & Notifications Administrateur
+            </h4>
+          </div>
+          <span className="text-[10px] font-mono text-slate-500 font-bold bg-white px-2 py-0.5 rounded border border-slate-200">
+            Surveillance Continue 24/7
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+          {/* Seuil 80% */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            quota.usagePercent >= 80 && quota.usagePercent < 95
+              ? 'bg-amber-50 border-amber-300 shadow-xs'
+              : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-extrabold text-amber-900 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                Seuil de Vigilance : 80% (1 200 req)
+              </span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                quota.usagePercent >= 80 ? 'bg-amber-500 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {quota.usagePercent >= 80 ? 'Actif' : 'Veille'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-snug">
+              Déclenche une notification d'avertissement proactive dans l'interface et informe les administrateurs pour anticiper.
+            </p>
+          </div>
+
+          {/* Seuil 95% */}
+          <div className={`p-3 rounded-xl border transition-all ${
+            quota.usagePercent >= 95
+              ? 'bg-rose-50 border-rose-300 shadow-xs'
+              : 'bg-white border-slate-200'
+          }`}>
+            <div className="flex items-center justify-between mb-1.5">
+              <span className="font-extrabold text-rose-900 flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse"></span>
+                Seuil Critique : 95% (1 425 req)
+              </span>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                quota.usagePercent >= 95 ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'
+              }`}>
+                {quota.usagePercent >= 95 ? 'CRITIQUE' : 'Veille'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-600 leading-snug">
+              Alerte d'urgence avec carillon sonore et notification persistante. Recommande le mode cache et la préparation au basculement.
+            </p>
+          </div>
+        </div>
+
+        {/* Boutons de test direct */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70 text-[11px]">
+          <span className="text-slate-600 font-medium">Tester les notifications d'alerte :</span>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={async () => {
+                const updated = await aiCreditTrackingService.simulateQuotaLevel(schoolId, 80);
+                setQuota(updated);
+                toast.warning(`⚠️ Simulation : Quota réglé à 80% (${updated.requestsUsed}/${updated.requestsLimit} req)`);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 font-bold border border-amber-300 transition-colors cursor-pointer"
+            >
+              Simuler 80%
+            </button>
+            <button
+              onClick={async () => {
+                const updated = await aiCreditTrackingService.simulateQuotaLevel(schoolId, 95);
+                setQuota(updated);
+                toast.error(`🚨 Simulation : Quota réglé à 95% (${updated.requestsUsed}/${updated.requestsLimit} req)`);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-rose-100 hover:bg-rose-200 text-rose-900 font-bold border border-rose-300 transition-colors cursor-pointer"
+            >
+              Simuler 95%
+            </button>
+            <button
+              onClick={async () => {
+                const updated = await aiCreditTrackingService.simulateQuotaLevel(schoolId, 10);
+                setQuota(updated);
+                toast.success(`✅ Quota réinitialisé à un niveau nominal (10%)`);
+              }}
+              className="px-2.5 py-1 rounded-lg bg-white hover:bg-slate-200 text-slate-700 font-bold border border-slate-300 transition-colors cursor-pointer"
+            >
+              Réinitialiser
+            </button>
+          </div>
         </div>
       </div>
 

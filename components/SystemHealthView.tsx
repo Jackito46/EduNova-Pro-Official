@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
-import { UserProfile } from '../types';
+import { UserProfile, UserRole } from '../types';
 import { supabase } from '../supabase';
 import { aiLocalCache, AiLocalCacheStats } from '../utils/aiLocalCache';
 import { geminiService } from '../services/geminiService';
@@ -523,6 +523,22 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
     if (h > 0) return `${h}h ${m}m ${s}s`;
     return `${m}m ${s}s`;
   };
+
+  const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === 'SUPER_ADMIN' || (user?.role as any) === UserRole.SUPER_ADMIN);
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="max-w-xl mx-auto my-16 bg-white p-8 rounded-3xl border border-slate-200 shadow-sm text-center space-y-4">
+        <div className="w-14 h-14 mx-auto bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center">
+          <Shield size={28} />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900">Accès Réservé au Super Administrateur</h2>
+        <p className="text-sm text-slate-600">
+          Le module de télémétrie, diagnostic et gestion des quotas système est exclusivement réservé au Super Administrateur de la plateforme.
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div id="system-health-root" className="max-w-7xl mx-auto space-y-6 pb-20 font-sans animate-in fade-in duration-300">
