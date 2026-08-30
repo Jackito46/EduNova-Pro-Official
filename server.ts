@@ -124,6 +124,37 @@ async function startServer() {
     }
   }
 
+  async function syncAiTelemetryWithSupabase() {
+    if (!supabase) return;
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const { data } = await supabase
+        .from('ai_credits_usage')
+        .select('*')
+        .eq('period_date', today)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (data) {
+        if (data.requests_used > aiTelemetryState.todayApiRequests) {
+          aiTelemetryState.todayApiRequests = data.requests_used;
+        }
+        if (data.tokens_used > aiTelemetryState.todayTokens) {
+          aiTelemetryState.todayTokens = data.tokens_used;
+        }
+        if (data.cache_hits > aiTelemetryState.todayCachedRequests) {
+          aiTelemetryState.todayCachedRequests = data.cache_hits;
+        }
+        if (data.local_fallbacks > aiTelemetryState.todayFallbackRequests) {
+          aiTelemetryState.todayFallbackRequests = data.local_fallbacks;
+        }
+      }
+    } catch (e) {
+      // Non bloquant
+    }
+  }
+
   function recordAiCall(entry: {
     type: string;
     model: string;
@@ -134,6 +165,7 @@ async function startServer() {
   }) {
     checkAndResetDailyAiQuota();
     const now = Date.now();
+    const today = new Date().toISOString().split('T')[0];
     aiTelemetryState.rollingMinuteRequests = aiTelemetryState.rollingMinuteRequests.filter(t => t > now - 60000);
 
     const estimatedTokens = Math.max(15, Math.round(((entry.prompt?.length || 0) + (entry.response?.length || 0)) / 3.8));
@@ -171,6 +203,27 @@ async function startServer() {
     if (aiTelemetryState.recentCalls.length > 30) {
       aiTelemetryState.recentCalls.pop();
     }
+
+    // Sync to Supabase ai_credits_usage in background
+    if (supabase) {
+      supabase
+        .from('ai_credits_usage')
+        .upsert([{
+          school_id: 'default-school',
+          period_date: today,
+          tier_name: 'Google AI Studio Free Tier',
+          requests_used: aiTelemetryState.todayApiRequests,
+          requests_limit: 1500,
+          tokens_used: aiTelemetryState.todayTokens,
+          tokens_limit: 1000000,
+          cache_hits: aiTelemetryState.todayCachedRequests,
+          local_fallbacks: aiTelemetryState.todayFallbackRequests,
+          last_request_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }], { onConflict: 'school_id,period_date' })
+        .then(() => {})
+        .catch(() => {});
+    }
   }
 
   function getAiTelemetryStats() {
@@ -186,6 +239,11 @@ async function startServer() {
       ? Math.round(((cachedHits + fallbackHits) / totalInteractions) * 100)
       : 100;
 
+    const todayRequestsRemaining = Math.max(0, 1500 - todayUsed);
+    const todayRequestsPct = Math.min(100, Math.round((todayUsed / 1500) * 100 * 10) / 10);
+    const todayTokensRemaining = Math.max(0, 1000000 - todayTokens);
+    const todayTokensPct = Math.min(100, Math.round((todayTokens / 1000000) * 100 * 10) / 10);
+
     return {
       geminiConfigured: !!process.env.GEMINI_API_KEY,
       activeModels: ['gemini-2.5-flash', 'gemini-3.7-flash'],
@@ -198,8 +256,8 @@ async function startServer() {
       liveUsage: {
         todayRequestsUsed: todayUsed,
         todayRequestsLimit: 1500,
-        todayRequestsRemaining: Math.max(0, 1500 - todayUsed),
-        todayRequestsPct: Math.min(100, Math.round((todayUsed / 1500) * 100)),
+        todayRequestsRemaining,
+        todayRequestsPct,
 
         rpmUsed: rpmUsed,
         rpmLimit: 15,
@@ -208,8 +266,8 @@ async function startServer() {
 
         todayTokensUsed: todayTokens,
         todayTokensLimit: 1000000,
-        todayTokensRemaining: Math.max(0, 1000000 - todayTokens),
-        todayTokensPct: Math.min(100, Math.round((todayTokens / 1000000) * 100)),
+        todayTokensRemaining,
+        todayTokensPct,
 
         cachedResponsesCount: aiResponseCache.size,
         cachedHitsToday: cachedHits,
@@ -291,6 +349,9 @@ async function startServer() {
 
     const mem = process.memoryUsage();
     const uptimeSec = Math.floor(process.uptime());
+
+    // Sync AI Telemetry with Supabase ai_credits_usage table
+    await syncAiTelemetryWithSupabase();
 
     // PWA & Build Hash Resolution
     let pwaSwHash = 'dev-runtime-active';

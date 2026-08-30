@@ -63,16 +63,16 @@ export const aiCreditTrackingService = {
       }
     } catch (e) {}
 
-    // Fallback initial
+    // Fallback initial propre
     return {
       school_id: schoolId || 'default-school',
       period_date: periodDate,
       tier_name: 'Google AI Studio (Palier Zéro-Frais)',
-      requests_used: 18,
+      requests_used: 0,
       requests_limit: DEFAULT_REQUESTS_LIMIT,
-      tokens_used: 14200,
+      tokens_used: 0,
       tokens_limit: DEFAULT_TOKENS_LIMIT,
-      cache_hits: 24,
+      cache_hits: 0,
       local_fallbacks: 0,
       last_request_at: new Date().toISOString()
     };
@@ -111,17 +111,17 @@ export const aiCreditTrackingService = {
         record = data as AiCreditUsageRecord;
         isSyncedWithSupabase = true;
         this.saveLocalUsage(record);
-      } else if (!data) {
+      } else if (!data && !error) {
         // Créer l'enregistrement du jour dans Supabase
         const initialRecord: AiCreditUsageRecord = {
           school_id: schoolId,
           period_date: today,
           tier_name: 'Google AI Studio (Palier Zéro-Frais)',
-          requests_used: 12,
+          requests_used: 0,
           requests_limit: DEFAULT_REQUESTS_LIMIT,
-          tokens_used: 9400,
+          tokens_used: 0,
           tokens_limit: DEFAULT_TOKENS_LIMIT,
-          cache_hits: 15,
+          cache_hits: 0,
           local_fallbacks: 0,
           last_request_at: new Date().toISOString()
         };
@@ -247,11 +247,11 @@ export const aiCreditTrackingService = {
       school_id: schoolId,
       period_date: today,
       tier_name: 'Google AI Studio (Palier Zéro-Frais)',
-      requests_used: 12,
+      requests_used: 0,
       requests_limit: DEFAULT_REQUESTS_LIMIT,
-      tokens_used: 8500,
+      tokens_used: 0,
       tokens_limit: DEFAULT_TOKENS_LIMIT,
-      cache_hits: 28,
+      cache_hits: 0,
       local_fallbacks: 0,
       last_request_at: new Date().toISOString()
     };
