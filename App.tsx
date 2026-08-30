@@ -79,6 +79,7 @@ import { SchoolProvider } from './contexts/SchoolContext';
 import Logo from './components/Logo';
 
 import { NotificationBanner } from './components/NotificationBanner';
+import { AiQuotaAlertBanner } from './components/AiQuotaAlertBanner';
 import { GlobalShortcuts } from './components/GlobalShortcuts';
 import { ModernDashboardSkeleton } from './components/SkeletonLoader';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
@@ -206,6 +207,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
         <main className="flex-1 overflow-y-auto p-4 pt-16 lg:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
           <ConnectivityBanner />
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
+          <AiQuotaAlertBanner user={user} />
           <AddressBarInstallHint />
           <ErrorBoundary key={location.pathname}>
             <AnimatePresence mode="wait" initial={false}>

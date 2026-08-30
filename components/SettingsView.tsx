@@ -79,8 +79,9 @@ import {
   getSchoolPaymentMethods, 
   DEFAULT_PAYMENT_METHODS 
 } from '../lib/paymentMethods';
+import { AiQuotaProgressWidget } from './AiQuotaProgressWidget';
 
-type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'banks' | 'gateways' | 'security';
+type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'banks' | 'gateways' | 'security' | 'ai_quotas';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -1629,6 +1630,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     ...((school?.has_multi_campus) ? [{ id: 'campuses', label: 'Filières / Annexes', icon: MapPin }] : []),
     { id: 'academic', label: terminology.academicYears, icon: Calendar },
     { id: 'finance', label: 'Finance & Taux', icon: CircleDollarSign },
+    { id: 'ai_quotas', label: 'Quotas & Crédits IA', icon: Sparkles },
     { id: 'payment_methods', label: 'Modes de Règlement', icon: Wallet },
     { id: 'banks', label: 'Comptes Bancaires', icon: CreditCard },
     { id: 'gateways', label: 'Passerelles API', icon: Key },
@@ -1728,6 +1730,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       <div className="lg:col-span-8">
        {activeTab === 'school' && (
          <div className="space-y-6 animate-in slide-in-from-right duration-500">
+           {/* Visual Quota Progress Bar Widget (Compact) */}
+           <AiQuotaProgressWidget 
+             schoolId={user.school_id} 
+             variant="compact" 
+             onNavigateToFull={() => setActiveTab('ai_quotas')} 
+           />
+
            {!canManageAllCampuses && (
              <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
                <div className="flex items-start gap-4">
@@ -4473,6 +4482,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 </div>
               </>
             )}
+          </div>
+        )}
+
+        {/* TAB: QUOTAS & CRÉDITS IA */}
+        {activeTab === 'ai_quotas' && (
+          <div className="space-y-6 animate-in slide-in-from-right duration-500">
+            <AiQuotaProgressWidget 
+              schoolId={user.school_id} 
+              variant="full" 
+            />
           </div>
         )}
       
