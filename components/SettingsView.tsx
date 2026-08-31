@@ -81,7 +81,7 @@ import {
 } from '../lib/paymentMethods';
 import { AiQuotaProgressWidget } from './AiQuotaProgressWidget';
 
-type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'banks' | 'gateways' | 'security' | 'ai_quotas';
+type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'gateways' | 'security';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -113,6 +113,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   }, []);
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('school');
+  const [paymentSubTab, setPaymentSubTab] = useState<'methods' | 'banks'>('methods');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -1630,9 +1631,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     ...((school?.has_multi_campus) ? [{ id: 'campuses', label: 'Filières / Annexes', icon: MapPin }] : []),
     { id: 'academic', label: terminology.academicYears, icon: Calendar },
     { id: 'finance', label: 'Finance & Taux', icon: CircleDollarSign },
-    ...(isSuperAdmin ? [{ id: 'ai_quotas', label: 'Quotas & Crédits IA', icon: Sparkles }] : []),
-    { id: 'payment_methods', label: 'Modes de Règlement', icon: Wallet },
-    { id: 'banks', label: 'Comptes Bancaires', icon: CreditCard },
+    { id: 'payment_methods', label: 'Modes de Règlement & Banques', icon: Wallet },
     { id: 'gateways', label: 'Passerelles API', icon: Key },
     { id: 'security', label: 'Sécurité', icon: Shield }
   ];
@@ -3333,321 +3332,99 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        </div>
       )}
 
-       {activeTab === 'banks' && (
-         <div className="space-y-4 animate-in slide-in-from-right duration-500">
-           {!canManageAllCampuses && (
-             <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800">
-               <div className="flex items-center gap-2.5">
-                 <Lock size={16} className="text-amber-700 shrink-0" />
-                 <p className="font-medium">
-                   <strong className="font-bold">Accès restreint (Annexe) :</strong> Seuls les administrateurs du Siège Social peuvent modifier les comptes bancaires.
-                 </p>
-               </div>
-               <span className="px-2 py-0.5 bg-amber-100/80 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
-                 Lecture Seule
-               </span>
-             </div>
-           )}
-
-           <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-             {/* Header */}
-             <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-               <div className="flex items-center gap-3">
-                 <div className="w-10 h-10 bg-slate-900 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
-                   <CreditCard size={18} />
-                 </div>
-                 <div>
-                   <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Comptes Bancaires & Réception</h3>
-                   <p className="text-xs text-slate-500 font-medium">
-                     Configuration des banques agréées pour la réception des paiements
-                   </p>
-                 </div>
-               </div>
-               <button 
-                 onClick={handleUpdateSchool} 
-                 disabled={saving || !canManageAllCampuses} 
-                 className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-1.5 hover:bg-black transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-               >
-                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                 Enregistrer l'ensemble
-               </button>
-             </div>
-
-             <div className="p-4 sm:p-6 space-y-6">
-               
-               {/* AJOUT BANQUE */}
-               {canManageAllCampuses && (
-                 <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
-                   <div className="flex items-center justify-between">
-                     <h4 className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider flex items-center gap-1.5">
-                       <Plus size={14} className="text-emerald-600" /> Ajouter un nouveau compte
-                     </h4>
-                     <span className="text-[10px] text-slate-400 font-mono font-medium">Saisie rapide</span>
-                   </div>
-
-                   <form onSubmit={(e) => {
-                     e.preventDefault();
-                     const resolved = newBankName === 'AUTRE' ? customBankName.trim() : newBankName.trim();
-                     if (!resolved) {
-                       toast.error('Veuillez spécifier le nom de la banque');
-                       return;
-                     }
-                     
-                     let combined = resolved;
-                     if (newBankAccount.trim()) {
-                       combined += ` - ${newBankAccount.trim()}`;
-                     }
-                     if (newBankLabel.trim()) {
-                       combined += ` (${newBankLabel.trim()})`;
-                     }
-
-                     const currentBanks = schoolData.global_settings?.banks || [];
-                     if (currentBanks.includes(combined)) {
-                       toast.error('Ce compte ou cette banque existe déjà dans la liste');
-                       return;
-                     }
-
-                     const updatedSettings = {
-                       ...(schoolData.global_settings || {}),
-                       banks: [...currentBanks, combined]
-                     };
-
-                     setSchoolData({ ...schoolData, global_settings: updatedSettings });
-                     setNewBankName('');
-                     setCustomBankName('');
-                     setNewBankAccount('');
-                     setNewBankLabel('');
-                     toast.success(`Banque ajoutée temporairement à la liste. N'oubliez pas d'enregistrer !`);
-                   }} className="space-y-3">
-                     <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                       <div className="space-y-1">
-                         <label className="text-[11px] font-bold text-slate-700 ml-0.5">Nom de la Banque</label>
-                         <select
-                           className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-slate-800 transition-all shadow-xs"
-                           value={newBankName}
-                           onChange={e => {
-                             setNewBankName(e.target.value);
-                             if (e.target.value !== 'AUTRE') setCustomBankName('');
-                           }}
-                         >
-                           <option value="" disabled>Sélectionner une banque...</option>
-                           <option value="UNIBANK">UNIBANK</option>
-                           <option value="Sogebank">Sogebank</option>
-                           <option value="BNC">BNC (Banque Nationale de Crédit)</option>
-                           <option value="BUH">BUH (Banque de l'Union Haïtienne)</option>
-                           <option value="Capital Bank">Capital Bank</option>
-                           <option value="Banque Populaire Haïtienne">Banque Populaire Haïtienne (BPH)</option>
-                           <option value="Citibank">Citibank</option>
-                           <option value="AUTRE">Autre banque (Saisie manuelle)...</option>
-                         </select>
-                       </div>
-
-                       {newBankName === 'AUTRE' && (
-                         <div className="space-y-1">
-                           <label className="text-[11px] font-bold text-slate-700 ml-0.5">Spécifier la banque</label>
-                           <input
-                             type="text"
-                             className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-slate-800 transition-all shadow-xs"
-                             placeholder="Nom de la banque"
-                             value={customBankName}
-                             onChange={e => setCustomBankName(e.target.value)}
-                           />
-                         </div>
-                       )}
-
-                       <div className="space-y-1">
-                         <label className="text-[11px] font-bold text-slate-700 ml-0.5">Numéro de compte</label>
-                         <input
-                           type="text"
-                           className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg font-mono text-xs font-bold tracking-wider outline-none focus:border-slate-800 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
-                           placeholder="Ex: 102-394-1928"
-                           value={newBankAccount}
-                           onChange={e => setNewBankAccount(e.target.value)}
-                         />
-                       </div>
-
-                       <div className="space-y-1">
-                         <label className="text-[11px] font-bold text-slate-700 ml-0.5">Libellé / Devise (Optionnel)</label>
-                         <input
-                           type="text"
-                           className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-slate-800 transition-all shadow-xs placeholder:text-slate-400"
-                           placeholder="Ex: Compte USD, Gourdes"
-                           value={newBankLabel}
-                           onChange={e => setNewBankLabel(e.target.value)}
-                         />
-                       </div>
-                     </div>
-
-                     <div className="flex justify-end pt-1">
-                       <button 
-                         type="submit" 
-                         disabled={!newBankName} 
-                         className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold font-mono tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-                       >
-                         <Plus size={14} />
-                         Ajouter à la liste
-                       </button>
-                     </div>
-                   </form>
-                 </div>
-               )}
-
-               {/* LISTE BANQUE */}
-               <div className="space-y-3">
-                 <div className="flex items-center justify-between">
-                   <h4 className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider">
-                     Comptes Actifs Répertoriés <span className="text-slate-400 font-normal font-sans">({(schoolData.global_settings?.banks || []).length})</span>
-                   </h4>
-                 </div>
-
-                 {(schoolData.global_settings?.banks || []).length > 0 ? (
-                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
-                     {schoolData.global_settings.banks.map((bank: string, idx: number) => {
-                       const parts = bank.split(' - ');
-                       const name = parts[0] || bank;
-                       let account = parts[1] || '';
-                       let label = '';
-                       if (account.includes('(')) {
-                         const lblIndex = account.indexOf('(');
-                         label = account.substring(lblIndex + 1, account.length - 1);
-                         account = account.substring(0, lblIndex).trim();
-                       }
-
-                       return (
-                         <div key={idx} className="p-3.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl shadow-xs transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group">
-                           <div className="space-y-2.5">
-                             <div className="flex items-center justify-between gap-2">
-                               <div className="flex items-center gap-2.5 min-w-0">
-                                 <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-xs shrink-0 shadow-xs">
-                                   {name.substring(0, 2).toUpperCase()}
-                                 </div>
-                                 <div className="truncate">
-                                   <p className="font-bold text-slate-900 tracking-tight text-xs uppercase truncate">{name}</p>
-                                   <p className="text-[10px] text-slate-400 font-mono font-medium">Réception</p>
-                                 </div>
-                               </div>
-                               
-                               {label && (
-                                 <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-[10px] rounded border border-slate-200/60 uppercase shrink-0">
-                                   {label}
-                                 </span>
-                               )}
-                             </div>
-
-                             {account ? (
-                               <div className="bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-200/80 flex items-center justify-between gap-2 group/acc">
-                                 <div className="min-w-0">
-                                   <p className="text-[9px] text-slate-400 font-mono font-bold uppercase">N° de Compte</p>
-                                   <p className="text-xs font-mono font-bold text-slate-900 tracking-wider truncate">{account}</p>
-                                 </div>
-                                 <button
-                                   type="button"
-                                   onClick={() => {
-                                     navigator.clipboard.writeText(account);
-                                     setCopiedAccount(account);
-                                     toast.success('Numéro de compte copié !');
-                                     setTimeout(() => setCopiedAccount(null), 2000);
-                                   }}
-                                   className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-200/60 rounded transition-colors shrink-0"
-                                   title="Copier le numéro"
-                                 >
-                                   {copiedAccount === account ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                                 </button>
-                               </div>
-                             ) : (
-                               <div className="bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-100 border-dashed text-slate-400 font-mono text-[11px] italic">
-                                 Sans numéro spécifié
-                               </div>
-                             )}
-                           </div>
-
-                           <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                             <div className="flex items-center gap-1.5">
-                               <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                               <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase">Actif</span>
-                             </div>
-                             {canManageAllCampuses && (
-                               <button 
-                                 type="button"
-                                 onClick={() => {
-                                   const updatedBanks = schoolData.global_settings.banks.filter((b: string) => b !== bank);
-                                   const updatedSettings = {
-                                     ...(schoolData.global_settings || {}),
-                                     banks: updatedBanks
-                                   };
-                                   setSchoolData({...schoolData, global_settings: updatedSettings});
-                                   toast.success('Compte masqué temporairement. Enregistrez pour valider.');
-                                 }}
-                                 className="flex items-center gap-1 text-[11px] font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-0.5 rounded transition-colors"
-                                 title="Supprimer"
-                               >
-                                 <Trash2 size={12} />
-                                 Retirer
-                               </button>
-                             )}
-                           </div>
-                         </div>
-                       );
-                     })}
-                   </div>
-                 ) : (
-                   <div className="text-center py-8 bg-slate-50 border border-slate-200 border-dashed rounded-xl">
-                     <CreditCard size={32} className="mx-auto text-slate-300 mb-2" />
-                     <p className="text-slate-800 font-bold text-xs">Aucun compte bancaire configuré</p>
-                     <p className="text-slate-500 text-[11px] mt-0.5 max-w-sm mx-auto">
-                       {canManageAllCampuses 
-                        ? "Configurez vos comptes bancaires ci-dessus pour la réception des paiements par versement ou virement bancaire."
-                        : "Veuillez contacter le Siège Social pour configurer les banques institutionnelles de réception."}
-                     </p>
-                   </div>
-                 )}
-               </div>
-             </div>
-           </div>
-         </div>
-        )}
-
         {activeTab === 'payment_methods' && (
           <div className="space-y-6 animate-in slide-in-from-right duration-500">
-            {/* Header Card */}
+            {/* Header Card with Unified Sub-Navigation */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
-                    <Wallet size={20} />
+                  <div className="w-11 h-11 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                    {paymentSubTab === 'methods' ? <Wallet size={22} /> : <CreditCard size={22} />}
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight">Modes de Règlement & Encaissements Autorisés</h3>
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Modes de Règlement & Comptes Bancaires</h3>
                     <p className="text-xs text-slate-500 mt-0.5">
-                      Définissez les méthodes de paiement acceptées par vos caissiers pour éviter tout encaissement non planifié par l'administration.
+                      Gestion unifiée des modes d'encaissement autorisés au guichet et des comptes bancaires de réception.
                     </p>
                   </div>
                 </div>
 
-                {canManageAllCampuses && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsAddingCustomMethod(true);
-                      setCustomMethodName('');
-                      setCustomMethodDescription('');
-                      setCustomMethodAccount('');
-                      setCustomMethodInstructions('');
-                      setCustomMethodCurrencies(['HTG', 'USD']);
-                      setCustomMethodRequiresRef(true);
-                      setCustomMethodRequiresBank(false);
-                    }}
-                    className="px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                <div className="flex items-center gap-2">
+                  {paymentSubTab === 'methods' && canManageAllCampuses && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsAddingCustomMethod(true);
+                        setCustomMethodName('');
+                        setCustomMethodDescription('');
+                        setCustomMethodAccount('');
+                        setCustomMethodInstructions('');
+                        setCustomMethodCurrencies(['HTG', 'USD']);
+                        setCustomMethodRequiresRef(true);
+                        setCustomMethodRequiresBank(false);
+                      }}
+                      className="px-4 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer active:scale-95 shrink-0"
+                    >
+                      <Plus size={15} />
+                      <span>Nouvelle Méthode Personnalisée</span>
+                    </button>
+                  )}
+
+                  <button 
+                    onClick={handleUpdateSchool} 
+                    disabled={saving || !canManageAllCampuses} 
+                    className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 cursor-pointer"
                   >
-                    <Plus size={15} />
-                    <span>Nouvelle Méthode Personnalisée</span>
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    <span>Enregistrer</span>
                   </button>
-                )}
+                </div>
+              </div>
+
+              {/* Sub-Navigation Switcher Pills */}
+              <div className="flex flex-wrap items-center gap-2 mt-5 pt-5 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setPaymentSubTab('methods')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    paymentSubTab === 'methods'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  }`}
+                >
+                  <Wallet size={15} />
+                  <span>Modes de Paiement (Guichet)</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] rounded-md font-mono font-bold ${
+                    paymentSubTab === 'methods' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {getSchoolPaymentMethods(schoolData).filter(m => m.enabled).length} actifs
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setPaymentSubTab('banks')}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                    paymentSubTab === 'banks'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                  }`}
+                >
+                  <CreditCard size={15} />
+                  <span>Comptes Bancaires & Réception</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] rounded-md font-mono font-bold ${
+                    paymentSubTab === 'banks' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}>
+                    {(schoolData.global_settings?.banks || []).length} répertoriés
+                  </span>
+                </button>
               </div>
             </div>
 
-            {/* Methods Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* SUB-VIEW 1: MODES DE RÈGLEMENT */}
+            {paymentSubTab === 'methods' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {getSchoolPaymentMethods(schoolData).map((method: PaymentMethodConfig) => {
                 const isEditing = editingMethodId === method.id;
                 const isConfiguredMoncash = method.id === 'MONCASH';
@@ -4104,6 +3881,259 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 </div>
               </div>
             )}
+            </div>
+            )}
+
+            {/* SUB-VIEW 2: COMPTES BANCAIRES */}
+            {paymentSubTab === 'banks' && (
+              <div className="space-y-4 animate-in fade-in duration-300">
+                {!canManageAllCampuses && (
+                  <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800">
+                    <div className="flex items-center gap-2.5">
+                      <Lock size={16} className="text-amber-700 shrink-0" />
+                      <p className="font-medium">
+                        <strong className="font-bold">Accès restreint (Annexe) :</strong> Seuls les administrateurs du Siège Social peuvent modifier les comptes bancaires.
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 bg-amber-100/80 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
+                      Lecture Seule
+                    </span>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                  <div className="p-4 sm:p-6 space-y-6">
+                    {/* AJOUT BANQUE */}
+                    {canManageAllCampuses && (
+                      <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <h4 className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider flex items-center gap-1.5">
+                            <Plus size={14} className="text-emerald-600" /> Ajouter un nouveau compte bancaire
+                          </h4>
+                          <span className="text-[10px] text-slate-400 font-mono font-medium">Saisie rapide</span>
+                        </div>
+
+                        <form onSubmit={(e) => {
+                          e.preventDefault();
+                          const resolved = newBankName === 'AUTRE' ? customBankName.trim() : newBankName.trim();
+                          if (!resolved) {
+                            toast.error('Veuillez spécifier le nom de la banque');
+                            return;
+                          }
+                          
+                          let combined = resolved;
+                          if (newBankAccount.trim()) {
+                            combined += ` - ${newBankAccount.trim()}`;
+                          }
+                          if (newBankLabel.trim()) {
+                            combined += ` (${newBankLabel.trim()})`;
+                          }
+
+                          const currentBanks = schoolData.global_settings?.banks || [];
+                          if (currentBanks.includes(combined)) {
+                            toast.error('Ce compte ou cette banque existe déjà dans la liste');
+                            return;
+                          }
+
+                          const updatedSettings = {
+                            ...(schoolData.global_settings || {}),
+                            banks: [...currentBanks, combined]
+                          };
+
+                          setSchoolData({ ...schoolData, global_settings: updatedSettings });
+                          setNewBankName('');
+                          setCustomBankName('');
+                          setNewBankAccount('');
+                          setNewBankLabel('');
+                          toast.success(`Banque ajoutée temporairement à la liste. N'oubliez pas d'enregistrer !`);
+                        }} className="space-y-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-700 ml-0.5">Nom de la Banque</label>
+                              <select
+                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-slate-800 transition-all shadow-xs"
+                                value={newBankName}
+                                onChange={e => {
+                                  setNewBankName(e.target.value);
+                                  if (e.target.value !== 'AUTRE') setCustomBankName('');
+                                }}
+                              >
+                                <option value="" disabled>Sélectionner une banque...</option>
+                                <option value="UNIBANK">UNIBANK</option>
+                                <option value="Sogebank">Sogebank</option>
+                                <option value="BNC">BNC (Banque Nationale de Crédit)</option>
+                                <option value="BUH">BUH (Banque de l'Union Haïtienne)</option>
+                                <option value="Capital Bank">Capital Bank</option>
+                                <option value="Banque Populaire Haïtienne">Banque Populaire Haïtienne (BPH)</option>
+                                <option value="Citibank">Citibank</option>
+                                <option value="AUTRE">Autre banque (Saisie manuelle)...</option>
+                              </select>
+                            </div>
+
+                            {newBankName === 'AUTRE' && (
+                              <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-slate-700 ml-0.5">Spécifier la banque</label>
+                                <input
+                                  type="text"
+                                  className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-slate-800 transition-all shadow-xs"
+                                  placeholder="Nom de la banque"
+                                  value={customBankName}
+                                  onChange={e => setCustomBankName(e.target.value)}
+                                />
+                              </div>
+                            )}
+
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-700 ml-0.5">Numéro de compte</label>
+                              <input
+                                type="text"
+                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg font-mono text-xs font-bold tracking-wider outline-none focus:border-slate-800 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
+                                placeholder="Ex: 102-394-1928"
+                                value={newBankAccount}
+                                onChange={e => setNewBankAccount(e.target.value)}
+                              />
+                            </div>
+
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-bold text-slate-700 ml-0.5">Libellé / Devise (Optionnel)</label>
+                              <input
+                                type="text"
+                                className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-medium outline-none focus:border-slate-800 transition-all shadow-xs placeholder:text-slate-400"
+                                placeholder="Ex: Compte USD, Gourdes"
+                                value={newBankLabel}
+                                onChange={e => setNewBankLabel(e.target.value)}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex justify-end pt-1">
+                            <button 
+                              type="submit" 
+                              disabled={!newBankName} 
+                              className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold font-mono tracking-wider flex items-center justify-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm cursor-pointer"
+                            >
+                              <Plus size={14} />
+                              Ajouter à la liste
+                            </button>
+                          </div>
+                        </form>
+                      </div>
+                    )}
+
+                    {/* LISTE BANQUE */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider">
+                          Comptes Actifs Répertoriés <span className="text-slate-400 font-normal font-sans">({(schoolData.global_settings?.banks || []).length})</span>
+                        </h4>
+                      </div>
+
+                      {(schoolData.global_settings?.banks || []).length > 0 ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
+                          {schoolData.global_settings.banks.map((bank: string, idx: number) => {
+                            const parts = bank.split(' - ');
+                            const name = parts[0] || bank;
+                            let account = parts[1] || '';
+                            let label = '';
+                            if (account.includes('(')) {
+                              const lblIndex = account.indexOf('(');
+                              label = account.substring(lblIndex + 1, account.length - 1);
+                              account = account.substring(0, lblIndex).trim();
+                            }
+
+                            return (
+                              <div key={idx} className="p-3.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl shadow-xs transition-all flex flex-col justify-between space-y-3 relative overflow-hidden group">
+                                <div className="space-y-2.5">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <div className="w-8 h-8 rounded-lg bg-slate-900 text-white flex items-center justify-center font-mono font-bold text-xs shrink-0 shadow-xs">
+                                        {name.substring(0, 2).toUpperCase()}
+                                      </div>
+                                      <div className="truncate">
+                                        <p className="font-bold text-slate-900 tracking-tight text-xs uppercase truncate">{name}</p>
+                                        <p className="text-[10px] text-slate-400 font-mono font-medium">Réception</p>
+                                      </div>
+                                    </div>
+                                    
+                                    {label && (
+                                      <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold text-[10px] rounded border border-slate-200/60 uppercase shrink-0">
+                                        {label}
+                                      </span>
+                                    )}
+                                  </div>
+
+                                  {account ? (
+                                    <div className="bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-200/80 flex items-center justify-between gap-2 group/acc">
+                                      <div className="min-w-0">
+                                        <p className="text-[9px] text-slate-400 font-mono font-bold uppercase">N° de Compte</p>
+                                        <p className="text-xs font-mono font-bold text-slate-900 tracking-wider truncate">{account}</p>
+                                      </div>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          navigator.clipboard.writeText(account);
+                                          setCopiedAccount(account);
+                                          toast.success('Numéro de compte copié !');
+                                          setTimeout(() => setCopiedAccount(null), 2000);
+                                        }}
+                                        className="p-1 text-slate-400 hover:text-slate-800 hover:bg-slate-200/60 rounded transition-colors shrink-0 cursor-pointer"
+                                        title="Copier le numéro"
+                                      >
+                                        {copiedAccount === account ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                                      </button>
+                                    </div>
+                                  ) : (
+                                    <div className="bg-slate-50 px-2.5 py-2 rounded-lg border border-slate-100 border-dashed text-slate-400 font-mono text-[11px] italic">
+                                      Sans numéro spécifié
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    <span className="text-[10px] font-mono font-bold text-emerald-700 uppercase">Actif</span>
+                                  </div>
+                                  {canManageAllCampuses && (
+                                    <button 
+                                      type="button"
+                                      onClick={() => {
+                                        const updatedBanks = schoolData.global_settings.banks.filter((b: string) => b !== bank);
+                                        const updatedSettings = {
+                                          ...(schoolData.global_settings || {}),
+                                          banks: updatedBanks
+                                        };
+                                        setSchoolData({...schoolData, global_settings: updatedSettings});
+                                        toast.success('Compte masqué temporairement. Enregistrez pour valider.');
+                                      }}
+                                      className="flex items-center gap-1 text-[11px] font-mono font-bold text-rose-600 hover:text-rose-700 hover:bg-rose-50 px-2 py-0.5 rounded transition-colors cursor-pointer"
+                                      title="Supprimer"
+                                    >
+                                      <Trash2 size={12} />
+                                      Retirer
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 bg-slate-50 border border-slate-200 border-dashed rounded-xl">
+                          <CreditCard size={32} className="mx-auto text-slate-300 mb-2" />
+                          <p className="text-slate-800 font-bold text-xs">Aucun compte bancaire configuré</p>
+                          <p className="text-slate-500 text-[11px] mt-0.5 max-w-sm mx-auto">
+                            {canManageAllCampuses 
+                            ? "Configurez vos comptes bancaires ci-dessus pour la réception des paiements par versement ou virement bancaire."
+                            : "Veuillez contacter le Siège Social pour configurer les banques institutionnelles de réception."}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -4478,16 +4508,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           </div>
         )}
 
-        {/* TAB: QUOTAS & CRÉDITS IA - SUPER ADMIN ONLY */}
-        {activeTab === 'ai_quotas' && isSuperAdmin && (
-          <div className="space-y-6 animate-in slide-in-from-right duration-500">
-            <AiQuotaProgressWidget 
-              schoolId={user.school_id} 
-              variant="full" 
-            />
-          </div>
-        )}
-      
       <AnimatePresence>
         {confirmState && (
           <motion.div 
