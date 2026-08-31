@@ -816,33 +816,17 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
                   {isUniversity ? 'Discipline & Déontologie' : isProfessional ? 'Discipline & Climat Académique' : 'Discipline & Climat Scolaire'}
                 </h1>
-                <span className="px-2.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-100 rounded-full text-[10px] sm:text-[11px] font-black uppercase tracking-wider">
-                  {isUniversity ? 'Supérieur' : isProfessional ? 'Formation Pro' : 'Scolaire'}
-                </span>
-              </div>
-              
-              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 text-[11px] sm:text-xs font-semibold text-slate-500">
-                <span className="inline-flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100 text-slate-700">
-                  <Building2 size={13} className="text-rose-600 shrink-0" />
-                  <span className="font-bold text-slate-900 truncate max-w-[150px] sm:max-w-[220px]">{school?.name || 'Établissement'}</span>
-                </span>
-
-                <span className="inline-flex items-center gap-1.5 bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-100 text-slate-700">
-                  <Calendar size={13} className="text-blue-600 shrink-0" />
-                  <span className="text-slate-400">Session :</span>
-                  <strong className="text-slate-900">{activeSessionLabel}</strong>
-                </span>
-
-                {hasMultiCampus && (
-                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-xl border border-emerald-100 text-emerald-800">
-                    <Layers size={13} className="text-emerald-600 shrink-0" />
-                    <span className="text-emerald-600/80">Annexe :</span>
-                    <strong className="text-emerald-950">
-                      {selectedCampusFilter === 'ALL' ? 'Tous les campus' : (campuses.find(c => c.id === selectedCampusFilter)?.name || 'Campus')}
-                    </strong>
+                {hasMultiCampus && selectedCampusFilter !== 'ALL' && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-rose-50 text-rose-700 border border-rose-200/60 rounded-full text-[11px] font-bold">
+                    <Building2 size={11} />
+                    <span>{campuses.find(c => c.id === selectedCampusFilter)?.name || 'Annexe'}</span>
                   </span>
                 )}
               </div>
+              
+              <p className="text-xs sm:text-[13px] font-medium text-slate-500 max-w-2xl leading-relaxed">
+                Registre officiel de suivi du comportement, médiations pédagogiques, assiduité et sanctions disciplinaires.
+              </p>
             </div>
           </div>
           

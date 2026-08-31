@@ -45,7 +45,7 @@ import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { supabase } from "../supabase";
 import { useSchool } from "../contexts/SchoolContext";
-import { UserProfile } from "../types";
+import { UserProfile, SchoolType } from "../types";
 import { AcademicSessionPill } from "./AcademicSessionPill";
 import { ClassSelectorPill } from "./ClassSelectorPill";
 import { SubjectSelectorPill } from "./SubjectSelectorPill";
@@ -170,7 +170,7 @@ const LEVEL_CURRICULUMS: Record<string, Array<{ name: string; code: string; coef
 
 const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { ipAddress } = useSecurity();
-  const { terminology, school, currentCampusId, campuses } = useSchool();
+  const { terminology, school, currentCampusId, campuses, setCurrentCampusId } = useSchool();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -1358,7 +1358,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 Journal des Évaluations
               </h2>
               {activeCampusName && (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[11px] font-bold border border-indigo-200">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 bg-blue-50 text-blue-700 rounded-full text-[11px] font-bold border border-blue-200">
                   <Building2 size={11} />
                   <span>{activeCampusName}</span>
                 </span>
@@ -1370,11 +1370,30 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
+          {/* Campus Switcher (if multi-campus) - Harmonisé en style Pilule */}
+          {campuses && campuses.length > 0 && !user.campus_id && (user.role === 'SUPER_ADMIN' || user.role === 'DIRECTOR') && (
+            <div className="relative min-w-[170px] sm:min-w-[190px]">
+              <select
+                aria-label="Sélectionner le campus ou l'annexe"
+                className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold pl-8 pr-8 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer appearance-none transition-all shadow-2xs"
+                value={currentCampusId || ''}
+                onChange={e => setCurrentCampusId(e.target.value || null)}
+              >
+                <option value="">🌐 Tous les Campus</option>
+                {campuses.map(c => (
+                  <option key={c.id} value={c.id}>📍 {c.name}</option>
+                ))}
+              </select>
+              <Building2 size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
+              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          )}
+
           {/* Bouton Mode Plein Écran */}
           <button
             onClick={() => setIsFullscreen(!isFullscreen)}
-            className={`px-3 py-1.5 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 border shadow-xs ${
+            className={`px-3 py-1.5 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-1.5 border shadow-xs cursor-pointer ${
               isFullscreen
                 ? "bg-slate-900 text-white border-slate-700"
                 : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-300"
@@ -1382,27 +1401,27 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             title="Basculer en mode plein écran (Focus saisie des notes)"
           >
             {isFullscreen ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            <span>{isFullscreen ? "Quitter Plein Écran" : "Plein Écran (Focus)"}</span>
+            <span className="hidden sm:inline">{isFullscreen ? "Quitter Plein Écran" : "Plein Écran"}</span>
           </button>
 
           <button
             onClick={exportJournalPDF}
             disabled={!selectedClassId || students.length === 0}
-            className="flex-1 md:flex-none px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border border-blue-200/60"
+            className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border border-blue-200/60 shadow-2xs cursor-pointer"
             title="Imprimer le journal au format PDF paysage"
           >
             <Download size={14} />
-            <span>Imprimer PDF</span>
+            <span className="hidden sm:inline">PDF</span>
           </button>
 
           <button
             onClick={exportJournalExcel}
             disabled={!selectedClassId || students.length === 0}
-            className="flex-1 md:flex-none px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg font-semibold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border border-emerald-200/60"
+            className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border border-emerald-200/60 shadow-2xs cursor-pointer"
             title="Exporter les notes vers Excel"
           >
             <FileSpreadsheet size={14} />
-            <span>Export Excel</span>
+            <span className="hidden sm:inline">Excel</span>
           </button>
 
           <button
@@ -1410,7 +1429,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               fetchRefs();
               loadGradeContext();
             }}
-            className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-600 rounded-lg hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-all active:rotate-180 shrink-0"
+            className="w-8 h-8 flex items-center justify-center bg-slate-50 text-slate-600 rounded-xl hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-all active:rotate-180 shrink-0 cursor-pointer shadow-2xs"
             title="Recharger le contexte"
           >
             <RefreshCw size={14} className={loading ? "animate-spin text-blue-600" : ""} />
@@ -1418,12 +1437,12 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       </div>
 
-      {/* 2. FILTRES DE CONTEXTE CONDENSÉS */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-xl shadow-xs border border-slate-200/90 space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+      {/* 2. FILTRES DE CONTEXTE CONDENSÉS (STYLE PILULE HARMONISÉ) */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-xl shadow-xs border border-slate-200/90 space-y-3.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
           {/* Année Académique */}
-          <div>
-            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1">
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
               <Calendar size={12} className="text-blue-500" />
               <span>Année Académique</span>
             </label>
@@ -1438,14 +1457,14 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Classe */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
                 <GraduationCap size={12} className="text-blue-500" />
                 <span>{terminology?.class || "Classe"}</span>
               </label>
               {selectedClassObj && (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
+                <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-700 rounded-full border border-slate-200">
                   {classLevelKey}
                 </span>
               )}
@@ -1463,13 +1482,13 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Matière */}
-          <div>
-            <div className="flex items-center justify-between mb-1">
+          <div className="space-y-1">
+            <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
                 <Layers size={12} className="text-blue-500" />
                 <span>{terminology?.subject || "Matière"}</span>
               </label>
-              <span className="text-[10px] font-bold text-blue-600">
+              <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 rounded-full border border-blue-100">
                 {subjects.length} assignée(s)
               </span>
             </div>
@@ -1486,41 +1505,74 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Période d'évaluation / Contrôles */}
-        <div className="pt-2 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-bold text-slate-400 uppercase mr-1">
-              Période :
+        {/* Période d'évaluation / Contrôles - Harmonisation Pilule Complète */}
+        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
+              <FileText size={12} className="text-blue-500" />
+              <span>{school?.school_type === SchoolType.UNIVERSITY ? 'Session :' : 'Évaluation :'}</span>
             </span>
-            {!isCustomTermMode ? (
-              examsList.map((exam) => (
-                <button
-                  key={exam}
-                  type="button"
-                  onClick={() => setSelectedTerm(exam)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all flex items-center gap-1 ${
-                    selectedTerm === exam
-                      ? "bg-blue-600 text-white shadow-xs"
-                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
-                  }`}
-                >
-                  <Calendar size={11} />
-                  <span>{exam}</span>
-                </button>
-              ))
-            ) : (
+
+            {/* Sélecteur Déroulant de type Pilule (Exactement comme dans Bulletins & Feuilles de Présence) */}
+            <div className="relative min-w-[190px] sm:min-w-[220px]">
+              <select
+                aria-label="Sélectionner la période d'évaluation"
+                value={isCustomTermMode ? "__CUSTOM__" : selectedTerm}
+                onChange={(e) => {
+                  if (e.target.value === "__CUSTOM__") {
+                    setIsCustomTermMode(true);
+                  } else {
+                    setIsCustomTermMode(false);
+                    setSelectedTerm(e.target.value);
+                  }
+                }}
+                className="w-full pl-8 pr-8 py-2 bg-slate-50 hover:bg-slate-100/90 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-blue-500 appearance-none transition-all cursor-pointer shadow-2xs"
+              >
+                {examsList.map((exam) => (
+                  <option key={exam} value={exam}>
+                    {exam}
+                  </option>
+                ))}
+                <option value="__CUSTOM__">➕ Autre nom d'évaluation personnalisé...</option>
+              </select>
+              <Calendar size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Puces / Pilules de sélection rapide en 1 clic */}
+            {!isCustomTermMode && (
+              <div className="hidden sm:flex flex-wrap items-center gap-1.5">
+                {examsList.slice(0, 4).map((exam) => (
+                  <button
+                    key={exam}
+                    type="button"
+                    onClick={() => setSelectedTerm(exam)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+                      selectedTerm === exam
+                        ? "bg-blue-600 text-white ring-2 ring-blue-400/30"
+                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80"
+                    }`}
+                  >
+                    <span>{exam}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Champ personnalisé si mode custom */}
+            {isCustomTermMode && (
               <div className="flex items-center gap-1.5">
                 <input
                   type="text"
                   value={selectedTerm}
                   onChange={(e) => setSelectedTerm(e.target.value)}
                   placeholder="Nom de l'évaluation personnalisée..."
-                  className="px-2.5 py-1 text-xs border border-blue-400 rounded-md font-semibold text-slate-800 bg-white"
+                  className="px-3 py-1.5 text-xs border border-blue-400 rounded-xl font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
                 />
                 <button
                   type="button"
                   onClick={() => setIsCustomTermMode(false)}
-                  className="text-xs text-slate-500 hover:text-slate-800 underline"
+                  className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 font-semibold cursor-pointer"
                 >
                   Annuler
                 </button>
@@ -1531,9 +1583,9 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <button
             type="button"
             onClick={() => setIsCustomTermMode(!isCustomTermMode)}
-            className="text-[11px] font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer self-end md:self-auto"
           >
-            {isCustomTermMode ? "Revenir aux contrôles standards" : "+ Autre nom d'évaluation..."}
+            {isCustomTermMode ? "Revenir aux évaluations standards" : "+ Autre nom d'évaluation..."}
           </button>
         </div>
       </div>
@@ -1593,28 +1645,28 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-xs flex flex-wrap items-center justify-between gap-2.5">
         <div className="flex items-center gap-2 flex-1 min-w-[180px]">
           <div className="relative flex-1 min-w-[140px] sm:min-w-[220px] max-w-sm sm:max-w-md">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Rechercher un élève par nom ou matricule..."
-              className="w-full pl-8 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all"
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-800 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-hidden transition-all shadow-2xs"
             />
           </div>
 
-          {/* Sélecteur de pagination par page */}
-          <div className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 text-[11px] font-medium text-slate-600 shrink-0">
+          {/* Sélecteur de pagination par page - Harmonisé en Pilule */}
+          <div className="hidden md:flex items-center gap-1 bg-slate-50 border border-slate-200/90 rounded-xl p-1 text-[11px] font-medium text-slate-600 shrink-0 shadow-2xs">
             <span className="px-1.5 text-slate-400 font-bold text-[10px] uppercase">Par page:</span>
             {[15, 25, 50].map((num) => (
               <button
                 key={num}
                 type="button"
                 onClick={() => setItemsPerPage(num)}
-                className={`px-2 py-0.5 rounded transition-all ${
+                className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
                   itemsPerPage === num
-                    ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                    : "hover:text-slate-900"
+                    ? "bg-white text-blue-600 font-black shadow-xs border border-slate-200"
+                    : "hover:text-slate-900 font-bold"
                 }`}
               >
                 {num}
@@ -1623,26 +1675,26 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={() => setItemsPerPage("ALL")}
-              className={`px-2 py-0.5 rounded transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
                 itemsPerPage === "ALL"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
+                  ? "bg-white text-blue-600 font-black shadow-xs border border-slate-200"
+                  : "hover:text-slate-900 font-bold"
               }`}
             >
               Tous
             </button>
           </div>
 
-          {/* Sélecteur de Hauteur de Vue */}
-          <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200 rounded-lg p-0.5 text-[11px] font-medium text-slate-600 shrink-0">
+          {/* Sélecteur de Hauteur de Vue - Harmonisé en Pilule */}
+          <div className="hidden sm:flex items-center gap-1 bg-slate-50 border border-slate-200/90 rounded-xl p-1 text-[11px] font-medium text-slate-600 shrink-0 shadow-2xs">
             <span className="px-1.5 text-slate-400 font-bold text-[10px] uppercase">Hauteur:</span>
             <button
               type="button"
               onClick={() => setTableHeightMode("adaptive")}
-              className={`px-2 py-0.5 rounded transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
                 tableHeightMode === "adaptive"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
+                  ? "bg-white text-blue-600 font-black shadow-xs border border-slate-200"
+                  : "hover:text-slate-900 font-bold"
               }`}
               title="Hauteur adaptée automatiquement à votre écran"
             >
@@ -1651,10 +1703,10 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={() => setTableHeightMode("fixed-500")}
-              className={`px-2 py-0.5 rounded transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
                 tableHeightMode === "fixed-500"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
+                  ? "bg-white text-blue-600 font-black shadow-xs border border-slate-200"
+                  : "hover:text-slate-900 font-bold"
               }`}
               title="Hauteur fixe compacte (500px)"
             >
@@ -1663,10 +1715,10 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={() => setTableHeightMode("fixed-750")}
-              className={`px-2 py-0.5 rounded transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
                 tableHeightMode === "fixed-750"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
+                  ? "bg-white text-blue-600 font-black shadow-xs border border-slate-200"
+                  : "hover:text-slate-900 font-bold"
               }`}
               title="Hauteur fixe large (750px - Idéal pour grands écrans)"
             >
@@ -1675,10 +1727,10 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={() => setTableHeightMode("full")}
-              className={`px-2 py-0.5 rounded transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-xs transition-all cursor-pointer ${
                 tableHeightMode === "full"
-                  ? "bg-white text-blue-600 font-bold shadow-xs border border-slate-200"
-                  : "hover:text-slate-900"
+                  ? "bg-white text-blue-600 font-black shadow-xs border border-slate-200"
+                  : "hover:text-slate-900 font-bold"
               }`}
               title="Afficher tous les élèves sans barre de défilement interne"
             >
@@ -1690,13 +1742,13 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="relative group shrink-0">
             <button
               type="button"
-              className="hidden md:inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-lg border border-slate-200 text-xs font-medium transition-all"
+              className="hidden md:inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl border border-slate-200 text-xs font-bold transition-all shadow-2xs cursor-pointer"
               title="Touches rapides de navigation clavier"
             >
               <Keyboard size={13} className="text-blue-600 shrink-0" />
               <span className="text-[11px]">Raccourcis</span>
             </button>
-            <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:flex group-focus-within:flex flex-col z-30 bg-slate-900 text-white text-[11px] p-2.5 rounded-lg shadow-xl border border-slate-800 whitespace-nowrap min-w-[210px] pointer-events-none">
+            <div className="absolute left-0 bottom-full mb-1.5 hidden group-hover:flex group-focus-within:flex flex-col z-30 bg-slate-900 text-white text-[11px] p-2.5 rounded-xl shadow-xl border border-slate-800 whitespace-nowrap min-w-[210px] pointer-events-none">
               <span className="font-bold text-blue-400 mb-1 flex items-center gap-1">
                 <Keyboard size={12} /> Navigation clavier :
               </span>
@@ -1711,7 +1763,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         <div className="flex items-center gap-2 shrink-0">
           {unsavedCount > 0 && (
-            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-lg text-xs font-bold border border-amber-200 animate-pulse">
+            <span className="inline-flex items-center gap-1 px-3 py-1 bg-amber-50 text-amber-700 rounded-full text-xs font-bold border border-amber-200 animate-pulse">
               <AlertCircle size={12} />
               <span>{unsavedCount} modif(s) non scellée(s)</span>
             </span>
@@ -1721,7 +1773,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               onClick={handleSaveGrades}
               disabled={saving}
-              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50"
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
             >
               {saving ? (
                 <>
@@ -2082,7 +2134,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         )}
 
-        {/* BARRE DE CONTRÔLE DE PAGINATION */}
+        {/* BARRE DE CONTRÔLE DE PAGINATION (STYLE PILULE) */}
         {filteredStudents.length > 0 && itemsPerPage !== "ALL" && totalPages > 1 && (
           <div className="bg-white px-4 py-2.5 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3 shrink-0">
             <div className="text-xs text-slate-600 font-medium">
@@ -2096,7 +2148,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
               >
                 <ChevronLeft size={13} />
                 <span className="hidden sm:inline">Précédent</span>
@@ -2115,9 +2167,9 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         key={page}
                         type="button"
                         onClick={() => setCurrentPage(page)}
-                        className={`w-7 h-7 rounded-lg text-xs font-bold transition-all ${
+                        className={`w-7 h-7 rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           currentPage === page
-                            ? "bg-blue-600 text-white shadow-xs"
+                            ? "bg-blue-600 text-white shadow-2xs"
                             : "text-slate-600 hover:bg-slate-100 border border-slate-200"
                         }`}
                       >
@@ -2142,7 +2194,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 type="button"
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1"
+                className="px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
               >
                 <span className="hidden sm:inline">Suivant</span>
                 <ChevronRight size={13} />
@@ -2200,7 +2252,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 value={bulkFillScore}
                 onChange={(e) => setBulkFillScore(e.target.value)}
                 placeholder="Ex: 85"
-                className="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm font-bold text-slate-800"
+                className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
                 autoFocus
               />
             </div>
@@ -2208,14 +2260,14 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setBulkFillTargetCol(null)}
-                className="px-3 py-1.5 text-xs text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
+                className="px-3.5 py-2 text-xs text-slate-600 hover:bg-slate-100 rounded-xl font-bold transition-all cursor-pointer"
               >
                 Annuler
               </button>
               <button
                 type="button"
                 onClick={() => handleApplyBulkFill(bulkFillTargetCol, bulkFillScore)}
-                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
               >
                 Appliquer à tous
               </button>

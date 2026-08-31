@@ -204,7 +204,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
         <ErrorBoundary>
           <Sidebar user={user} onLogout={purgeSystemState} />
         </ErrorBoundary>
-        <main className="flex-1 overflow-y-auto p-4 pt-16 lg:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
+        <main className="flex-1 overflow-y-auto p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
           <ConnectivityBanner />
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
           <AiQuotaAlertBanner user={user} />

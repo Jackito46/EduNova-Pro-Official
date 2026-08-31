@@ -194,7 +194,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       </button>
 
       <aside 
-        className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} fixed lg:static inset-y-0 left-0 z-50 ${isNarrow ? 'w-[280px] lg:w-20' : 'w-[280px] lg:w-[300px]'} bg-slate-100 text-slate-800 transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200 shadow-xl lg:shadow-sm print:hidden group`}
+        className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} fixed lg:static inset-y-0 left-0 z-50 ${isNarrow ? 'w-[280px] lg:w-20' : 'w-[280px] lg:w-[260px] xl:w-[270px] 2xl:w-[285px]'} bg-slate-100 text-slate-800 transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200 shadow-xl lg:shadow-sm print:hidden group`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >

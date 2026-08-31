@@ -20,6 +20,7 @@ import {
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { aiCreditTrackingService, AiQuotaSummary } from '../services/aiCreditTrackingService';
+import { AiCreditAuditTable } from './AiCreditAuditTable';
 
 interface AiQuotaProgressWidgetProps {
   schoolId?: string;
@@ -487,6 +488,9 @@ export const AiQuotaProgressWidget: React.FC<AiQuotaProgressWidgetProps> = ({
           </div>
         </div>
       </div>
+
+      {/* TABLE D'AUDIT SIMPLIFIÉE DES 10 DERNIÈRES ACTIONS AYANT CONSOMMÉ DES CRÉDITS */}
+      <AiCreditAuditTable schoolId={schoolId} limit={10} showSimulateButton={true} />
 
       {/* SUPABASE TABLE STRUCTURE ACCORDION / NOTE */}
       <div className="bg-slate-900 text-slate-200 rounded-2xl p-5 space-y-3">

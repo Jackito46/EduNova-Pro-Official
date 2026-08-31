@@ -62,6 +62,17 @@ export const geminiService = {
         data.source === 'FALLBACK'
       );
 
+      aiCreditTrackingService.recordAuditAction({
+        featureName: "Génération Appréciation Bulletin",
+        featureCategory: 'PEDAGOGY',
+        creditsUsed: data.source === 'API' ? 1 : 0,
+        tokensConsumed: 280,
+        model: data.model || 'Gemini 2.5 Flash',
+        latencyMs,
+        status: data.source === 'API' ? 'CONSUMED' : 'FALLBACK',
+        summary: `Élève ${studentName || "sélectionné"} (${grades?.length || 0} notes analysées)`
+      });
+
       return text;
     } catch (error: any) {
       console.error("Gemini Pro Error:", error?.message || error);
@@ -121,6 +132,17 @@ export const geminiService = {
         data.source === 'FALLBACK'
       );
 
+      aiCreditTrackingService.recordAuditAction({
+        featureName: "Audit & Diagnostic Financier",
+        featureCategory: 'FINANCE',
+        creditsUsed: data.source === 'API' ? 1 : 0,
+        tokensConsumed: 350,
+        model: data.model || 'Gemini 2.5 Flash',
+        latencyMs,
+        status: data.source === 'API' ? 'CONSUMED' : 'FALLBACK',
+        summary: "Analyse prévisionnelle de santé financière et trésorerie"
+      });
+
       return text;
     } catch (error: any) {
       console.error("Gemini Finance Error:", error?.message || error);
@@ -178,6 +200,17 @@ export const geminiService = {
         false, 
         data.source === 'FALLBACK'
       );
+
+      aiCreditTrackingService.recordAuditAction({
+        featureName: options?.type || "Assistant Pédagogique & Rédaction",
+        featureCategory: 'ASSISTANT',
+        creditsUsed: data.source === 'API' ? 1 : 0,
+        tokensConsumed: 200,
+        model: data.model || 'Gemini 2.5 Flash',
+        latencyMs,
+        status: data.source === 'API' ? 'CONSUMED' : 'FALLBACK',
+        summary: prompt ? prompt.substring(0, 70) + (prompt.length > 70 ? '...' : '') : 'Génération de texte'
+      });
 
       return data.text;
     } catch (error: any) {

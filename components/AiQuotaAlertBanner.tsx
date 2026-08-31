@@ -32,7 +32,13 @@ export const AiQuotaAlertBanner: React.FC<AiQuotaAlertBannerProps> = ({ user }) 
   const [isSimulating, setIsSimulating] = useState(false);
   const toastTriggeredRef = useRef<{ eighty: boolean; ninetyFive: boolean }>({ eighty: false, ninetyFive: false });
 
-  const isSuperAdmin = Boolean(user?.is_super_admin || user?.role === 'SUPER_ADMIN' || (user?.role as any) === UserRole.SUPER_ADMIN);
+  // Vérifier strictement si l'utilisateur est Super Administrateur
+  const roleStr = String(user?.role || '');
+  const isSuperAdmin = Boolean(
+    user?.is_super_admin || 
+    roleStr === 'SUPER_ADMIN' || 
+    user?.role === UserRole.SUPER_ADMIN
+  );
 
   // Joue un signal sonore discret (Web Audio API synthétique) pour avertir l'administrateur
   const playAlertSound = useCallback((type: 'warning' | 'critical') => {
@@ -68,16 +74,35 @@ export const AiQuotaAlertBanner: React.FC<AiQuotaAlertBannerProps> = ({ user }) 
     }
   }, []);
 
+  // Déclenche une notification système navigateur (si la permission est accordée)
+  const sendSystemNotification = useCallback((title: string, body: string) => {
+    try {
+      if ('Notification' in window && Notification.permission === 'granted') {
+        new Notification(title, {
+          body,
+          icon: '/favicon.ico',
+          badge: '/favicon.ico'
+        });
+      }
+    } catch (e) {
+      // Silencieux si indisponible en iframe
+    }
+  }, []);
+
   const triggerProactiveNotification = useCallback((data: AiQuotaSummary) => {
     if (data.usagePercent >= 95) {
       if (!toastTriggeredRef.current.ninetyFive) {
         toastTriggeredRef.current.ninetyFive = true;
         playAlertSound('critical');
-        toast.error(`🚨 ALERTE CRITIQUE : Quota IA saturé à 95% (${data.requestsUsed}/${data.requestsLimit} req)`, {
-          description: "Le plafond quotidien de requêtes gratuites Google AI Studio est presque atteint. Activez le mode cache pour éviter tout blocage.",
+        sendSystemNotification(
+          '🚨 Alerte Critique Quota IA (95%)',
+          `Le quota IA a atteint ${data.usagePercent}% (${data.requestsUsed}/${data.requestsLimit} req). Le plafond est presque saturé.`
+        );
+        toast.error(`🚨 ALERTE CRITIQUE : Quota IA saturé à ${data.usagePercent}% (${data.requestsUsed}/${data.requestsLimit} req)`, {
+          description: "Le plafond quotidien de requêtes gratuites Google AI Studio (1 500 RPD) est presque atteint. Activez le mode cache pour éviter tout blocage.",
           duration: 9000,
           action: {
-            label: "Console Santé IA",
+            label: "Console Santé & Quotas",
             onClick: () => navigate('/super-admin/system-health')
           }
         });
@@ -86,8 +111,12 @@ export const AiQuotaAlertBanner: React.FC<AiQuotaAlertBannerProps> = ({ user }) 
       if (!toastTriggeredRef.current.eighty) {
         toastTriggeredRef.current.eighty = true;
         playAlertSound('warning');
-        toast.warning(`⚠️ ATTENTION : Quota IA à 80% (${data.requestsUsed}/${data.requestsLimit} req)`, {
-          description: "Le palier de vigilance est franchi. Les requêtes récurrentes continuent d'être accélérées par le cache mémoire.",
+        sendSystemNotification(
+          '⚠️ Seuil d’alerte Quota IA (80%)',
+          `Le quota IA a atteint ${data.usagePercent}% (${data.requestsUsed}/${data.requestsLimit} req). Mode économique recommandé.`
+        );
+        toast.warning(`⚠️ ATTENTION : Quota IA à ${data.usagePercent}% (${data.requestsUsed}/${data.requestsLimit} req)`, {
+          description: "Le palier de vigilance de 80% est franchi. Les requêtes récurrentes continuent d'être accélérées par le cache mémoire.",
           duration: 7000,
           action: {
             label: "Voir Diagnostic",
@@ -100,7 +129,7 @@ export const AiQuotaAlertBanner: React.FC<AiQuotaAlertBannerProps> = ({ user }) 
       toastTriggeredRef.current.eighty = false;
       toastTriggeredRef.current.ninetyFive = false;
     }
-  }, [navigate, playAlertSound]);
+  }, [navigate, playAlertSound, sendSystemNotification]);
 
   const checkQuota = useCallback(async () => {
     if (!isSuperAdmin) return;
@@ -115,6 +144,13 @@ export const AiQuotaAlertBanner: React.FC<AiQuotaAlertBannerProps> = ({ user }) 
 
   useEffect(() => {
     checkQuota();
+
+    // Demander poliment la permission de notification si Super Admin
+    if (isSuperAdmin && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        Notification.requestPermission().catch(() => {});
+      } catch (e) {}
+    }
 
     // Écouter les mises à jour émises par le service après chaque appel IA
     const handleQuotaUpdated = (event: Event) => {
@@ -136,9 +172,9 @@ export const AiQuotaAlertBanner: React.FC<AiQuotaAlertBannerProps> = ({ user }) 
       window.removeEventListener('edunova-ai-quota-updated', handleQuotaUpdated);
       clearInterval(interval);
     };
-  }, [checkQuota, triggerProactiveNotification]);
+  }, [checkQuota, triggerProactiveNotification, isSuperAdmin]);
 
-  // Si l'utilisateur n'a pas les droits Super Admin ou pas de données
+  // Si l'utilisateur n'a pas les droits Super Administrateur ou pas de données
   if (!isSuperAdmin || !quota) {
     return null;
   }

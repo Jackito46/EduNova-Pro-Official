@@ -24,7 +24,10 @@ import {
   Layers,
   HardDrive,
   Trash2,
-  Boxes
+  Boxes,
+  AlertTriangle,
+  AlertOctagon,
+  Bell
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -32,6 +35,8 @@ import { UserProfile, UserRole } from '../types';
 import { supabase } from '../supabase';
 import { aiLocalCache, AiLocalCacheStats } from '../utils/aiLocalCache';
 import { geminiService } from '../services/geminiService';
+import { aiCreditTrackingService } from '../services/aiCreditTrackingService';
+import { AiCreditAuditTable } from './AiCreditAuditTable';
 
 interface SystemHealthViewProps {
   user: UserProfile;
@@ -423,6 +428,21 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
       setTestingAi(false);
       refreshAiLocalCache();
       fetchTelemetry(true);
+    }
+  };
+
+  // Simulation des seuils d'alerte de quota (80% et 95%) pour les administrateurs
+  const [simulatingQuota, setSimulatingQuota] = useState(false);
+  const handleSimulateQuotaThreshold = async (percent: number) => {
+    setSimulatingQuota(true);
+    try {
+      const summary = await aiCreditTrackingService.simulateQuotaLevel(user?.school_id || 'default-school', percent);
+      toast.info(`Simulation de quota configurée à ${percent}% (${summary.requestsUsed}/${summary.requestsLimit} req)`);
+      await fetchTelemetry(true);
+    } catch (e: any) {
+      toast.error(`Erreur simulation : ${e?.message || 'Inconnue'}`);
+    } finally {
+      setSimulatingQuota(false);
     }
   };
 
@@ -1110,6 +1130,96 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
               </div>
             )}
 
+            {/* PROACTIVE QUOTA NOTIFICATION & ALERT THRESHOLDS (80% & 95%) */}
+            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 border border-slate-700 shadow-md">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                <div className="flex items-start gap-3.5">
+                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/30 flex items-center justify-center shrink-0">
+                    <Bell size={20} className="animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-sm font-black uppercase tracking-wider text-white">
+                        Système d'Alerte Proactive de Quota IA (80% & 95%)
+                      </h4>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Actif
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Avertit proactivement et uniquement les Super Administrateurs via bannière, notification sonore et toast dès que la consommation franchit les seuils critiques.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Simulation & Test Controls */}
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <span className="text-[11px] text-slate-400 font-mono">Tester les alertes :</span>
+                  <button
+                    onClick={() => handleSimulateQuotaThreshold(80)}
+                    disabled={simulatingQuota}
+                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    title="Simuler un quota à 80% pour déclencher l'alerte d'avertissement"
+                  >
+                    <AlertTriangle size={14} />
+                    <span>Seuil 80%</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleSimulateQuotaThreshold(95)}
+                    disabled={simulatingQuota}
+                    className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    title="Simuler un quota à 95% pour déclencher l'alerte critique"
+                  >
+                    <AlertOctagon size={14} />
+                    <span>Seuil 95% (Critique)</span>
+                  </button>
+
+                  <button
+                    onClick={() => handleSimulateQuotaThreshold(10)}
+                    disabled={simulatingQuota}
+                    className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 border border-white/20 text-xs transition-all cursor-pointer disabled:opacity-50"
+                    title="Réinitialiser la simulation au niveau nominal"
+                  >
+                    Nominal (10%)
+                  </button>
+                </div>
+              </div>
+
+              {/* Threshold Indicators bar */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-3.5 border-t border-white/10">
+                <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertTriangle size={14} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-amber-200 text-xs font-mono">Palier 1 : 80% (1 200 req)</strong>
+                      <span className="text-[10px] text-amber-400 uppercase font-bold">Vigilance</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Notification toast jaune, carillon d'avertissement et bannière d'optimisation invitant à prioriser le cache.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-start gap-2.5">
+                  <div className="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0 mt-0.5">
+                    <AlertOctagon size={14} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <strong className="text-rose-200 text-xs font-mono">Palier 2 : 95% (1 425 req)</strong>
+                      <span className="text-[10px] text-rose-400 uppercase font-bold">Critique</span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      Alerte rouge d'urgence, signal sonore critique, notification système et bascule automatique en mode autonome.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* 3 DYNAMIC LIVE QUOTA GAUGES (USED VS REMAINING) */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
@@ -1121,7 +1231,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                     Requêtes / Jour (RPD)
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1498} Restantes
+                    {(telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500).toLocaleString()} Restantes
                   </span>
                 </div>
 
@@ -1129,21 +1239,21 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                   <div className="flex items-baseline justify-between">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-3xl font-black text-slate-900 font-mono">
-                        {telemetry?.apiLimits?.liveUsage?.todayRequestsUsed ?? 2}
+                        {telemetry?.apiLimits?.liveUsage?.todayRequestsUsed ?? 0}
                       </span>
                       <span className="text-xs font-bold text-slate-500">
                         / {telemetry?.apiLimits?.liveUsage?.todayRequestsLimit ?? 1500} req
                       </span>
                     </div>
                     <span className="text-xs font-bold text-purple-700 font-mono">
-                      {telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0.1}%
+                      {telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0}%
                     </span>
                   </div>
 
                   <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
                     <div 
                       className="bg-purple-600 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(1, telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0.5)}%` }}
+                      style={{ width: `${Math.min(100, Math.max(telemetry?.apiLimits?.liveUsage?.todayRequestsUsed ? 2 : 0, telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0))}%` }}
                     ></div>
                   </div>
                 </div>
@@ -1184,7 +1294,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                   <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
                     <div 
                       className="bg-indigo-600 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(1, (telemetry?.apiLimits?.liveUsage?.rpmPct ?? 0))}%` }}
+                      style={{ width: `${Math.min(100, Math.max(telemetry?.apiLimits?.liveUsage?.rpmUsed ? 5 : 0, telemetry?.apiLimits?.liveUsage?.rpmPct ?? 0))}%` }}
                     ></div>
                   </div>
                 </div>
@@ -1203,7 +1313,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                     Jetons Estimés (Tokens)
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    ~{(telemetry?.apiLimits?.liveUsage?.todayTokensRemaining ?? 999650).toLocaleString()} Restants
+                    ~{(telemetry?.apiLimits?.liveUsage?.todayTokensRemaining ?? 1000000).toLocaleString()} Restants
                   </span>
                 </div>
 
@@ -1211,21 +1321,21 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                   <div className="flex items-baseline justify-between">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-3xl font-black text-slate-900 font-mono">
-                        {(telemetry?.apiLimits?.liveUsage?.todayTokensUsed ?? 350).toLocaleString()}
+                        {(telemetry?.apiLimits?.liveUsage?.todayTokensUsed ?? 0).toLocaleString()}
                       </span>
                       <span className="text-xs font-bold text-slate-500">
                         / 1 000 000 TPM
                       </span>
                     </div>
                     <span className="text-xs font-bold text-blue-700 font-mono">
-                      {telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0.1}%
+                      {telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0}%
                     </span>
                   </div>
 
                   <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
                     <div 
                       className="bg-blue-600 h-full rounded-full transition-all duration-500"
-                      style={{ width: `${Math.max(1, (telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0.1))}%` }}
+                      style={{ width: `${Math.min(100, Math.max(telemetry?.apiLimits?.liveUsage?.todayTokensUsed ? 1 : 0, telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0))}%` }}
                     ></div>
                   </div>
                 </div>
@@ -1448,85 +1558,8 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
               </div>
             </div>
 
-            {/* LIVE ACTIVITY LOG OF AI REQUESTS */}
-            <div className="space-y-3 pt-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <Activity size={15} className="text-purple-600" />
-                  Journal d'Activité Récent des Requêtes IA
-                </h3>
-                <span className="text-[11px] text-slate-500 font-medium">
-                  {telemetry?.apiLimits?.liveUsage?.recentCalls?.length || 2} interaction(s) enregistrée(s)
-                </span>
-              </div>
-
-              <div className="border border-slate-200/90 rounded-2xl overflow-hidden shadow-2xs">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse text-xs">
-                    <thead>
-                      <tr className="bg-slate-50 border-b border-slate-200 text-slate-600 font-extrabold text-[11px] uppercase tracking-wider">
-                        <th className="py-2.5 px-3.5">Heure</th>
-                        <th className="py-2.5 px-3.5">Type d'Action</th>
-                        <th className="py-2.5 px-3.5">Moteur Déclenché</th>
-                        <th className="py-2.5 px-3.5">Latence</th>
-                        <th className="py-2.5 px-3.5">Jetons</th>
-                        <th className="py-2.5 px-3.5">Impact Quota</th>
-                        <th className="py-2.5 px-3.5 hidden md:table-cell">Aperçu Réponse</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white font-medium">
-                      {(telemetry?.apiLimits?.liveUsage?.recentCalls && telemetry.apiLimits.liveUsage.recentCalls.length > 0) ? (
-                        telemetry.apiLimits.liveUsage.recentCalls.map((call) => (
-                          <tr key={call.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="py-2.5 px-3.5 font-mono text-slate-500 text-[11px] whitespace-nowrap">
-                              {call.timeFormatted}
-                            </td>
-                            <td className="py-2.5 px-3.5 font-bold text-slate-900 whitespace-nowrap">
-                              {call.type}
-                            </td>
-                            <td className="py-2.5 px-3.5 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold font-mono ${
-                                call.status === 'SUCCESS_API'
-                                  ? 'bg-purple-50 text-purple-700 border border-purple-200'
-                                  : call.status === 'SERVED_CACHE'
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              }`}>
-                                {call.model}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3.5 font-mono text-slate-600 text-[11px] whitespace-nowrap">
-                              {call.latencyMs} ms
-                            </td>
-                            <td className="py-2.5 px-3.5 font-mono text-slate-600 text-[11px] whitespace-nowrap">
-                              {call.tokensConsumed > 0 ? `${call.tokensConsumed} tok` : '0'}
-                            </td>
-                            <td className="py-2.5 px-3.5 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-extrabold ${
-                                call.status === 'SUCCESS_API'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-emerald-100 text-emerald-800'
-                              }`}>
-                                {call.quotaImpact}
-                              </span>
-                            </td>
-                            <td className="py-2.5 px-3.5 text-slate-500 text-[11px] truncate max-w-[200px] hidden md:table-cell" title={call.preview}>
-                              {call.preview}
-                            </td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={7} className="py-6 text-center text-slate-400 text-xs">
-                            Aucune requête IA enregistrée pour le moment. Cliquez sur "Tester le Quota" pour initialiser le journal.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            {/* TABLE D'AUDIT SIMPLIFIÉE DES 10 DERNIÈRES ACTIONS AYANT CONSOMMÉ DES CRÉDITS */}
+            <AiCreditAuditTable schoolId={user?.school_id || 'default-school'} limit={10} showSimulateButton={true} />
 
             {/* FALLBACK HIERARCHY BANNER */}
             <div className="bg-purple-50/60 border border-purple-200/80 rounded-2xl p-4 sm:p-5 space-y-3">
