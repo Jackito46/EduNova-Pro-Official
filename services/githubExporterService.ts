@@ -18,7 +18,7 @@ const ALLOWED_DIRS = new Set([
 ]);
 
 const EXCLUDE_DIRS = new Set([
-  'node_modules', '.git', 'dist', '.cache', 'temp_repo', '.temp_repo', '.local', '.config', '.npm', 'app', 'data', 'backups'
+  'node_modules', '.git', 'dist', '.cache', 'temp_repo', '.temp_repo', '.local', '.config', '.npm', 'app', 'data', 'backups', 'backup'
 ]);
 
 const EXCLUDE_EXTENSIONS = new Set([
@@ -88,9 +88,10 @@ export async function exportProjectToGitHub(
     throw new Error('Aucun fichier à exporter trouvé dans le répertoire.');
   }
 
-  // 1. Get reference commit and existing tree
+  // 1. Get reference commit and existing base tree
   onProgress?.(`Vérification de la branche "${branch}" sur GitHub...`, 10);
   let parentCommitSha: string | null = null;
+  let parentTreeSha: string | null = null;
   const remoteTreeMap = new Map<string, string>();
 
   try {
@@ -100,6 +101,13 @@ export async function exportProjectToGitHub(
       parentCommitSha = refData.object?.sha || null;
       
       if (parentCommitSha) {
+        // Fetch commit data to get parent tree sha
+        const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${parentCommitSha}`, { headers });
+        if (commitRes.ok) {
+          const commitData = await commitRes.json();
+          parentTreeSha = commitData.tree?.sha || null;
+        }
+
         // Fetch remote tree recursively to enable zero-upload diffing
         const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${parentCommitSha}?recursive=1`, { headers });
         if (treeRes.ok) {
@@ -127,10 +135,12 @@ export async function exportProjectToGitHub(
     sha: string;
   }
 
+  const localFileMap = new Map<string, typeof localFiles[0]>();
   const filesToUpload: FileToUpload[] = [];
-  const treeItems: { path: string; mode: string; type: string; sha: string }[] = [];
+  const deltaTreeItems: { path: string; mode: string; type: string; sha: string | null }[] = [];
 
   for (const file of localFiles) {
+    localFileMap.set(file.relPath, file);
     const fileBuffer = fs.readFileSync(file.fullPath);
     let finalBuffer: Buffer;
 
@@ -146,16 +156,10 @@ export async function exportProjectToGitHub(
     const localSha = computeGitBlobSha(finalBuffer);
     const remoteSha = remoteTreeMap.get(file.relPath);
 
-    if (remoteSha && remoteSha === localSha) {
-      // File is identical on GitHub, reuse existing sha without uploading!
-      treeItems.push({
-        path: file.relPath,
-        mode: '100644',
-        type: 'blob',
-        sha: localSha
-      });
+    if (parentTreeSha && remoteSha === localSha) {
+      // File is identical on GitHub, Git base_tree will retain it automatically
     } else {
-      // File is new or changed, schedule upload
+      // File is new or modified
       filesToUpload.push({
         relPath: file.relPath,
         contentBase64: finalBuffer.toString('base64'),
@@ -164,9 +168,36 @@ export async function exportProjectToGitHub(
     }
   }
 
-  // 3. Upload only modified/new files in fast concurrent batches
+  // Detect deleted files when updating existing base_tree
+  if (parentTreeSha) {
+    for (const [remotePath] of remoteTreeMap) {
+      if (!localFileMap.has(remotePath)) {
+        deltaTreeItems.push({
+          path: remotePath,
+          mode: '100644',
+          type: 'blob',
+          sha: null // In Git Tree API, sha: null marks a file as deleted from base_tree
+        });
+      }
+    }
+  }
+
+  // If nothing changed at all, return existing commit
+  if (filesToUpload.length === 0 && deltaTreeItems.length === 0 && parentCommitSha) {
+    onProgress?.('Tous les fichiers sont déjà à jour sur GitHub !', 100);
+    return {
+      success: true,
+      commitSha: parentCommitSha,
+      filesCount: localFiles.length,
+      modifiedFilesCount: 0,
+      repoUrl: `https://github.com/${owner}/${repo}`,
+      commitUrl: `https://github.com/${owner}/${repo}/commit/${parentCommitSha}`
+    };
+  }
+
+  // 3. Upload modified/new files in concurrent batches
   if (filesToUpload.length > 0) {
-    onProgress?.(`Transfert rapide des deltas (${filesToUpload.length} fichier(s) modifié(s))...`, 30);
+    onProgress?.(`Transfert rapide des deltas (${filesToUpload.length} fichier(s) à synchroniser)...`, 30);
 
     const BATCH_SIZE = 6;
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
@@ -215,38 +246,68 @@ export async function exportProjectToGitHub(
         };
       }));
 
-      treeItems.push(...batchResults);
+      deltaTreeItems.push(...batchResults);
 
       const percent = Math.min(85, 30 + Math.round(((i + batch.length) / filesToUpload.length) * 55));
-      onProgress?.(`Envoi des modifications (${Math.min(i + batch.length, filesToUpload.length)}/${filesToUpload.length})...`, percent);
+      onProgress?.(`Envoi des sources (${Math.min(i + batch.length, filesToUpload.length)}/${filesToUpload.length})...`, percent);
     }
-  } else {
-    onProgress?.('Tous les fichiers sont déjà à jour sur GitHub !', 85);
   }
 
-  // 4. Create Tree
+  // 4. Build Tree Incrementally to prevent GitHub API 422 Timeouts
   onProgress?.('Construction de l\'arborescence Git...', 88);
-  const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ tree: treeItems })
-  });
 
-  if (!treeRes.ok) {
-    const errText = await treeRes.text();
-    throw new Error(`Erreur lors de la création de l'arbre Git: ${errText}`);
+  const TREE_CHUNK_SIZE = 50;
+  let currentTreeSha = parentTreeSha;
+
+  for (let i = 0; i < deltaTreeItems.length; i += TREE_CHUNK_SIZE) {
+    const chunk = deltaTreeItems.slice(i, i + TREE_CHUNK_SIZE);
+    const body: Record<string, any> = {
+      tree: chunk
+    };
+    if (currentTreeSha) {
+      body.base_tree = currentTreeSha;
+    }
+
+    const progressPercent = 88 + Math.round(((i + chunk.length) / deltaTreeItems.length) * 4);
+    onProgress?.(`Arborescence Git (${Math.min(i + chunk.length, deltaTreeItems.length)}/${deltaTreeItems.length} éléments)...`, progressPercent);
+
+    let treeRes: Response | null = null;
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(body)
+      });
+
+      if (treeRes.ok) break;
+
+      if ((treeRes.status === 403 || treeRes.status === 429 || treeRes.status === 422) && attempt < 3) {
+        await new Promise(r => setTimeout(r, 1500 * attempt));
+        continue;
+      }
+    }
+
+    if (!treeRes || !treeRes.ok) {
+      const errText = treeRes ? await treeRes.text() : 'Pas de réponse du serveur GitHub';
+      throw new Error(`Erreur lors de la création de l'arbre Git: ${errText}`);
+    }
+
+    const treeData = await treeRes.json();
+    currentTreeSha = treeData.sha;
   }
 
-  const treeData = await treeRes.json();
+  if (!currentTreeSha) {
+    throw new Error("Impossible d'obtenir l'empreinte de l'arbre Git.");
+  }
 
   // 5. Create Commit
-  onProgress?.('Création du commit GitHub...', 92);
+  onProgress?.('Création du commit GitHub...', 94);
   const newCommitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits`, {
     method: 'POST',
     headers,
     body: JSON.stringify({
       message: commitMessage,
-      tree: treeData.sha,
+      tree: currentTreeSha,
       parents: parentCommitSha ? [parentCommitSha] : []
     })
   });
@@ -259,7 +320,7 @@ export async function exportProjectToGitHub(
   const newCommitData = await newCommitRes.json();
 
   // 6. Update Branch Ref
-  onProgress?.('Finalisation de la branche...', 96);
+  onProgress?.('Finalisation de la branche...', 97);
   const updateRefRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/refs/heads/${branch}`, {
     method: 'PATCH',
     headers,
@@ -285,7 +346,7 @@ export async function exportProjectToGitHub(
     }
   }
 
-  onProgress?.('Exportation ultra-rapide terminée !', 100);
+  onProgress?.('Exportation GitHub réussie !', 100);
 
   return {
     success: true,
