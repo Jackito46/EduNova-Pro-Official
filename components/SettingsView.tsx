@@ -80,7 +80,6 @@ import {
   DEFAULT_PAYMENT_METHODS 
 } from '../lib/paymentMethods';
 import { PaymentMethodManager } from './PaymentMethodManager';
-import { AiQuotaProgressWidget } from './AiQuotaProgressWidget';
 
 type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'gateways' | 'security';
 
@@ -1669,20 +1668,25 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       </div>
      </div>
 
-     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-      <div className="lg:col-span-4 space-y-6">
-       <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex flex-col gap-2">
-        {tabs.map(item => (
-         <button 
-          key={item.id} 
-          onClick={() => setActiveTab(item.id as SettingsTab)}
-          className={`flex items-center gap-5 px-8 py-5 rounded-xl text-sm font-bold tracking-tight transition-all ${activeTab === item.id ? 'bg-slate-900 text-white shadow-lg shadow-slate-200' : 'text-slate-700 hover:bg-slate-50 hover:text-slate-900'}`}
-         >
-          <item.icon size={22} />
-          {item.label}
-         </button>
-        ))}
-       </div>
+     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
+       <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+        <div className="bg-white p-2 sm:p-2.5 lg:p-3 rounded-2xl shadow-xs border border-slate-200/80 flex flex-row lg:flex-col gap-1.5 sm:gap-2 overflow-x-auto lg:overflow-visible no-scrollbar">
+         {tabs.map(item => (
+          <button 
+           key={item.id} 
+           onClick={() => setActiveTab(item.id as SettingsTab)}
+           title={item.label}
+           className={`shrink-0 lg:shrink w-auto lg:w-full flex items-center gap-3 px-3.5 sm:px-4 py-3 rounded-xl text-xs xl:text-[13px] font-bold tracking-tight transition-all whitespace-nowrap cursor-pointer ${
+             activeTab === item.id 
+               ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10' 
+               : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+           }`}
+          >
+           <item.icon size={18} className={`shrink-0 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
+           <span className="whitespace-nowrap">{item.label}</span>
+          </button>
+         ))}
+        </div>
 
        {/* GitHub Quick Access Card (Super Admin Exclusive on Dev Workstation) */}
        {isSuperAdmin && isDevWorkstation && (
@@ -1727,7 +1731,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        )}
       </div>
 
-      <div className="lg:col-span-8">
+      <div className="lg:col-span-8 xl:col-span-9">
        {activeTab === 'school' && (
          <div className="space-y-6 animate-in slide-in-from-right duration-500">
            {!canManageAllCampuses && (
@@ -1793,7 +1797,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                  </div>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
                    <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Nom de l'Annexe / Campus</label>
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Nom de l'Annexe</label>
                      <input 
                        type="text" 
                        disabled
@@ -1802,7 +1806,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                      />
                    </div>
                    <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Type de structure administrative</label>
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Type de Structure</label>
                      <input 
                        type="text" 
                        disabled
@@ -1827,7 +1831,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Nom Officiel de l'Établissement</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Nom de l'Établissement</label>
                   <input 
                     type="text" 
                     className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -1837,7 +1841,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Nom du Signataire Officiel (Directeur / Doyen)</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Signataire Officiel</label>
                   <input 
                     type="text" 
                     placeholder="Ex: Jacques ETIENNE"
@@ -1848,7 +1852,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Titre de Fonction du Signataire (Bulletins / Documents)</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Titre du Signataire</label>
                   <input 
                     type="text" 
                     placeholder="Ex: La Direction Pédagogique, Le Doyen, Le Rectorat..."
@@ -1868,7 +1872,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Langue & Format de Date d'Émission</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Langue & Format Date</label>
                   <select
                     className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
                     value={schoolData.global_settings?.locale || 'fr-FR'}
@@ -1891,7 +1895,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   </select>
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Devise de l'Établissement (Motto)</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Devise / Slogan</label>
                   <input 
                     type="text" 
                     placeholder="Ex: Excellence - Savoir - Discipline"
@@ -1912,7 +1916,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">Année de Fondation</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Année de Fondation</label>
                   <input 
                     type="number" 
                     className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -1922,7 +1926,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">NIF (Identifiant Fiscal)</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">NIF (Fiscal)</label>
                   <input 
                     type="text" 
                     placeholder="000-000-000-0"
@@ -1933,7 +1937,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">N° Licence / Agrément</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">N° Agrément / Licence</label>
                   <input 
                     type="text" 
                     placeholder="MENFP-..."
@@ -1954,7 +1958,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2"><MapPin size={12} /> Adresse Physique</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><MapPin size={12} /> Adresse Physique</label>
                   <input 
                     type="text" 
                     className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
@@ -1964,7 +1968,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2"><Phone size={12} /> Téléphone</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><Phone size={12} /> Téléphone</label>
                   <input 
                     type="text" 
                     className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all"
@@ -1973,7 +1977,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2"><Mail size={12} /> Email Institutionnel</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><Mail size={12} /> Email</label>
                   <input 
                     type="email" 
                     className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all"
@@ -1982,7 +1986,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   />
                 </div>
                 <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2"><Globe size={12} /> Site Web</label>
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><Globe size={12} /> Site Web</label>
                   <input 
                     type="text" 
                     placeholder="https://www.ecole.com"
@@ -2319,283 +2323,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 )}
               </div>
             </div>
-
-            {/* Sauvegarde Cloud des Données Critiques - Accessible Uniquement au Super Admin pour préserver le stockage Supabase (1 Go) */}
-            {isSuperAdmin && (
-              <div className="pt-8 border-t border-slate-100">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-                      <CloudUpload size={20} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Sauvegarde Cloud des Données Critiques</h4>
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 text-[10px] font-bold rounded-md flex items-center gap-1">
-                          <Database size={10} /> Cloud Storage
-                        </span>
-                        <span className="px-2 py-0.5 bg-amber-100 text-amber-900 text-[10px] font-black rounded-md flex items-center gap-1">
-                          <Crown size={10} /> Super Admin
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">
-                        Déclenchez manuellement une sauvegarde instantanée et chiffrée de toutes les données fondamentales de votre établissement.
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Cloud Status Pill */}
-                  <div className="shrink-0 flex items-center gap-2">
-                    {isBackingUp ? (
-                      <span className="px-3 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 text-xs font-bold rounded-full flex items-center gap-2 animate-pulse">
-                        <Loader2 size={13} className="animate-spin text-indigo-600" />
-                        Sauvegarde en cours...
-                      </span>
-                    ) : lastBackupInfo.status === 'SUCCESS' && lastBackupInfo.timestamp ? (
-                      <span className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-full flex items-center gap-1.5 shadow-2xs">
-                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Cloud Sécurisé & À Jour
-                      </span>
-                    ) : lastBackupInfo.status === 'FAILED' ? (
-                      <span className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold rounded-full flex items-center gap-1.5">
-                        <AlertCircle size={13} />
-                        Échec du dernier backup
-                      </span>
-                    ) : (
-                      <span className="px-3 py-1 bg-slate-100 text-slate-600 border border-slate-200 text-xs font-bold rounded-full flex items-center gap-1.5">
-                        <Clock size={13} />
-                        Prêt pour premier backup
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Main Backup Dashboard Card */}
-                <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-2xl p-6 md:p-8 shadow-xl shadow-slate-900/10 border border-slate-800 space-y-6 relative overflow-hidden">
-                  {/* Background decorative glow */}
-                  <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 relative z-10">
-                    {/* Left Column: Status & Timestamp */}
-                    <div className="lg:col-span-7 space-y-4">
-                      <div className="flex items-center gap-2 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-                        <ShieldCheck size={16} className="text-indigo-400" />
-                        <span>État de la Dernière Sauvegarde</span>
-                      </div>
-
-                      <div className="bg-slate-800/80 backdrop-blur-sm p-5 rounded-xl border border-slate-700/80 space-y-3">
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-3">
-                          <div className="space-y-0.5">
-                            <p className="text-[11px] text-slate-400 font-bold uppercase tracking-wider">Horodatage de la sauvegarde</p>
-                            <p className="text-sm md:text-base font-black text-white flex items-center gap-2">
-                              <Clock size={16} className="text-indigo-400 shrink-0" />
-                              {lastBackupInfo.timestamp ? (
-                                <span>
-                                  {new Date(lastBackupInfo.timestamp).toLocaleDateString('fr-FR', { 
-                                    weekday: 'short', 
-                                    day: 'numeric', 
-                                    month: 'short', 
-                                    year: 'numeric' 
-                                  })} à {new Date(lastBackupInfo.timestamp).toLocaleTimeString('fr-FR', { 
-                                    hour: '2-digit', 
-                                    minute: '2-digit',
-                                    second: '2-digit'
-                                  })}
-                                </span>
-                              ) : (
-                                <span className="text-slate-400 font-normal italic">Aucun horodatage enregistré</span>
-                              )}
-                            </p>
-                          </div>
-
-                          {lastBackupInfo.timestamp && (
-                            <div className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] font-bold rounded-lg self-start sm:self-auto flex items-center gap-1.5">
-                              <CheckCircle2 size={12} />
-                              Succès Vérifié
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-1">
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Enregistrements</p>
-                            <p className="text-sm font-black text-white mt-0.5">
-                              {lastBackupInfo.rows_count != null ? lastBackupInfo.rows_count.toLocaleString('fr-FR') : '—'}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Tables Incluses</p>
-                            <p className="text-sm font-black text-white mt-0.5">
-                              {lastBackupInfo.tables_count || (lastBackupInfo.rows_count ? '38 tables' : '—')}
-                            </p>
-                          </div>
-                          <div className="col-span-2 sm:col-span-1">
-                            <p className="text-[10px] text-slate-400 font-bold uppercase">Taille de l'Archive</p>
-                            <p className="text-sm font-black text-indigo-300 mt-0.5 font-mono">
-                              {lastBackupInfo.size_bytes ? `${(lastBackupInfo.size_bytes / 1024).toFixed(1)} Ko` : '—'}
-                            </p>
-                          </div>
-                        </div>
-
-                        {lastBackupInfo.created_by_name && (
-                          <div className="pt-2 text-[11px] text-slate-400 border-t border-slate-700/40 flex items-center gap-1.5">
-                            <span>Initié par :</span>
-                            <span className="font-bold text-slate-200">{lastBackupInfo.created_by_name}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Right Column: Storage & Security Details */}
-                    <div className="lg:col-span-5 space-y-4">
-                      <div className="flex items-center gap-2 text-indigo-300 text-xs font-bold uppercase tracking-wider">
-                        <HardDrive size={16} className="text-indigo-400" />
-                        <span>Stockage & Chiffrement Cloud</span>
-                      </div>
-
-                      <div className="bg-slate-800/80 backdrop-blur-sm p-5 rounded-xl border border-slate-700/80 space-y-3">
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Cible de Réplication</p>
-                          <p className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <Cloud size={14} className="text-sky-400" />
-                            Supabase Cloud Storage (Bucket: <span className="font-mono text-indigo-300">database_backups</span>)
-                          </p>
-                        </div>
-
-                        <div className="space-y-1">
-                          <p className="text-[10px] text-slate-400 font-bold uppercase">Format & Intégrité</p>
-                          <p className="text-xs text-slate-300 font-medium leading-relaxed">
-                            JSON structuré & Checksum SHA-256 avec métadonnées conformes pour restauration intégrale ou sélective.
-                          </p>
-                        </div>
-
-                        <button
-                          type="button"
-                          onClick={handleTestCloudStorage}
-                          disabled={isTestingStorage}
-                          className="text-[11px] text-indigo-300 hover:text-indigo-200 font-bold flex items-center gap-1.5 transition-colors disabled:opacity-50"
-                        >
-                          <RefreshCw size={12} className={isTestingStorage ? "animate-spin" : ""} />
-                          <span>{isTestingStorage ? "Vérification en cours..." : "Tester la connexion au stockage Cloud"}</span>
-                        </button>
-
-                        {storageStatusInfo && (
-                          <div className={`p-2.5 rounded-lg text-xs font-medium ${
-                            storageStatusInfo.available 
-                              ? 'bg-emerald-950/60 border border-emerald-800/80 text-emerald-300' 
-                              : 'bg-rose-950/60 border border-rose-800/80 text-rose-300'
-                          }`}>
-                            {storageStatusInfo.message}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Live Progress Bar when Backing Up */}
-                  {isBackingUp && (
-                    <div className="bg-indigo-950/80 p-4 rounded-xl border border-indigo-500/40 space-y-2 animate-in fade-in duration-300">
-                      <div className="flex items-center justify-between text-xs font-bold text-indigo-200">
-                        <span className="flex items-center gap-2">
-                          <Loader2 size={14} className="animate-spin text-indigo-400" />
-                          {backupProgressStep || 'Traitement de la sauvegarde Cloud...'}
-                        </span>
-                        <span className="font-mono text-indigo-300">En cours</span>
-                      </div>
-                      <div className="w-full h-2 bg-indigo-900/60 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-indigo-500 via-sky-400 to-indigo-500 rounded-full animate-pulse w-full"></div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Critical Data Coverage Badges */}
-                  <div className="pt-2 border-t border-slate-800 space-y-2">
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Périmètre des données scolaires sécurisées :</p>
-                    <div className="flex flex-wrap gap-2">
-                      {[
-                        'Élèves & Inscriptions',
-                        'Frais & Règlements',
-                        'Notes & Évaluations',
-                        'Personnel & Salaires',
-                        'Classes & Matières',
-                        'Présences & Assiduité',
-                        'Registre Disciplinaire',
-                        'Dépenses & Caisse',
-                        'Paramètres de l\'Établissement'
-                      ].map((tag, i) => (
-                        <span key={i} className="px-2.5 py-1 bg-slate-800/90 text-slate-300 text-[11px] font-medium rounded-lg border border-slate-700/60 flex items-center gap-1">
-                          <Check size={11} className="text-emerald-400" />
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Action Buttons Toolbar */}
-                  <div className="pt-4 border-t border-slate-800 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap items-center gap-2.5">
-                      {/* Primary Trigger Button */}
-                      <button
-                        type="button"
-                        onClick={() => handleTriggerCloudBackup()}
-                        disabled={isBackingUp}
-                        className="px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold tracking-wide transition-all shadow-lg shadow-indigo-600/30 flex items-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                      >
-                        {isBackingUp ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <CloudUpload size={16} />
-                        )}
-                        <span>Déclencher une Sauvegarde Cloud</span>
-                      </button>
-
-                      {/* Custom Options Modal Opener */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setBackupCustomName(`Sauvegarde Cloud - ${schoolData.name || 'École'} - ${new Date().toLocaleDateString('fr-FR')}`);
-                          setBackupCustomDesc('');
-                          setBackupScope('SCHOOL_SPECIFIC');
-                          setIsBackupModalOpen(true);
-                        }}
-                        disabled={isBackingUp}
-                        className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95 disabled:opacity-50"
-                        title="Personnaliser le nom ou le périmètre de la sauvegarde"
-                      >
-                        <Sparkles size={14} className="text-indigo-400" />
-                        <span>Options Avancées</span>
-                      </button>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                      {/* Download Last Backup File Button */}
-                      {lastBackupInfo.id && (
-                        <button
-                          type="button"
-                          onClick={handleDownloadLastBackup}
-                          disabled={isBackingUp}
-                          className="px-4 py-3 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95"
-                          title="Télécharger l'archive JSON sur votre ordinateur"
-                        >
-                          <Download size={14} className="text-sky-400" />
-                          <span>Télécharger le Fichier</span>
-                        </button>
-                      )}
-
-                      {/* History Modal Button */}
-                      <button
-                        type="button"
-                        onClick={() => setIsHistoryModalOpen(true)}
-                        className="px-4 py-3 bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 active:scale-95"
-                      >
-                        <Clock size={14} className="text-amber-400" />
-                        <span>Historique ({recentSchoolBackups.length})</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {/* Zone de Danger */}
             {canManageAllCampuses && (

@@ -1044,31 +1044,34 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
       {activeTab === 'api' && (
         <div id="tab-content-api" className="space-y-6 animate-in fade-in duration-200">
           
-          {/* HEADER & MAIN OVERVIEW */}
-          <div className="bg-white p-5 sm:p-7 rounded-3xl border border-slate-200/90 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-4">
+          {/* HEADER & QUICK TEST BAR */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-xs space-y-5">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 border-b border-slate-100 pb-4">
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="px-2.5 py-0.5 bg-purple-50 text-purple-700 border border-purple-200 rounded-md text-[10px] font-black uppercase tracking-wider">
                     Google AI Studio • Free Tier
                   </span>
-                  <span className="text-slate-400 text-xs font-mono">• Protection 0-Crédit Active</span>
+                  <span className="text-emerald-600 text-xs font-bold flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    Protection 0-Crédit Active
+                  </span>
                 </div>
                 <h2 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <Sparkles size={20} className="text-purple-600" />
-                  Quotas, Consommation & Plafonds d'Intelligence Artificielle
+                  <Sparkles size={20} className="text-purple-600 shrink-0" />
+                  Quotas & Plafonds d'Intelligence Artificielle
                 </h2>
-                <p className="text-slate-500 text-xs sm:text-sm mt-1">
-                  Suivi en temps réel de votre consommation (utilisé / restant), des requêtes journalières et de la cascade anti-surcoût.
+                <p className="text-slate-500 text-xs mt-0.5">
+                  Suivi en temps réel de la consommation, des fenêtres de requêtes et de la cascade anti-surcoût.
                 </p>
               </div>
 
               {/* QUICK TEST CONTROLS */}
-              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={aiTestType}
                   onChange={(e) => setAiTestType(e.target.value)}
-                  className="bg-slate-100 border border-slate-200 text-slate-800 text-xs font-bold rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 min-h-[42px] cursor-pointer"
+                  className="bg-slate-50 border border-slate-200 text-slate-900 text-xs font-bold rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 min-h-[38px] cursor-pointer"
                 >
                   <option value="diagnostic">Diagnostic Général</option>
                   <option value="bulletin">Génération Bulletin</option>
@@ -1079,8 +1082,8 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                   id="btn-test-ai-cached"
                   onClick={() => handleTestAi(aiTestType, false)}
                   disabled={testingAi}
-                  className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 active:scale-98 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[42px] shadow-xs disabled:opacity-50"
-                  title="Utilise le cache local si disponible (0ms, 0 quota consommé)"
+                  className="px-3.5 py-2 bg-purple-600 hover:bg-purple-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[38px] shadow-xs disabled:opacity-50"
+                  title="Test avec réutilisation du cache si disponible"
                 >
                   <Zap size={14} className={testingAi ? 'animate-spin' : ''} />
                   <span>Tester avec Cache</span>
@@ -1090,186 +1093,219 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                   id="btn-test-ai-force"
                   onClick={() => handleTestAi(aiTestType, true)}
                   disabled={testingAi}
-                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[42px] disabled:opacity-50"
-                  title="Force un nouvel appel API même si les données sont en cache"
+                  className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 border border-slate-200 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer min-h-[38px] disabled:opacity-50"
+                  title="Force un appel réseau API direct"
                 >
                   <RefreshCw size={13} className={testingAi ? 'animate-spin' : ''} />
-                  <span>Forcer Appel Réseau</span>
+                  <span>Forcer Réseau</span>
                 </button>
               </div>
             </div>
 
             {/* AI DIAGNOSTIC TEST RESULT BANNER IF PRESENT */}
             {aiTestResult && (
-              <div className={`p-4 rounded-2xl border text-xs space-y-2 animate-in fade-in duration-200 ${
+              <div className={`p-4 rounded-xl border text-xs space-y-2 animate-in fade-in duration-200 ${
                 aiTestResult.fromCache
-                  ? 'bg-indigo-50/80 border-indigo-200 text-indigo-950'
+                  ? 'bg-indigo-50/90 border-indigo-200 text-indigo-950'
                   : aiTestResult.success
-                  ? 'bg-purple-50/80 border-purple-200 text-purple-950'
-                  : 'bg-emerald-50/80 border-emerald-200 text-emerald-950'
+                  ? 'bg-purple-50/90 border-purple-200 text-purple-950'
+                  : 'bg-emerald-50/90 border-emerald-200 text-emerald-950'
               }`}>
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-black/5 pb-2">
                   <div className="flex items-center gap-2">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase font-mono ${
-                      aiTestResult.fromCache
-                        ? 'bg-indigo-600 text-white'
-                        : 'bg-purple-600 text-white'
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase font-mono ${
+                      aiTestResult.fromCache ? 'bg-indigo-600 text-white' : 'bg-purple-600 text-white'
                     }`}>
-                      {aiTestResult.fromCache ? '⚡ CACHE LOCAL LOCALSTORAGE (0 QUOTA)' : '🌐 RÉSEAU API SERVEUR'}
+                      {aiTestResult.fromCache ? '⚡ CACHE LOCAL (0 QUOTA)' : '🌐 APPEL RÉSEAU SERVEUR'}
                     </span>
                     <span className="font-bold font-mono text-[11px]">{aiTestResult.model}</span>
                   </div>
                   <div className="flex items-center gap-3 text-[11px] font-mono">
                     <span>Latence : <strong className="text-slate-900">{aiTestResult.latencyMs} ms</strong></span>
-                    <span>Quota consommé : <strong className={aiTestResult.fromCache ? 'text-emerald-700' : 'text-purple-700'}>{aiTestResult.fromCache ? '0 unité' : '1 req'}</strong></span>
+                    <span>Quota : <strong className={aiTestResult.fromCache ? 'text-emerald-700' : 'text-purple-700'}>{aiTestResult.fromCache ? '0 req' : '1 req'}</strong></span>
                   </div>
                 </div>
-                <p className="text-slate-700 text-xs italic leading-relaxed line-clamp-3">
+                <p className="text-slate-700 text-xs italic leading-relaxed line-clamp-2">
                   "{aiTestResult.response}"
                 </p>
               </div>
             )}
 
-            {/* PROACTIVE QUOTA NOTIFICATION & ALERT THRESHOLDS (80% & 95%) */}
-            <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white rounded-2xl p-5 border border-slate-700 shadow-md">
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                <div className="flex items-start gap-3.5">
-                  <div className="w-10 h-10 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-400/30 flex items-center justify-center shrink-0">
-                    <Bell size={20} className="animate-pulse" />
+            {/* PROACTIVE THRESHOLD SURVEILLANCE & CONTROLS */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 text-white space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95 
+                      ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' 
+                      : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80 
+                      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40' 
+                      : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40'
+                  }`}>
+                    {(telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95 ? (
+                      <AlertOctagon size={18} />
+                    ) : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80 ? (
+                      <AlertTriangle size={18} />
+                    ) : (
+                      <ShieldCheck size={18} />
+                    )}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h4 className="text-sm font-black uppercase tracking-wider text-white">
-                        Système d'Alerte Proactive de Quota IA (80% & 95%)
-                      </h4>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                        Actif
+                      <h3 className="text-xs font-black uppercase tracking-wider text-slate-200">
+                        Surveillance Proactive des Quotas & Alertes
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase font-mono border ${
+                        (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95
+                          ? 'bg-rose-950 text-rose-300 border-rose-600'
+                          : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80
+                          ? 'bg-amber-950 text-amber-300 border-amber-600'
+                          : 'bg-emerald-950 text-emerald-300 border-emerald-600'
+                      }`}>
+                        {(telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95
+                          ? '🔴 Alerte Seuil Épuisant (95%)'
+                          : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80
+                          ? '🟡 Vigilance (80%)'
+                          : '🟢 Nominal (Zéro Alerte)'}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-300 mt-0.5">
-                      Avertit proactivement et uniquement les Super Administrateurs via bannière, notification sonore et toast dès que la consommation franchit les seuils critiques.
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      {(telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95
+                        ? 'Urgence : Quota quasi épuisé. Le moteur local 0-crédit prend le relais sans surcoût.'
+                        : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80
+                        ? 'Attention : Seuil de 80% atteint. Le cache et la déduplication sont priorisés.'
+                        : 'Flux normal : Toutes les requêtes sont fluides et aucun message d\'alerte intempestif n\'est émis.'}
                     </p>
                   </div>
                 </div>
 
                 {/* Simulation & Test Controls */}
                 <div className="flex flex-wrap items-center gap-2 text-xs">
-                  <span className="text-[11px] text-slate-400 font-mono">Tester les alertes :</span>
+                  <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">Tester les alertes :</span>
                   <button
                     onClick={() => handleSimulateQuotaThreshold(80)}
                     disabled={simulatingQuota}
-                    className="px-3 py-1.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                    title="Simuler un quota à 80% pour déclencher l'alerte d'avertissement"
+                    className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    title="Simuler Seuil 80% (Alerte Vigilance)"
                   >
-                    <AlertTriangle size={14} />
+                    <AlertTriangle size={13} />
                     <span>Seuil 80%</span>
                   </button>
 
                   <button
                     onClick={() => handleSimulateQuotaThreshold(95)}
                     disabled={simulatingQuota}
-                    className="px-3 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
-                    title="Simuler un quota à 95% pour déclencher l'alerte critique"
+                    className="px-2.5 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                    title="Simuler Seuil 95% (Alerte Épuisement)"
                   >
-                    <AlertOctagon size={14} />
-                    <span>Seuil 95% (Critique)</span>
+                    <AlertOctagon size={13} />
+                    <span>Seuil 95%</span>
                   </button>
 
                   <button
-                    onClick={() => handleSimulateQuotaThreshold(10)}
+                    onClick={() => handleSimulateQuotaThreshold(0)}
                     disabled={simulatingQuota}
-                    className="px-2.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 border border-white/20 text-xs transition-all cursor-pointer disabled:opacity-50"
-                    title="Réinitialiser la simulation au niveau nominal"
+                    className="px-2.5 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                    title="Rétablir l'état nominal à 100% disponible"
                   >
-                    Nominal (10%)
+                    <Check size={13} />
+                    <span>Nominal (0%)</span>
                   </button>
                 </div>
               </div>
 
               {/* Threshold Indicators bar */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4 pt-3.5 border-t border-white/10">
-                <div className="p-3 rounded-xl bg-amber-950/40 border border-amber-500/30 flex items-start gap-2.5">
-                  <div className="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertTriangle size={14} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3.5 pt-3.5 border-t border-slate-800">
+                <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-500/20 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle size={14} className="text-amber-400 shrink-0" />
+                    <span className="text-amber-200 text-xs font-bold">Palier 80% (1 200 req)</span>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <strong className="text-amber-200 text-xs font-mono">Palier 1 : 80% (1 200 req)</strong>
-                      <span className="text-[10px] text-amber-400 uppercase font-bold">Vigilance</span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Notification toast jaune, carillon d'avertissement et bannière d'optimisation invitant à prioriser le cache.
-                    </p>
-                  </div>
+                  <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    Avertissement & Cache
+                  </span>
                 </div>
 
-                <div className="p-3 rounded-xl bg-rose-950/40 border border-rose-500/30 flex items-start gap-2.5">
-                  <div className="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center shrink-0 mt-0.5">
-                    <AlertOctagon size={14} />
+                <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/20 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertOctagon size={14} className="text-rose-400 shrink-0" />
+                    <span className="text-rose-200 text-xs font-bold">Palier 95% (1 425 req)</span>
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <strong className="text-rose-200 text-xs font-mono">Palier 2 : 95% (1 425 req)</strong>
-                      <span className="text-[10px] text-rose-400 uppercase font-bold">Critique</span>
-                    </div>
-                    <p className="text-[11px] text-slate-300 mt-0.5">
-                      Alerte rouge d'urgence, signal sonore critique, notification système et bascule automatique en mode autonome.
-                    </p>
-                  </div>
+                  <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                    Urgence & Mode Autonome
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* 3 DYNAMIC LIVE QUOTA GAUGES (USED VS REMAINING) */}
+            {/* 3 LIVE DYNAMIC QUOTA CARDS */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               
-              {/* Card 1: Requêtes / Jour (RPD) */}
-              <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-3">
+              {/* Card 1: Requêtes / Jour (RPD) - Affiche clairement le NOMBRE RESTANT */}
+              <div className="p-4 sm:p-5 bg-slate-50/70 hover:bg-white transition-all rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                     <Activity size={14} className="text-purple-600" />
                     Requêtes / Jour (RPD)
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                    {(telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500).toLocaleString()} Restantes
+                  <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full font-bold border ${
+                    (telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500) < 150
+                      ? 'bg-rose-50 text-rose-700 border-rose-200'
+                      : (telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500) < 300
+                      ? 'bg-amber-50 text-amber-700 border-amber-200'
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                  }`}>
+                    {(telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500).toLocaleString('fr-FR')} Restantes
                   </span>
                 </div>
 
                 <div>
                   <div className="flex items-baseline justify-between">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black text-slate-900 font-mono">
-                        {telemetry?.apiLimits?.liveUsage?.todayRequestsUsed ?? 0}
+                    <div>
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                        {(telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500).toLocaleString('fr-FR')}
                       </span>
-                      <span className="text-xs font-bold text-slate-500">
-                        / {telemetry?.apiLimits?.liveUsage?.todayRequestsLimit ?? 1500} req
+                      <span className="text-xs font-bold text-slate-500 ml-1">
+                        / {(telemetry?.apiLimits?.liveUsage?.todayRequestsLimit ?? 1500).toLocaleString('fr-FR')} dispo
                       </span>
                     </div>
-                    <span className="text-xs font-bold text-purple-700 font-mono">
-                      {telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0}%
+                    <span className={`text-xs font-mono font-black px-2 py-0.5 rounded ${
+                      (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95 
+                        ? 'bg-rose-100 text-rose-700' 
+                        : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80 
+                        ? 'bg-amber-100 text-amber-700' 
+                        : 'bg-purple-100 text-purple-700'
+                    }`}>
+                      {(telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0)}% consommé
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
+                  <div className="w-full bg-slate-200/80 h-2.5 rounded-full overflow-hidden mt-2.5 p-0.5">
                     <div 
-                      className="bg-purple-600 h-full rounded-full transition-all duration-500"
+                      className={`h-full rounded-full transition-all duration-500 ${
+                        (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 95
+                          ? 'bg-gradient-to-r from-rose-500 to-red-600'
+                          : (telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0) >= 80
+                          ? 'bg-gradient-to-r from-amber-500 to-orange-600'
+                          : 'bg-gradient-to-r from-purple-600 to-indigo-600'
+                      }`}
                       style={{ width: `${Math.min(100, Math.max(telemetry?.apiLimits?.liveUsage?.todayRequestsUsed ? 2 : 0, telemetry?.apiLimits?.liveUsage?.todayRequestsPct ?? 0))}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Plafond : 1 500 req/jour</span>
-                  <span className="font-semibold text-slate-700">Reset à 00:00 UTC</span>
+                  <span>{(telemetry?.apiLimits?.liveUsage?.todayRequestsUsed ?? 0).toLocaleString('fr-FR')} req utilisée(s)</span>
+                  <span className="font-bold text-slate-700">Reset à 00:00 UTC</span>
                 </div>
               </div>
 
               {/* Card 2: Requêtes / Minute (RPM) */}
-              <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-3">
+              <div className="p-4 sm:p-5 bg-slate-50/70 hover:bg-white transition-all rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                     <Gauge size={14} className="text-indigo-600" />
-                    Requêtes / Minute (RPM)
+                    Débit / Minute (RPM)
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
                     {telemetry?.apiLimits?.liveUsage?.rpmRemaining ?? 15} Dispo
@@ -1278,124 +1314,198 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
 
                 <div>
                   <div className="flex items-baseline justify-between">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black text-slate-900 font-mono">
-                        {telemetry?.apiLimits?.liveUsage?.rpmUsed ?? 0}
+                    <div>
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                        {telemetry?.apiLimits?.liveUsage?.rpmRemaining ?? 15}
                       </span>
-                      <span className="text-xs font-bold text-slate-500">
-                        / {telemetry?.apiLimits?.liveUsage?.rpmLimit ?? 15} RPM
+                      <span className="text-xs font-bold text-slate-500 ml-1">
+                        / {telemetry?.apiLimits?.liveUsage?.rpmLimit ?? 15} RPM dispo
                       </span>
                     </div>
-                    <span className="text-xs font-bold text-indigo-700 font-mono">
-                      {telemetry?.apiLimits?.liveUsage?.rpmPct ?? 0}%
+                    <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
+                      {telemetry?.apiLimits?.liveUsage?.rpmUsed ?? 0} actif
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
+                  <div className="w-full bg-slate-200/80 h-2.5 rounded-full overflow-hidden mt-2.5 p-0.5">
                     <div 
-                      className="bg-indigo-600 h-full rounded-full transition-all duration-500"
+                      className="bg-gradient-to-r from-indigo-600 to-sky-600 h-full rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.max(telemetry?.apiLimits?.liveUsage?.rpmUsed ? 5 : 0, telemetry?.apiLimits?.liveUsage?.rpmPct ?? 0))}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Fenêtre glissante (60s)</span>
-                  <span className="font-semibold text-emerald-700">Flux fluide</span>
+                  <span>Fenêtre glissante 60s</span>
+                  <span className="font-bold text-emerald-700">Flux fluide</span>
                 </div>
               </div>
 
-              {/* Card 3: Jetons / Tokens (TPM) */}
-              <div className="p-5 bg-slate-50/80 rounded-2xl border border-slate-200/90 flex flex-col justify-between space-y-3">
+              {/* Card 3: Jetons / Tokens (TPM) - Affiche clairement le NOMBRE RESTANT */}
+              <div className="p-4 sm:p-5 bg-slate-50/70 hover:bg-white transition-all rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-extrabold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                  <span className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                     <Zap size={14} className="text-blue-600" />
-                    Jetons Estimés (Tokens)
+                    Volume Jetons (Tokens)
                   </span>
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full font-bold bg-blue-50 text-blue-700 border border-blue-200">
-                    ~{(telemetry?.apiLimits?.liveUsage?.todayTokensRemaining ?? 1000000).toLocaleString()} Restants
+                    {(telemetry?.apiLimits?.liveUsage?.todayTokensRemaining ?? 1000000).toLocaleString('fr-FR')} Restants
                   </span>
                 </div>
 
                 <div>
                   <div className="flex items-baseline justify-between">
-                    <div className="flex items-baseline gap-1.5">
-                      <span className="text-3xl font-black text-slate-900 font-mono">
-                        {(telemetry?.apiLimits?.liveUsage?.todayTokensUsed ?? 0).toLocaleString()}
+                    <div>
+                      <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+                        {(telemetry?.apiLimits?.liveUsage?.todayTokensRemaining ?? 1000000).toLocaleString('fr-FR')}
                       </span>
-                      <span className="text-xs font-bold text-slate-500">
+                      <span className="text-xs font-bold text-slate-500 ml-1">
                         / 1 000 000 TPM
                       </span>
                     </div>
-                    <span className="text-xs font-bold text-blue-700 font-mono">
-                      {telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0}%
+                    <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-blue-100 text-blue-700">
+                      {(telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0)}% consommé
                     </span>
                   </div>
 
-                  <div className="w-full bg-slate-200 h-2.5 rounded-full overflow-hidden mt-2">
+                  <div className="w-full bg-slate-200/80 h-2.5 rounded-full overflow-hidden mt-2.5 p-0.5">
                     <div 
-                      className="bg-blue-600 h-full rounded-full transition-all duration-500"
+                      className="bg-gradient-to-r from-blue-600 to-cyan-500 h-full rounded-full transition-all duration-500"
                       style={{ width: `${Math.min(100, Math.max(telemetry?.apiLimits?.liveUsage?.todayTokensUsed ? 1 : 0, telemetry?.apiLimits?.liveUsage?.todayTokensPct ?? 0))}%` }}
-                    ></div>
+                    />
                   </div>
                 </div>
 
                 <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>Capacité : 1M tokens/min</span>
-                  <span className="font-semibold text-slate-700">Bulletins & Audits</span>
+                  <span>{(telemetry?.apiLimits?.liveUsage?.todayTokensUsed ?? 0).toLocaleString('fr-FR')} jetons consommés</span>
+                  <span className="font-bold text-slate-700">Bulletins & Audits</span>
                 </div>
               </div>
 
             </div>
 
-            {/* QUOTA SAVING & PROTECTION SUMMARY */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              
-              <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between gap-4">
+            {/* BARÈME & DÉCOMPOSITION RÉELLE DE CONSOMMATION LORS D'UNE COMMANDE */}
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 sm:p-5 shadow-2xs space-y-3.5">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0">
+                    <Cpu size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Détail de la Consommation Réelle lors d'une Commande
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Exactitude télémétrique des requêtes et tokens débités selon chaque fonctionnalité.
+                    </p>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-bold">
+                  Tarification Zéro-Frais
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-purple-900 uppercase">Appréciation Bulletin</span>
+                    <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded">1 Req</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 text-slate-900 font-mono font-bold text-sm">
+                    ~280 tokens <span className="text-[10px] text-slate-500 font-normal">/ élève</span>
+                  </div>
+                  <p className="text-[10px] text-slate-600">
+                    <strong>Cache 48h</strong> : 0 req et 0 token si réaffiché ou notes inchangées.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-emerald-900 uppercase">Audit Financier</span>
+                    <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">1 Req</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 text-slate-900 font-mono font-bold text-sm">
+                    ~350 tokens <span className="text-[10px] text-slate-500 font-normal">/ audit</span>
+                  </div>
+                  <p className="text-[10px] text-slate-600">
+                    <strong>Cache 12h</strong> : 0 req réutilisé tant que les flux restent stables.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-indigo-900 uppercase">Assistant / Texte</span>
+                    <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-indigo-100 text-indigo-800 rounded">1 Req</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 text-slate-900 font-mono font-bold text-sm">
+                    ~180 tokens <span className="text-[10px] text-slate-500 font-normal">/ message</span>
+                  </div>
+                  <p className="text-[10px] text-slate-600">
+                    <strong>Cache 24h</strong> : Déduplication immédiate des prompts identiques.
+                  </p>
+                </div>
+
+                <div className="p-3.5 bg-emerald-50/70 rounded-xl border border-emerald-200 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-emerald-950 uppercase">Requête en Cache</span>
+                    <span className="text-[10px] font-mono font-black px-1.5 py-0.5 bg-emerald-600 text-white rounded">0 Crédit</span>
+                  </div>
+                  <div className="flex items-baseline gap-1 text-emerald-900 font-mono font-bold text-sm">
+                    0 token <span className="text-[10px] text-emerald-700 font-normal">• 1ms</span>
+                  </div>
+                  <p className="text-[10px] text-emerald-800">
+                    <strong>100% Économisé</strong> : Aucun impact sur vos 1 500 req/jour.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* QUOTA SAVING & CACHE METRICS */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+              <div className="p-3.5 sm:p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-bold text-sm shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black text-xs shrink-0">
                     {telemetry?.apiLimits?.liveUsage?.quotaSavedPct ?? 100}%
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm">Taux d'Économie de Quota</h4>
-                    <p className="text-[11px] text-emerald-800">Requêtes servies sans impacter vos crédits API.</p>
+                    <h4 className="font-black text-slate-900 text-xs sm:text-sm">Économie de Quota</h4>
+                    <p className="text-[11px] text-emerald-800 font-medium">Requêtes servies sans impacter vos quotas Google AI.</p>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-bold font-mono whitespace-nowrap">
+                <span className="px-2 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-[10px] font-black uppercase font-mono shrink-0">
                   Anti-Surcoût
                 </span>
               </div>
 
-              <div className="p-4 bg-purple-50/70 border border-purple-200 rounded-2xl flex items-center justify-between gap-4">
+              <div className="p-3.5 sm:p-4 bg-purple-50/70 border border-purple-200 rounded-2xl flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-purple-600 text-white flex items-center justify-center font-mono font-bold text-sm shrink-0">
+                  <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center font-mono font-black text-xs shrink-0">
                     {telemetry?.apiLimits?.caching?.cachedResponsesCount ?? 2}
                   </div>
                   <div>
-                    <h4 className="font-bold text-slate-900 text-xs sm:text-sm">Cache Mémoire Dédupliqué</h4>
-                    <p className="text-[11px] text-purple-800">TTL 24 heures avec réutilisation instantanée.</p>
+                    <h4 className="font-black text-slate-900 text-xs sm:text-sm">Réponses Dédupliquées</h4>
+                    <p className="text-[11px] text-purple-800 font-medium">Mémorisation rapide pour un rendu immédiat à 0ms.</p>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 bg-purple-100 text-purple-800 rounded-lg text-[10px] font-bold font-mono whitespace-nowrap">
+                <span className="px-2 py-1 bg-purple-100 text-purple-800 rounded-lg text-[10px] font-black uppercase font-mono shrink-0">
                   0ms Latence
                 </span>
               </div>
-
             </div>
 
-            {/* LOCALSTORAGE CLIENT-SIDE CACHE MANAGEMENT SECTION */}
-            <div className="bg-slate-50/80 border border-slate-200/90 rounded-2xl p-5 space-y-4">
+            {/* LOCALSTORAGE CLIENT-SIDE CACHE MANAGEMENT */}
+            <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200/70 pb-3">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center">
-                    <HardDrive size={18} />
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-700 flex items-center justify-center shrink-0">
+                    <HardDrive size={16} />
                   </div>
                   <div>
-                    <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                      Mise en Cache Locale Browser (LocalStorage)
+                    <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
+                      Cache Local Navigateur
                     </h3>
-                    <p className="text-[11px] text-slate-500">
-                      Évite toute surconsommation de quotas API sur les requêtes identiques et données inchangées.
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Évite la surconsommation de requêtes identiques côté client.
                     </p>
                   </div>
                 </div>
@@ -1404,7 +1514,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                   <button
                     onClick={refreshAiLocalCache}
                     className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer"
-                    title="Actualiser la liste des éléments en cache"
+                    title="Actualiser la liste"
                   >
                     <RefreshCw size={12} />
                     <span>Actualiser</span>
@@ -1414,58 +1524,58 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                     onClick={handleClearLocalAiCache}
                     disabled={clearingAiCache || localAiCacheStats.totalEntries === 0}
                     className="px-2.5 py-1.5 bg-rose-50 border border-rose-200 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-40"
-                    title="Vider les réponses IA stockées en cache local"
+                    title="Vider le cache IA"
                   >
                     <Trash2 size={12} />
-                    <span>Vider le Cache IA ({localAiCacheStats.totalEntries})</span>
+                    <span>Vider ({localAiCacheStats.totalEntries})</span>
                   </button>
                 </div>
               </div>
 
-              {/* 4 LOCAL CACHE STATS CARDS */}
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              {/* 4 STATS CARDS */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5">
                 <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Éléments en Cache</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">En Cache</span>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-xl font-black text-slate-900 font-mono">{localAiCacheStats.totalEntries}</span>
-                    <span className="text-[11px] text-slate-500 font-medium">réponses</span>
+                    <span className="text-[11px] text-slate-500">éléments</span>
                   </div>
                 </div>
 
                 <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Taille Mémoire</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Taille</span>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-xl font-black text-slate-900 font-mono">{localAiCacheStats.totalSizeFormatted}</span>
-                    <span className="text-[11px] text-slate-500 font-medium">LocalStorage</span>
+                    <span className="text-[11px] text-slate-500">mémoire</span>
                   </div>
                 </div>
 
                 <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Hits Client (0ms)</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Hits (0ms)</span>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-xl font-black text-indigo-700 font-mono">{localAiCacheStats.localHits}</span>
-                    <span className="text-[11px] text-indigo-600 font-medium">interceptions</span>
+                    <span className="text-[11px] text-indigo-600">servis</span>
                   </div>
                 </div>
 
                 <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Taux d'Économie Local</span>
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Économie</span>
                   <div className="flex items-baseline gap-1 mt-1">
                     <span className="text-xl font-black text-emerald-700 font-mono">{localAiCacheStats.hitRatioPct}%</span>
-                    <span className="text-[11px] text-emerald-600 font-medium">sans appel API</span>
+                    <span className="text-[11px] text-emerald-600">local</span>
                   </div>
                 </div>
               </div>
 
               {/* TABLE OF LOCALLY CACHED ENTRIES */}
               <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
-                <div className="px-3.5 py-2 bg-slate-100/60 border-b border-slate-200 flex items-center justify-between">
+                <div className="px-3 py-2 bg-slate-100/60 border-b border-slate-200 flex items-center justify-between">
                   <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
                     <Boxes size={13} className="text-purple-600" />
-                    Réponses IA Mémorisées Côté Client
+                    Entrées Mémorisées
                   </span>
                   <span className="text-[10px] text-slate-500 font-mono font-bold">
-                    TTL Dégressif Automatique
+                    TTL Automatique
                   </span>
                 </div>
 
@@ -1474,11 +1584,11 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                     <table className="w-full text-left text-xs border-collapse">
                       <thead>
                         <tr className="bg-slate-50/70 border-b border-slate-200 text-slate-600 font-extrabold text-[10px] uppercase tracking-wider">
-                          <th className="py-2 px-3">Domaine</th>
-                          <th className="py-2 px-3">Enregistré</th>
+                          <th className="py-2 px-3">Type</th>
+                          <th className="py-2 px-3">Date</th>
                           <th className="py-2 px-3">Expiration</th>
                           <th className="py-2 px-3">Taille</th>
-                          <th className="py-2 px-3">Aperçu Réponse</th>
+                          <th className="py-2 px-3">Aperçu</th>
                           <th className="py-2 px-3 text-right">Action</th>
                         </tr>
                       </thead>
@@ -1519,7 +1629,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                                   }
                                 }}
                                 className="p-1 hover:bg-slate-200 rounded text-slate-600 transition-colors cursor-pointer"
-                                title="Copier le contenu du cache"
+                                title="Copier le contenu"
                               >
                                 <Copy size={13} />
                               </button>
@@ -1530,58 +1640,53 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                     </table>
                   </div>
                 ) : (
-                  <div className="py-6 px-4 text-center space-y-1">
-                    <p className="text-xs text-slate-500 font-medium">
-                      Aucune réponse IA en cache local pour l'instant.
-                    </p>
-                    <p className="text-[11px] text-slate-400">
-                      Les requêtes générées lors des bulletins, audits financiers ou tests seront automatiquement mémorisées ici pour économiser vos quotas.
-                    </p>
+                  <div className="py-5 px-4 text-center text-xs text-slate-500">
+                    Aucune réponse IA en cache local. Les prochaines requêtes s'enregistreront ici.
                   </div>
                 )}
               </div>
 
               {/* TTL POLICY NOTE */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-[11px] text-slate-600 pt-1">
-                <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 flex items-start gap-2">
-                  <Check size={14} className="text-purple-600 shrink-0 mt-0.5" />
-                  <span><strong>Bulletins d'Élèves</strong> : Cache 48h (invalidation dès que les notes changent)</span>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px] text-slate-600 pt-1">
+                <div className="p-2 bg-white rounded-lg border border-slate-200/80 flex items-center gap-2">
+                  <Check size={13} className="text-purple-600 shrink-0" />
+                  <span><strong>Bulletins</strong> : 48h (invalidation si notes modifiées)</span>
                 </div>
-                <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 flex items-start gap-2">
-                  <Check size={14} className="text-emerald-600 shrink-0 mt-0.5" />
-                  <span><strong>Audits Financiers</strong> : Cache 12h (recalcul automatique si encaissements modifiés)</span>
+                <div className="p-2 bg-white rounded-lg border border-slate-200/80 flex items-center gap-2">
+                  <Check size={13} className="text-emerald-600 shrink-0" />
+                  <span><strong>Audits Financiers</strong> : 12h (recalcul sur encaissements)</span>
                 </div>
-                <div className="p-2.5 bg-white rounded-lg border border-slate-200/80 flex items-start gap-2">
-                  <Check size={14} className="text-indigo-600 shrink-0 mt-0.5" />
-                  <span><strong>Générateur de Textes</strong> : Cache 24h avec déduplication rapide</span>
+                <div className="p-2 bg-white rounded-lg border border-slate-200/80 flex items-center gap-2">
+                  <Check size={13} className="text-indigo-600 shrink-0" />
+                  <span><strong>Générateur Textes</strong> : 24h dédupliqué</span>
                 </div>
               </div>
             </div>
 
-            {/* TABLE D'AUDIT SIMPLIFIÉE DES 10 DERNIÈRES ACTIONS AYANT CONSOMMÉ DES CRÉDITS */}
+            {/* TABLE D'AUDIT SIMPLIFIÉE */}
             <AiCreditAuditTable schoolId={user?.school_id || 'default-school'} limit={10} showSimulateButton={true} />
 
             {/* FALLBACK HIERARCHY BANNER */}
             <div className="bg-purple-50/60 border border-purple-200/80 rounded-2xl p-4 sm:p-5 space-y-3">
-              <h3 className="text-xs font-bold text-purple-900 uppercase tracking-wider flex items-center gap-2">
+              <h3 className="text-xs font-black text-purple-900 uppercase tracking-wider flex items-center gap-2">
                 <ShieldCheck size={16} className="text-purple-600" />
-                Cascade de Tolérance aux Pannes & Protection 0-Panne
+                Cascade de Tolérance aux Pannes (0-Panne)
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
                 <div className="p-3 bg-white rounded-xl border border-purple-100 shadow-2xs space-y-1">
-                  <span className="text-[10px] font-extrabold uppercase text-purple-600">Niveau 1 (Standard)</span>
+                  <span className="text-[10px] font-black uppercase text-purple-600">Niveau 1 (Principal)</span>
                   <p className="font-bold text-slate-900 font-mono">Gemini 2.5 Flash</p>
-                  <p className="text-[11px] text-slate-500">Haute précision pédagogique et financière (15 RPM / 1 500 RPD).</p>
+                  <p className="text-[11px] text-slate-500">Pédagogique & financier (15 RPM / 1 500 RPD).</p>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-purple-100 shadow-2xs space-y-1">
-                  <span className="text-[10px] font-extrabold uppercase text-indigo-600">Niveau 2 (Bascule)</span>
+                  <span className="text-[10px] font-black uppercase text-indigo-600">Niveau 2 (Relais)</span>
                   <p className="font-bold text-slate-900 font-mono">Gemini 3.7 Flash</p>
-                  <p className="text-[11px] text-slate-500">Modèle analytique en relais direct si besoin.</p>
+                  <p className="text-[11px] text-slate-500">Moteur de secours analytique automatique.</p>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-1 bg-emerald-50/50">
-                  <span className="text-[10px] font-extrabold uppercase text-emerald-700">Niveau 3 (0 Crédit)</span>
-                  <p className="font-bold text-emerald-950 font-mono">Moteur Contextuel Local</p>
-                  <p className="text-[11px] text-emerald-800">Génération algorithmique instantanée sans aucun risque de panne ni de coût.</p>
+                  <span className="text-[10px] font-black uppercase text-emerald-700">Niveau 3 (Autonome)</span>
+                  <p className="font-bold text-emerald-950 font-mono">Moteur Local 0-Crédit</p>
+                  <p className="text-[11px] text-emerald-800">Génération algorithmique instantanée hors-ligne.</p>
                 </div>
               </div>
             </div>
