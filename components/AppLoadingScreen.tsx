@@ -15,7 +15,6 @@ import {
   Clock
 } from 'lucide-react';
 import Logo from './Logo';
-import edunovaLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
 
 export interface AppLoadingScreenProps {
   onSkipToLogin?: () => void;
@@ -156,7 +155,7 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
           <div className="relative mb-3.5 group">
             <div className="absolute inset-0 bg-blue-500/35 blur-2xl rounded-3xl animate-pulse" />
             <Logo
-              src={edunovaLogo || "/logo.png"}
+              src="/logo.png"
               size="xl"
               className="w-20 h-20 sm:w-22 sm:h-22 relative z-10 rounded-2xl shadow-2xl ring-1 ring-white/15"
               imgClassName="object-contain w-full h-full scale-[1.02]"

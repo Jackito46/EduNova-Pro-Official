@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { GraduationCap } from 'lucide-react';
-import edunovaAuthenticLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
-import edunovaMasterLogo from '../src/assets/images/edunova_master_logo.jpg';
-import edunovaLogoBackup from '../src/assets/images/backup/edunova_logo_backup.jpg';
 
 interface LogoProps {
   src?: string | null;
@@ -19,12 +16,12 @@ const Logo: React.FC<LogoProps> = ({
   imgClassName = "",
   size = 'md' 
 }) => {
-  const primaryLogo = src || edunovaAuthenticLogo || edunovaMasterLogo || edunovaLogoBackup || "/logo.png";
+  const primaryLogo = src || "/logo.png";
   const [currentSrc, setCurrentSrc] = useState<string>(primaryLogo);
   const [errorCount, setErrorCount] = useState(0);
 
   useEffect(() => {
-    setCurrentSrc(src || edunovaAuthenticLogo || edunovaMasterLogo || edunovaLogoBackup || "/logo.png");
+    setCurrentSrc(src || "/logo.png");
     setErrorCount(0);
   }, [src]);
 
@@ -50,27 +47,24 @@ const Logo: React.FC<LogoProps> = ({
   };
 
   const handleError = () => {
-    if (errorCount === 0 && currentSrc !== edunovaAuthenticLogo) {
-      setCurrentSrc(edunovaAuthenticLogo);
-      setErrorCount(1);
-    } else if (errorCount <= 1 && currentSrc !== edunovaMasterLogo) {
-      setCurrentSrc(edunovaMasterLogo);
-      setErrorCount(2);
-    } else if (errorCount <= 2 && currentSrc !== edunovaLogoBackup) {
-      setCurrentSrc(edunovaLogoBackup);
-      setErrorCount(3);
-    } else if (errorCount <= 3 && currentSrc !== '/logo.png') {
+    if (errorCount === 0 && currentSrc !== '/logo.png') {
       setCurrentSrc('/logo.png');
-      setErrorCount(4);
+      setErrorCount(1);
+    } else if (errorCount <= 1 && currentSrc !== '/logo.jpg') {
+      setCurrentSrc('/logo.jpg');
+      setErrorCount(2);
+    } else if (errorCount <= 2 && currentSrc !== '/favicon.png') {
+      setCurrentSrc('/favicon.png');
+      setErrorCount(3);
     } else {
-      setErrorCount(5);
+      setErrorCount(4);
     }
   };
 
   const hasCustomSize = className.includes('w-') || className.includes('h-');
   const dimensionsClass = hasCustomSize ? '' : sizeClasses[size];
 
-  if (errorCount >= 5) {
+  if (errorCount >= 4) {
     const isSchoolName = alt && alt !== "Logo" && alt !== "EduNova Logo" && alt !== "Logo École" && alt !== "EduNova";
     const defaultLetter = isSchoolName ? alt.charAt(0).toUpperCase() : null;
 

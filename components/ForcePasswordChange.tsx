@@ -5,7 +5,6 @@ import { UserProfile } from '../types';
 import { AuditLogger } from '../utils/auditLogger';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
-import edunovaLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
 
 interface ForcePasswordChangeProps {
   user: UserProfile;
@@ -146,7 +145,7 @@ export const ForcePasswordChange: React.FC<ForcePasswordChangeProps> = ({ user, 
           <div className="relative z-10 space-y-6">
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 rounded-2xl bg-white p-1 shadow-lg shrink-0 flex items-center justify-center overflow-hidden">
-                <Logo src={edunovaLogo} size="md" className="w-full h-full" imgClassName="object-cover" />
+                <Logo src="/logo.png" size="md" className="w-full h-full" imgClassName="object-cover" />
               </div>
               <div>
                 <span className="text-xs font-black text-indigo-300 tracking-wider uppercase block">EduNova Pro</span>

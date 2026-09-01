@@ -65,7 +65,6 @@ import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ModernDashboardSkeleton } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import Logo from './Logo';
-import edunovaLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
 
 const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();

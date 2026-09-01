@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
 import { toast } from 'sonner';
-import edunovaLogo from '../src/assets/images/edunova_logo2_exact_authentic_colors_1786352038404.jpg';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -440,7 +439,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                   className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-2xl" 
                 />
                 <Logo 
-                  src={edunovaLogo || "/logo.png"} 
+                  src="/logo.png" 
                   size="xl" 
                   className="w-20 h-20 sm:w-24 sm:h-24 relative z-10 transform group-hover:scale-[1.03] transition-transform duration-500 shadow-xl shadow-blue-500/15 ring-1 ring-blue-500/20 rounded-2xl" 
                   imgClassName="object-contain w-full h-full scale-[1.02]" 
