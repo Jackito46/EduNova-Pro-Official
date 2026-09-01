@@ -5,6 +5,8 @@ import { toast } from "sonner";
 import { useSchool } from "../contexts/SchoolContext";
 import { getExamsListForClass } from "../lib/evaluations";
 import { useSearchParams } from "react-router-dom";
+import { ClassSelectorPill } from "./ClassSelectorPill";
+import { SelectPill } from "./SelectPill";
 import { 
   BookOpen, 
   Calendar, 
@@ -620,54 +622,52 @@ export const CourseEvaluationsView: React.FC<CourseEvaluationsViewProps & { hide
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl border drop-shadow-sm grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white p-4 md:p-6 rounded-2xl border border-slate-200 shadow-xs grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">{terminology.class}</label>
-          <select 
-            value={selectedClassId}
-            onChange={(e) => setSelectedClassId(e.target.value)}
-            className="w-full border-gray-200 border rounded-xl p-3 bg-gray-50 text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm"
+          <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-2">{terminology.class}</label>
+          <ClassSelectorPill
+            classes={availableClasses}
+            selectedClassId={selectedClassId}
+            onSelectClass={(id) => setSelectedClassId(id)}
+            allowAll={false}
+            emptyLabel={availableClasses.length === 0 ? "Aucune affectation" : "Choisir une classe..."}
+            variant="field"
+            size="md"
+            colorScheme="blue"
+            labelPrefix=""
             disabled={availableClasses.length === 0}
-          >
-            {availableClasses.map((c:any) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-            {availableClasses.length === 0 && (
-              <option value="">Aucune affectation / sans inscrits</option>
-            )}
-          </select>
+          />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">{terminology.subject}</label>
-          <select 
+          <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-2">{terminology.subject}</label>
+          <SelectPill
+            options={availableSubjects.map((s: any) => ({
+              value: s.id,
+              label: `${s.name}${user.role !== 'TEACHER' && s.staffName !== 'Non assigné' ? ` (${s.staffName})` : ''}`
+            }))}
             value={selectedSubjectId}
-            onChange={(e) => setSelectedSubjectId(e.target.value)}
-            className="w-full border-gray-200 border rounded-xl p-3 bg-gray-50 text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm"
+            onChange={(val) => setSelectedSubjectId(val)}
+            variant="field"
+            size="md"
+            colorScheme="blue"
+            icon={BookOpen}
+            placeholder={availableSubjects.length === 0 ? "Aucune affectation" : "Choisir une matière..."}
             disabled={availableSubjects.length === 0}
-          >
-             {availableSubjects.map((s:any) => (
-               <option key={s.id} value={s.id}>
-                 {s.name} {user.role !== 'TEACHER' && s.staffName !== 'Non assigné' ? `(${s.staffName})` : ''}
-               </option>
-             ))}
-             {availableSubjects.length === 0 && (
-               <option value="">Aucune affectation</option>
-             )}
-          </select>
+          />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-gray-700 mb-2">Période d'évaluation</label>
-          <select 
-            id="selected-term-filter"
+          <label className="block text-xs font-black text-slate-800 uppercase tracking-wider mb-2">Période d'évaluation</label>
+          <SelectPill
+            options={examsList.map(ex => ({ value: ex, label: ex }))}
             value={selectedTerm}
-            onChange={(e) => setSelectedTerm(e.target.value)}
-            className="w-full border-gray-200 border rounded-xl p-3 bg-gray-50 text-gray-900 font-medium focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none transition-all text-sm"
-            disabled={!selectedAssignmentId}
-          >
-            {examsList.map(exam => (
-              <option key={exam} value={exam}>{exam}</option>
-            ))}
-          </select>
+            onChange={(val) => setSelectedTerm(val)}
+            variant="field"
+            size="md"
+            colorScheme="blue"
+            icon={Calendar}
+            placeholder="Sélectionner une période..."
+            disabled={!selectedAssignmentId || examsList.length === 0}
+          />
         </div>
       </div>
 

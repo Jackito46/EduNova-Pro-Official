@@ -18,6 +18,9 @@ import {
   matchSubjects, 
   normalizeSubjectName 
 } from '../utils/subjectMatching';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { StaffSelectorPill } from './StaffSelectorPill';
+import { SelectPill, SelectOption } from './SelectPill';
 
 interface ScheduleViewProps {
   user: UserProfile;
@@ -215,6 +218,59 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
       allSelectableSubjects: affiliated.length > 0 ? [...affiliated, ...others] : subjects
     };
   }, [formData.class_id, formData.staff_id, editingSchedule, classes, classSubjects, allAssignments, subjects, staff]);
+
+  // Options for subject SelectPill
+  const subjectSelectOptions: SelectOption[] = useMemo(() => {
+    if (affiliatedSubjects.length > 0) {
+      const options: SelectOption[] = affiliatedSubjects.map(s => ({
+        value: s.id,
+        label: s.name,
+        badge: 'Au programme',
+        description: s.code ? `Code : ${s.code}` : (s.description || undefined)
+      }));
+      if (otherSubjects.length > 0) {
+        options.push(...otherSubjects.map(s => ({
+          value: s.id,
+          label: s.name,
+          badge: s.code || 'Hors prog.',
+          description: s.description || undefined
+        })));
+      }
+      return options;
+    }
+    return subjects.map(s => ({
+      value: s.id,
+      label: s.name,
+      badge: s.code || undefined,
+      description: s.description || undefined
+    }));
+  }, [affiliatedSubjects, otherSubjects, subjects]);
+
+  // Options for Day of Week SelectPill
+  const daySelectOptions: SelectOption[] = useMemo(() => {
+    return days.map(day => ({
+      value: day,
+      label: day,
+      badge: day === currentDayName ? 'Aujourd\'hui' : undefined
+    }));
+  }, [days, currentDayName]);
+
+  // Duration calculation
+  const computedDuration = useMemo(() => {
+    if (!formData.start_time || !formData.end_time) return null;
+    const start = new Date(`2000-01-01T${formData.start_time}`);
+    const end = new Date(`2000-01-01T${formData.end_time}`);
+    const diffMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+    if (diffMinutes <= 0) return { isValid: false, text: 'Horaire invalide' };
+    const h = Math.floor(diffMinutes / 60);
+    const m = diffMinutes % 60;
+    return { 
+      isValid: true, 
+      text: `${h > 0 ? `${h}h ` : ''}${m > 0 ? `${m.toString().padStart(2, '0')}min` : ''}`.trim() || '0min',
+      minutes: diffMinutes,
+      hours: diffMinutes / 60
+    };
+  }, [formData.start_time, formData.end_time]);
 
   // Ensure formData.subject_id is valid when class or subjects change
   useEffect(() => {
@@ -910,45 +966,42 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">
                     {terminology.class || 'Classe'} :
                   </label>
-                  <select 
-                    value={selectedClassId}
-                    onChange={(e) => setSelectedClassId(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-xl text-xs font-black px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs transition-all text-slate-900 min-w-[180px]"
-                  >
-                    {visibleClasses.length === 0 ? (
-                      <option value="">Aucune classe disponible</option>
-                    ) : (
-                      visibleClasses.map(c => {
-                        const campusName = campuses?.find(cmp => cmp.id === c.campus_id)?.name;
-                        return (
-                          <option key={c.id} value={c.id} className="text-slate-900">
-                            {c.name} {campusName && !user.campus_id ? `(${campusName})` : ''}
-                          </option>
-                        );
-                      })
-                    )}
-                  </select>
+                  <div className="min-w-[190px]">
+                    <ClassSelectorPill
+                      classes={visibleClasses}
+                      selectedClassId={selectedClassId}
+                      onSelectClass={(id) => setSelectedClassId(id)}
+                      allowAll={false}
+                      emptyLabel={visibleClasses.length === 0 ? "Aucune classe" : "Choisir une classe..."}
+                      variant="pill"
+                      size="sm"
+                      colorScheme="indigo"
+                      dropdownAlign="right"
+                      labelPrefix=""
+                      disabled={visibleClasses.length === 0}
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="flex items-center gap-1.5 w-full sm:w-auto">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">
                     Enseignant :
                   </label>
-                  <select 
-                    value={selectedStaffId}
-                    onChange={(e) => setSelectedStaffId(e.target.value)}
-                    className="bg-white border border-slate-200 rounded-xl text-xs font-black px-3 py-1.5 outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-2xs transition-all text-slate-900 min-w-[200px]"
-                  >
-                    {filteredStaff.length === 0 ? (
-                      <option value="">Aucun enseignant assigné</option>
-                    ) : (
-                      filteredStaff.map(s => (
-                        <option key={s.id} value={s.id} className="text-slate-900">
-                          {formatStudentName(s.last_name, s.first_name).fullName}
-                        </option>
-                      ))
-                    )}
-                  </select>
+                  <div className="min-w-[200px]">
+                    <StaffSelectorPill
+                      staffList={filteredStaff}
+                      selectedStaffId={selectedStaffId}
+                      onSelectStaff={(id) => setSelectedStaffId(id)}
+                      allowAll={false}
+                      emptyLabel={filteredStaff.length === 0 ? "Aucun enseignant" : "Choisir un enseignant..."}
+                      variant="pill"
+                      size="sm"
+                      colorScheme="indigo"
+                      dropdownAlign="right"
+                      labelPrefix=""
+                      disabled={filteredStaff.length === 0}
+                    />
+                  </div>
                 </div>
               )}
             </div>
@@ -1141,110 +1194,101 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
 
       {/* MODALE D'AJOUT / MODIFICATION DE COURS */}
       {showModal && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200 border border-slate-100">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center z-50 p-3 sm:p-5 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-xl overflow-hidden flex flex-col max-h-[92vh] animate-in zoom-in-95 duration-200 border border-slate-200/80">
             {/* Modal Header */}
-            <div className="flex justify-between items-center px-5 py-3.5 border-b border-slate-100 bg-slate-50/50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold">
-                  {editingSchedule ? <Clock size={16} /> : <Plus size={16} />}
+            <div className="flex justify-between items-center px-5 sm:px-6 py-4 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-bold shadow-md shadow-indigo-200">
+                  {editingSchedule ? <Clock size={20} /> : <Plus size={20} className="stroke-[2.5]" />}
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 leading-tight">
-                    {editingSchedule ? 'Modifier le créneau' : 'Nouveau cours à l\'emploi du temps'}
+                  <h2 className="text-base font-black text-slate-900 leading-tight">
+                    {editingSchedule ? 'Modifier le créneau horaire' : 'Nouveau cours à l\'emploi du temps'}
                   </h2>
-                  <p className="text-[11px] text-slate-400 font-medium leading-none mt-0.5">Configuration pédagogique et horaire</p>
+                  <p className="text-xs text-slate-500 font-bold leading-none mt-1">
+                    Affectation de la matière, enseignant et tranche horaire
+                  </p>
                 </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setShowModal(false)} 
-                className="w-7 h-7 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors"
+                className="w-8 h-8 rounded-xl hover:bg-slate-200/70 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors"
+                title="Fermer"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Modal Form */}
-            <form onSubmit={handleSubmit} className="p-4 sm:p-5 space-y-3.5 overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar flex-1">
               {/* Section 1: Informations de la classe & Matière */}
-              <div className="space-y-2.5">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                  <BookOpen size={13} className="text-indigo-600" />
-                  <span>Attribution Pédagogique</span>
-                </h3>
+              <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 sm:p-4.5 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <BookOpen size={15} className="text-indigo-600" />
+                    <span>1. Attribution Pédagogique</span>
+                  </h3>
+                  {affiliatedSubjects.length > 0 && (
+                    <span className="text-[10px] font-black px-2 py-0.5 bg-indigo-100/80 text-indigo-700 rounded-lg">
+                      {affiliatedSubjects.length} au programme
+                    </span>
+                  )}
+                </div>
                 
-                <div className="space-y-2.5">
+                <div className="space-y-3">
+                  {/* Classe cible */}
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
                       {terminology.class || 'Classe'} cible <span className="text-rose-500">*</span>
                     </label>
-                    <div className="relative">
-                      <select
-                        required
-                        value={formData.class_id}
-                        onChange={(e) => {
-                          const newClassId = e.target.value;
-                          // Find affiliated subjects for new class
-                          const newAffiliated = subjects.filter(s => {
-                            const inClassSubj = classSubjects.some(cs => 
-                              (cs.class_id === newClassId || matchClasses(cs.class_id, newClassId, classes)) && 
-                              matchSubjects(s, cs.subject_id, subjects)
-                            );
-                            const inAssignments = allAssignments.some(sa => 
-                              (sa.class_id === newClassId || matchClasses(sa.class_id || sa.class_name, newClassId, classes)) && 
-                              matchSubjects(s, sa.subject_id || sa.subject_name, subjects)
-                            );
-                            return inClassSubj || inAssignments;
-                          });
-
-                          let nextSubjectId = formData.subject_id;
-                          if (newAffiliated.length > 0 && !newAffiliated.some(s => s.id === formData.subject_id)) {
-                            nextSubjectId = newAffiliated[0].id;
-                          }
-
-                          setFormData(prev => ({ 
-                            ...prev, 
-                            class_id: newClassId,
-                            subject_id: nextSubjectId
-                          }));
-                        }}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                      >
-                        <option value="">Sélectionner une classe...</option>
-                        {visibleClasses.map(c => {
-                          const campusName = campuses?.find(cmp => cmp.id === c.campus_id)?.name;
-                          return (
-                            <option key={c.id} value={c.id}>
-                              {c.name} {campusName && !user.campus_id ? `— ${campusName}` : ''}
-                            </option>
+                    <ClassSelectorPill
+                      classes={visibleClasses}
+                      selectedClassId={formData.class_id}
+                      onSelectClass={(newClassId) => {
+                        const newAffiliated = subjects.filter(s => {
+                          const inClassSubj = classSubjects.some(cs => 
+                            (cs.class_id === newClassId || matchClasses(cs.class_id, newClassId, classes)) && 
+                            matchSubjects(s, cs.subject_id, subjects)
                           );
-                        })}
-                      </select>
-                    </div>
+                          const inAssignments = allAssignments.some(sa => 
+                            (sa.class_id === newClassId || matchClasses(sa.class_id || sa.class_name, newClassId, classes)) && 
+                            matchSubjects(s, sa.subject_id || sa.subject_name, subjects)
+                          );
+                          return inClassSubj || inAssignments;
+                        });
+
+                        let nextSubjectId = formData.subject_id;
+                        if (newAffiliated.length > 0 && !newAffiliated.some(s => s.id === formData.subject_id)) {
+                          nextSubjectId = newAffiliated[0].id;
+                        }
+
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          class_id: newClassId,
+                          subject_id: nextSubjectId
+                        }));
+                      }}
+                      allowAll={false}
+                      emptyLabel="Sélectionner une classe..."
+                      variant="field"
+                      size="sm"
+                      colorScheme="indigo"
+                      labelPrefix=""
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {/* Matière & Enseignant */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <div className="flex items-center justify-between mb-1">
-                        <label className="block text-[11px] font-bold text-slate-700">
-                          Matière <span className="text-rose-500">*</span>
-                        </label>
-                        {affiliatedSubjects.length > 0 ? (
-                          <span className="text-[10px] font-bold text-indigo-600">
-                            ({affiliatedSubjects.length} au programme)
-                          </span>
-                        ) : subjects.length > 0 ? (
-                          <span className="text-[10px] font-medium text-slate-500">
-                            ({subjects.length} disponible{subjects.length > 1 ? 's' : ''})
-                          </span>
-                        ) : null}
-                      </div>
-                      <select
-                        required
+                      <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                        Matière <span className="text-rose-500">*</span>
+                      </label>
+                      <SelectPill
+                        options={subjectSelectOptions}
                         value={formData.subject_id}
-                        onChange={(e) => {
-                          const newSubjId = e.target.value;
-                          // If there's an assigned teacher for this subject in the class, auto-suggest them
+                        onChange={(newSubjId) => {
                           let nextStaffId = formData.staff_id;
                           if (formData.class_id && newSubjId) {
                             const assignMatch = allAssignments.find(sa => 
@@ -1262,44 +1306,26 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                             staff_id: nextStaffId
                           }));
                         }}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                      >
-                        <option value="">Sélectionner une matière...</option>
-                        {affiliatedSubjects.length > 0 ? (
-                          <>
-                            <optgroup label={`Matières au programme / Tableau (${affiliatedSubjects.length})`}>
-                              {affiliatedSubjects.map(s => (
-                                <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>
-                              ))}
-                            </optgroup>
-                            {otherSubjects.length > 0 && (
-                              <optgroup label={`Autres matières de l'établissement (${otherSubjects.length})`}>
-                                {otherSubjects.map(s => (
-                                  <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>
-                                ))}
-                              </optgroup>
-                            )}
-                          </>
-                        ) : (
-                          subjects.map(s => (
-                            <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>
-                          ))
-                        )}
-                      </select>
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        searchable={true}
+                        dropdownAlign="left"
+                        placeholder="Choisir une matière..."
+                        icon={BookOpen}
+                      />
                     </div>
 
                     <div>
-                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      <label className="block text-xs font-bold text-slate-800 mb-1.5">
                         Enseignant <span className="text-rose-500">*</span>
                       </label>
-                      <select
-                        required
-                        value={formData.staff_id}
-                        onChange={(e) => {
-                          const newStaffId = e.target.value;
+                      <StaffSelectorPill
+                        staffList={staff}
+                        selectedStaffId={formData.staff_id}
+                        onSelectStaff={(newStaffId) => {
                           let nextSubjectId = formData.subject_id;
                           
-                          // If teacher has an assigned subject for this class, auto-select it
                           if (newStaffId && formData.class_id) {
                             const staffAssign = allAssignments.find(sa => 
                               sa.staff_id === newStaffId && 
@@ -1311,7 +1337,6 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                             }
                           }
                           
-                          // If not found in assignments, check teacher's profile subject
                           if (newStaffId && (!nextSubjectId || !affiliatedSubjects.some(s => s.id === nextSubjectId))) {
                             const staffObj = staff.find(s => s.id === newStaffId);
                             if (staffObj && (staffObj as any).subject) {
@@ -1326,74 +1351,125 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                             subject_id: nextSubjectId
                           }));
                         }}
-                        className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                      >
-                        <option value="">Sélectionner un enseignant...</option>
-                        {staff.map(s => (
-                          <option key={s.id} value={s.id}>
-                            {formatStudentName(s.last_name, s.first_name).fullName}
-                          </option>
-                        ))}
-                      </select>
+                        allowAll={false}
+                        emptyLabel="Sélectionner un enseignant..."
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        labelPrefix=""
+                        dropdownAlign="right"
+                      />
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* Section 2: Horaires et Rémunération */}
-              <div className="space-y-2.5">
-                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-100 pb-1">
-                  <Clock size={13} className="text-emerald-600" />
-                  <span>Créneau & Tarification</span>
-                </h3>
+              <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 sm:p-4.5 space-y-3.5">
+                <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
+                  <h3 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                    <Clock size={15} className="text-emerald-600" />
+                    <span>2. Créneau & Tarification</span>
+                  </h3>
+                  {computedDuration && (
+                    <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-lg border ${
+                      computedDuration.isValid 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}>
+                      {computedDuration.isValid ? `Durée : ${computedDuration.text}` : computedDuration.text}
+                    </span>
+                  )}
+                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Jour de la semaine</label>
-                    <select
-                      required
-                      value={formData.day_of_week}
-                      onChange={(e) => setFormData({...formData, day_of_week: e.target.value})}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    >
-                      {days.map(day => (
-                        <option key={day} value={day}>{day}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Taux horaire (GNF)</label>
-                    <input
-                      type="number"
-                      value={formData.hourly_rate}
-                      onChange={(e) => setFormData({...formData, hourly_rate: e.target.value})}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                      placeholder="0"
-                    />
+                {/* Sélecteur de jour rapide & ergonomique */}
+                <div>
+                  <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                    Jour de la semaine <span className="text-rose-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
+                    {days.map((day) => {
+                      const isSelected = formData.day_of_week === day;
+                      const shortName = day.substring(0, 3).toUpperCase();
+                      const isToday = day === currentDayName;
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => setFormData({ ...formData, day_of_week: day })}
+                          className={`flex flex-col items-center justify-center py-2 px-1 rounded-xl text-center transition-all ${
+                            isSelected
+                              ? 'bg-indigo-600 text-white font-black shadow-sm ring-2 ring-indigo-600/30'
+                              : 'bg-white hover:bg-slate-100 text-slate-700 font-bold border border-slate-200 hover:border-slate-300'
+                          }`}
+                        >
+                          <span className="text-xs">{shortName}</span>
+                          {isToday && (
+                            <span className={`text-[8px] font-black uppercase tracking-tighter ${isSelected ? 'text-indigo-200' : 'text-indigo-600'}`}>
+                              Auj.
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2.5">
+                {/* Tranche horaire */}
+                <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Heure de début</label>
-                    <input
-                      type="time"
-                      required
-                      value={formData.start_time}
-                      onChange={(e) => setFormData({...formData, start_time: e.target.value})}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
-                    />
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                      Heure de début <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        required
+                        value={formData.start_time}
+                        onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
                   </div>
                   <div>
-                    <label className="block text-[11px] font-bold text-slate-700 mb-1">Heure de fin</label>
+                    <label className="block text-xs font-bold text-slate-800 mb-1.5">
+                      Heure de fin <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="time"
+                        required
+                        value={formData.end_time}
+                        onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
+                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Taux horaire */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-bold text-slate-800">
+                      Taux horaire enseignant <span className="text-slate-600 text-[10px] font-semibold">(Optionnel)</span>
+                    </label>
+                    {formData.hourly_rate && computedDuration?.isValid && (
+                      <span className="text-[10px] font-bold text-slate-700">
+                        Coût estimé créneau : {(parseFloat(formData.hourly_rate) * (computedDuration.hours || 1)).toLocaleString()} GNF
+                      </span>
+                    )}
+                  </div>
+                  <div className="relative">
                     <input
-                      type="time"
-                      required
-                      value={formData.end_time}
-                      onChange={(e) => setFormData({...formData, end_time: e.target.value})}
-                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
+                      type="number"
+                      value={formData.hourly_rate}
+                      onChange={(e) => setFormData({ ...formData, hourly_rate: e.target.value })}
+                      className="w-full pl-3 pr-14 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                      placeholder="Ex: 50000"
                     />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded">
+                      GNF / h
+                    </span>
                   </div>
                 </div>
               </div>
@@ -1404,26 +1480,27 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => handleDelete(editingSchedule.id)}
-                    className="flex items-center gap-1.5 px-3 py-1.5 text-rose-600 font-bold text-xs hover:bg-rose-50 rounded-xl transition-colors"
+                    className="flex items-center gap-1.5 px-3.5 py-2 text-rose-700 font-bold text-xs hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-xl transition-colors"
                   >
-                    <Trash2 size={14} />
-                    <span>Supprimer</span>
+                    <Trash2 size={15} />
+                    <span>Supprimer le créneau</span>
                   </button>
                 ) : <div />}
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <button
                     type="button"
                     onClick={() => setShowModal(false)}
-                    className="px-3.5 py-1.5 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    className="px-4 py-2 border border-slate-300 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 hover:text-slate-900 transition-colors"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-200 hover:shadow-lg transition-all"
+                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-200 hover:shadow-lg transition-all flex items-center gap-2"
                   >
-                    {editingSchedule ? 'Enregistrer' : 'Ajouter le cours'}
+                    <Check size={15} className="stroke-[2.5]" />
+                    <span>{editingSchedule ? 'Enregistrer les modifications' : 'Ajouter le cours'}</span>
                   </button>
                 </div>
               </div>

@@ -9,6 +9,7 @@ import { supabase, isValidUuid } from '../supabase';
 import { UserProfile, SchoolClass, StudentAttendance } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
+import { ClassSelectorPill } from './ClassSelectorPill';
 
 interface AttendanceViewProps {
   user: UserProfile;
@@ -604,24 +605,18 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
                 <span className="text-[10px] text-slate-400 font-normal">({classes.length} dispo.)</span>
               )}
             </label>
-            <div className="relative">
-              <select
-                value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                className="w-full pl-3 pr-8 py-2.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-blue-500 appearance-none transition-all cursor-pointer"
-              >
-                {classes.length === 0 ? (
-                  <option value="">Aucune {terminology.class?.toLowerCase() || 'classe'} disponible</option>
-                ) : (
-                  classes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name.toUpperCase()}
-                    </option>
-                  ))
-                )}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
-            </div>
+            <ClassSelectorPill
+              classes={classes}
+              selectedClassId={selectedClassId}
+              onSelectClass={(id) => setSelectedClassId(id)}
+              allowAll={false}
+              emptyLabel={classes.length === 0 ? `Aucune ${terminology.class?.toLowerCase() || 'classe'} disponible` : `Choisir une ${terminology.class?.toLowerCase() || 'classe'}...`}
+              variant="field"
+              size="sm"
+              colorScheme="blue"
+              labelPrefix=""
+              disabled={classes.length === 0}
+            />
           </div>
 
           {/* Sélecteur de Date Intelligent avec Navigation Rapide */}

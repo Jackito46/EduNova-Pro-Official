@@ -42,6 +42,8 @@ import { ReportCardItem, getMention, getDecision } from './report-cards/ReportCa
 import { PalmaresView } from './report-cards/PalmaresView';
 import { ReportCardStudent, ReportCardOptions } from './report-cards/types';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SelectPill } from './SelectPill';
 
 const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { ipAddress } = useSecurity();
@@ -901,9 +903,9 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {/* Main Form Box */}
-      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs overflow-hidden">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-xs relative">
         {/* Mode Segmented Switcher & Status Bar */}
-        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/60 rounded-t-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="inline-flex bg-slate-200/70 p-1 rounded-xl">
             <button
               onClick={() => {
@@ -969,23 +971,21 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <Layers size={13} className="text-indigo-600" />
                 {terminology.class || 'Classe'} & Section
               </label>
-              <div className="relative">
-                <select
-                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-semibold text-xs text-slate-800 cursor-pointer appearance-none transition-all"
-                  value={selectedClassId}
-                  onChange={e => {
-                    setSelectedClassId(e.target.value);
-                    setSelectedStudent(null);
-                  }}
-                >
-                  {classes.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.level ? `(${c.level})` : ''}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-              </div>
+              <ClassSelectorPill
+                classes={classes}
+                selectedClassId={selectedClassId}
+                onSelectClass={(id) => {
+                  setSelectedClassId(id);
+                  setSelectedStudent(null);
+                }}
+                allowAll={false}
+                emptyLabel={classes.length === 0 ? "Aucune classe" : "Choisir une classe..."}
+                variant="field"
+                size="md"
+                colorScheme="indigo"
+                labelPrefix=""
+                disabled={classes.length === 0}
+              />
             </div>
 
             {/* Period / Exam Term */}
@@ -994,20 +994,17 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <FileText size={13} className="text-indigo-600" />
                 {school?.school_type === 'UNIVERSITE' || school?.school_type === 'SUPERIEUR' ? 'Session / Examen' : 'Période / Évaluation'}
               </label>
-              <div className="relative">
-                <select
-                  className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-semibold text-xs text-slate-800 cursor-pointer appearance-none transition-all"
-                  value={term}
-                  onChange={e => setTerm(e.target.value)}
-                >
-                  {availableExams.map(ex => (
-                    <option key={ex} value={ex}>
-                      {ex}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-              </div>
+              <SelectPill
+                options={availableExams.map(ex => ({ value: ex, label: ex }))}
+                value={term}
+                onChange={(newTerm) => setTerm(newTerm)}
+                variant="field"
+                size="md"
+                colorScheme="indigo"
+                icon={FileText}
+                placeholder="Sélectionner une période..."
+                disabled={availableExams.length === 0}
+              />
             </div>
           </div>
 

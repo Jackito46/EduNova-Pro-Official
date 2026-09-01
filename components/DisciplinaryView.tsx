@@ -20,6 +20,8 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SelectPill } from './SelectPill';
 
 interface DisciplinaryRecord {
   id: string;
@@ -391,7 +393,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const matchesStatus = statusFilter === 'ALL' || r.status === statusFilter;
       
       const classMatchObj = classes.find(c => c.id === r.student?.class_id);
-      const matchesClass = classFilter === 'ALL' || classMatchObj?.name === classFilter;
+      const matchesClass = classFilter === 'ALL' || classMatchObj?.name === classFilter || classMatchObj?.id === classFilter;
       
       const effectiveCampus = user.campus_id || (selectedCampusFilter === 'ALL' ? null : selectedCampusFilter);
       if (effectiveCampus && classMatchObj?.campus_id && classMatchObj.campus_id !== effectiveCampus) {
@@ -882,17 +884,17 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div 
           onClick={() => { setStatusFilter('ALL'); setTypeFilter('ALL'); }}
-          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">Total Incidents</span>
-            <div className="w-10 h-10 bg-slate-50 text-slate-700 group-hover:bg-slate-900 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
+            <span className="text-[11px] font-black text-slate-700 uppercase tracking-wider">Total Incidents</span>
+            <div className="w-10 h-10 bg-slate-100 text-slate-800 group-hover:bg-slate-900 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
               <ShieldAlert size={20} />
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
             <span className="text-3xl font-black text-slate-900">{stats.total}</span>
-            <span className="text-xs font-bold text-slate-400">enregistrés</span>
+            <span className="text-xs font-bold text-slate-600">enregistrés</span>
           </div>
           <div className="mt-3 w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
             <div className="bg-slate-900 h-full w-full rounded-full" />
@@ -901,17 +903,17 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         <div 
           onClick={() => setStatusFilter('EN_COURS')}
-          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-amber-500 uppercase tracking-wider">Dossiers en cours</span>
-            <div className="w-10 h-10 bg-amber-50 text-amber-600 group-hover:bg-amber-500 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
+            <span className="text-[11px] font-black text-amber-700 uppercase tracking-wider">Dossiers en cours</span>
+            <div className="w-10 h-10 bg-amber-50 text-amber-700 group-hover:bg-amber-600 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
               <Clock size={20} />
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-amber-600">{stats.pendingOrInProgress}</span>
-            <span className="text-xs font-bold text-slate-400">en instruction</span>
+            <span className="text-3xl font-black text-amber-700">{stats.pendingOrInProgress}</span>
+            <span className="text-xs font-bold text-amber-800 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">en instruction</span>
           </div>
           <div className="mt-3 w-full bg-amber-100 h-1.5 rounded-full overflow-hidden">
             <div 
@@ -923,17 +925,17 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         <div 
           onClick={() => setSanctionFilter('WITH_SANCTION')}
-          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-rose-500 uppercase tracking-wider">Sanctions Prononcées</span>
-            <div className="w-10 h-10 bg-rose-50 text-rose-600 group-hover:bg-rose-600 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
+            <span className="text-[11px] font-black text-rose-700 uppercase tracking-wider">Sanctions Prononcées</span>
+            <div className="w-10 h-10 bg-rose-50 text-rose-700 group-hover:bg-rose-600 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
               <Gavel size={20} />
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-rose-600">{stats.withSanctions}</span>
-            <span className="text-xs font-bold text-slate-400">décisions fermes</span>
+            <span className="text-3xl font-black text-rose-700">{stats.withSanctions}</span>
+            <span className="text-xs font-bold text-rose-800 bg-rose-50 px-2 py-0.5 rounded-md border border-rose-200/60">décisions fermes</span>
           </div>
           <div className="mt-3 w-full bg-rose-100 h-1.5 rounded-full overflow-hidden">
             <div 
@@ -945,17 +947,17 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         <div 
           onClick={() => setStatusFilter('CLOS')}
-          className="bg-white p-6 rounded-3xl border border-slate-100 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+          className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-sm hover:shadow-md transition-all cursor-pointer group"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-black text-emerald-500 uppercase tracking-wider">Dossiers Résolus / Clos</span>
-            <div className="w-10 h-10 bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
+            <span className="text-[11px] font-black text-emerald-700 uppercase tracking-wider">Dossiers Résolus / Clos</span>
+            <div className="w-10 h-10 bg-emerald-50 text-emerald-700 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center transition-all">
               <CheckCircle2 size={20} />
             </div>
           </div>
           <div className="mt-4 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-emerald-600">{stats.closed}</span>
-            <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+            <span className="text-3xl font-black text-emerald-700">{stats.closed}</span>
+            <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60">
               {stats.resolutionRate}% résolus
             </span>
           </div>
@@ -969,23 +971,23 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {/* 3. Main Filter & Control Bar */}
-      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-100 space-y-4">
+      <div className="bg-white p-4 sm:p-5 rounded-3xl shadow-sm border border-slate-200/80 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           
           {/* Live Search */}
           <div className="flex-1 min-w-[240px] relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
             <input 
               type="text"
               placeholder={`Rechercher un ${terminology.student.toLowerCase()}, matricule, motif...`}
-              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs sm:text-sm font-semibold focus:bg-white focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all"
+              className="w-full pl-11 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-500 placeholder:font-medium focus:bg-white focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 outline-none transition-all"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button 
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700"
               >
                 <X size={14} />
               </button>
@@ -996,7 +998,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
           {hasMultiCampus && (
             <select 
               aria-label="Filtrer par campus ou annexe"
-              className="px-3.5 py-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 focus:bg-white focus:border-rose-500 outline-none transition-all cursor-pointer"
+              className="px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:bg-white focus:border-rose-500 outline-none transition-all cursor-pointer"
               value={selectedCampusFilter}
               onChange={(e) => setSelectedCampusFilter(e.target.value)}
             >
@@ -1008,52 +1010,71 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
 
           {/* Class / Promotion Filter */}
-          <select 
-            aria-label="Filtrer par classe ou formation"
-            className="px-3.5 py-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 focus:bg-white focus:border-rose-500 outline-none transition-all cursor-pointer"
-            value={classFilter}
-            onChange={(e) => setClassFilter(e.target.value)}
-          >
-            <option value="ALL">
-              {isUniversity ? 'Toutes les filières / promotions' :
-               isProfessional ? 'Toutes les formations' :
-               'Toutes les classes'}
-            </option>
-            {classes.map(c => (
-              <option key={c.id} value={c.name}>{c.name}</option>
-            ))}
-          </select>
+          <div className="min-w-[200px]">
+            <ClassSelectorPill
+              classes={classes}
+              selectedClassId={classFilter === 'ALL' ? 'all' : (classes.find(c => c.name === classFilter || c.id === classFilter)?.id || classFilter)}
+              onSelectClass={(classId) => {
+                if (classId === 'all') {
+                  setClassFilter('ALL');
+                } else {
+                  const cls = classes.find(c => c.id === classId);
+                  setClassFilter(cls ? cls.name : classId);
+                }
+              }}
+              allowAll={true}
+              allLabel={isUniversity ? 'Toutes les filières / promotions' :
+                       isProfessional ? 'Toutes les formations' :
+                       'Toutes les classes'}
+              labelPrefix=""
+              variant="field"
+              size="sm"
+              colorScheme="rose"
+            />
+          </div>
 
           {/* Incident Type Filter */}
-          <select 
-            aria-label="Filtrer par type d'incident"
-            className="px-3.5 py-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 focus:bg-white focus:border-rose-500 outline-none transition-all cursor-pointer"
-            value={typeFilter}
-            onChange={(e) => setTypeFilter(e.target.value)}
-          >
-            <option value="ALL">Tous les types d'incidents</option>
-            <option value="CONDUITE">Conduite / Déontologie</option>
-            <option value="RETARD">Retard</option>
-            <option value="ABSENCE_NON_JUSTIFIEE">Absence non justifiée</option>
-            <option value="TRAVAIL_NON_FAIT">Travail non fait</option>
-            <option value="FRAUDE">Fraude académique / Plagiat</option>
-            <option value="VIOLENCE">Gravité / Violence</option>
-            <option value="AUTRE">Autre incident</option>
-          </select>
+          <div className="min-w-[190px]">
+            <SelectPill
+              options={[
+                { value: 'ALL', label: "Tous les types d'incidents" },
+                { value: 'CONDUITE', label: 'Conduite / Déontologie' },
+                { value: 'RETARD', label: 'Retard' },
+                { value: 'ABSENCE_NON_JUSTIFIEE', label: 'Absence non justifiée' },
+                { value: 'TRAVAIL_NON_FAIT', label: 'Travail non fait' },
+                { value: 'FRAUDE', label: 'Fraude académique / Plagiat' },
+                { value: 'VIOLENCE', label: 'Gravité / Violence' },
+                { value: 'AUTRE', label: 'Autre incident' },
+              ]}
+              value={typeFilter}
+              onChange={(newType) => setTypeFilter(newType as any)}
+              variant="field"
+              size="sm"
+              colorScheme="rose"
+              dropdownAlign="right"
+              icon={ShieldAlert}
+            />
+          </div>
 
           {/* Status Filter */}
-          <select 
-            aria-label="Filtrer par statut du dossier"
-            className="px-3.5 py-3 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-700 focus:bg-white focus:border-rose-500 outline-none transition-all cursor-pointer"
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-          >
-            <option value="ALL">Tous les statuts</option>
-            <option value="SIGNALÉ">Signalé</option>
-            <option value="EN_COURS">En cours d'instruction</option>
-            <option value="CLOS">Clos / Résolu</option>
-            <option value="ANNULÉ">Annulé</option>
-          </select>
+          <div className="min-w-[170px]">
+            <SelectPill
+              options={[
+                { value: 'ALL', label: 'Tous les statuts' },
+                { value: 'SIGNALÉ', label: 'Signalé' },
+                { value: 'EN_COURS', label: "En cours d'instruction" },
+                { value: 'CLOS', label: 'Clos / Résolu' },
+                { value: 'ANNULÉ', label: 'Annulé' },
+              ]}
+              value={statusFilter}
+              onChange={(newStatus) => setStatusFilter(newStatus as any)}
+              variant="field"
+              size="sm"
+              colorScheme="rose"
+              dropdownAlign="right"
+              icon={Filter}
+            />
+          </div>
 
           {/* View Switcher & Action Tools */}
           <div className="flex items-center gap-2">
@@ -1061,7 +1082,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 onClick={() => setViewMode('CARDS')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  viewMode === 'CARDS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  viewMode === 'CARDS' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-700 hover:text-slate-900'
                 }`}
               >
                 Fiches
@@ -1069,7 +1090,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 onClick={() => setViewMode('TABLE')}
                 className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
-                  viewMode === 'TABLE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-800'
+                  viewMode === 'TABLE' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-700 hover:text-slate-900'
                 }`}
               >
                 Registre
@@ -1107,7 +1128,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
         {/* Active Filters Summary Pills */}
         {(typeFilter !== 'ALL' || statusFilter !== 'ALL' || classFilter !== 'ALL' || sanctionFilter !== 'ALL' || searchTerm) && (
           <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 text-xs font-bold">
-            <span className="text-slate-400">Filtres actifs :</span>
+            <span className="text-slate-700">Filtres actifs :</span>
             {searchTerm && (
               <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg flex items-center gap-1.5">
                 Recherche: "{searchTerm}"
@@ -1242,38 +1263,38 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   {/* Incident Type and Date */}
-                  <div className="flex items-center justify-between text-xs font-semibold text-slate-500 pt-2 border-t border-slate-50">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 pt-2 border-t border-slate-100">
                     <div className="flex items-center gap-1.5">
-                      <Calendar size={13} className="text-slate-400" />
+                      <Calendar size={13} className="text-slate-500" />
                       <span>{format(new Date(record.incident_date), 'dd MMMM yyyy', { locale: fr })}</span>
                     </div>
                     {getTypeBadge(record.incident_type)}
                   </div>
 
                   {/* Incident Description */}
-                  <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium bg-slate-50/70 p-3.5 rounded-2xl border border-slate-100 line-clamp-3">
+                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-semibold bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 line-clamp-3">
                     {record.description}
                   </p>
 
                   {/* Sanction Decision Section */}
                   {record.sanction_type !== 'AUCUNE' ? (
-                    <div className="p-3 bg-rose-50/60 border border-rose-100 rounded-2xl flex items-center justify-between">
+                    <div className="p-3 bg-rose-50/80 border border-rose-200/80 rounded-2xl flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <Gavel size={15} className="text-rose-600 shrink-0" />
+                        <Gavel size={15} className="text-rose-700 shrink-0" />
                         <div>
-                          <p className="text-[10px] font-black text-rose-400 uppercase tracking-widest">Sanction Appliquée</p>
-                          <p className="text-xs font-black text-rose-700">{record.sanction_type}</p>
+                          <p className="text-[10px] font-black text-rose-800 uppercase tracking-widest">Sanction Appliquée</p>
+                          <p className="text-xs font-black text-rose-900">{record.sanction_type}</p>
                         </div>
                       </div>
                       {record.sanction_duration > 0 && (
-                        <span className="px-2.5 py-1 bg-white text-rose-700 border border-rose-200 rounded-xl text-xs font-black shadow-xs">
+                        <span className="px-2.5 py-1 bg-white text-rose-800 border border-rose-200 rounded-xl text-xs font-black shadow-xs">
                           {record.sanction_duration} j
                         </span>
                       )}
                     </div>
                   ) : (
-                    <div className="p-2.5 bg-slate-50 rounded-2xl flex items-center gap-2 text-slate-400 text-xs font-semibold">
-                      <Shield size={14} />
+                    <div className="p-2.5 bg-slate-100/70 border border-slate-200/60 rounded-2xl flex items-center gap-2 text-slate-600 text-xs font-bold">
+                      <Shield size={14} className="text-slate-500" />
                       <span>Aucune sanction formelle prononcée</span>
                     </div>
                   )}
@@ -1530,49 +1551,43 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             {!isEditModalOpen && !selectedStudentForAdd && (
-              <div className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 space-y-3.5">
+              <div className="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
+                    <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                       1. Choisir la {terminology.class.toLowerCase()} *
                     </label>
-                    <select
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all cursor-pointer"
-                      value={selectedClassForAdd}
-                      onChange={(e) => {
-                        setSelectedClassForAdd(e.target.value);
-                      }}
-                    >
-                      <option value="ALL">Toutes les classes ({students.length} {terminology.students.toLowerCase()})</option>
-                      {classes.map(c => {
-                        const count = students.filter(s => s.class_id === c.id).length;
-                        return (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({count} {terminology.students.toLowerCase()})
-                          </option>
-                        );
-                      })}
-                    </select>
+                    <ClassSelectorPill
+                      classes={classes}
+                      selectedClassId={selectedClassForAdd === 'ALL' ? 'all' : selectedClassForAdd}
+                      onSelectClass={(classId) => setSelectedClassForAdd(classId === 'all' ? 'ALL' : classId)}
+                      allowAll={true}
+                      allLabel={`Toutes les classes (${students.length} ${terminology.students.toLowerCase()})`}
+                      labelPrefix=""
+                      variant="field"
+                      size="sm"
+                      colorScheme="rose"
+                    />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
+                    <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                       2. Filtrer par nom ou matricule
                     </label>
                     <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={15} />
                       <input
                         type="text"
                         placeholder={`Rechercher parmi les apprenants...`}
                         value={studentSearchTerm}
                         onChange={(e) => setStudentSearchTerm(e.target.value)}
-                        className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all"
+                        className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-500 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all"
                       />
                       {studentSearchTerm && (
                         <button
                           type="button"
                           onClick={() => setStudentSearchTerm('')}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5"
                         >
                           <X size={13} />
                         </button>
@@ -1583,24 +1598,24 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {/* Instant Student Grid List */}
                 <div className="space-y-2 pt-1">
-                  <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 px-0.5">
+                  <div className="flex items-center justify-between text-xs font-bold text-slate-700 px-0.5">
                     <span>
                       {selectedClassForAdd === 'ALL' 
                         ? `Sélectionnez un ${terminology.student.toLowerCase()} (${studentsForModal.length} disponibles) :` 
                         : `Apprenants de la classe (${studentsForModal.length} trouvés) :`}
                     </span>
                     {selectedClassForAdd !== 'ALL' && (
-                      <span className="text-rose-600 font-extrabold">
+                      <span className="text-rose-700 font-extrabold">
                         {classes.find(c => c.id === selectedClassForAdd)?.name}
                       </span>
                     )}
                   </div>
 
                   {studentsForModal.length === 0 ? (
-                    <div className="p-6 bg-white rounded-xl border border-dashed border-slate-200 text-center space-y-1">
-                      <User className="mx-auto text-slate-300" size={24} />
-                      <p className="text-xs font-black text-slate-700">Aucun {terminology.student.toLowerCase()} trouvé</p>
-                      <p className="text-[11px] text-slate-400">
+                    <div className="p-6 bg-white rounded-xl border border-dashed border-slate-300 text-center space-y-1">
+                      <User className="mx-auto text-slate-400" size={24} />
+                      <p className="text-xs font-black text-slate-800">Aucun {terminology.student.toLowerCase()} trouvé</p>
+                      <p className="text-xs text-slate-600 font-medium">
                         {selectedClassForAdd !== 'ALL' 
                           ? "Cette classe ne contient aucun apprenant inscrit dans cette session." 
                           : "Essayez de modifier vos critères de recherche."}
@@ -1620,11 +1635,11 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               setStudentSearchTerm('');
                             }}
                             className={`p-3 bg-white hover:bg-rose-50/70 border rounded-xl text-left flex items-center justify-between gap-2.5 transition-all group active:scale-[0.99] ${
-                              isSelected ? 'border-rose-500 bg-rose-50/40 ring-2 ring-rose-500/20' : 'border-slate-200/80 hover:border-rose-200 shadow-2xs'
+                              isSelected ? 'border-rose-500 bg-rose-50/40 ring-2 ring-rose-500/20' : 'border-slate-200 hover:border-rose-300 shadow-2xs'
                             }`}
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center font-black text-xs shrink-0 group-hover:bg-rose-600 group-hover:text-white transition-colors overflow-hidden">
+                              <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-800 flex items-center justify-center font-black text-xs shrink-0 group-hover:bg-rose-600 group-hover:text-white transition-colors overflow-hidden border border-slate-200">
                                 {s.photo_url ? (
                                   <img src={s.photo_url} alt="" className="w-full h-full object-cover" />
                                 ) : (
@@ -1635,7 +1650,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 <p className="text-xs font-black text-slate-900 group-hover:text-rose-700 truncate leading-tight">
                                   {s.name}
                                 </p>
-                                <p className="text-[10px] text-slate-400 font-bold truncate">
+                                <p className="text-xs text-slate-600 font-bold truncate">
                                   {s.class_name} {s.code ? `• Mat: ${s.code}` : ''}
                                 </p>
                               </div>
@@ -1711,12 +1726,12 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 block">
+                <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                   Date des faits *
                 </label>
                 <input
                   type="date"
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-rose-500"
+                  className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all"
                   value={formData.incident_date}
                   max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
                   onChange={(e) => setFormData({ ...formData, incident_date: e.target.value })}
@@ -1724,11 +1739,11 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 block">
+                <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                   Qualification de l'incident *
                 </label>
                 <select
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:bg-white focus:border-rose-500"
+                  className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all cursor-pointer"
                   value={formData.incident_type}
                   onChange={(e) => setFormData({ ...formData, incident_type: e.target.value as any })}
                 >
@@ -1744,11 +1759,11 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div>
-              <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1 block">
+              <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                 Description détaillée des faits *
               </label>
               <textarea
-                className="w-full px-4 py-3.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-rose-500 min-h-[100px] resize-none"
+                className="w-full px-4 py-3.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-500 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 min-h-[100px] resize-none transition-all"
                 placeholder="Rapportez les faits avec précision (heure, lieu, témoins, propos ou attitude observée)..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
@@ -1756,8 +1771,8 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* Quick Template Chips */}
               {!isEditModalOpen && (
-                <div className="mt-2.5 flex flex-wrap gap-1.5">
-                  <span className="text-[10px] font-bold text-slate-400 mr-1 self-center">Modèles :</span>
+                <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-700 mr-1 self-center">Modèles :</span>
                   {incidentTemplates.map((tpl, i) => (
                     <button
                       key={i}
@@ -1767,7 +1782,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         incident_type: tpl.type as any,
                         description: tpl.description
                       })}
-                      className="px-2.5 py-1 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-600 rounded-lg text-[10px] font-bold transition-all border border-slate-200/60"
+                      className="px-2.5 py-1 bg-slate-100 hover:bg-rose-50 hover:text-rose-700 text-slate-800 rounded-lg text-xs font-bold transition-all border border-slate-300"
                     >
                       {tpl.title}
                     </button>
@@ -1784,14 +1799,14 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider">Sanction & Statut du dossier</h3>
             </div>
 
-            <div className="bg-rose-50/40 p-4 sm:p-5 rounded-2xl border border-rose-100 space-y-4">
+            <div className="bg-rose-50/50 p-4 sm:p-5 rounded-2xl border border-rose-200 space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-black text-rose-600 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs font-black text-rose-900 uppercase tracking-wider mb-1.5 block">
                     Type de Sanction
                   </label>
                   <select
-                    className="w-full px-4 py-3 bg-white border border-rose-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-500"
+                    className="w-full px-4 py-3 bg-white border border-rose-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 cursor-pointer"
                     value={formData.sanction_type}
                     onChange={(e) => setFormData({ ...formData, sanction_type: e.target.value })}
                   >
@@ -1811,13 +1826,13 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div>
-                  <label className="text-[10px] font-black text-rose-600 uppercase tracking-wider mb-1 block">
+                  <label className="text-xs font-black text-rose-900 uppercase tracking-wider mb-1.5 block">
                     Durée / Volume (Jours ou Heures)
                   </label>
                   <input
                     type="number"
                     min="0"
-                    className="w-full px-4 py-3 bg-white border border-rose-200 rounded-xl text-xs font-bold text-slate-800 outline-none focus:border-rose-500"
+                    className="w-full px-4 py-3 bg-white border border-rose-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10"
                     value={formData.sanction_duration}
                     onChange={(e) => setFormData({ ...formData, sanction_duration: parseInt(e.target.value) || 0 })}
                   />
@@ -1825,15 +1840,15 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               <div>
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-2 block">
+                <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-2 block">
                   État d'instruction du dossier
                 </label>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   {[
                     { id: 'SIGNALÉ', label: 'Signalé', icon: Clock, color: 'bg-amber-500 text-white' },
-                    { id: 'EN_COURS', label: 'En cours', icon: Info, color: 'bg-blue-500 text-white' },
-                    { id: 'CLOS', label: 'Clos & Résolu', icon: CheckCircle2, color: 'bg-emerald-500 text-white' },
-                    { id: 'ANNULÉ', label: 'Annulé', icon: XCircle, color: 'bg-slate-500 text-white' }
+                    { id: 'EN_COURS', label: 'En cours', icon: Info, color: 'bg-blue-600 text-white' },
+                    { id: 'CLOS', label: 'Clos & Résolu', icon: CheckCircle2, color: 'bg-emerald-600 text-white' },
+                    { id: 'ANNULÉ', label: 'Annulé', icon: XCircle, color: 'bg-slate-700 text-white' }
                   ].map((st) => {
                     const Icon = st.icon;
                     const isSelected = formData.status === st.id;
@@ -1842,8 +1857,8 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         key={st.id}
                         type="button"
                         onClick={() => setFormData({ ...formData, status: st.id as any })}
-                        className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all ${
-                          isSelected ? `${st.color} shadow-md` : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                        className={`p-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                          isSelected ? `${st.color} shadow-md` : 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50'
                         }`}
                       >
                         <Icon size={14} />
