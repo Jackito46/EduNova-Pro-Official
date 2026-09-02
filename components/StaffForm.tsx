@@ -4,7 +4,7 @@ import {
   ChevronDown, Contact, Loader2, AlertCircle, CheckCircle2, 
   ShieldCheck, MapPin, Mail, Phone, Banknote, Edit2, Clock, 
   Sparkles, FileText, Calendar, Tag, School, Search, Plus, X, Check,
-  Building2, BadgeCheck, AlertTriangle, RefreshCw
+  Building2, BadgeCheck, AlertTriangle, RefreshCw, Coins
 } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../supabase';
@@ -14,6 +14,7 @@ import { UserProfile, StaffRole, SchoolType } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
 import { staffSchema } from '../utils/validation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SelectPill, SelectOption } from './SelectPill';
 
 interface StaffFormProps {
   user: UserProfile;
@@ -293,6 +294,30 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
     return found ? found.name : 'Annexe assignée';
   }, [formData.campus_id, campuses, hasMultipleCampuses, school?.name]);
 
+  // Options mémorisées pour le campus d'affectation
+  const campusSelectOptions: SelectOption[] = useMemo(() => {
+    const opts: SelectOption[] = [
+      { value: '', label: 'Administration Centrale (Toutes les Annexes)', badge: 'Global', icon: School }
+    ];
+    if (campuses && campuses.length > 0) {
+      campuses.forEach(c => {
+        opts.push({
+          value: c.id,
+          label: c.name,
+          badge: 'Annexe',
+          icon: Building2
+        });
+      });
+    }
+    return opts;
+  }, [campuses]);
+
+  // Options mémorisées pour le mode de rémunération
+  const payTypeOptions: SelectOption[] = useMemo(() => [
+    { value: 'Fixe', label: 'Salaire Fixe Mensuel', badge: 'Mensuel', description: 'Rémunération fixe versée chaque mois' },
+    { value: 'Horaire', label: 'Taux Horaire / Prestation', badge: 'Horaire', description: 'Rémunération selon les heures prestées' },
+  ], []);
+
   const handleNext = () => {
     if (step === 1) {
       if (!formData.lastName.trim() || !formData.firstName.trim() || !formData.phone.trim() || !formData.dob) {
@@ -519,54 +544,61 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
   }
 
   const stepsList = [
-    { id: 1, title: 'Identité & Profil', subtitle: 'Informations personnelles', icon: User },
-    { id: 2, title: 'Contrat & Rémunération', subtitle: 'Poste, salaire & banque', icon: Briefcase },
-    { id: 3, title: 'Récapitulatif & Validation', subtitle: 'Certification du dossier', icon: ShieldCheck }
+    { id: 1, title: 'Identité & Profil', subtitle: 'Informations civiles', icon: User },
+    { id: 2, title: 'Contrat & Paie', subtitle: 'Poste & rémunération', icon: Briefcase },
+    { id: 3, title: 'Synthèse & Validation', subtitle: 'Certification RH', icon: ShieldCheck }
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-300 pb-20">
+    <div className="max-w-5xl mx-auto space-y-6 md:space-y-7 animate-in fade-in duration-300 pb-20">
       
-      {/* Top Banner & Institutional Header */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-6 md:p-8 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-blue-50/70 via-slate-50/30 to-transparent pointer-events-none" />
+      {/* Top Banner & Modern Institutional Header */}
+      <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-xs border border-slate-200/80 p-5 md:p-7 relative overflow-hidden">
+        {/* Subtle Ambient Background Accents */}
+        <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-indigo-50/50 via-blue-50/30 to-transparent pointer-events-none" />
+        <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-          <div className="flex items-start sm:items-center gap-4 md:gap-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
+          <div className="flex items-start sm:items-center gap-3.5 md:gap-4.5">
             <button 
               type="button"
               onClick={() => navigate(-1)}
               aria-label="Retour"
-              className="p-3 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl border border-slate-200/80 shadow-xs transition-all active:scale-95 shrink-0"
+              className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl border border-slate-200/80 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
             >
               <ArrowLeft size={18} />
             </button>
             
-            <div className="flex items-center gap-3 md:gap-4">
-              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md shrink-0 ${
-                isEdit ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white' : 'bg-gradient-to-br from-blue-600 to-indigo-700 text-white'
+            <div className="flex items-center gap-3.5 md:gap-4">
+              <div className={`w-12 h-12 md:w-13 md:h-13 rounded-2xl flex items-center justify-center shadow-xs shrink-0 ${
+                isEdit 
+                  ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white' 
+                  : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 text-white shadow-blue-500/10'
               }`}>
-                {isEdit ? <Edit2 size={24} /> : <User size={26} />}
+                {isEdit ? <Edit2 size={22} /> : <User size={24} />}
               </div>
               
               <div>
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <span className="text-[11px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
                     {school?.name || 'Système RH'}
                   </span>
                   {hasMultipleCampuses && (
-                    <span className="text-[11px] font-semibold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
-                      <School size={11} /> {selectedCampusName}
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
+                      <School size={10} /> {selectedCampusName}
                     </span>
                   )}
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                    Étape {step}/3
+                  </span>
                 </div>
-                <h1 className="text-2xl md:text-3xl font-extrabold text-slate-900 tracking-tight leading-tight">
-                  {isEdit ? 'Édition du Dossier Contractuel' : 'Recrutement & Dossier RH'}
+                <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-tight">
+                  {isEdit ? 'Édition du Dossier Collaborateur' : 'Recrutement & Dossier RH'}
                 </h1>
-                <p className="text-slate-500 font-medium text-xs md:text-sm mt-0.5">
+                <p className="text-slate-500 font-medium text-xs mt-0.5">
                   {isEdit 
-                    ? `Mise à jour des clauses administratives • ID : ${id?.slice(0, 8)}` 
-                    : 'Création du profil employé, affectation institutionnelle et impact de paie'
+                    ? `Mise à jour des clauses administratives et contractuelles • ID : ${id?.slice(0, 8)}` 
+                    : 'Création du profil employé, rattachement et formule de rémunération'
                   }
                 </p>
               </div>
@@ -574,11 +606,10 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
           </div>
 
           {/* Stepper horizontal compact & responsive */}
-          <div className="flex items-center gap-2 bg-slate-50/80 p-2 rounded-2xl border border-slate-200/60 self-stretch lg:self-auto justify-between sm:justify-end">
-            {stepsList.map((st, idx) => {
+          <div className="flex items-center gap-1.5 bg-slate-50/90 p-1.5 rounded-2xl border border-slate-200/70 self-stretch lg:self-auto justify-between sm:justify-end shadow-2xs">
+            {stepsList.map((st) => {
               const isCurrent = step === st.id;
               const isDone = step > st.id;
-              const StepIcon = st.icon;
 
               return (
                 <button
@@ -588,22 +619,22 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                     if (isDone) setStep(st.id);
                   }}
                   disabled={!isDone && !isCurrent}
-                  className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-left transition-all ${
+                  className={`flex items-center gap-2 px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-left transition-all ${
                     isCurrent 
-                      ? 'bg-white text-blue-700 shadow-sm font-bold border border-blue-200/60' 
+                      ? 'bg-white text-blue-700 shadow-xs font-bold border border-blue-200/70' 
                       : isDone 
                         ? 'bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/80 cursor-pointer font-semibold' 
                         : 'text-slate-400 opacity-60 cursor-not-allowed font-medium'
                   }`}
                 >
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
+                  <div className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center text-xs font-black transition-all ${
                     isCurrent 
                       ? 'bg-blue-600 text-white shadow-xs' 
                       : isDone 
                         ? 'bg-emerald-600 text-white' 
                         : 'bg-slate-200 text-slate-500'
                   }`}>
-                    {isDone ? <Check size={14} className="stroke-[3]" /> : st.id}
+                    {isDone ? <Check size={13} className="stroke-[3]" /> : st.id}
                   </div>
                   <div className="hidden sm:block">
                     <p className="text-xs leading-none font-bold">{st.title}</p>
@@ -616,7 +647,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
         </div>
 
         {/* Dynamic step progress line */}
-        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-6 overflow-hidden">
+        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-5 overflow-hidden">
           <motion.div 
             className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500"
             initial={{ width: '33%' }}
@@ -661,35 +692,35 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.25 }}
-                className="space-y-8"
+                className="space-y-7"
               >
                 {/* Section Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                      <Contact size={22} />
+                      <Contact size={20} />
                     </div>
                     <div>
-                      <h2 className="text-lg md:text-xl font-bold text-slate-900">1. Identité Civile & Coordonnées</h2>
-                      <p className="text-xs text-slate-500">Renseignez les données administratives certifiées du collaborateur</p>
+                      <h2 className="text-base md:text-lg font-black text-slate-900">Identité & Coordonnées</h2>
+                      <p className="text-xs text-slate-500 font-medium">Informations personnelles et administratives du collaborateur</p>
                     </div>
                   </div>
                   
                   {/* Dynamic Avatar Preview */}
-                  <div className="flex items-center gap-3 bg-slate-50 px-3.5 py-2 rounded-2xl border border-slate-200/70 self-start sm:self-auto">
-                    <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
+                  <div className="flex items-center gap-3 bg-slate-50 px-3.5 py-1.5 rounded-2xl border border-slate-200/70 self-start sm:self-auto">
+                    <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white font-bold text-xs flex items-center justify-center shadow-xs">
                       {initials}
                     </div>
                     <div className="text-left">
                       <p className="text-xs font-bold text-slate-800 leading-tight">
                         {formData.firstName || formData.lastName ? `${formData.firstName} ${formData.lastName}` : 'Nouveau Collaborateur'}
                       </p>
-                      <p className="text-[10px] text-slate-400 font-medium">Aperçu du badge RH</p>
+                      <p className="text-[10px] text-slate-400 font-medium">Badge RH</p>
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                   
                   {/* Nom de famille */}
                   <div className="space-y-1.5">
@@ -740,7 +771,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                           key={g.val}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, gender: g.val }))}
-                          className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center ${
+                          className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all text-center cursor-pointer ${
                             formData.gender === g.val 
                               ? 'bg-blue-600 border-blue-600 text-white shadow-xs' 
                               : 'bg-slate-50/80 border-slate-200 text-slate-600 hover:bg-slate-100 hover:border-slate-300'
@@ -848,38 +879,37 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
 
                 {/* Multi-Tenant / Affectation Annexe Section */}
                 {school?.has_multi_campus && campuses && campuses.length > 1 && (
-                  <div className="mt-8 pt-6 border-t border-slate-100 space-y-3 bg-indigo-50/40 p-5 rounded-2xl border border-indigo-100/70">
-                    <div className="flex items-center gap-2">
-                      <School className="text-indigo-600" size={18} />
-                      <h3 className="text-sm font-bold text-indigo-950">Affectation Multi-Campus / Annexe</h3>
+                  <div className="mt-6 pt-5 border-t border-slate-100 space-y-2.5 bg-indigo-50/30 p-4.5 rounded-2xl border border-indigo-100/70">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <School className="text-indigo-600" size={16} />
+                        <h3 className="text-xs font-bold uppercase tracking-wider text-indigo-950">Affectation Campus & Annexe</h3>
+                      </div>
+                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-full">
+                        Multi-Campus
+                      </span>
                     </div>
-                    <p className="text-xs text-indigo-800/80">
-                      Spécifiez l'annexe à laquelle ce collaborateur est rattaché. L'administration centrale lui donne accès à toutes les structures.
+                    <p className="text-xs text-indigo-900/70 font-medium">
+                      Rattachement à une annexe spécifique ou accès global (Administration Centrale).
                     </p>
                     
-                    <div className="relative">
-                      <select 
-                        id="campus_id" 
-                        name="campus_id" 
+                    <div className="w-full pt-1">
+                      <SelectPill
+                        options={campusSelectOptions}
+                        value={formData.campus_id}
+                        onChange={(val) => setFormData(prev => ({ ...prev, campus_id: val }))}
+                        variant="field"
+                        size="md"
+                        colorScheme="indigo"
+                        dropdownAlign="left"
                         disabled={!!user.campus_id}
-                        className={`w-full px-4 py-3 bg-white border rounded-xl text-sm font-semibold outline-none appearance-none transition-all ${
-                          user.campus_id 
-                            ? 'bg-slate-100 text-slate-500 border-slate-200 cursor-not-allowed' 
-                            : 'border-indigo-200 text-indigo-950 cursor-pointer focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 shadow-xs'
-                        }`} 
-                        value={formData.campus_id} 
-                        onChange={handleChange}
-                      >
-                        {!user.campus_id && <option value="">Administration Centrale (Toutes les Annexes)</option>}
-                        {campuses.map(c => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
-                        ))}
-                      </select>
-                      <ChevronDown className={`absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none ${user.campus_id ? 'text-slate-300' : 'text-indigo-400'}`} size={16} />
+                        icon={Building2}
+                        className="w-full"
+                      />
                     </div>
                     {user.campus_id && (
                       <p className="text-[11px] text-amber-700 font-medium flex items-center gap-1 mt-1">
-                        <AlertTriangle size={12} /> Affectation verrouillée selon vos privilèges d'administrateur d'annexe.
+                        <AlertTriangle size={12} /> Affectation verrouillée sur votre campus actuel.
                       </p>
                     )}
                   </div>
@@ -895,20 +925,20 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.25 }}
-                className="space-y-8"
+                className="space-y-7"
               >
                 {/* Section Header */}
-                <div className="flex items-center gap-3 pb-5 border-b border-slate-100">
+                <div className="flex items-center gap-3 pb-4 border-b border-slate-100">
                   <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                    <Briefcase size={22} />
+                    <Briefcase size={20} />
                   </div>
                   <div>
-                    <h2 className="text-lg md:text-xl font-bold text-slate-900">2. Termes de l'Engagement & Rémunération</h2>
-                    <p className="text-xs text-slate-500">Configurez le poste, le régime contractuel et les modalités bancaires</p>
+                    <h2 className="text-base md:text-lg font-black text-slate-900">Contrat & Rémunération</h2>
+                    <p className="text-xs text-slate-500 font-medium">Poste de travail, type d'engagement et coordonnées bancaires</p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-7">
                   
                   {/* Poste de Travail (Searchable Role Dropdown) */}
                   <div className="space-y-1.5 relative" ref={dropdownRef}>
@@ -942,7 +972,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                                 e.stopPropagation();
                                 setFormData(prev => ({ ...prev, role: '' }));
                               }}
-                              className="p-1 hover:bg-slate-200 rounded-full transition-all text-slate-400 hover:text-slate-600"
+                              className="p-1 hover:bg-slate-200 rounded-full transition-all text-slate-400 hover:text-slate-600 cursor-pointer"
                             >
                               <X size={14} />
                             </button>
@@ -994,7 +1024,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                                     key={r.id}
                                     type="button"
                                     onClick={(e) => { e.stopPropagation(); handleSelectRole(r.label); }}
-                                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+                                    className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all cursor-pointer ${
                                       formData.role === r.label 
                                         ? 'bg-blue-600 border-blue-600 text-white shadow-xs' 
                                         : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-600'
@@ -1029,7 +1059,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                                       type="button"
                                       disabled={isCreatingRole}
                                       onClick={(e) => { e.stopPropagation(); handleCreateNewRole(); }}
-                                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2"
+                                      className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
                                     >
                                       {isCreatingRole ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
                                       Créer le poste "{roleSearch.trim()}" à la volée
@@ -1055,71 +1085,69 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                   {/* Type de Contrat (Visual Selector) */}
                   <div className="space-y-1.5">
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      Type de Contrat & Engagement <span className="text-rose-500">*</span>
+                      Type d'Engagement <span className="text-rose-500">*</span>
                     </label>
                     <div className="grid grid-cols-2 gap-3">
                       <div 
                         onClick={() => {
                           setFormData(prev => ({ ...prev, contractType: 'Permanent', payType: 'Fixe' }));
                         }}
-                        className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
                           formData.contractType === 'Permanent' 
                             ? 'bg-blue-50/80 border-blue-500 ring-2 ring-blue-100 shadow-xs' 
                             : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/70'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900">Permanent</span>
+                          <span className="text-xs font-black text-slate-900">Permanent</span>
                           <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                             formData.contractType === 'Permanent' ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300'
                           }`}>
                             {formData.contractType === 'Permanent' && <Check size={10} className="stroke-[3]" />}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">Salaire fixe mensuel garanti</p>
+                        <p className="text-[11px] text-slate-500 mt-1 font-medium">Salaire fixe mensuel</p>
                       </div>
 
                       <div 
                         onClick={() => {
                           setFormData(prev => ({ ...prev, contractType: 'Vacationnaire', payType: 'Horaire' }));
                         }}
-                        className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
+                        className={`p-3 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between ${
                           formData.contractType === 'Vacationnaire' 
                             ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-100 shadow-xs' 
                             : 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/70'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-slate-900">Vacationnaire</span>
+                          <span className="text-xs font-black text-slate-900">Vacationnaire</span>
                           <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${
                             formData.contractType === 'Vacationnaire' ? 'border-amber-600 bg-amber-600 text-white' : 'border-slate-300'
                           }`}>
                             {formData.contractType === 'Vacationnaire' && <Check size={10} className="stroke-[3]" />}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-1">Taux horaire par heure prestée</p>
+                        <p className="text-[11px] text-slate-500 mt-1 font-medium">Taux par heure de cours</p>
                       </div>
                     </div>
                   </div>
 
-                  {/* Mode de Rémunération */}
+                  {/* Mode de Rémunération (SelectPill) */}
                   <div className="space-y-1.5">
                     <label htmlFor="payType" className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                       Régime de Rémunération
                     </label>
-                    <div className="relative">
-                      <select 
-                        id="payType" 
-                        name="payType" 
-                        className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-800 outline-none appearance-none cursor-pointer focus:border-blue-500 focus:ring-4 focus:ring-blue-50 transition-all shadow-2xs" 
-                        value={formData.payType} 
-                        onChange={handleChange}
-                      >
-                        <option value="Fixe">Salaire Fixe Mensuel</option>
-                        <option value="Horaire">Taux Horaire / Prestation</option>
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                    </div>
+                    <SelectPill
+                      options={payTypeOptions}
+                      value={formData.payType}
+                      onChange={(val) => setFormData(prev => ({ ...prev, payType: val }))}
+                      variant="field"
+                      size="md"
+                      colorScheme="blue"
+                      dropdownAlign="left"
+                      icon={Coins}
+                      className="w-full"
+                    />
                   </div>
 
                   {/* Montant (Amount) */}
@@ -1167,7 +1195,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                           key={b}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, bankName: b }))}
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-all cursor-pointer ${
                             formData.bankName === b 
                               ? 'bg-blue-600 border-blue-600 text-white' 
                               : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
@@ -1196,10 +1224,10 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                   </div>
 
                   {formData.contractType === 'Vacationnaire' && (
-                    <div className="md:col-span-2 p-4 bg-amber-50/80 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-3">
-                      <Sparkles className="text-amber-600 shrink-0 mt-0.5" size={16} />
-                      <p>
-                        <strong>Note Pédagogique :</strong> Le taux horaire de base défini ici servira de référence. L'assignation des matières, cours et classes pourra être affinée individuellement depuis le registre des signatures de cours.
+                    <div className="md:col-span-2 p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl text-xs text-amber-900 flex items-center gap-2.5">
+                      <Sparkles className="text-amber-600 shrink-0" size={16} />
+                      <p className="font-medium">
+                        <strong>Rémunération horaire :</strong> Ce taux servira de base lors de l'attribution des cours et créneaux d'enseignement.
                       </p>
                     </div>
                   )}
@@ -1215,20 +1243,20 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -15 }}
                 transition={{ duration: 0.25 }}
-                className="space-y-8"
+                className="space-y-7"
               >
                 {/* Section Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-5 border-b border-slate-100">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                      <ShieldCheck size={24} />
+                      <ShieldCheck size={22} />
                     </div>
                     <div>
-                      <h2 className="text-lg md:text-xl font-extrabold text-slate-900">
-                        3. Vision Globale du Dossier & Validation RH
+                      <h2 className="text-base md:text-lg font-black text-slate-900">
+                        Synthèse & Validation Finale
                       </h2>
                       <p className="text-xs text-slate-500 font-medium">
-                        Examinez la synthèse intégrale du profil avant l'enregistrement définitif dans le cloud
+                        Vérifiez l'ensemble des informations avant confirmation du dossier
                       </p>
                     </div>
                   </div>
@@ -1239,13 +1267,13 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                 </div>
 
                 {/* Panoramic Grid of Summary Cards */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 md:gap-6">
                   
                   {/* Badge & Civil Profile Card */}
-                  <div className="lg:col-span-2 bg-slate-50/90 rounded-3xl p-6 md:p-8 border border-slate-200/80 space-y-6 shadow-xs">
+                  <div className="lg:col-span-2 bg-slate-50/90 rounded-3xl p-5 md:p-7 border border-slate-200/80 space-y-5 shadow-2xs">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                      <div className="flex items-center gap-4">
-                        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-black text-xl flex items-center justify-center shadow-md shrink-0">
+                      <div className="flex items-center gap-3.5">
+                        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 text-white font-black text-lg flex items-center justify-center shadow-xs shrink-0">
                           {initials}
                         </div>
                         <div>
@@ -1254,10 +1282,10 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                               {formData.role || 'Poste non défini'}
                             </span>
                             <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full text-[11px] font-bold">
-                              Statut : Actif
+                              Actif
                             </span>
                           </div>
-                          <h3 className="text-2xl font-black text-slate-900 tracking-tight mt-1">
+                          <h3 className="text-xl font-black text-slate-900 tracking-tight mt-1">
                             {formData.lastName.toUpperCase()} {formData.firstName}
                           </h3>
                           <p className="text-xs text-slate-500 font-semibold">
@@ -1269,28 +1297,28 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                       <button
                         type="button"
                         onClick={() => setStep(1)}
-                        className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0"
+                        className="px-3 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 active:scale-95 shrink-0 cursor-pointer"
                       >
-                        <Edit2 size={13} /> Modifier Identité
+                        <Edit2 size={12} /> Modifier
                       </button>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-slate-200/70 text-xs">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-4 border-t border-slate-200/70 text-xs">
                       <div className="bg-white p-3 rounded-xl border border-slate-200/60">
-                        <span className="text-slate-400 font-medium block">Téléphone Mobile / Contact :</span>
+                        <span className="text-slate-400 font-medium block text-[11px]">Téléphone / Contact :</span>
                         <span className="font-bold text-slate-900 font-mono text-sm">{formData.phone || 'Non renseigné'}</span>
                       </div>
                       <div className="bg-white p-3 rounded-xl border border-slate-200/60">
-                        <span className="text-slate-400 font-medium block">Email Professionnel :</span>
+                        <span className="text-slate-400 font-medium block text-[11px]">Email Professionnel :</span>
                         <span className="font-bold text-slate-900 text-sm truncate block">{formData.email || 'Non renseigné'}</span>
                       </div>
                       <div className="bg-white p-3 rounded-xl border border-slate-200/60">
-                        <span className="text-slate-400 font-medium block">Identifiant Fiscal (NIF / CIN) :</span>
+                        <span className="text-slate-400 font-medium block text-[11px]">Identifiant Fiscal (NIF / CIN) :</span>
                         <span className="font-bold text-slate-900 font-mono text-sm">{formData.nif_cin || 'Non renseigné'}</span>
                       </div>
                       <div className="bg-white p-3 rounded-xl border border-slate-200/60">
-                        <span className="text-slate-400 font-medium block">
-                          {hasMultipleCampuses ? 'Annexe d\'Affectation :' : 'Établissement de Rattachement :'}
+                        <span className="text-slate-400 font-medium block text-[11px]">
+                          {hasMultipleCampuses ? 'Annexe d\'Affectation :' : 'Établissement :'}
                         </span>
                         <span className="font-bold text-indigo-700 text-sm flex items-center gap-1">
                           <School size={13} /> {selectedCampusName}
@@ -1298,7 +1326,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                       </div>
                       {formData.address && (
                         <div className="sm:col-span-2 bg-white p-3 rounded-xl border border-slate-200/60">
-                          <span className="text-slate-400 font-medium block">Adresse de Résidence :</span>
+                          <span className="text-slate-400 font-medium block text-[11px]">Adresse de Résidence :</span>
                           <span className="font-bold text-slate-800 text-xs">{formData.address}</span>
                         </div>
                       )}
@@ -1306,43 +1334,43 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                   </div>
 
                   {/* Financial & Contract Summary Card */}
-                  <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-6 md:p-8 flex flex-col justify-between shadow-xl relative overflow-hidden">
+                  <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-3xl p-5 md:p-7 flex flex-col justify-between shadow-xl relative overflow-hidden">
                     <div className="absolute top-0 right-0 w-36 h-36 bg-blue-500/15 rounded-full blur-2xl pointer-events-none" />
                     
                     <div>
                       <div className="flex items-center justify-between gap-2 mb-3">
                         <span className="text-[10px] font-bold uppercase tracking-wider text-blue-300 px-2.5 py-0.5 rounded-full bg-white/10 inline-block">
-                          Engagement Contractuel
+                          Engagement
                         </span>
                         <button
                           type="button"
                           onClick={() => setStep(2)}
-                          className="text-[11px] font-bold text-blue-200 hover:text-white underline underline-offset-2 transition-colors flex items-center gap-1"
+                          className="text-[11px] font-bold text-blue-200 hover:text-white underline underline-offset-2 transition-colors flex items-center gap-1 cursor-pointer"
                         >
                           <Edit2 size={11} /> Ajuster
                         </button>
                       </div>
 
                       <p className="text-xs text-slate-300 font-medium">Formule & Régime</p>
-                      <p className="text-xl font-black text-white mt-0.5">
+                      <p className="text-lg font-black text-white mt-0.5">
                         Contrat {formData.contractType}
                       </p>
                       <p className="text-xs text-blue-200 font-semibold">
                         Régime : {formData.payType === 'Fixe' ? 'Salaire Fixe Mensuel' : 'Taux Horaire Prestation'}
                       </p>
 
-                      <div className="mt-6 pt-5 border-t border-white/10">
+                      <div className="mt-5 pt-4 border-t border-white/10">
                         <p className="text-xs text-blue-200 font-medium">Rémunération de Référence</p>
-                        <p className="text-3xl md:text-4xl font-black font-mono text-emerald-400 mt-1 tracking-tight">
+                        <p className="text-2xl md:text-3xl font-black font-mono text-emerald-400 mt-0.5 tracking-tight">
                           {parseFloat(formData.amount || '0').toLocaleString()} <span className="text-sm text-slate-300 font-sans font-normal">HTG</span>
                         </p>
-                        <p className="text-[11px] text-slate-400 mt-1">
-                          {formData.contractType === 'Permanent' ? 'Salaire mensuel net de référence' : 'Montant par heure de cours assurée'}
+                        <p className="text-[11px] text-slate-400 mt-0.5">
+                          {formData.contractType === 'Permanent' ? 'Salaire mensuel net garanti' : 'Montant par heure de cours effectuée'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="mt-6 pt-4 border-t border-white/10 text-xs text-slate-300 space-y-1.5">
+                    <div className="mt-5 pt-4 border-t border-white/10 text-xs text-slate-300 space-y-1.5">
                       {formData.bankName ? (
                         <>
                           <p className="flex items-center gap-1.5">
@@ -1355,14 +1383,14 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                             </p>
                           ) : (
                             <p className="text-[10px] text-slate-400 ml-5 italic">
-                              Compte : Non spécifié (virement sur présentation du RIB)
+                              Compte non spécifié
                             </p>
                           )}
                         </>
                       ) : (
                         <div className="p-2.5 rounded-xl bg-white/5 border border-white/10 text-[11px] text-slate-300 flex items-center gap-2">
                           <Banknote size={14} className="text-blue-300 shrink-0" />
-                          <span>Mode de versement : <strong className="text-white">Paiement Direct (Chèque / Espèces)</strong></span>
+                          <span>Versement : <strong className="text-white">Paiement Direct (Chèque / Espèces)</strong></span>
                         </div>
                       )}
                     </div>
@@ -1370,30 +1398,30 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                 </div>
 
                 {/* Traçabilité & Validation RH - Format Simplifié & Précis */}
-                <div className="p-4 sm:p-5 bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="p-4 sm:p-4.5 bg-slate-900 text-white rounded-2xl border border-slate-800 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3.5">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold shrink-0">
-                      <ShieldCheck size={20} />
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center font-bold shrink-0">
+                      <ShieldCheck size={18} />
                     </div>
                     <div>
-                      <h4 className="text-sm font-extrabold text-white tracking-tight flex items-center gap-2">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-white">
                         Certification & Traçabilité RH
                       </h4>
-                      <p className="text-xs text-slate-400 mt-0.5">
-                        L'enregistrement initialise le matricule officiel, active la paie et consigne l'action au journal d'audit.
+                      <p className="text-xs text-slate-400 mt-0.5 font-medium">
+                        Création du matricule officiel, activation de la paie et horodatage sécurisé.
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-300 shrink-0">
-                    <span className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-1.5 text-emerald-300">
-                      <Check size={13} className="text-emerald-400 stroke-[3]" /> Registre RH
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold text-slate-300 shrink-0">
+                    <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1.5 text-emerald-300 text-[11px]">
+                      <Check size={12} className="text-emerald-400 stroke-[3]" /> Registre RH
                     </span>
-                    <span className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-1.5 text-blue-300">
-                      <Check size={13} className="text-blue-400 stroke-[3]" /> Grille de Paie
+                    <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1.5 text-blue-300 text-[11px]">
+                      <Check size={12} className="text-blue-400 stroke-[3]" /> Paie Active
                     </span>
-                    <span className="px-3 py-1.5 rounded-xl bg-white/5 border border-white/10 flex items-center gap-1.5 text-indigo-300">
-                      <Check size={13} className="text-indigo-400 stroke-[3]" /> Horodatage Sécurisé
+                    <span className="px-2.5 py-1 rounded-lg bg-white/5 border border-white/10 flex items-center gap-1.5 text-indigo-300 text-[11px]">
+                      <Check size={12} className="text-indigo-400 stroke-[3]" /> Audit Sécurisé
                     </span>
                   </div>
                 </div>
