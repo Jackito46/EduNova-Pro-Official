@@ -341,43 +341,43 @@ const StaffManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-700 pb-20 font-sans">
       {/* Header Banner */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-5 md:p-7 rounded-2xl md:rounded-3xl shadow-lg border border-slate-800 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4 md:gap-6 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-6 md:p-8 rounded-3xl shadow-xl border border-slate-800 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-6 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="z-10 space-y-1">
-          <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-widest">
-            <Briefcase size={14} /> Personnel & RH
+        <div className="z-10">
+          <div className="flex items-center gap-2 text-indigo-400 font-bold text-xs uppercase tracking-widest mb-2">
+            <Briefcase size={16} /> Registre du Personnel & RH
           </div>
-          <h2 className="text-xl md:text-2xl font-black text-white tracking-tight">
+          <h2 className="text-2xl md:text-3xl font-black text-white tracking-tight">
             Registre des Collaborateurs
           </h2>
-          <p className="text-xs text-slate-300 font-medium">
-            {schoolName} • {statsKPI.total} collaborateurs actifs
+          <p className="text-xs text-slate-300 font-medium mt-1">
+            {schoolName} • {statsKPI.total} Membres Actifs au Registre
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 z-10 w-full md:w-auto">
+        <div className="flex flex-wrap items-center gap-3 z-10 w-full md:w-auto">
           <button 
             onClick={fetchStaff}
-            className="p-2.5 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-xl border border-slate-700 transition-all active:scale-95 flex items-center justify-center cursor-pointer"
+            className="p-3 bg-slate-800/80 hover:bg-slate-700 text-slate-300 rounded-2xl border border-slate-700/80 transition-all active:scale-95 flex items-center justify-center"
             title="Rafraîchir"
           >
-            <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
+            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
           </button>
           
           {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR) && (
             <>
               <button 
                 onClick={() => setIsRolesManagerOpen(true)}
-                className="bg-slate-800/90 text-indigo-300 font-bold py-2.5 px-3.5 rounded-xl border border-indigo-500/30 hover:bg-indigo-950 transition-all flex items-center gap-1.5 text-xs cursor-pointer"
+                className="bg-slate-800/90 text-indigo-300 font-bold py-3 px-4 rounded-2xl border border-indigo-500/30 hover:bg-indigo-950 transition-all flex items-center gap-2 text-xs"
               >
-                <Settings size={15} /> <span>Postes</span>
+                <Settings size={16} /> <span>Gérer les Postes</span>
               </button>
               <button 
                 onClick={() => navigate('/personnel/embaucher')}
-                className="bg-indigo-600 hover:bg-indigo-500 text-white font-black py-2.5 px-4 rounded-xl shadow-md shadow-indigo-600/30 transition-all flex items-center gap-1.5 text-xs active:scale-95 cursor-pointer"
+                className="bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-black py-3 px-5 rounded-2xl shadow-lg shadow-indigo-600/30 hover:from-indigo-500 hover:to-blue-500 transition-all flex items-center gap-2 text-xs active:scale-95"
               >
-                <Plus size={16} /> <span>Recruter</span>
+                <Plus size={18} /> <span>Nouvel Embauche</span>
               </button>
             </>
           )}

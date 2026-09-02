@@ -1066,8 +1066,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* DASHBOARD PREVIEW */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-        <div className={`bg-white p-5 sm:p-6 lg:p-7 rounded-2xl shadow-xs border border-gray-100 space-y-6 sm:space-y-8 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+        <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-2xs border border-gray-100 space-y-5 sm:space-y-6 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
           {canViewSensitiveStats && (
             <>
               <div className="flex items-center justify-between flex-wrap gap-2">
@@ -1230,20 +1230,27 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {canViewSensitiveStats && (
-        <div className="lg:col-span-4 bg-white p-8 rounded-2xl shadow-sm border border-slate-200 space-y-8 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 rounded-full -mr-16 -mt-16 opacity-50"></div>
+        <div className="lg:col-span-4 bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/90 space-y-3.5 sm:space-y-4 relative overflow-hidden">
+          <div className="absolute top-0 right-0 w-28 h-28 bg-slate-50 rounded-full -mr-12 -mt-12 opacity-40 pointer-events-none" />
           
           <div className="flex items-center justify-between relative z-10">
-            <h3 className="text-xl font-bold text-slate-900 flex items-center gap-3">
-              <Target size={24} className="text-indigo-600" />
-              Alertes Solvabilité
-            </h3>
-            <div className="w-10 h-10 bg-slate-100 text-slate-600 rounded-xl flex items-center justify-center">
-              <ClipboardList size={20} />
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold border border-indigo-100/80 shrink-0">
+                <Target size={16} />
+              </div>
+              <div className="min-w-0">
+                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight truncate">
+                  Alertes Solvabilité
+                </h3>
+                <p className="text-[10px] text-slate-500 font-medium truncate">Pilotage Direction</p>
+              </div>
+            </div>
+            <div className="w-7 h-7 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center shrink-0">
+              <ClipboardList size={14} />
             </div>
           </div>
 
-          <div className="space-y-4 relative z-10">
+          <div className="space-y-2 relative z-10">
             {[
               { label: 'Réévaluations validées', count: `${loading ? '...' : discountedStudents} Dossiers`, color: 'text-amber-600', borderColor: 'border-l-amber-500', path: '/economat/rapport-reductions' },
               { label: 'Paiements en attente', count: `${loading ? '...' : pendingPayments} Sessions`, color: 'text-indigo-600', borderColor: 'border-l-indigo-500', path: '/economat/liste', state: { filterStatus: 'En attente' } },
@@ -1251,12 +1258,12 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div 
                 key={i} 
                 onClick={() => navigate(item.path, { state: item.state })}
-                className={`flex justify-between items-center p-4 bg-slate-50 border-l-4 ${item.borderColor} rounded-r-xl cursor-pointer hover:bg-slate-100 transition-all group`}
+                className={`flex justify-between items-center px-3 py-2 bg-slate-50/80 border border-slate-100 border-l-4 ${item.borderColor} rounded-r-xl cursor-pointer hover:bg-slate-100/90 transition-all group`}
               >
-                <p className="text-sm font-semibold text-slate-700">{item.label}</p>
-                <div className="flex items-center gap-2">
-                  <p className={`text-sm font-bold ${item.color}`}>{item.count}</p>
-                  <ArrowUpRight size={14} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+                <p className="text-xs font-semibold text-slate-700 truncate pr-2">{item.label}</p>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <p className={`text-xs font-bold ${item.color}`}>{item.count}</p>
+                  <ArrowUpRight size={13} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
                 </div>
               </div>
             ))}
@@ -1264,9 +1271,9 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           
           <button 
             onClick={() => navigate('/economat/suivi')}
-            className="w-full py-4 bg-slate-900 text-white rounded-xl text-sm font-bold hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 flex items-center justify-center gap-2"
+            className="w-full py-2.5 px-3 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
           >
-            <ArrowRight size={18} />
+            <ArrowRight size={15} />
             Rapport Complet de Solvabilité
           </button>
         </div>

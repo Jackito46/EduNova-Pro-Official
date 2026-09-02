@@ -1402,7 +1402,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="w-full max-w-7xl 2xl:max-w-[1600px] min-[1920px]:max-w-[1800px] mx-auto space-y-6 md:space-y-8 pb-12 animate-in fade-in duration-500">
+    <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-in fade-in duration-500">
       {/* Security Recommendation Banner */}
       {showSecurityBanner && (
         <motion.div 

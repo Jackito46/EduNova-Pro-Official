@@ -18,7 +18,8 @@ import {
   ShieldCheck,
   Receipt,
   SearchCheck,
-  Clock
+  Clock,
+  Sparkles
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { formatStudentName } from '../utils/formatters';
@@ -26,8 +27,9 @@ import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ModernRegistrySkeleton, FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { PrintPreviewModal } from './PrintPreviewModal';
 import { AcademicSessionPill } from './AcademicSessionPill';
-
-const DATE_FILTERS = ['Toutes les dates', "Aujourd'hui", 'Cette semaine', 'Ce mois'];
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 
 const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { school, terminology, currentCampusId, campuses } = useSchool();
@@ -53,9 +55,28 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
   const [dateFilter, setDateFilter] = useState("Aujourd'hui");
+  
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const [customDate, setCustomDate] = useState<string>(todayStr);
   const [activeView, setActiveView] = useState<'journal' | 'generator'>('journal');
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
   
+  // Options de filtrage de dates harmonisées (SelectPill)
+  const dateFilterOptions: SelectOption[] = useMemo(() => [
+    { value: "Aujourd'hui", label: "Aujourd'hui", description: "Transactions du jour" },
+    { value: 'Cette semaine', label: 'Cette semaine', description: "Depuis début de semaine" },
+    { value: 'Ce mois', label: 'Ce mois', description: "Mois civil en cours" },
+    { value: 'Date précise', label: 'Date précise', description: "Sélectionner au calendrier" },
+    { value: 'Toutes les dates', label: 'Toutes les dates', description: "Historique complet" },
+  ], []);
+
   // States du Générateur
   const [genYear, setGenYear] = useState('');
   const [genClass, setGenClass] = useState('');
@@ -136,11 +157,10 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return payments.filter(p => {
       const student = students.find(s => s.id === p.student_id);
       const studentName = student ? formatStudentName(student.last_name, student.first_name).fullName : 'Inconnu';
-      const className = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : 'N/A';
 
-      const matchesYear = p.academic_year_id === selectedYear;
+      const matchesYear = !selectedYear || p.academic_year_id === selectedYear;
       const matchesClass = selectedClass === 'all' || student?.class_id === selectedClass;
-      const matchesSearch = searchTerm.length > 0 
+      const matchesSearch = searchTerm.trim().length > 0 
         ? (studentName.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase()))
         : true;
         
@@ -149,16 +169,27 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       today.setHours(0, 0, 0, 0);
       
       const paymentDate = new Date(p.created_at);
-      paymentDate.setHours(0, 0, 0, 0);
+      const paymentDateMidnight = new Date(p.created_at);
+      paymentDateMidnight.setHours(0, 0, 0, 0);
 
       if (dateFilter === "Aujourd'hui") {
-        matchesDate = paymentDate.getTime() === today.getTime();
+        matchesDate = paymentDateMidnight.getTime() === today.getTime();
       } else if (dateFilter === 'Cette semaine') {
         const firstDay = new Date(today);
-        firstDay.setDate(today.getDate() - today.getDay());
-        matchesDate = paymentDate >= firstDay;
+        const dayOfWeek = today.getDay();
+        const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        firstDay.setDate(diff);
+        firstDay.setHours(0, 0, 0, 0);
+        matchesDate = paymentDateMidnight >= firstDay && paymentDateMidnight <= new Date();
       } else if (dateFilter === 'Ce mois') {
-        matchesDate = paymentDate.getMonth() === today.getMonth() && paymentDate.getFullYear() === today.getFullYear();
+        matchesDate = paymentDateMidnight.getMonth() === today.getMonth() && paymentDateMidnight.getFullYear() === today.getFullYear();
+      } else if (dateFilter === 'Date précise') {
+        if (customDate) {
+          const [cYear, cMonth, cDay] = customDate.split('-').map(Number);
+          const targetDate = new Date(cYear, cMonth - 1, cDay);
+          targetDate.setHours(0, 0, 0, 0);
+          matchesDate = paymentDateMidnight.getTime() === targetDate.getTime();
+        }
       }
 
       return matchesYear && matchesClass && matchesSearch && matchesDate;
@@ -183,7 +214,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         currency: p.currency || 'HTG'
       };
     });
-  }, [payments, selectedYear, selectedClass, searchTerm, dateFilter, students, classes]);
+  }, [payments, selectedYear, selectedClass, searchTerm, dateFilter, customDate, students, classes]);
 
   // Étudiants disponibles pour la classe sélectionnée dans le générateur
   const availableStudentsForGen = useMemo(() => {
@@ -195,6 +226,16 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
   }, [students, genClass]);
+
+  // Options pour le SelectPill de sélection d'élève
+  const studentGenOptions: SelectOption[] = useMemo(() => {
+    return availableStudentsForGen.map(s => ({
+      value: s.id,
+      label: s.name,
+      badge: `ID: ${s.id.substring(0, 8)}`,
+      description: classes.find(c => c.id === s.class_id)?.name || undefined
+    }));
+  }, [availableStudentsForGen, classes]);
 
   // Historique des paiements de l'élève sélectionné dans le générateur
   const studentPaymentsHistory = useMemo(() => {
@@ -232,9 +273,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       <div className={`max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 ${printPreview ? 'print:hidden' : 'print:p-0'}`}>
         
         {/* NAVIGATION HAUTE */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 print:hidden bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200/60">
-        <div className="space-y-1.5">
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-[0.2em] mb-1">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] uppercase tracking-widest">
             <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
             <span>Économat • Facturation</span>
             <span className="text-slate-300">•</span>
@@ -242,30 +283,30 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               {activeCampusName}
             </span>
           </div>
-          <h2 className="text-3xl font-bold text-slate-900 tracking-tight leading-none">Gestion des Reçus</h2>
-          <p className="text-slate-500 font-medium text-sm">Archives, traçabilité et émissions certifiées des paiements.</p>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Gestion des Reçus</h2>
+          <p className="text-slate-500 font-medium text-xs">Archives, traçabilité et émissions certifiées des paiements.</p>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl border border-slate-200/50 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row gap-1.5 bg-slate-100/80 p-1.5 rounded-xl border border-slate-200/50 w-full lg:w-auto">
           <button 
             onClick={() => setActiveView('journal')}
-            className={`flex-1 lg:flex-none px-6 md:px-8 py-3 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 ${activeView === 'journal' ? 'bg-white text-indigo-700 shadow-md ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+            className={`flex-1 lg:flex-none px-4 sm:px-6 py-2 rounded-lg text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer ${activeView === 'journal' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
           >
-            <History size={16} />
+            <History size={15} />
             Registre Global
           </button>
           <button 
             onClick={() => { setActiveView('generator'); setSelectedGenStudent(null); }}
-            className={`flex-1 lg:flex-none px-6 md:px-8 py-3 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 ${activeView === 'generator' ? 'bg-white text-indigo-700 shadow-md ring-1 ring-slate-200/50' : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'}`}
+            className={`flex-1 lg:flex-none px-4 sm:px-6 py-2 rounded-lg text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer ${activeView === 'generator' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/50' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'}`}
           >
-            <Printer size={16} />
+            <Printer size={15} />
             Émettre Reçu
           </button>
           <button 
             onClick={() => setIsClosureModalOpen(true)}
-            className="flex-1 lg:flex-none px-4 md:px-6 py-3 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-md active:scale-95 border border-slate-700"
+            className="flex-1 lg:flex-none px-3.5 sm:px-5 py-2 rounded-lg text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white shadow-xs active:scale-98 border border-slate-700 cursor-pointer"
           >
-            <ShieldCheck size={16} className="text-emerald-400" />
+            <ShieldCheck size={15} className="text-emerald-400" />
             Clôture de Caisse
           </button>
         </div>
@@ -274,59 +315,124 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       {activeView === 'journal' ? (
         <>
           {/* FILTRES ARCHIVES GLOBALES */}
-          <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200/60 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 print:hidden items-end">
-            <div className="space-y-2.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</label>
-              <AcademicSessionPill
-                academicYears={academicYears}
-                selectedYearId={selectedYear}
-                onSelectYear={(yearId) => setSelectedYear(yearId)}
-                variant="field"
-                size="md"
-                colorScheme="indigo"
-              />
-            </div>
-
-            <div className="space-y-2.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Filtre {terminology.option}</label>
-              <div className="relative group">
-                <select 
-                  className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none cursor-pointer"
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                >
-                  <option value="all">Toutes les {terminology.classes.toLowerCase()}</option>
-                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" size={16} />
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Période</label>
-              <div className="relative group">
-                <select 
-                  className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none cursor-pointer"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                >
-                  {DATE_FILTERS.map(f => <option key={f} value={f}>{f}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" size={16} />
-              </div>
-            </div>
-
-            <div className="space-y-2.5">
-              <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1">Recherche Rapide</label>
-              <div className="relative group">
-                <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 transition-colors" size={18} />
-                <input 
-                  type="text" 
-                  placeholder={`${terminology.student}, ID ou Reçu...`}
-                  className="w-full pl-12 pr-6 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-xl text-sm font-semibold outline-none focus:bg-white focus:border-indigo-500 transition-all"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/80 print:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
+              {/* 1. Session */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <Calendar size={13} className="text-indigo-600 shrink-0" />
+                  Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}
+                </label>
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={selectedYear}
+                  onSelectYear={(yearId) => setSelectedYear(yearId)}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  className="w-full"
                 />
+              </div>
+
+              {/* 2. Filtre Classe / Option */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <Layers size={13} className="text-indigo-600 shrink-0" />
+                  Filtre {terminology.option}
+                </label>
+                <ClassSelectorPill
+                  classes={classes}
+                  selectedClassId={selectedClass}
+                  onSelectClass={(classId) => setSelectedClass(classId)}
+                  allowAll={true}
+                  allLabel={`Toutes les ${terminology.classes.toLowerCase()}`}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  className="w-full"
+                  title={`Filtrer par ${terminology.class.toLowerCase()}`}
+                />
+              </div>
+
+              {/* 3. Période & DateTime (Harmonisé DatePickerPill / SelectPill) */}
+              <div className="space-y-1.5 min-w-0">
+                <div className="flex items-center justify-between gap-1">
+                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                    <Clock size={13} className="text-indigo-600 shrink-0" />
+                    Période
+                  </label>
+                  {dateFilter === 'Date précise' && customDate !== todayStr && (
+                    <button
+                      type="button"
+                      onClick={() => setCustomDate(todayStr)}
+                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer shrink-0"
+                    >
+                      Aujourd'hui
+                    </button>
+                  )}
+                </div>
+                {dateFilter === 'Date précise' ? (
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex-1 min-w-0">
+                      <DatePickerPill
+                        selectedDate={customDate}
+                        onSelectDate={(newDate) => setCustomDate(newDate)}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        showShortcuts={false}
+                        showQuickArrows={true}
+                        showTodayBadge={true}
+                        className="w-full"
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setDateFilter("Aujourd'hui")}
+                      className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-bold transition-colors shrink-0 cursor-pointer"
+                      title="Revenir aux filtres rapides"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <SelectPill
+                    options={dateFilterOptions}
+                    value={dateFilter}
+                    onChange={(val) => setDateFilter(val)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    icon={Calendar}
+                    className="w-full"
+                  />
+                )}
+              </div>
+
+              {/* 4. Recherche Rapide */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <Search size={13} className="text-indigo-600 shrink-0" />
+                  Recherche Rapide
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
+                  <input 
+                    type="text" 
+                    placeholder={`${terminology.student}, ID ou Reçu...`}
+                    className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                  {searchTerm && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md hover:bg-slate-200/50 cursor-pointer"
+                    >
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -463,67 +569,79 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         <div className="max-w-6xl mx-auto animate-in slide-in-from-bottom-8 duration-500 print:hidden space-y-8">
           
           {/* BARRE DE SÉLECTION */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200/60 p-8 flex flex-col md:flex-row items-end gap-6">
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 w-full">
-              <div className="space-y-2.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
-                  <Calendar size={12} className="text-indigo-500" /> 1. Session
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-4 sm:p-5 flex flex-col md:flex-row items-end gap-4">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 w-full">
+              {/* 1. Session */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <Calendar size={13} className="text-indigo-600 shrink-0" />
+                  1. Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}
                 </label>
-                <div className="relative group">
-                  <select 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none cursor-not-allowed opacity-80"
-                    value={genYear}
-                    disabled
-                  >
-                    {academicYears.filter(y => y.status === 'ACTIVE').map(y => <option key={y.id} value={y.id}>{y.label || y.name}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" size={16} />
-                </div>
+                <AcademicSessionPill
+                  academicYears={academicYears}
+                  selectedYearId={genYear}
+                  onSelectYear={(yearId) => setGenYear(yearId)}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  className="w-full"
+                />
               </div>
-              <div className="space-y-2.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
-                  <Layers size={12} className="text-indigo-500" /> 2. {terminology.option}
+
+              {/* 2. Classe / Option */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <Layers size={13} className="text-indigo-600 shrink-0" />
+                  2. {terminology.option}
                 </label>
-                <div className="relative group">
-                  <select 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-100 rounded-xl text-sm font-semibold outline-none focus:border-indigo-500 focus:bg-white transition-all appearance-none cursor-pointer"
-                    value={genClass}
-                    onChange={(e) => { setGenClass(e.target.value); setSelectedGenStudent(null); }}
-                  >
-                    {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" size={16} />
-                </div>
+                <ClassSelectorPill
+                  classes={classes}
+                  selectedClassId={genClass}
+                  onSelectClass={(classId) => {
+                    setGenClass(classId);
+                    setSelectedGenStudent(null);
+                  }}
+                  allowAll={false}
+                  emptyLabel={`Sélectionner une ${terminology.class.toLowerCase()}`}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  className="w-full"
+                  title={`Sélectionner une ${terminology.class.toLowerCase()}`}
+                />
               </div>
-              <div className="space-y-2.5">
-                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
-                  <User size={12} className="text-indigo-500" /> 3. Choisir {terminology.student.toLowerCase()}
+
+              {/* 3. Choisir Élève */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <User size={13} className="text-indigo-600 shrink-0" />
+                  3. Choisir {terminology.student.toLowerCase()}
                 </label>
-                <div className="relative group">
-                  <select 
-                    className={`w-full px-5 py-3.5 border-2 rounded-xl text-sm font-semibold text-slate-900 outline-none appearance-none transition-all cursor-pointer ${selectedGenStudent ? 'bg-indigo-50 border-indigo-500' : 'bg-slate-50 border-slate-100 focus:border-indigo-500 focus:bg-white'}`}
-                    onChange={(e) => {
-                      const student = availableStudentsForGen.find(s => s.id === e.target.value);
-                      setSelectedGenStudent(student);
-                    }}
-                    value={selectedGenStudent?.id || ''}
-                  >
-                    <option value="">-- Sélectionner --</option>
-                    {availableStudentsForGen.map(s => (
-                      <option key={s.id} value={s.id}>{s.name} ({s.id.substring(0,8)})</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-500 pointer-events-none transition-colors" size={16} />
-                </div>
+                <SelectPill
+                  options={studentGenOptions}
+                  value={selectedGenStudent?.id || ''}
+                  onChange={(val) => {
+                    const student = availableStudentsForGen.find(s => s.id === val);
+                    setSelectedGenStudent(student || null);
+                  }}
+                  placeholder={availableStudentsForGen.length === 0 ? "Aucun élève disponible" : `Choisir un(e) ${terminology.student.toLowerCase()}...`}
+                  searchable={true}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  icon={User}
+                  className="w-full"
+                  disabled={availableStudentsForGen.length === 0}
+                />
               </div>
             </div>
             {selectedGenStudent && (
               <button 
                 onClick={() => setSelectedGenStudent(null)}
-                className="p-3.5 bg-rose-50 text-rose-500 rounded-xl hover:bg-rose-100 transition-all active:scale-95 border border-rose-100"
+                className="p-2.5 bg-rose-50 text-rose-600 hover:bg-rose-100 rounded-xl transition-all active:scale-95 border border-rose-200/70 shrink-0 cursor-pointer"
                 title="Effacer la sélection"
               >
-                <RefreshCcw size={20} />
+                <RefreshCcw size={16} />
               </button>
             )}
           </div>

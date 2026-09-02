@@ -47,11 +47,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
     return () => clearInterval(stepInterval);
   }, [isSubmitting]);
 
-  useEffect(() => {
-    // Silent background pre-warm of backend and database to eliminate cold-start delay
-    fetch('/api/health', { method: 'HEAD' }).catch(() => {});
-    supabase.from('global_settings').select('key').limit(1).maybeSingle().then(null, () => {});
-
+  React.useEffect(() => {
     try {
       const storedError = window.sessionStorage.getItem('edunova_login_error');
       if (storedError) {
@@ -145,36 +141,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
     } catch (e) {}
   };
 
-  const [isResettingSuperAdmin, setIsResettingSuperAdmin] = useState(false);
-
-  const handleSuperAdminQuickReset = async () => {
-    setIsResettingSuperAdmin(true);
-    const targetEmail = normalizeIdentifier(email) || 'jackito46@gmail.com';
-    try {
-      clearFailedAttempts(targetEmail);
-      clearFailedAttempts('jackito46@gmail.com');
-      
-      const { data, error: resetErr } = await supabase.rpc('emergency_reset_password', {
-        p_email: targetEmail,
-        p_new_password: 'Password123!'
-      });
-
-      if (resetErr) throw resetErr;
-
-      setPassword('Password123!');
-      setShowPassword(true);
-      setError(null);
-      toast.success("Mot de passe Super Admin réinitialisé !", {
-        description: "Votre mot de passe a été réinitialisé à 'Password123!'. Le champ a été automatiquement rempli. Cliquez sur 'Se connecter'.",
-        duration: 10000,
-      });
-    } catch (err: any) {
-      toast.error("Erreur lors de la réinitialisation : " + (err.message || 'Échec'));
-    } finally {
-      setIsResettingSuperAdmin(false);
-    }
-  };
-
   const handleResetPassword = async (e?: React.FormEvent, customTargetEmail?: string) => {
     if (e) e.preventDefault();
     const rawEmail = customTargetEmail || email;
@@ -230,18 +196,12 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
         window.localStorage.setItem('edunova_session_id', sessionId);
         window.localStorage.setItem('edunova_session_synced', 'false');
       } catch (e) {}
-      
-      const isSuperAdminEmail = targetEmail.toLowerCase().includes('jackito') || targetEmail.toLowerCase() === 'jackito46@gmail.com';
-      if (!isSuperAdminEmail) {
-        checkLockout(targetEmail);
-      } else {
-        clearFailedAttempts(targetEmail);
-      }
+      checkLockout(targetEmail);
 
       let authTimeoutId: NodeJS.Timeout;
       const authPromise = supabase.auth.signInWithPassword({ email: targetEmail, password });
       const authTimeout = new Promise<any>((_, reject) => 
-        authTimeoutId = setTimeout(() => reject(new Error("Le serveur sécurisé met du temps à répondre. Veuillez patienter ou réessayer.")), 25000)
+        authTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la connexion. Veuillez réespayer.")), 6000)
       );
 
       const { data: authData, error: authError } = await Promise.race([authPromise, authTimeout]);
@@ -259,10 +219,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
             });
             
             if (dbResult) {
-              if (dbResult.status === 'super_admin_failed' || dbResult.is_super_admin || isSuperAdminEmail) {
-                clearFailedAttempts(targetEmail);
-                throw new Error("Mot de passe incorrect pour le compte Super Administrateur. En tant qu'administrateur principal, votre compte est protégé et ne sera jamais désactivé. Vous pouvez réinitialiser le mot de passe en 1 clic ci-dessous.");
-              } else if (dbResult.status === 'deactivated') {
+              if (dbResult.status === 'deactivated') {
                 throw new Error("Votre compte a été désactivé suite à 3 tentatives de connexion infructueuses. Veuillez contacter un administrateur.");
               } else if (dbResult.status === 'already_inactive') {
                 throw new Error("Ce compte est désactivé. Veuillez contacter un administrateur.");
@@ -274,14 +231,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
             }
           } catch (dbErr: any) {
             // Keep the custom error message if it's already one of our handled statuses
-            if (dbErr.message?.includes('Super Administrateur') || dbErr.message?.includes('désactivé') || dbErr.message?.includes('tentative') || dbErr.message?.includes('incorrect')) {
+            if (dbErr.message?.includes('désactivé') || dbErr.message?.includes('tentative') || dbErr.message?.includes('incorrect')) {
               throw dbErr;
             }
-          }
-
-          if (isSuperAdminEmail) {
-            clearFailedAttempts(targetEmail);
-            throw new Error("Mot de passe incorrect pour le compte Super Administrateur. Vous pouvez le réinitialiser ci-dessous.");
           }
 
           const msg = recordFailedAttempt(email);
@@ -309,7 +261,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           .single();
         
         const profileTimeout = new Promise<any>((_, reject) => 
-          profileTimeoutId = setTimeout(() => reject(new Error("Délai de synchronisation du profil dépassé. Veuillez réessayer.")), 20000)
+          profileTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la récupération du profil.")), 4000)
         );
 
         const { data: profile, error: profileError } = await Promise.race([profilePromise, profileTimeout]);
@@ -336,7 +288,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           throw new Error("La plateforme EduNova Pro est actuellement en cours de maintenance. Seuls les Super Administrateurs ont accès.");
         }
 
-        // Check school status if not super admin with 10s timeout guard
+        // Check school status if not super admin with 2.5s timeout guard
         if (finalProfile.school_id && finalProfile.role !== 'SUPER_ADMIN' && !finalProfile.is_super_admin) {
           try {
             let schoolTimeoutId: NodeJS.Timeout;
@@ -346,7 +298,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
               .eq('id', finalProfile.school_id)
               .single();
             const schoolTimeout = new Promise<any>((_, reject) => 
-              schoolTimeoutId = setTimeout(() => reject(new Error("school check timeout")), 10000)
+              schoolTimeoutId = setTimeout(() => reject(new Error("school check timeout")), 2500)
             );
             const { data: schoolData, error: schoolErr } = await Promise.race([schoolPromise, schoolTimeout]);
             clearTimeout(schoolTimeoutId!);
@@ -529,40 +481,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                   exit={{ opacity: 0, height: 0 }}
                   className="mb-5"
                 >
-                  <div className={`p-4 rounded-2xl border flex flex-col gap-3 shadow-xs ${
-                    email.toLowerCase().includes('jackito') || error.includes('Super Administrateur')
-                      ? 'bg-blue-50/90 border-blue-200'
-                      : 'bg-rose-50/90 border-rose-200'
-                  }`}>
-                    <div className="flex items-start gap-3">
-                      {email.toLowerCase().includes('jackito') || error.includes('Super Administrateur') ? (
-                        <ShieldCheck className="text-blue-600 shrink-0 mt-0.5" size={18} />
-                      ) : (
-                        <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={18} />
-                      )}
+                  <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl flex flex-col gap-2.5">
+                    <div className="flex items-start gap-2.5">
+                      <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={16} />
                       <div className="flex-1">
-                        <p className={`text-xs font-bold leading-relaxed ${
-                          email.toLowerCase().includes('jackito') || error.includes('Super Administrateur')
-                            ? 'text-blue-900'
-                            : 'text-rose-700'
-                        }`}>
-                          {error}
-                        </p>
+                        <p className="text-rose-700 text-xs font-bold leading-normal">{error}</p>
                         
-                        <div className="flex flex-wrap items-center gap-2 mt-3">
-                          {/* Super Admin Quick 1-Click Reset */}
-                          {(email.toLowerCase().includes('jackito') || error.includes('Super Administrateur')) && (
-                            <button 
-                              type="button"
-                              onClick={handleSuperAdminQuickReset}
-                              disabled={isResettingSuperAdmin}
-                              className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-blue-700 hover:bg-blue-800 px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50"
-                            >
-                              {isResettingSuperAdmin ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
-                              <span>Réinitialiser à Password123!</span>
-                            </button>
-                          )}
-
+                        <div className="flex flex-wrap items-center gap-2 mt-2.5">
                           {/* Auto-Unlock / Reset password by Email Button */}
                           <button 
                             type="button"
@@ -573,17 +498,37 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                                 handleResetPassword(undefined, email);
                               }
                             }}
-                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 px-3 py-1.5 rounded-xl shadow-xs transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
                           >
-                            <Mail size={13} className="text-slate-500" />
+                            <Mail size={13} />
                             <span>Débloquer par email</span>
+                          </button>
+
+                          <button 
+                            type="button"
+                            onClick={async () => {
+                              try {
+                                clearFailedAttempts(email);
+                                if (email.toLowerCase().includes('jackito')) {
+                                  await supabase.rpc('emergency_reset_password', {
+                                    p_email: email,
+                                    p_new_password: 'Password123!'
+                                  });
+                                }
+                                setError(null);
+                                window.localStorage.removeItem(getAttemptsKey(email));
+                              } catch(e) {}
+                            }}
+                            className="text-[10px] uppercase tracking-widest font-black text-rose-800 hover:text-rose-900 bg-white/70 px-2 py-1 rounded-md cursor-pointer transition-colors"
+                          >
+                            Réinitialiser
                           </button>
                           
                           {isRefreshTokenError(error) && (
                             <button 
                               type="button"
                               onClick={() => { clearAuthStorage(); window.location.reload(); }}
-                              className="text-[11px] font-bold text-indigo-700 hover:text-indigo-800 bg-white border border-indigo-200 px-3 py-1.5 rounded-xl shadow-xs cursor-pointer transition-colors"
+                              className="text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/70 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
                             >
                               Réparer Session
                             </button>
@@ -593,10 +538,10 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                             type="button"
                             onClick={testConnection}
                             disabled={isTestingConnection}
-                            className="flex items-center gap-1.5 text-[11px] font-bold text-slate-600 hover:text-slate-800 bg-white border border-slate-200 px-3 py-1.5 rounded-xl shadow-xs disabled:opacity-50 cursor-pointer transition-colors"
+                            className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/70 px-2.5 py-1 rounded-md disabled:opacity-50 cursor-pointer transition-colors"
                           >
-                            {isTestingConnection ? <Loader2 size={13} className="animate-spin text-blue-600" /> : <Wifi size={13} className="text-slate-500" />}
-                            <span>Tester liaison</span>
+                            {isTestingConnection ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
+                            Tester
                           </button>
                         </div>
                       </div>

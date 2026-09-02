@@ -21,8 +21,7 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
-import { SelectPill, SelectOption } from './SelectPill';
-import { DatePickerPill } from './DatePickerPill';
+import { SelectPill } from './SelectPill';
 
 interface DisciplinaryRecord {
   id: string;
@@ -149,76 +148,6 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
       { title: 'Violences verbales/physiques', type: 'VIOLENCE', description: `Altercation ou comportement agressif envers un camarade nécessitant une intervention immédiate.` }
     ];
   }, [isUniversity, isProfessional, terminology.student]);
-
-  // Options mémorisées pour les listes déroulantes de style Pilule
-  const campusFilterOptions: SelectOption[] = useMemo(() => {
-    const opts: SelectOption[] = [
-      { value: 'ALL', label: 'Tous les campus / annexes', badge: 'Global' }
-    ];
-    if (campuses && campuses.length > 0) {
-      campuses.forEach(cp => {
-        opts.push({
-          value: cp.id,
-          label: cp.name,
-          badge: 'Annexe',
-          icon: Building2
-        });
-      });
-    }
-    return opts;
-  }, [campuses]);
-
-  const incidentTypeOptions: SelectOption[] = useMemo(() => [
-    { value: 'ALL', label: "Tous les types d'incidents", badge: 'Filtre' },
-    { value: 'CONDUITE', label: 'Conduite & Déontologie', badge: 'Comportement', description: 'Respect du règlement intérieur' },
-    { value: 'RETARD', label: 'Retard systématique', badge: 'Ponctualité' },
-    { value: 'ABSENCE_NON_JUSTIFIEE', label: 'Absence non justifiée', badge: 'Assiduité' },
-    { value: 'TRAVAIL_NON_FAIT', label: 'Travail non rendu', badge: 'Pédagogique' },
-    { value: 'FRAUDE', label: 'Fraude académique / Plagiat', badge: 'Gravité haute' },
-    { value: 'VIOLENCE', label: 'Gravité / Violence', badge: 'Incident grave' },
-    { value: 'AUTRE', label: 'Autre incident', badge: 'Divers' },
-  ], []);
-
-  const modalIncidentTypeOptions: SelectOption[] = useMemo(() => [
-    { value: 'CONDUITE', label: 'Comportement / Déontologie', description: 'Attitude, respect du cadre' },
-    { value: 'RETARD', label: 'Retard systématique', description: 'Arrivées tardives non justifiées' },
-    { value: 'ABSENCE_NON_JUSTIFIEE', label: 'Absence non justifiée', description: 'Non respect de l\'assiduité' },
-    { value: 'TRAVAIL_NON_FAIT', label: 'Travail non rendu', description: 'Devoirs ou projets non remis' },
-    { value: 'FRAUDE', label: 'Fraude académique / Plagiat', description: 'Tricherie, copie ou IA frauduleuse' },
-    { value: 'VIOLENCE', label: 'Violence / Incident grave', description: 'Altercation verbale ou physique' },
-    { value: 'AUTRE', label: 'Autre manquement', description: 'Tout autre motif disciplinaire' },
-  ], []);
-
-  const sanctionTypeOptions: SelectOption[] = useMemo(() => {
-    const baseList: SelectOption[] = [
-      { value: 'AUCUNE', label: 'Aucune sanction (Rappel à l\'ordre)', badge: 'Médiation', description: 'Avertissement verbal ou rappel à la règle' },
-      { value: 'AVERTISSEMENT', label: 'Avertissement écrit', badge: 'Officiel', description: 'Notification formelle au dossier' },
-      { value: 'BLAME', label: 'Blâme officiel', badge: 'Disciplinaire', description: 'Sanction inscrite au livret' },
-      { value: 'RETENUE', label: 'Heures de retenue', badge: 'Travail / Présence' },
-      { value: 'EXCLUSION_TEMPORAIRE', label: 'Exclusion temporaire', badge: 'Suspension' },
-      { value: 'EXCLUSION_DEFINITIVE', label: 'Exclusion définitive', badge: 'Conseil de discipline' },
-    ];
-    if (sanctionTypes && sanctionTypes.length > 0) {
-      sanctionTypes
-        .filter(t => !['AUCUNE', 'AVERTISSEMENT', 'BLAME', 'RETENUE', 'EXCLUSION_TEMPORAIRE', 'EXCLUSION_DEFINITIVE'].includes(t.name))
-        .forEach(t => {
-          baseList.push({
-            value: t.name,
-            label: t.name,
-            badge: 'Sur-mesure',
-            description: t.description || undefined
-          });
-        });
-    }
-    return baseList;
-  }, [sanctionTypes]);
-
-  const quickStatusOptions: SelectOption[] = useMemo(() => [
-    { value: 'SIGNALÉ', label: 'Signalé', badge: 'Nouveau' },
-    { value: 'EN_COURS', label: 'En cours', badge: 'Instruction' },
-    { value: 'CLOS', label: 'Clos & Résolu', badge: 'Résolu' },
-    { value: 'ANNULÉ', label: 'Annulé', badge: 'Classé' },
-  ], []);
 
   // Load active academic year and all years
   const fetchAcademicYears = useCallback(async () => {
@@ -1067,22 +996,21 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           {/* Campus Filter (if multi-campus) */}
           {hasMultiCampus && (
-            <div className="w-full sm:w-auto min-w-[200px]">
-              <SelectPill 
-                options={campusFilterOptions}
-                value={selectedCampusFilter}
-                onChange={(newCampus) => setSelectedCampusFilter(newCampus)}
-                variant="field"
-                size="sm"
-                colorScheme="rose"
-                dropdownAlign="left"
-                icon={Building2}
-              />
-            </div>
+            <select 
+              aria-label="Filtrer par campus ou annexe"
+              className="px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-2xl text-xs font-bold text-slate-800 focus:bg-white focus:border-rose-500 outline-none transition-all cursor-pointer"
+              value={selectedCampusFilter}
+              onChange={(e) => setSelectedCampusFilter(e.target.value)}
+            >
+              <option value="ALL">Tous les campus / annexes</option>
+              {campuses.map(cp => (
+                <option key={cp.id} value={cp.id}>{cp.name}</option>
+              ))}
+            </select>
           )}
 
           {/* Class / Promotion Filter */}
-          <div className="w-full sm:w-auto min-w-[200px]">
+          <div className="min-w-[200px]">
             <ClassSelectorPill
               classes={classes}
               selectedClassId={classFilter === 'ALL' ? 'all' : (classes.find(c => c.name === classFilter || c.id === classFilter)?.id || classFilter)}
@@ -1106,9 +1034,18 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Incident Type Filter */}
-          <div className="w-full sm:w-auto min-w-[190px]">
+          <div className="min-w-[190px]">
             <SelectPill
-              options={incidentTypeOptions}
+              options={[
+                { value: 'ALL', label: "Tous les types d'incidents" },
+                { value: 'CONDUITE', label: 'Conduite / Déontologie' },
+                { value: 'RETARD', label: 'Retard' },
+                { value: 'ABSENCE_NON_JUSTIFIEE', label: 'Absence non justifiée' },
+                { value: 'TRAVAIL_NON_FAIT', label: 'Travail non fait' },
+                { value: 'FRAUDE', label: 'Fraude académique / Plagiat' },
+                { value: 'VIOLENCE', label: 'Gravité / Violence' },
+                { value: 'AUTRE', label: 'Autre incident' },
+              ]}
               value={typeFilter}
               onChange={(newType) => setTypeFilter(newType as any)}
               variant="field"
@@ -1120,14 +1057,14 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Status Filter */}
-          <div className="w-full sm:w-auto min-w-[170px]">
+          <div className="min-w-[170px]">
             <SelectPill
               options={[
-                { value: 'ALL', label: 'Tous les statuts', badge: 'Filtre' },
-                { value: 'SIGNALÉ', label: 'Signalé', badge: 'Nouveau' },
-                { value: 'EN_COURS', label: "En cours d'instruction", badge: 'Instruction' },
-                { value: 'CLOS', label: 'Clos / Résolu', badge: 'Résolu' },
-                { value: 'ANNULÉ', label: 'Annulé', badge: 'Classé' },
+                { value: 'ALL', label: 'Tous les statuts' },
+                { value: 'SIGNALÉ', label: 'Signalé' },
+                { value: 'EN_COURS', label: "En cours d'instruction" },
+                { value: 'CLOS', label: 'Clos / Résolu' },
+                { value: 'ANNULÉ', label: 'Annulé' },
               ]}
               value={statusFilter}
               onChange={(newStatus) => setStatusFilter(newStatus as any)}
@@ -1368,17 +1305,17 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <div className="flex items-center gap-1">
                     {/* Quick status transition dropdown */}
                     {isAdmin && (
-                      <div className="min-w-[100px]">
-                        <SelectPill 
-                          options={quickStatusOptions}
-                          value={record.status}
-                          onChange={(newStatus) => handleQuickStatusChange(record.id, newStatus as any)}
-                          variant="compact"
-                          size="xs"
-                          colorScheme="rose"
-                          dropdownAlign="left"
-                        />
-                      </div>
+                      <select 
+                        aria-label="Modifier le statut du dossier"
+                        value={record.status}
+                        onChange={(e) => handleQuickStatusChange(record.id, e.target.value as any)}
+                        className="px-2.5 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-[11px] font-bold border border-slate-200 outline-none cursor-pointer"
+                      >
+                        <option value="SIGNALÉ">Signalé</option>
+                        <option value="EN_COURS">En cours</option>
+                        <option value="CLOS">Clos</option>
+                        <option value="ANNULÉ">Annulé</option>
+                      </select>
                     )}
                   </div>
 
@@ -1792,15 +1729,12 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                   Date des faits *
                 </label>
-                <DatePickerPill
-                  selectedDate={formData.incident_date}
-                  maxDate={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
-                  onSelectDate={(newDate) => setFormData({ ...formData, incident_date: newDate })}
-                  variant="field"
-                  size="md"
-                  colorScheme="rose"
-                  showTodayBadge={true}
-                  className="w-full"
+                <input
+                  type="date"
+                  className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all"
+                  value={formData.incident_date}
+                  max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
+                  onChange={(e) => setFormData({ ...formData, incident_date: e.target.value })}
                 />
               </div>
 
@@ -1808,16 +1742,19 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                   Qualification de l'incident *
                 </label>
-                <SelectPill
-                  options={modalIncidentTypeOptions}
+                <select
+                  className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all cursor-pointer"
                   value={formData.incident_type}
-                  onChange={(newType) => setFormData({ ...formData, incident_type: newType as any })}
-                  variant="field"
-                  size="md"
-                  colorScheme="rose"
-                  dropdownAlign="left"
-                  icon={ShieldAlert}
-                />
+                  onChange={(e) => setFormData({ ...formData, incident_type: e.target.value as any })}
+                >
+                  <option value="CONDUITE">Comportement / Déontologie</option>
+                  <option value="RETARD">Retard systématique</option>
+                  <option value="ABSENCE_NON_JUSTIFIEE">Absence non justifiée</option>
+                  <option value="TRAVAIL_NON_FAIT">Travail non rendu</option>
+                  <option value="FRAUDE">Fraude académique / Plagiat</option>
+                  <option value="VIOLENCE">Violence / Incident grave</option>
+                  <option value="AUTRE">Autre manquement</option>
+                </select>
               </div>
             </div>
 
@@ -1868,16 +1805,24 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <label className="text-xs font-black text-rose-900 uppercase tracking-wider mb-1.5 block">
                     Type de Sanction
                   </label>
-                  <SelectPill
-                    options={sanctionTypeOptions}
+                  <select
+                    className="w-full px-4 py-3 bg-white border border-rose-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 cursor-pointer"
                     value={formData.sanction_type}
-                    onChange={(newSanction) => setFormData({ ...formData, sanction_type: newSanction })}
-                    variant="field"
-                    size="md"
-                    colorScheme="rose"
-                    dropdownAlign="left"
-                    icon={Gavel}
-                  />
+                    onChange={(e) => setFormData({ ...formData, sanction_type: e.target.value })}
+                  >
+                    <option value="AUCUNE">Aucune sanction (Rappel à l'ordre)</option>
+                    <option value="AVERTISSEMENT">Avertissement écrit</option>
+                    <option value="BLAME">Blâme officiel</option>
+                    <option value="RETENUE">Heures de retenue</option>
+                    <option value="EXCLUSION_TEMPORAIRE">Exclusion temporaire</option>
+                    <option value="EXCLUSION_DEFINITIVE">Exclusion définitive</option>
+                    {sanctionTypes
+                      .filter(t => !['AUCUNE', 'AVERTISSEMENT', 'BLAME', 'RETENUE', 'EXCLUSION_TEMPORAIRE', 'EXCLUSION_DEFINITIVE'].includes(t.name))
+                      .map(t => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))
+                    }
+                  </select>
                 </div>
 
                 <div>

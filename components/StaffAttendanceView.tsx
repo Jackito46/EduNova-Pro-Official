@@ -12,6 +12,7 @@ import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
 import { DatePickerPill } from './DatePickerPill';
+import { SelectPill } from './SelectPill';
 
 interface StaffAttendanceViewProps {
   user: UserProfile;
@@ -866,52 +867,55 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
       )}
 
       {/* Header Banner */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xl relative overflow-hidden">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-xl relative z-20">
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="relative z-10 flex items-center justify-between gap-3 flex-wrap md:flex-nowrap">
-          <div className="flex items-center gap-3">
+        <div className="relative z-10 flex items-center justify-between gap-3 min-w-0 flex-1">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-300 shrink-0">
               <UserCheck className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
                   Pointage & Présences Staff
                 </h1>
 
                 {/* School Category / Institutional Type Badge */}
-                <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl border text-[11px] font-bold ${schoolCategoryBadge.color}`}>
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl border text-[11px] font-bold shrink-0 ${schoolCategoryBadge.color}`}>
                   <schoolCategoryBadge.icon size={13} className="shrink-0" />
                   <span>{schoolCategoryBadge.label}</span>
                 </div>
 
                 {/* Multi-Campus / Annexe Badge or Switcher */}
                 {campuses && campuses.length > 0 && (
-                  <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/15 text-[11px] text-indigo-200">
-                    <Building2 size={13} className="text-indigo-300 shrink-0" />
+                  <div className="min-w-0 max-w-full">
                     {user.campus_id ? (
-                      <span className="font-bold text-white">
-                        {campuses.find(c => c.id === user.campus_id)?.name || 'Annexe assignée'}
-                      </span>
+                      <div className="inline-flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-xl border border-white/15 text-[11px] text-indigo-200">
+                        <Building2 size={13} className="text-indigo-300 shrink-0" />
+                        <span className="font-bold text-white truncate">
+                          {campuses.find(c => c.id === user.campus_id)?.name || 'Annexe assignée'}
+                        </span>
+                      </div>
                     ) : (
-                      <select
+                      <SelectPill
+                        options={[
+                          { value: 'GLOBAL', label: 'Tous les Campus (Global)', icon: Building2 },
+                          ...campuses.map(c => ({ value: c.id, label: c.name, icon: Building2 }))
+                        ]}
                         value={currentCampusId || 'GLOBAL'}
-                        onChange={(e) => setCurrentCampusId(e.target.value === 'GLOBAL' ? null : e.target.value)}
-                        className="bg-transparent text-white font-bold outline-none cursor-pointer pr-1"
-                      >
-                        <option value="GLOBAL" className="text-slate-900 bg-white font-semibold">Tous les Campus (Global)</option>
-                        {campuses.map(c => (
-                          <option key={c.id} value={c.id} className="text-slate-900 bg-white font-semibold">
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={(val) => setCurrentCampusId(val === 'GLOBAL' ? null : val)}
+                        variant="pill"
+                        size="xs"
+                        colorScheme="indigo"
+                        icon={Building2}
+                        className="text-xs"
+                      />
                     )}
                   </div>
                 )}
               </div>
-              <p className="text-slate-300 text-[11px] sm:text-xs mt-0.5 font-medium">
+              <p className="text-slate-300 text-[11px] sm:text-xs mt-0.5 font-medium truncate">
                 {terms.headerSubtitle}
               </p>
             </div>
@@ -919,14 +923,13 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
         </div>
 
         {/* Date Selector Quick Bar (Harmonisé DatePickerPill) */}
-        <div className="relative z-10 self-start md:self-auto shrink-0 w-full sm:w-auto min-w-[220px]">
+        <div className="relative z-10 w-full lg:w-auto min-w-0 sm:min-w-[280px] lg:min-w-[320px] shrink-0">
           <DatePickerPill
             selectedDate={selectedDate}
             onSelectDate={(newDate) => setSelectedDate(newDate)}
-            variant="compact"
+            variant="field"
             size="sm"
             colorScheme="indigo"
-            dropdownAlign="right"
             showShortcuts={false}
             showQuickArrows={true}
             showTodayBadge={true}
@@ -1130,7 +1133,7 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
       </div>
 
       {/* Main Content Card */}
-      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
+      <div className="bg-white rounded-3xl shadow-sm border border-slate-200 relative z-10">
         {/* Search & Toolbar Header */}
         <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row gap-3 justify-between items-stretch md:items-center">
           {activeTab === 'calendar' ? (
@@ -1160,22 +1163,29 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
               </div>
 
               {/* Staff Selector Filter */}
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
                 <span className="text-xs font-bold text-slate-500 flex items-center gap-1 shrink-0">
                   <Filter size={14} className="text-indigo-600" /> Intervenant :
                 </span>
-                <select
-                  value={selectedStaffFilter}
-                  onChange={(e) => setSelectedStaffFilter(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
-                >
-                  <option value="ALL">-- Tous les collaborateurs --</option>
-                  {staff.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {formatStudentName(s.last_name, s.first_name).fullName} ({s.role})
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full sm:w-64 min-w-0">
+                  <SelectPill
+                    options={[
+                      { value: 'ALL', label: 'Tous les collaborateurs' },
+                      ...staff.map(s => ({
+                        value: s.id,
+                        label: `${formatStudentName(s.last_name, s.first_name).fullName} (${s.role})`
+                      }))
+                    ]}
+                    value={selectedStaffFilter}
+                    onChange={(val) => setSelectedStaffFilter(val)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    searchable={true}
+                    placeholder="Choisir collaborateur..."
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
           ) : activeTab === 'weekly' ? (
@@ -1186,22 +1196,29 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
                   Planning Hebdomadaire des Cours & Co-Enseignants
                 </h3>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
                 <span className="text-xs font-bold text-slate-500 flex items-center gap-1 shrink-0">
                   <Filter size={14} className="text-indigo-600" /> Filtrer par Prof :
                 </span>
-                <select
-                  value={selectedStaffFilter}
-                  onChange={(e) => setSelectedStaffFilter(e.target.value)}
-                  className="px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
-                >
-                  <option value="ALL">-- Tous les enseignants --</option>
-                  {staff.map(s => (
-                    <option key={s.id} value={s.id}>
-                      {formatStudentName(s.last_name, s.first_name).fullName}
-                    </option>
-                  ))}
-                </select>
+                <div className="w-full sm:w-64 min-w-0">
+                  <SelectPill
+                    options={[
+                      { value: 'ALL', label: 'Tous les enseignants' },
+                      ...staff.map(s => ({
+                        value: s.id,
+                        label: formatStudentName(s.last_name, s.first_name).fullName
+                      }))
+                    ]}
+                    value={selectedStaffFilter}
+                    onChange={(val) => setSelectedStaffFilter(val)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    searchable={true}
+                    placeholder="Choisir enseignant..."
+                    className="w-full"
+                  />
+                </div>
               </div>
             </div>
           ) : (

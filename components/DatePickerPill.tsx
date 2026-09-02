@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { 
   Calendar, ChevronLeft, ChevronRight, ChevronDown, 
-  RotateCcw, Sparkles, Check, Clock, X
+  RotateCcw, Sparkles, Check, Clock
 } from 'lucide-react';
 import { format, parseISO, isValid, addDays, subDays, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -12,7 +12,7 @@ export interface DatePickerPillProps {
   labelPrefix?: string;
   variant?: 'pill' | 'field' | 'compact' | 'header';
   size?: 'xs' | 'sm' | 'md' | 'lg';
-  colorScheme?: 'blue' | 'indigo' | 'emerald' | 'slate' | 'purple' | 'amber' | 'rose';
+  colorScheme?: 'blue' | 'indigo' | 'emerald' | 'slate' | 'purple' | 'amber';
   className?: string;
   dropdownAlign?: 'left' | 'right';
   disabled?: boolean;
@@ -25,17 +25,6 @@ export interface DatePickerPillProps {
 }
 
 const COLOR_SCHEMES = {
-  rose: {
-    border: 'border-rose-200 hover:border-rose-300',
-    focusBorder: 'focus:border-rose-500 focus:ring-rose-500/20',
-    selectedBg: 'bg-rose-600 text-white',
-    badge: 'bg-rose-100 text-rose-700',
-    todayBadge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-    activeRing: 'ring-rose-500',
-    iconText: 'text-rose-600',
-    shortcutActive: 'bg-rose-600 text-white shadow-xs',
-    shortcutInactive: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
-  },
   blue: {
     border: 'border-blue-200 hover:border-blue-300',
     focusBorder: 'focus:border-blue-500 focus:ring-blue-500/20',
@@ -130,9 +119,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
-  const [openUpward, setOpenUpward] = useState(false);
 
   // Format today string YYYY-MM-DD
   const todayStr = useMemo(() => {
@@ -168,41 +155,27 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
   const scheme = COLOR_SCHEMES[colorScheme] || COLOR_SCHEMES.blue;
   const isToday = selectedDate === todayStr;
 
-  // Handle alignment detection dynamically on resize / open
+  // Handle alignment detection on open
   useEffect(() => {
     if (dropdownAlign) {
       setEffectiveAlign(dropdownAlign);
     } else if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      const spaceOnRight = window.innerWidth - rect.left;
-      if (spaceOnRight < 350 && rect.right >= 340) {
+      const popoverWidth = 340;
+      if (rect.left + popoverWidth > window.innerWidth && rect.right >= popoverWidth) {
+        setEffectiveAlign('right');
+      } else if (rect.right + 260 > window.innerWidth) {
         setEffectiveAlign('right');
       } else {
         setEffectiveAlign('left');
-      }
-    }
-
-    if (containerRef.current && isOpen) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      if (spaceBelow < 380 && spaceAbove > spaceBelow) {
-        setOpenUpward(true);
-      } else {
-        setOpenUpward(false);
       }
     }
   }, [dropdownAlign, isOpen]);
 
   // Close when clicked outside or pressed Escape
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
-      if (
-        containerRef.current && 
-        !containerRef.current.contains(event.target as Node) &&
-        dropdownRef.current &&
-        !dropdownRef.current.contains(event.target as Node)
-      ) {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
         setShowMonthYearPicker(false);
       }
@@ -216,12 +189,10 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
-      document.addEventListener('touchstart', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
@@ -263,7 +234,9 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
     const firstDayOfMonth = new Date(viewYear, viewMonth, 1);
     const lastDayOfMonth = new Date(viewYear, viewMonth + 1, 0);
 
+    // Get day of week: 0 is Sunday, 1 is Monday, ... 6 is Saturday
     let startDayOfWeek = firstDayOfMonth.getDay(); // 0 (Sun) to 6 (Sat)
+    // Convert to Monday = 0, ..., Sunday = 6
     let mondayStartIndex = (startDayOfWeek + 6) % 7;
 
     const days: Array<{
@@ -311,7 +284,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
       });
     }
 
-    // Next month filler days to complete grid
+    // Next month filler days to complete grid (up to 35 or 42)
     const remaining = (7 - (days.length % 7)) % 7;
     for (let i = 1; i <= remaining; i++) {
       const d = new Date(viewYear, viewMonth + 1, i);
@@ -331,8 +304,8 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
     return days;
   }, [viewYear, viewMonth, selectedDate, todayStr, minDate, maxDate]);
 
-  // Formatted date representations (responsive full vs short)
-  const formattedDisplay = useMemo(() => {
+  // Formatted date representations (responsive: full on large, standard on medium, compact on mobile)
+  const fullFormattedDisplay = useMemo(() => {
     try {
       if (!selectedDate) return 'Sélectionner une date';
       const d = parseISO(selectedDate);
@@ -343,7 +316,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
     }
   }, [selectedDate]);
 
-  const mediumFormattedDisplay = useMemo(() => {
+  const standardFormattedDisplay = useMemo(() => {
     try {
       if (!selectedDate) return 'Sélectionner une date';
       const d = parseISO(selectedDate);
@@ -397,227 +370,14 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
     return list;
   }, []);
 
-  const renderDropdownContent = () => (
-    <div className="space-y-3">
-      {/* Mobile Top Header (Mobile Only) */}
-      <div className="flex sm:hidden items-center justify-between pb-2 border-b border-slate-100">
-        <div className="flex items-center gap-2">
-          <Calendar size={16} className={scheme.iconText} />
-          <span className="text-xs font-black text-slate-900">Sélectionner une date</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsOpen(false)}
-          className="p-1.5 hover:bg-slate-100 text-slate-500 rounded-lg cursor-pointer"
-        >
-          <X size={16} />
-        </button>
-      </div>
-
-      {/* Quick Presets Bar */}
-      {showShortcuts && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 border-b border-slate-100 custom-scrollbar -mx-1 px-1">
-          <button
-            type="button"
-            onClick={() => setQuickDate('today')}
-            className={`min-h-[34px] px-3 py-1 text-xs font-black rounded-xl transition-all whitespace-nowrap cursor-pointer shrink-0 active:scale-95 ${
-              isToday 
-                ? scheme.shortcutActive
-                : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-            }`}
-          >
-            Aujourd'hui
-          </button>
-          <button
-            type="button"
-            onClick={() => setQuickDate('yesterday')}
-            className="min-h-[34px] px-3 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all whitespace-nowrap border border-slate-200 cursor-pointer shrink-0 active:scale-95"
-          >
-            Hier
-          </button>
-          <button
-            type="button"
-            onClick={() => setQuickDate('monday')}
-            className="min-h-[34px] px-3 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all whitespace-nowrap border border-slate-200 cursor-pointer shrink-0 active:scale-95"
-          >
-            Lundi
-          </button>
-          <button
-            type="button"
-            onClick={() => setQuickDate('friday')}
-            className="min-h-[34px] px-3 py-1 text-xs font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all whitespace-nowrap border border-slate-200 cursor-pointer shrink-0 active:scale-95"
-          >
-            Vendredi
-          </button>
-        </div>
-      )}
-
-      {/* Month & Year Navigation Header */}
-      <div className="flex items-center justify-between px-0.5">
-        <button
-          type="button"
-          onClick={prevMonth}
-          className="min-h-[38px] min-w-[38px] p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95 flex items-center justify-center cursor-pointer"
-          title="Mois précédent"
-        >
-          <ChevronLeft size={18} className="stroke-[2.5]" />
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setShowMonthYearPicker(!showMonthYearPicker)}
-          className="min-h-[38px] px-3 py-1.5 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5 transition-all group cursor-pointer"
-        >
-          <span>{FRENCH_MONTHS[viewMonth]} {viewYear}</span>
-          <ChevronDown size={14} className={`text-slate-500 group-hover:text-slate-800 transition-transform ${showMonthYearPicker ? 'rotate-180' : ''}`} />
-        </button>
-
-        <button
-          type="button"
-          onClick={nextMonth}
-          className="min-h-[38px] min-w-[38px] p-2 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95 flex items-center justify-center cursor-pointer"
-          title="Mois suivant"
-        >
-          <ChevronRight size={18} className="stroke-[2.5]" />
-        </button>
-      </div>
-
-      {/* Fast Month / Year Selector Grid */}
-      {showMonthYearPicker ? (
-        <div className="py-2 space-y-3 animate-in fade-in zoom-in-95 duration-100">
-          <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
-            Choisir le mois & l'année
-          </div>
-          <div className="grid grid-cols-3 gap-1.5">
-            {FRENCH_MONTHS.map((mName, idx) => (
-              <button
-                key={mName}
-                type="button"
-                onClick={() => {
-                  setViewMonth(idx);
-                  setShowMonthYearPicker(false);
-                }}
-                className={`min-h-[36px] py-2 px-1 rounded-xl text-xs font-bold text-center transition-all cursor-pointer active:scale-95 ${
-                  viewMonth === idx 
-                    ? `${scheme.selectedBg} font-black shadow-xs` 
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-100'
-                }`}
-              >
-                {mName.substring(0, 4)}
-              </button>
-            ))}
-          </div>
-
-          {/* Year Chips */}
-          <div className="pt-2 border-t border-slate-100">
-            <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1 mb-1.5">
-              Année
-            </div>
-            <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
-              {yearOptions.map(y => (
-                <button
-                  key={y}
-                  type="button"
-                  onClick={() => {
-                    setViewYear(y);
-                    setShowMonthYearPicker(false);
-                  }}
-                  className={`min-h-[34px] px-3 py-1 rounded-lg text-xs font-bold shrink-0 transition-all cursor-pointer active:scale-95 ${
-                    viewYear === y
-                      ? `${scheme.selectedBg} font-black shadow-xs`
-                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                  }`}
-                >
-                  {y}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      ) : (
-        <>
-          {/* Day of week headers */}
-          <div className="grid grid-cols-7 gap-1 text-center mb-1">
-            {WEEKDAY_NAMES.map((wd, idx) => (
-              <div 
-                key={wd} 
-                className={`text-[10px] sm:text-[11px] font-black uppercase tracking-wider py-1 ${
-                  idx >= 5 ? 'text-rose-500/80' : 'text-slate-600'
-                }`}
-              >
-                {wd}
-              </div>
-            ))}
-          </div>
-
-          {/* Days Grid */}
-          <div className="grid grid-cols-7 gap-1 sm:gap-1.5">
-            {calendarDays.map((d, index) => {
-              return (
-                <button
-                  key={`${d.dateStr}-${index}`}
-                  type="button"
-                  disabled={d.isDisabled}
-                  onClick={() => {
-                    if (!d.isDisabled) {
-                      onSelectDate(d.dateStr);
-                      setIsOpen(false);
-                    }
-                  }}
-                  className={`
-                    min-h-[38px] sm:min-h-[36px] w-full rounded-xl flex flex-col items-center justify-center relative text-xs sm:text-[13px] transition-all
-                    ${d.isSelected 
-                      ? `${scheme.selectedBg} font-black shadow-md scale-105 z-10` 
-                      : d.isToday
-                        ? 'bg-emerald-50 text-emerald-900 font-black border-2 border-emerald-500 hover:bg-emerald-100'
-                        : d.isCurrentMonth
-                          ? d.isWeekend
-                            ? 'text-slate-700 hover:bg-slate-100 font-bold'
-                            : 'text-slate-900 hover:bg-slate-100 font-bold'
-                          : 'text-slate-300 hover:bg-slate-50 font-medium'
-                    }
-                    ${d.isDisabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer active:scale-90'}
-                  `}
-                >
-                  <span>{d.dayNumber}</span>
-                  {d.isToday && !d.isSelected && (
-                    <span className="w-1.5 h-1.5 bg-emerald-600 rounded-full absolute bottom-1" />
-                  )}
-                </button>
-              );
-            })}
-          </div>
-        </>
-      )}
-
-      {/* Footer Bar */}
-      <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-        <span className="text-[11px] font-bold text-slate-600 truncate max-w-[200px] capitalize">
-          {formattedDisplay}
-        </span>
-
-        {!isToday && (
-          <button
-            type="button"
-            onClick={() => setQuickDate('today')}
-            className="text-[11px] font-black text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer"
-          >
-            <RotateCcw size={12} className="stroke-[2.5]" />
-            <span>Aujourd'hui</span>
-          </button>
-        )}
-      </div>
-    </div>
-  );
-
   return (
     <div 
       ref={containerRef} 
-      className={`relative inline-block w-full text-left font-sans ${className}`}
+      className={`relative inline-block w-full min-w-0 text-left font-sans ${className}`}
       title={title}
     >
       {/* TRIGGER BAR */}
-      <div className="flex items-center gap-1 sm:gap-1.5 w-full">
+      <div className="flex items-center gap-1 sm:gap-1.5 w-full min-w-0">
         {/* Quick Shift Previous Day Button */}
         {showQuickArrows && (
           <button
@@ -625,9 +385,9 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
             onClick={(e) => handleShiftDay(-1, e)}
             disabled={disabled}
             title="Jour précédent"
-            className="min-h-[42px] min-w-[42px] sm:min-h-0 sm:min-w-0 p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shrink-0 active:scale-95 disabled:opacity-50 flex items-center justify-center cursor-pointer"
+            className="p-1.5 sm:p-2 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg sm:rounded-xl border border-slate-200 hover:border-slate-300 transition-all shrink-0 active:scale-95 disabled:opacity-50 flex items-center justify-center"
           >
-            <ChevronLeft size={16} className="stroke-[2.5]" />
+            <ChevronLeft size={15} className="stroke-[2.5]" />
           </button>
         )}
 
@@ -637,38 +397,36 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
           onClick={() => !disabled && setIsOpen(!isOpen)}
           disabled={disabled}
           className={`
-            w-full min-h-[42px] flex items-center justify-between gap-2 sm:gap-2.5 text-left transition-all outline-none select-none
+            w-full min-w-0 flex-1 flex items-center justify-between gap-1.5 sm:gap-2 text-left transition-all outline-none select-none overflow-hidden
             ${variant === 'field' 
-              ? 'px-3 sm:px-3.5 py-2 sm:py-2.5 bg-slate-50 hover:bg-slate-100/90 focus:bg-white text-xs font-bold text-slate-900 rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300' 
-              : 'px-3 sm:px-3.5 py-2 bg-white hover:bg-slate-50 text-xs font-bold text-slate-800 rounded-full border border-slate-200 shadow-xs hover:border-slate-300'
+              ? 'px-2.5 sm:px-3.5 py-1.5 sm:py-2 bg-slate-50 hover:bg-slate-100/90 focus:bg-white text-xs font-bold text-slate-900 rounded-lg sm:rounded-xl border border-slate-200 shadow-2xs hover:border-slate-300' 
+              : 'px-3 py-1.5 sm:py-2 bg-white hover:bg-slate-50 text-xs font-bold text-slate-800 rounded-full border border-slate-200 shadow-xs hover:border-slate-300'
             }
             ${isOpen ? `ring-2 ${scheme.activeRing} bg-white border-transparent` : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed bg-slate-100' : 'cursor-pointer'}
           `}
         >
-          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 flex-1">
-            <div className={`p-1.5 rounded-lg ${isToday ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-700'} shrink-0`}>
-              <Calendar size={15} className="stroke-[2.2]" />
+          <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+            <div className={`p-1 sm:p-1.5 rounded-lg ${isToday ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200/80 text-slate-700'} shrink-0`}>
+              <Calendar size={14} className="stroke-[2.2]" />
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 overflow-hidden">
               {labelPrefix && (
-                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">
+                <div className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight truncate">
                   {labelPrefix}
                 </div>
               )}
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap sm:flex-nowrap">
-                {/* Desktop & Tablet Full Name */}
-                <span className="hidden sm:inline truncate text-xs font-black text-slate-900 capitalize">
-                  {formattedDisplay}
+              <div className="flex items-center gap-1.5 min-w-0">
+                {/* Full date format on extra large screens, standard concise on medium/small */}
+                <span className="truncate text-xs font-bold sm:font-black text-slate-900 capitalize hidden 2xl:inline">
+                  {fullFormattedDisplay}
                 </span>
-                {/* Mobile Medium/Short Display */}
-                <span className="inline sm:hidden truncate text-xs font-black text-slate-900 capitalize">
-                  {mediumFormattedDisplay}
+                <span className="truncate text-xs font-bold sm:font-black text-slate-900 capitalize 2xl:hidden">
+                  {standardFormattedDisplay}
                 </span>
-
                 {showTodayBadge && isToday && (
-                  <span className="shrink-0 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-black bg-emerald-100 text-emerald-800 rounded-md border border-emerald-200/80">
+                  <span className="shrink-0 px-1.5 py-0.5 text-[9px] sm:text-[9.5px] font-black bg-emerald-100 text-emerald-800 rounded border border-emerald-200/80 hidden xs:inline-flex">
                     Aujourd'hui
                   </span>
                 )}
@@ -676,9 +434,9 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0 text-slate-500">
+          <div className="flex items-center shrink-0 text-slate-500 pl-0.5">
             <ChevronDown 
-              size={15} 
+              size={14} 
               className={`transition-transform duration-200 stroke-[2.5] ${isOpen ? 'rotate-180 text-blue-600' : ''}`} 
             />
           </div>
@@ -691,42 +449,217 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
             onClick={(e) => handleShiftDay(1, e)}
             disabled={disabled}
             title="Jour suivant"
-            className="min-h-[42px] min-w-[42px] sm:min-h-0 sm:min-w-0 p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-xl border border-slate-200 hover:border-slate-300 transition-all shrink-0 active:scale-95 disabled:opacity-50 flex items-center justify-center cursor-pointer"
+            className="p-1.5 sm:p-2 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 text-slate-700 hover:text-slate-900 rounded-lg sm:rounded-xl border border-slate-200 hover:border-slate-300 transition-all shrink-0 active:scale-95 disabled:opacity-50 flex items-center justify-center"
           >
-            <ChevronRight size={16} className="stroke-[2.5]" />
+            <ChevronRight size={15} className="stroke-[2.5]" />
           </button>
         )}
       </div>
 
-      {/* POPUP / DROPDOWN CONTAINER */}
+      {/* FLOATING CALENDAR DROPDOWN */}
       {isOpen && (
-        <>
-          {/* Mobile Overlay Backdrop */}
-          <div 
-            className="fixed inset-0 bg-slate-900/40 backdrop-blur-2xs z-[99] sm:hidden animate-in fade-in duration-150"
-            onClick={() => {
-              setIsOpen(false);
-              setShowMonthYearPicker(false);
-            }}
-          />
+        <div 
+          className={`
+            absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2
+            w-80 sm:w-[340px] max-w-[calc(100vw-1.5rem)] bg-white rounded-3xl shadow-2xl border border-slate-200
+            p-3.5 sm:p-4 z-[200] animate-in fade-in zoom-in-95 duration-150 select-none
+          `}
+        >
+          {/* Quick Presets Bar */}
+          {showShortcuts && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 border-b border-slate-100 custom-scrollbar">
+              <button
+                type="button"
+                onClick={() => setQuickDate('today')}
+                className={`px-2.5 py-1 text-[11px] font-black rounded-lg transition-all whitespace-nowrap ${
+                  isToday 
+                    ? scheme.shortcutActive
+                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                }`}
+              >
+                Aujourd'hui
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickDate('yesterday')}
+                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+              >
+                Hier
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickDate('monday')}
+                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+              >
+                Lundi
+              </button>
+              <button
+                type="button"
+                onClick={() => setQuickDate('friday')}
+                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+              >
+                Vendredi
+              </button>
+            </div>
+          )}
 
-          {/* Desktop & Tablet Floating Popover */}
-          <div 
-            ref={dropdownRef}
-            className={`
-              /* Mobile: Centered Bottom Sheet / Card Modal */
-              fixed left-3 right-3 bottom-4 max-h-[85vh] overflow-y-auto sm:overflow-visible sm:max-h-none sm:left-auto sm:right-auto sm:bottom-auto
-              /* Tablet / Desktop: Anchor Floating Popover */
-              sm:absolute ${effectiveAlign === 'right' ? 'sm:right-0' : 'sm:left-0'} ${openUpward ? 'sm:bottom-full sm:mb-2' : 'sm:top-full sm:mt-2'}
-              w-auto sm:w-[340px] max-w-full sm:max-w-[calc(100vw-2rem)] bg-white rounded-3xl shadow-2xl border border-slate-200
-              p-4 z-[100] animate-in fade-in zoom-in-95 duration-150 select-none
-            `}
-          >
-            {renderDropdownContent()}
+          {/* Month & Year Navigation Header */}
+          <div className="flex items-center justify-between px-1 mb-3">
+            <button
+              type="button"
+              onClick={prevMonth}
+              className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
+              title="Mois précédent"
+            >
+              <ChevronLeft size={17} className="stroke-[2.5]" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowMonthYearPicker(!showMonthYearPicker)}
+              className="px-3 py-1 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5 transition-all group"
+            >
+              <span>{FRENCH_MONTHS[viewMonth]} {viewYear}</span>
+              <ChevronDown size={14} className={`text-slate-500 group-hover:text-slate-800 transition-transform ${showMonthYearPicker ? 'rotate-180' : ''}`} />
+            </button>
+
+            <button
+              type="button"
+              onClick={nextMonth}
+              className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
+              title="Mois suivant"
+            >
+              <ChevronRight size={17} className="stroke-[2.5]" />
+            </button>
           </div>
-        </>
+
+          {/* Fast Month / Year Selector Grid */}
+          {showMonthYearPicker ? (
+            <div className="py-2 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+              <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
+                Choisir le mois & l'année
+              </div>
+              <div className="grid grid-cols-3 gap-1.5">
+                {FRENCH_MONTHS.map((mName, idx) => (
+                  <button
+                    key={mName}
+                    type="button"
+                    onClick={() => {
+                      setViewMonth(idx);
+                      setShowMonthYearPicker(false);
+                    }}
+                    className={`py-1.5 px-1 rounded-xl text-xs font-bold text-center transition-all ${
+                      viewMonth === idx 
+                        ? `${scheme.selectedBg} font-black shadow-xs` 
+                        : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-100'
+                    }`}
+                  >
+                    {mName.substring(0, 4)}
+                  </button>
+                ))}
+              </div>
+
+              {/* Year Chips */}
+              <div className="pt-2 border-t border-slate-100">
+                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1 mb-1.5">
+                  Année
+                </div>
+                <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
+                  {yearOptions.map(y => (
+                    <button
+                      key={y}
+                      type="button"
+                      onClick={() => {
+                        setViewYear(y);
+                        setShowMonthYearPicker(false);
+                      }}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all ${
+                        viewYear === y
+                          ? `${scheme.selectedBg} font-black shadow-xs`
+                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      }`}
+                    >
+                      {y}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              {/* Day of week headers */}
+              <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                {WEEKDAY_NAMES.map((wd, idx) => (
+                  <div 
+                    key={wd} 
+                    className={`text-[10px] font-black uppercase tracking-wider py-1 ${
+                      idx >= 5 ? 'text-rose-500/80' : 'text-slate-600'
+                    }`}
+                  >
+                    {wd}
+                  </div>
+                ))}
+              </div>
+
+              {/* Days Grid */}
+              <div className="grid grid-cols-7 gap-1">
+                {calendarDays.map((d, index) => {
+                  return (
+                    <button
+                      key={`${d.dateStr}-${index}`}
+                      type="button"
+                      disabled={d.isDisabled}
+                      onClick={() => {
+                        if (!d.isDisabled) {
+                          onSelectDate(d.dateStr);
+                          setIsOpen(false);
+                        }
+                      }}
+                      className={`
+                        h-8.5 sm:h-9 w-full rounded-xl flex flex-col items-center justify-center relative text-xs transition-all
+                        ${d.isSelected 
+                          ? `${scheme.selectedBg} font-black shadow-md shadow-blue-500/20 scale-105 z-10` 
+                          : d.isToday
+                            ? 'bg-emerald-50 text-emerald-900 font-black border-2 border-emerald-500 hover:bg-emerald-100'
+                            : d.isCurrentMonth
+                              ? d.isWeekend
+                                ? 'text-slate-700 hover:bg-slate-100 font-bold'
+                                : 'text-slate-900 hover:bg-slate-100 font-bold'
+                              : 'text-slate-300 hover:bg-slate-50 font-medium'
+                        }
+                        ${d.isDisabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
+                      `}
+                    >
+                      <span>{d.dayNumber}</span>
+                      {d.isToday && !d.isSelected && (
+                        <span className="w-1 h-1 bg-emerald-600 rounded-full absolute bottom-1" />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </>
+          )}
+
+          {/* Footer Bar */}
+          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+            <span className="text-[11px] font-bold text-slate-600 truncate max-w-[190px]">
+              {shortFormattedDisplay}
+            </span>
+
+            {!isToday && (
+              <button
+                type="button"
+                onClick={() => setQuickDate('today')}
+                className="text-[11px] font-black text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+              >
+                <RotateCcw size={11} className="stroke-[2.5]" />
+                <span>Aujourd'hui</span>
+              </button>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
 };
-

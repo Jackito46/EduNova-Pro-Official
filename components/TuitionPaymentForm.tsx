@@ -28,7 +28,9 @@ import {
   Sparkles,
   Key,
   Lock,
-  Wallet
+  Wallet,
+  Building2,
+  Calendar
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
@@ -42,9 +44,10 @@ import { MonCashService } from '../services/moncashService';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
-import { DatePickerPill } from './DatePickerPill';
 import { tuitionPaymentSchema } from '../utils/validation';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig, PaymentMethodConfig } from '../lib/paymentMethods';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
 
@@ -151,6 +154,98 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       setPaymentMethod(activePaymentMethods[0].code);
     }
   }, [activePaymentMethods, paymentMethod]);
+
+  // Options mémoïsées pour les menus déroulants harmonisés (SelectPill)
+  const feeTypeOptions: SelectOption[] = useMemo(() => {
+    const isInscriptionReenrollment = selectedStudent && selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) && selectedStudent.inscriptionDue > 0;
+    const opts: SelectOption[] = [
+      {
+        value: 'INSCRIPTION',
+        label: isInscriptionReenrollment ? 'Réinscription' : 'Inscription',
+        badge: isInscriptionReenrollment ? 'Réinscription' : 'Frais Fixes',
+        icon: Tags
+      },
+      {
+        value: 'SCOLARITE',
+        label: terminology.tuition,
+        badge: 'Échéancier',
+        icon: Tags
+      },
+      {
+        value: 'DIVERS',
+        label: 'Frais Divers',
+        badge: 'Obligatoire',
+        icon: Tags
+      },
+      {
+        value: 'CREDIT_PORTEFEUILLE',
+        label: 'Alimenter Portefeuille',
+        badge: 'Réserve',
+        icon: Wallet
+      }
+    ];
+
+    if (selectedStudent?.adHocCampaigns && Array.isArray(selectedStudent.adHocCampaigns)) {
+      selectedStudent.adHocCampaigns.forEach((c: any) => {
+        opts.push({
+          value: `ADHOC_${c.id}`,
+          label: `Campagne : ${c.name}`,
+          badge: `${c.amount?.toLocaleString() || 0} HTG`,
+          icon: Sparkles
+        });
+      });
+    }
+
+    return opts;
+  }, [selectedStudent, terminology.tuition]);
+
+  const paymentMethodOptions: SelectOption[] = useMemo(() => {
+    const opts: SelectOption[] = activePaymentMethods.map(m => ({
+      value: m.code,
+      label: m.name,
+      badge: m.requires_bank ? 'Banque' : m.requires_reference ? 'Réf.' : undefined,
+      icon: m.code === 'MonCash' ? Zap : m.code === 'Chèque' || m.code === 'Dépôt Bancaire' ? Building2 : CreditCard
+    }));
+
+    if (feeType !== 'CREDIT_PORTEFEUILLE' && ((currency === 'USD' ? selectedStudent?.wallet_balance_usd : selectedStudent?.wallet_balance_htg) || 0) > 0) {
+      const bal = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
+      opts.push({
+        value: 'Portefeuille',
+        label: 'Portefeuille Électronique',
+        badge: `Solde: ${bal.toLocaleString()} ${currency}`,
+        icon: Wallet
+      });
+    }
+
+    return opts;
+  }, [activePaymentMethods, feeType, currency, selectedStudent]);
+
+  const currencyOptions: SelectOption[] = useMemo(() => {
+    if (currentMethodConfig?.supported_currencies && currentMethodConfig.supported_currencies.length > 0) {
+      return currentMethodConfig.supported_currencies.map(cur => ({
+        value: cur,
+        label: cur === 'HTG' ? 'Gourdes (HTG)' : 'Dollars (USD)',
+        badge: cur,
+        icon: Banknote
+      }));
+    }
+    return [
+      { value: 'HTG', label: 'Gourdes (HTG)', badge: 'HTG', icon: Banknote },
+      ...(paymentMethod !== 'MonCash' ? [{ value: 'USD', label: 'Dollars (USD)', badge: 'USD', icon: Banknote }] : [])
+    ];
+  }, [currentMethodConfig, paymentMethod]);
+
+  const bankOptions: SelectOption[] = useMemo(() => {
+    const banks = schoolDetails?.global_settings?.banks;
+    if (banks && Array.isArray(banks) && banks.length > 0) {
+      return banks.map((b: string) => ({
+        value: b,
+        label: b,
+        icon: Building2
+      }));
+    }
+    return [];
+  }, [schoolDetails]);
 
   // Double-validation pour transactions sensibles du portefeuille (Wallet)
   const [showSuperiorAuthModal, setShowSuperiorAuthModal] = useState(false);
@@ -1722,35 +1817,35 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-500 pb-12">
       {/* Header Institutionnel Moderne */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6 bg-white p-6 sm:p-7 rounded-3xl shadow-sm border border-slate-200">
-        <div className="flex items-center gap-4">
-          <div className="p-3.5 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 rounded-2xl border border-blue-100 shadow-2xs">
-            <CreditCard size={26} className="stroke-[2.2]" />
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200">
+        <div className="flex items-center gap-3.5">
+          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 rounded-xl sm:rounded-2xl border border-blue-100 shadow-2xs">
+            <CreditCard size={22} className="stroke-[2.2]" />
           </div>
           <div>
-            <div className="flex items-center gap-2.5 flex-wrap">
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">Guichet de Régularisation</h2>
-              <span className="px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 text-[10px] font-black uppercase tracking-wider">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Guichet de Régularisation</h2>
+              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 text-[9.5px] font-black uppercase tracking-wider">
                 Caisse & Perception
               </span>
             </div>
-            <p className="text-slate-500 text-sm mt-0.5">Encaissement des droits scolaires, régularisation tarifaire et audit de scolarité</p>
+            <p className="text-slate-500 text-xs mt-0.5">Encaissement des droits scolaires, régularisation tarifaire et audit de scolarité</p>
           </div>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
           <button
             type="button"
             onClick={() => setIsClosureModalOpen(true)}
-            className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 border border-slate-700 active:scale-95 cursor-pointer"
+            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 border border-slate-700 active:scale-95 cursor-pointer"
           >
-            <ShieldCheck size={16} className="text-emerald-400" />
+            <ShieldCheck size={15} className="text-emerald-400" />
             <span>Clôture de Caisse</span>
           </button>
           {isLocked && (
-            <div className="bg-emerald-50 border border-emerald-200 px-4 py-2 rounded-xl flex items-center gap-2">
-              <ShieldCheck size={16} className="text-emerald-600" />
+            <div className="bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
+              <ShieldCheck size={15} className="text-emerald-600" />
               <span className="text-emerald-700 font-bold text-xs tracking-tight">Dossier Certifié</span>
             </div>
           )}
@@ -1758,38 +1853,38 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {apiError && (
-        <div className="bg-rose-50 border border-rose-200 p-6 rounded-2xl flex items-start gap-4 animate-in slide-in-from-top-4">
-          <ShieldAlert className="text-rose-600 mt-0.5 flex-shrink-0" size={24} />
+        <div className="bg-rose-50 border border-rose-200 p-4 sm:p-5 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-4">
+          <ShieldAlert className="text-rose-600 mt-0.5 flex-shrink-0" size={20} />
           <div className="flex-1">
-            <p className="text-rose-800 font-bold text-sm">Erreur de Transaction</p>
-            <p className="text-rose-700 text-sm mt-1">{apiError}</p>
-            <button onClick={() => setApiError(null)} className="text-rose-600 text-xs font-bold tracking-tight mt-3 hover:underline">Ignorer</button>
+            <p className="text-rose-800 font-bold text-xs sm:text-sm">Erreur de Transaction</p>
+            <p className="text-rose-700 text-xs mt-0.5">{apiError}</p>
+            <button onClick={() => setApiError(null)} className="text-rose-600 text-[11px] font-bold tracking-tight mt-2 hover:underline">Ignorer</button>
           </div>
         </div>
       )}
 
       {globalDebt > 0 && (
-        <div className="bg-gradient-to-r from-rose-50 via-white to-rose-50/50 border border-rose-200 p-6 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
-          <div className="flex items-center gap-4">
-             <div className="p-3 bg-rose-100 text-rose-600 rounded-xl border border-rose-200"><ShieldAlert size={24} /></div>
+        <div className="bg-gradient-to-r from-rose-50 via-white to-rose-50/50 border border-rose-200 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-center gap-3">
+             <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl border border-rose-200"><ShieldAlert size={20} /></div>
              <div>
                <div className="flex items-center gap-2">
-                 <h3 className="text-base font-black text-rose-950">Dette Globale Détectée</h3>
-                 <span className="px-2 py-0.5 bg-rose-200 text-rose-800 text-[10px] font-black uppercase tracking-wider rounded-md">Audit Antérieur</span>
+                 <h3 className="text-sm sm:text-base font-black text-rose-950">Dette Globale Détectée</h3>
+                 <span className="px-2 py-0.5 bg-rose-200 text-rose-800 text-[9.5px] font-black uppercase tracking-wider rounded-md">Audit Antérieur</span>
                </div>
-               <p className="text-xs text-rose-700 mt-1">L'{terminology.student.toLowerCase()} présente un reliquat total non apuré sur son historique académique.</p>
+               <p className="text-xs text-rose-700 mt-0.5">L'{terminology.student.toLowerCase()} présente un reliquat total non apuré sur son historique académique.</p>
              </div>
           </div>
-          <div className="bg-white px-6 py-3.5 rounded-2xl border border-rose-200 text-center md:text-right shadow-xs">
-             <p className="text-[10px] font-black text-rose-500 uppercase tracking-widest">Arriéré Total Cumulé</p>
-             <p className="text-2xl font-black text-rose-700 font-mono tracking-tight">{globalDebt.toLocaleString()} HTG</p>
+          <div className="bg-white px-5 py-2.5 rounded-xl sm:rounded-2xl border border-rose-200 text-center md:text-right shadow-xs">
+             <p className="text-[9.5px] font-black text-rose-500 uppercase tracking-widest">Arriéré Total Cumulé</p>
+             <p className="text-xl sm:text-2xl font-black text-rose-700 font-mono tracking-tight">{globalDebt.toLocaleString()} HTG</p>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10">
-        <div className="lg:col-span-7 space-y-6">
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6 sm:p-7 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
+        <div className="lg:col-span-7 space-y-4 sm:space-y-5">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 space-y-4 sm:space-y-5">
             {loading ? (
               <div className="py-12">
                 <FluidLoadingState 
@@ -2189,20 +2284,22 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         {/* Volet Latéral Formulaire d'Encaissement */}
         <div className="lg:col-span-5">
-          <form onSubmit={handleValidation} className="bg-white rounded-3xl shadow-[0_2px_24px_-8px_rgba(0,0,0,0.08)] border border-slate-200 p-6 sm:p-8 h-full flex flex-col justify-between gap-6 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500" />
-            <div className="space-y-6">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 sm:p-3 bg-blue-50 text-blue-600 rounded-2xl border border-blue-100 shadow-2xs"><Calculator size={22} className="stroke-[2.5]" /></div>
+          <form onSubmit={handleValidation} className="bg-white rounded-2xl sm:rounded-3xl shadow-[0_2px_20px_-6px_rgba(0,0,0,0.07)] border border-slate-200 p-4 sm:p-5 lg:p-6 h-full flex flex-col justify-between gap-4 sm:gap-5 relative">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 rounded-t-2xl sm:rounded-t-3xl" />
+            <div className="space-y-4 sm:space-y-4.5">
+              <div className="flex items-center gap-2.5 sm:gap-3">
+                <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl border border-blue-100 shadow-2xs shrink-0">
+                  <Calculator size={20} className="stroke-[2.5]" />
+                </div>
                 <div>
-                  <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Caisse & Règlement</h3>
-                  <p className="text-xs text-slate-500">Enregistrement et ventilation des recettes</p>
+                  <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Caisse & Règlement</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-500">Enregistrement et ventilation des recettes</p>
                 </div>
               </div>
               
-              <div className="space-y-5">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Session de Destination</label>
+              <div className="space-y-3.5 sm:space-y-4">
+                <div className="space-y-1 min-w-0 relative z-30">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">Session académique</label>
                   <AcademicSessionPill
                     academicYears={academicYears}
                     selectedYearId={targetYearId}
@@ -2215,332 +2312,309 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     variant="field"
                     size="md"
                     colorScheme="blue"
+                    className="w-full"
                   />
                 </div>
 
-                  <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Type de Frais</label>
-                      <div className="relative">
-                        <Tags className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                          <select 
-                            className="w-full pl-11 pr-10 py-3 rounded-2xl text-sm outline-none border border-slate-200 bg-slate-50/70 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 appearance-none cursor-pointer transition-all disabled:opacity-70 disabled:cursor-not-allowed font-medium"
-                            value={feeType}
-                            onChange={(e) => handleFeeTypeChange(e.target.value as any)}
-                            disabled={isFeeTypeLocked}
-                          >
-                            <option value="INSCRIPTION">
-                              {selectedStudent && selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) && selectedStudent.inscriptionDue > 0 
-                                ? 'Réinscription' 
-                                : 'Inscription'}
-                            </option>
-                            <option value="SCOLARITE">{terminology.tuition}</option>
-                            <option value="DIVERS">Frais Divers</option>
-                            <option value="CREDIT_PORTEFEUILLE">Alimenter Portefeuille</option>
-                            {selectedStudent?.adHocCampaigns?.map((c: any) => (
-                               <option key={c.id} value={`ADHOC_${c.id}`}>Campagne: {c.name}</option>
-                            ))}
-                          </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                      </div>
-                    </div>
+                <div className="space-y-1 min-w-0 relative z-25">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">Nature des frais</label>
+                  <SelectPill
+                    options={feeTypeOptions}
+                    value={feeType}
+                    onChange={(val) => handleFeeTypeChange(val as any)}
+                    disabled={isFeeTypeLocked}
+                    icon={Tags}
+                    variant="field"
+                    size="md"
+                    colorScheme="blue"
+                    placeholder="Sélectionner la nature des frais..."
+                    className="w-full"
+                  />
+                </div>
 
-                  <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4`}>
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Méthode de Paiement</label>
-                      <div className="relative">
-                        <CreditCard className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <select 
-                          className="w-full pl-11 pr-10 py-3 rounded-2xl text-sm outline-none border border-slate-200 bg-slate-50/70 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 appearance-none cursor-pointer transition-all font-medium"
-                          value={paymentMethod}
-                          onChange={(e) => handlePaymentMethodChange(e.target.value)}
-                        >
-                          {activePaymentMethods.map(m => (
-                            <option key={m.code} value={m.code}>{m.name}</option>
-                          ))}
-                          {feeType !== 'CREDIT_PORTEFEUILLE' && ((currency === 'USD' ? selectedStudent?.wallet_balance_usd : selectedStudent?.wallet_balance_htg) || 0) > 0 && (
-                            <option value="Portefeuille">Portefeuille (Solde: {currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0)} {currency})</option>
-                          )}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                      </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Devise d'Encaissement</label>
-                      <div className="relative">
-                        <Banknote className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <select 
-                          className={`w-full pl-11 pr-10 py-3 rounded-2xl text-sm outline-none border border-slate-200 bg-slate-50/70 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 appearance-none transition-all font-medium ${
-                            (currentMethodConfig?.supported_currencies && currentMethodConfig.supported_currencies.length === 1) || paymentMethod === 'MonCash' ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
-                          }`}
-                          value={currency}
-                          onChange={(e) => {
-                            setCurrency(e.target.value as any);
-                            if (montantReel) setMontantReel('');
-                          }}
-                          disabled={(currentMethodConfig?.supported_currencies && currentMethodConfig.supported_currencies.length === 1) || paymentMethod === 'MonCash'}
-                        >
-                          {currentMethodConfig?.supported_currencies ? (
-                            currentMethodConfig.supported_currencies.map(cur => (
-                              <option key={cur} value={cur}>{cur === 'HTG' ? 'Gourdes (HTG)' : 'Dollars (USD)'}</option>
-                            ))
-                          ) : (
-                            <>
-                              <option value="HTG">Gourdes (HTG)</option>
-                              {paymentMethod !== 'MonCash' && (
-                                <option value="USD">Dollars (USD)</option>
-                              )}
-                            </>
-                          )}
-                        </select>
-                        <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                      </div>
-                    </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-20">
+                  <div className="space-y-1 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Mode de règlement">
+                      Mode de règlement
+                    </label>
+                    <SelectPill
+                      options={paymentMethodOptions}
+                      value={paymentMethod}
+                      onChange={(val) => handlePaymentMethodChange(val)}
+                      icon={CreditCard}
+                      variant="field"
+                      size="md"
+                      colorScheme="blue"
+                      placeholder="Mode de paiement..."
+                      className="w-full"
+                    />
                   </div>
 
-                  {/* Instructions ou compte pour la méthode active */}
-                  {(currentMethodConfig?.account_info || currentMethodConfig?.instructions) && (
-                    <div className="p-3.5 bg-blue-50/60 border border-blue-200/60 rounded-2xl text-xs text-blue-900 space-y-1">
-                      {currentMethodConfig.account_info && (
-                        <p className="font-bold flex items-center gap-1.5">
-                          <span>Compte / Destinataire :</span>
-                          <span className="font-mono bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-950 font-black">{currentMethodConfig.account_info}</span>
-                        </p>
-                      )}
-                      {currentMethodConfig.instructions && (
-                        <p className="text-slate-600 leading-relaxed">{currentMethodConfig.instructions}</p>
-                      )}
-                    </div>
-                  )}
-                  
-                  {!isSuperior && (feeType === 'CREDIT_PORTEFEUILLE' || paymentMethod === 'Portefeuille' || paymentMethod === 'Chèque') && (
-                    <div className="mt-4 p-4 bg-amber-50/70 border border-amber-200/70 rounded-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                      <ShieldAlert className="text-amber-600 mt-0.5 shrink-0 animate-pulse" size={18} />
-                      <div>
-                        <h6 className="text-xs font-bold text-amber-800 uppercase tracking-tight">Approbation d'un supérieur requise</h6>
-                        <p className="text-[11px] text-amber-700 mt-1 leading-relaxed font-medium">
-                          Cette transaction ({feeType === 'CREDIT_PORTEFEUILLE' ? 'Alimentation Portefeuille' : paymentMethod === 'Portefeuille' ? 'Paiement par Portefeuille' : 'Paiement par Chèque'}) est hautement sécurisée. Une double-validation par un supérieur (Directeur ou Administrateur) sera requise lors de l'enregistrement.
-                        </p>
-                      </div>
-                    </div>
-                  )}
-                  
-                  {/* Additional fields for methods requiring bank or reference */}
-                  {Boolean(currentMethodConfig?.requires_reference || currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash') && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in-95 duration-200">
-                      {Boolean(currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Nom de la Banque</label>
-                          <div className="relative">
-                            <select 
-                              required 
-                              className="w-full pl-4 pr-10 py-3 border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-900 rounded-2xl text-sm outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 appearance-none font-medium" 
-                              value={bankName} 
-                              onChange={(e) => {
-                                const newBank = e.target.value;
-                                setBankName(newBank);
-                                if (referenceNumber) verifyReference(referenceNumber, newBank);
-                              }} 
-                            >
-                              <option value="" disabled>Sélectionner une banque</option>
-                              {(schoolDetails?.global_settings?.banks && schoolDetails?.global_settings?.banks?.length > 0) ? (
-                                schoolDetails.global_settings.banks.map((b: string) => (
-                                  <option key={b} value={b}>{b}</option>
-                                ))
-                              ) : (
-                                <option value="" disabled>Aucune banque configurée (Voir Paramètres)</option>
-                              )}
-                            </select>
-                            <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                          </div>
-                        </div>
-                      )}
-                      
-                      {Boolean(currentMethodConfig?.requires_reference || paymentMethod === 'MonCash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
-                            {paymentMethod === 'MonCash' ? 'ID Transaction' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}
-                          </label>
-                          <div className="relative">
-                            <input 
-                              type="text" 
-                              required 
-                              className={`w-full px-4 py-3 border ${refError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10'} bg-slate-50/70 focus:bg-white text-slate-900 rounded-2xl text-sm outline-none transition-all font-medium`} 
-                              placeholder="..."
-                              value={referenceNumber} 
-                              onChange={(e) => {
-                                const val = e.target.value.toUpperCase();
-                                setReferenceNumber(val);
-                                verifyReference(val, bankName);
-                              }} 
-                            />
-                            {isCheckingRef && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" size={16} />}
-                          </div>
-                          {refError && <p className="text-xs text-rose-600 font-medium">{refError}</p>}
-                        </div>
-                      )}
+                  <div className="space-y-1 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Devise d'encaissement">
+                      Devise d'encaissement
+                    </label>
+                    <SelectPill
+                      options={currencyOptions}
+                      value={currency}
+                      onChange={(val) => {
+                        setCurrency(val as any);
+                        if (montantReel) setMontantReel('');
+                      }}
+                      disabled={(currentMethodConfig?.supported_currencies && currentMethodConfig.supported_currencies.length === 1) || paymentMethod === 'MonCash'}
+                      icon={Banknote}
+                      variant="field"
+                      size="md"
+                      colorScheme="blue"
+                      className="w-full"
+                    />
+                  </div>
+                </div>
 
-                      {(paymentMethod === 'Dépôt Bancaire' || currentMethodConfig?.requires_bank) && (
-                        <div className="space-y-1.5">
-                          <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Date du dépôt</label>
-                          <DatePickerPill
-                            selectedDate={depositDate}
-                            onSelectDate={(newDate) => {
-                              const restriction = isRestrictedBankDate(newDate);
-                              if (restriction.restricted) {
-                                toast.error(`Opération impossible : ${restriction.reason}.`);
-                                return;
-                              }
-                              setDepositDate(newDate);
-                            }}
-                            maxDate={getLocalTodayString()}
-                            variant="field"
-                            size="md"
-                            colorScheme="blue"
-                            showTodayBadge={true}
-                            className="w-full"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {(paymentMethod === 'Chèque' || paymentMethod === 'MonCash') && (
-                    <div className="bg-amber-50/80 p-4 rounded-2xl border border-amber-200 flex items-start gap-3 animate-in fade-in duration-300">
-                      <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={16} />
-                      <p className="text-xs text-amber-900">
-                        <span className="font-bold block mb-1">Validation Requise</span>
-                        Ce paiement par {paymentMethod} sera enregistré avec le statut <span className="font-bold">EN ATTENTE</span>. Un reçu provisoire sera émis. La transaction devra être confirmée ultérieurement par l'administration après vérification des fonds.
+                {/* Instructions ou compte pour la méthode active */}
+                {(currentMethodConfig?.account_info || currentMethodConfig?.instructions) && (
+                  <div className="p-3 bg-blue-50/70 border border-blue-200/70 rounded-xl sm:rounded-2xl text-xs text-blue-900 space-y-1">
+                    {currentMethodConfig.account_info && (
+                      <p className="font-bold flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[11px] text-blue-800">Compte / Destinataire :</span>
+                        <span className="font-mono bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-950 font-black text-xs">{currentMethodConfig.account_info}</span>
+                      </p>
+                    )}
+                    {currentMethodConfig.instructions && (
+                      <p className="text-slate-600 text-[11px] sm:text-xs leading-relaxed">{currentMethodConfig.instructions}</p>
+                    )}
+                  </div>
+                )}
+                
+                {!isSuperior && (feeType === 'CREDIT_PORTEFEUILLE' || paymentMethod === 'Portefeuille' || paymentMethod === 'Chèque') && (
+                  <div className="p-3 sm:p-3.5 bg-amber-50/70 border border-amber-200/70 rounded-xl sm:rounded-2xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                    <ShieldAlert className="text-amber-600 mt-0.5 shrink-0 animate-pulse" size={16} />
+                    <div>
+                      <h6 className="text-[11px] font-bold text-amber-800 uppercase tracking-tight">Approbation d'un supérieur requise</h6>
+                      <p className="text-[10.5px] text-amber-700 mt-0.5 leading-relaxed font-medium">
+                        Cette transaction ({feeType === 'CREDIT_PORTEFEUILLE' ? 'Alimentation Portefeuille' : paymentMethod === 'Portefeuille' ? 'Paiement par Portefeuille' : 'Paiement par Chèque'}) nécessite une double-validation par un supérieur lors de l'enregistrement.
                       </p>
                     </div>
-                  )}
-                </div>
-
-                {/* Detected Active Payment Stage Banner */}
-                {selectedStudent && feeType === 'SCOLARITE' && paymentLogic?.currentStepLabel && (
-                  <div className="bg-emerald-50/90 border border-emerald-200/80 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in duration-300 shadow-2xs">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
-                        <Sparkles size={20} className="animate-pulse" />
+                  </div>
+                )}
+                
+                {/* Additional fields for methods requiring bank or reference */}
+                {Boolean(currentMethodConfig?.requires_reference || currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash') && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-15 animate-in fade-in zoom-in-95 duration-200">
+                    {Boolean(currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Banque d'encaissement">
+                          Banque d'encaissement
+                        </label>
+                        <SelectPill
+                          options={bankOptions}
+                          value={bankName}
+                          onChange={(val) => {
+                            setBankName(val);
+                            if (referenceNumber) verifyReference(referenceNumber, val);
+                          }}
+                          icon={Building2}
+                          variant="field"
+                          size="md"
+                          colorScheme="blue"
+                          placeholder={bankOptions.length > 0 ? "Sélectionner une banque..." : "Aucune banque configurée"}
+                          searchable={bankOptions.length > 4}
+                          className="w-full"
+                        />
                       </div>
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800">
-                            📍 Étape Détectée :
-                          </span>
-                          <span className="px-2.5 py-0.5 rounded-full bg-emerald-600 text-white text-[10px] font-black tracking-wide">
-                            {paymentLogic.currentStepLabel}
-                          </span>
-                          {paymentLogic.totalSteps > 0 && paymentLogic.currentStepIndex > 0 && (
-                            <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100/80 px-2 py-0.5 rounded-md">
-                              Tranche {paymentLogic.currentStepIndex} / {paymentLogic.totalSteps}
-                            </span>
-                          )}
+                    )}
+                    
+                    {Boolean(currentMethodConfig?.requires_reference || paymentMethod === 'MonCash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
+                      <div className="space-y-1 min-w-0">
+                        <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title={paymentMethod === 'MonCash' ? 'ID Transaction MonCash' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}>
+                          {paymentMethod === 'MonCash' ? 'ID Transaction' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
+                        </label>
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            required 
+                            className={`w-full px-3.5 py-2.5 sm:py-3 border ${refError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10'} bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl text-xs sm:text-sm outline-none transition-all font-medium`} 
+                            placeholder={paymentMethod === 'MonCash' ? 'Ex: MC-839201...' : 'Ex: DEP-94829...'}
+                            value={referenceNumber} 
+                            onChange={(e) => {
+                              const val = e.target.value.toUpperCase();
+                              setReferenceNumber(val);
+                              verifyReference(val, bankName);
+                            }} 
+                          />
+                          {isCheckingRef && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" size={15} />}
                         </div>
-                        <p className="text-xs text-emerald-900 font-semibold mt-1">
-                          Montant attendu : <strong className="font-extrabold text-emerald-950 font-mono">{paymentLogic.suggestion?.toLocaleString()} {currency}</strong>
-                          {paymentLogic.stepDueDate && (
-                            <span className="text-emerald-700/80 text-[10px] ml-2 italic">
-                              • Échéance: {new Date(paymentLogic.stepDueDate).toLocaleDateString()}
-                            </span>
-                          )}
-                        </p>
+                        {refError && <p className="text-[10.5px] text-rose-600 font-medium mt-0.5">{refError}</p>}
                       </div>
-                    </div>
-                    {montantReel !== paymentLogic.suggestion?.toString() && paymentLogic.suggestion > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => setMontantReel(paymentLogic.suggestion.toString())}
-                        className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all active:scale-95 shrink-0 shadow-sm flex items-center justify-center gap-1.5 cursor-pointer"
-                      >
-                        <Sparkles size={14} /> Appliquer {paymentLogic.suggestion.toLocaleString()} {currency}
-                      </button>
+                    )}
+
+                    {(paymentMethod === 'Dépôt Bancaire' || currentMethodConfig?.requires_bank) && (
+                      <div className="space-y-1 min-w-0 sm:col-span-2">
+                        <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                          Date du versement / dépôt
+                        </label>
+                        <DatePickerPill
+                          selectedDate={depositDate}
+                          onSelectDate={(newDate) => {
+                            const restriction = isRestrictedBankDate(newDate);
+                            if (restriction.restricted) {
+                              toast.error(`Opération impossible : ${restriction.reason}.`);
+                              return;
+                            }
+                            setDepositDate(newDate);
+                          }}
+                          maxDate={getLocalTodayString()}
+                          variant="field"
+                          size="md"
+                          colorScheme="blue"
+                          showShortcuts={false}
+                          showQuickArrows={false}
+                          showTodayBadge={true}
+                          title="Date du dépôt bancaire"
+                          className="w-full"
+                        />
+                      </div>
                     )}
                   </div>
                 )}
 
-                <div className="space-y-2">
-                  <div className="flex justify-between items-end">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Montant à Encaisser ({currency})</label>
-                    {paymentLogic?.suggestion > 0 && (
-                      <button 
-                        type="button" 
-                        onClick={() => setMontantReel(paymentLogic.suggestion.toString())}
-                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-widest bg-blue-50 border border-blue-100 px-2.5 py-1 rounded-lg cursor-pointer"
-                      >
-                        Suggérer : {paymentLogic.suggestion.toLocaleString()} {currency}
-                      </button>
-                    )}
-                  </div>
-                  <div className="relative group">
-                    <input 
-                      type="number" 
-                      required 
-                      className="w-full px-5 py-4 border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-900 rounded-2xl text-2xl font-black font-mono outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 disabled:bg-slate-50" 
-                      placeholder="0.00" 
-                      value={montantReel} 
-                      onChange={(e) => setMontantReel(e.target.value)} 
-                      disabled={!selectedStudent || isSubmitting} 
-                    />
-                    {currency === 'USD' ? <DollarSign className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400" size={24} /> : <div className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-xl">G</div>}
-                  </div>
-                  {globalDebt > 0 && (
-                    <p className="text-[10px] text-rose-600 font-semibold mt-1">
-                      Note : L'{terminology.student.toLowerCase()} a également une dette historique de {globalDebt.toLocaleString()} HTG.
+                {(paymentMethod === 'Chèque' || paymentMethod === 'MonCash') && (
+                  <div className="bg-amber-50/80 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-amber-200 flex items-start gap-2.5 animate-in fade-in duration-300">
+                    <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={15} />
+                    <p className="text-[11px] sm:text-xs text-amber-900 leading-relaxed">
+                      <span className="font-bold block mb-0.5">Validation Requise</span>
+                      Ce paiement par {paymentMethod} sera enregistré avec le statut <span className="font-bold">EN ATTENTE</span>. Un reçu provisoire sera émis.
                     </p>
-                  )}
-                  {montantReel && getActiveFeeTypeCurrency() === 'USD' && (
-                    <div className="flex justify-between items-center text-xs font-bold text-slate-500 mt-1">
-                      <span></span>
-                      {currency === 'USD' ? (
-                        <span>Équivalent : {((Math.round(parseFloat(montantReel) * currentExchangeRate * 100)) / 100).toLocaleString()} HTG</span>
-                      ) : (
-                        <span>Équivalent : {((Math.round((parseFloat(montantReel) / (currentExchangeRate || 1)) * 100)) / 100).toLocaleString()} USD</span>
-                      )}
-                    </div>
-                  )}
-                </div>
-                
-                {globalDebt > 0 && (
-                  <div className="bg-rose-50/80 p-4 rounded-2xl border border-rose-200 flex items-start gap-3">
-                    <AlertTriangle className="text-rose-600 mt-0.5 shrink-0" size={16} />
-                    <p className="text-xs text-rose-900">
-                      <strong className="font-bold">Avertissement Arriérés :</strong> L'{terminology.student.toLowerCase()} a une dette globale de {globalDebt.toLocaleString()} HTG. Assurez-vous d'imputer le paiement à la bonne session.
-                    </p>
-                  </div>
-                )}
-                
-                {!loadingDebt && selectedStudent && !globalDebt && Boolean(selectedStudent?.otherEnrollments && selectedStudent.otherEnrollments.length > 0) && (
-                  <div className="bg-emerald-50/70 p-4 rounded-2xl border border-emerald-200/70 flex items-start gap-3">
-                    <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={16} />
-                    <p className="text-xs text-emerald-900 font-medium leading-relaxed">
-                      <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est en règle pour l'ensemble des sessions antérieures ({selectedStudent.otherEnrollments.length} session(s) précédente(s)). Le versement sera imputé à la session active.
-                    </p>
-                  </div>
-                )}
-
-                {loadingDebt && (
-                  <div className="flex items-center gap-2.5 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200">
-                    <Loader2 size={16} className="animate-spin text-blue-600" />
-                    <span className="text-xs font-medium text-slate-500">Audit de solvabilité historique en cours...</span>
                   </div>
                 )}
               </div>
+
+              {/* Detected Active Payment Stage Banner */}
+              {selectedStudent && feeType === 'SCOLARITE' && paymentLogic?.currentStepLabel && (
+                <div className="bg-emerald-50/90 border border-emerald-200/80 rounded-xl sm:rounded-2xl p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 animate-in fade-in duration-300 shadow-2xs relative z-10">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-emerald-500/10 text-emerald-600 flex items-center justify-center shrink-0">
+                      <Sparkles size={18} className="animate-pulse" />
+                    </div>
+                    <div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[9.5px] font-black uppercase tracking-wider text-emerald-800">
+                          Étape Détectée :
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-600 text-white text-[9.5px] font-black tracking-wide">
+                          {paymentLogic.currentStepLabel}
+                        </span>
+                        {paymentLogic.totalSteps > 0 && paymentLogic.currentStepIndex > 0 && (
+                          <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded">
+                            Tranche {paymentLogic.currentStepIndex}/{paymentLogic.totalSteps}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] sm:text-xs text-emerald-900 font-semibold mt-0.5">
+                        Attendu : <strong className="font-extrabold text-emerald-950 font-mono">{paymentLogic.suggestion?.toLocaleString()} {currency}</strong>
+                        {paymentLogic.stepDueDate && (
+                          <span className="text-emerald-700/80 text-[10px] ml-1.5 italic">
+                            • Échéance: {new Date(paymentLogic.stepDueDate).toLocaleDateString()}
+                          </span>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+                  {montantReel !== paymentLogic.suggestion?.toString() && paymentLogic.suggestion > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => setMontantReel(paymentLogic.suggestion.toString())}
+                      className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold rounded-lg transition-all active:scale-95 shrink-0 shadow-xs flex items-center justify-center gap-1 cursor-pointer"
+                    >
+                      <Sparkles size={12} /> Appliquer {paymentLogic.suggestion.toLocaleString()} {currency}
+                    </button>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-1.5 relative z-10">
+                <div className="flex justify-between items-end gap-2">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
+                    Montant à percevoir ({currency})
+                  </label>
+                  {paymentLogic?.suggestion > 0 && (
+                    <button 
+                      type="button" 
+                      onClick={() => setMontantReel(paymentLogic.suggestion.toString())}
+                      className="text-[9.5px] font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-wider bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md cursor-pointer shrink-0"
+                    >
+                      Suggérer : {paymentLogic.suggestion.toLocaleString()} {currency}
+                    </button>
+                  )}
+                </div>
+                <div className="relative group">
+                  <input 
+                    type="number" 
+                    required 
+                    className="w-full px-4 py-3 sm:py-3.5 border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-black font-mono outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 disabled:bg-slate-50" 
+                    placeholder="0.00" 
+                    value={montantReel} 
+                    onChange={(e) => setMontantReel(e.target.value)} 
+                    disabled={!selectedStudent || isSubmitting} 
+                  />
+                  {currency === 'USD' ? <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} /> : <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">G</div>}
+                </div>
+                {globalDebt > 0 && (
+                  <p className="text-[10px] text-rose-600 font-semibold mt-0.5">
+                    Note : L'{terminology.student.toLowerCase()} a également une dette historique de {globalDebt.toLocaleString()} HTG.
+                  </p>
+                )}
+                {montantReel && getActiveFeeTypeCurrency() === 'USD' && (
+                  <div className="flex justify-between items-center text-[11px] font-bold text-slate-500 mt-0.5">
+                    <span></span>
+                    {currency === 'USD' ? (
+                      <span>Équivalent : {((Math.round(parseFloat(montantReel) * currentExchangeRate * 100)) / 100).toLocaleString()} HTG</span>
+                    ) : (
+                      <span>Équivalent : {((Math.round((parseFloat(montantReel) / (currentExchangeRate || 1)) * 100)) / 100).toLocaleString()} USD</span>
+                    )}
+                  </div>
+                )}
+              </div>
+              
+              {globalDebt > 0 && (
+                <div className="bg-rose-50/80 p-3 rounded-xl border border-rose-200 flex items-start gap-2.5">
+                  <AlertTriangle className="text-rose-600 mt-0.5 shrink-0" size={15} />
+                  <p className="text-[11px] text-rose-900">
+                    <strong className="font-bold">Avertissement Arriérés :</strong> L'{terminology.student.toLowerCase()} a une dette globale de {globalDebt.toLocaleString()} HTG. Assurez-vous d'imputer le paiement à la bonne session.
+                  </p>
+                </div>
+              )}
+              
+              {!loadingDebt && selectedStudent && !globalDebt && Boolean(selectedStudent?.otherEnrollments && selectedStudent.otherEnrollments.length > 0) && (
+                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/70 flex items-start gap-2.5">
+                  <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={15} />
+                  <p className="text-[11px] text-emerald-900 font-medium leading-relaxed">
+                    <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est en règle pour l'ensemble des sessions antérieures ({selectedStudent.otherEnrollments.length} session(s) précédente(s)). Le versement sera imputé à la session active.
+                  </p>
+                </div>
+              )}
+
+              {loadingDebt && (
+                <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
+                  <Loader2 size={14} className="animate-spin text-blue-600" />
+                  <span className="text-[11px] font-medium text-slate-500">Audit de solvabilité historique en cours...</span>
+                </div>
+              )}
             </div>
+            
             <button 
               type="submit" 
               disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError} 
-              className="w-full py-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-2xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 mt-8 cursor-pointer active:scale-98"
+              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl sm:rounded-2xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 sm:mt-3 cursor-pointer active:scale-98 text-sm"
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={20} />
+                  <Loader2 className="animate-spin" size={18} />
                   <span>Traitement de l'encaissement...</span>
                 </div>
               ) : (
                 <>
-                  <Save size={19} /> 
+                  <Save size={18} /> 
                   <span>{selectedStudent?.isNotEnrolledInTargetYear ? "Régulariser l'Inscription" : "Enregistrer l'Encaissement"}</span>
                 </>
               )}

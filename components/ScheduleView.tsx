@@ -246,24 +246,6 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     }));
   }, [affiliatedSubjects, otherSubjects, subjects]);
 
-  // Options mémorisées pour le Filtre Campus / Annexe (Style Pilule)
-  const campusFilterOptions: SelectOption[] = useMemo(() => {
-    const opts: SelectOption[] = [
-      { value: 'ALL', label: 'Toutes les annexes', badge: 'Global' }
-    ];
-    if (campuses && campuses.length > 0) {
-      campuses.forEach(cp => {
-        opts.push({
-          value: cp.id,
-          label: cp.name,
-          badge: 'Annexe',
-          icon: Building2
-        });
-      });
-    }
-    return opts;
-  }, [campuses]);
-
   // Options for Day of Week SelectPill
   const daySelectOptions: SelectOption[] = useMemo(() => {
     return days.map(day => ({
@@ -912,16 +894,15 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
 
       {/* FILTRES MODERNES : MULTI-TENANT ANNEXES, VUES & ENTITÉS */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs p-3 sm:p-3.5 space-y-2.5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5">
           
           {/* SÉLECTEUR DE MODE : PAR CLASSE / PAR ENSEIGNANT */}
           {user.role !== 'TEACHER' ? (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/60 shadow-2xs">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex p-1 bg-slate-100/80 rounded-xl border border-slate-200/60">
                 <button
-                  type="button"
                   onClick={() => setViewMode('class')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
                     viewMode === 'class' 
                       ? 'bg-white text-indigo-700 shadow-xs' 
                       : 'text-slate-600 hover:text-slate-900'
@@ -931,9 +912,8 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                   <span>Par {terminology.class || 'Classe'}</span>
                 </button>
                 <button
-                  type="button"
                   onClick={() => setViewMode('staff')}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer ${
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-black transition-all ${
                     viewMode === 'staff' 
                       ? 'bg-white text-indigo-700 shadow-xs' 
                       : 'text-slate-600 hover:text-slate-900'
@@ -944,20 +924,25 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                 </button>
               </div>
 
-              {/* Multi-Tenant Annexe Filter (Visible if School has multiple campuses) - Style Pilule */}
+              {/* Multi-Tenant Annexe Filter (Visible if School has multiple campuses) */}
               {isMultiCampusActive && !user.campus_id && (
-                <div className="w-full sm:w-auto min-w-[180px] sm:min-w-[210px]">
-                  <SelectPill
-                    options={campusFilterOptions}
+                <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                    <Building2 size={12} className="text-indigo-500" />
+                    <span>Annexe :</span>
+                  </label>
+                  <select
                     value={selectedCampusFilter}
-                    onChange={(newCampus) => setSelectedCampusFilter(newCampus)}
-                    variant="compact"
-                    size="sm"
-                    colorScheme="indigo"
-                    dropdownAlign="left"
-                    icon={Building2}
-                    className="w-full"
-                  />
+                    onChange={(e) => setSelectedCampusFilter(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold px-2.5 py-1.5 text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:bg-white transition-all min-w-[150px]"
+                  >
+                    <option value="ALL">🌐 Toutes les annexes</option>
+                    {campuses.map(campus => (
+                      <option key={campus.id} value={campus.id}>
+                        📍 {campus.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>
@@ -975,14 +960,13 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
 
           {/* SÉLECTEUR DE LA CLASSE OU DU PROFESSEUR */}
           {user.role !== 'TEACHER' && (
-            <div className="w-full lg:w-auto flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="flex items-center gap-2">
               {viewMode === 'class' ? (
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    <BookOpen size={12} className="text-indigo-600" />
-                    <span>{terminology.class || 'Classe'} :</span>
-                  </span>
-                  <div className="w-full sm:w-auto min-w-[200px] sm:min-w-[230px] flex-1 sm:flex-initial">
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">
+                    {terminology.class || 'Classe'} :
+                  </label>
+                  <div className="min-w-[190px]">
                     <ClassSelectorPill
                       classes={visibleClasses}
                       selectedClassId={selectedClassId}
@@ -995,17 +979,15 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                       dropdownAlign="right"
                       labelPrefix=""
                       disabled={visibleClasses.length === 0}
-                      className="w-full"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="flex items-center gap-2 w-full sm:w-auto">
-                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider shrink-0 flex items-center gap-1">
-                    <Users size={12} className="text-indigo-600" />
-                    <span>Enseignant :</span>
-                  </span>
-                  <div className="w-full sm:w-auto min-w-[210px] sm:min-w-[240px] flex-1 sm:flex-initial">
+                <div className="flex items-center gap-1.5 w-full sm:w-auto">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-wider shrink-0">
+                    Enseignant :
+                  </label>
+                  <div className="min-w-[200px]">
                     <StaffSelectorPill
                       staffList={filteredStaff}
                       selectedStaffId={selectedStaffId}
@@ -1018,7 +1000,6 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                       dropdownAlign="right"
                       labelPrefix=""
                       disabled={filteredStaff.length === 0}
-                      className="w-full"
                     />
                   </div>
                 </div>

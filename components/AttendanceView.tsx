@@ -596,11 +596,11 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
       {/* 2. PARAMÈTRES & TOOLBAR DE CONTRÔLE */}
       <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-3.5 sm:p-4 space-y-3.5 print:hidden">
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-center">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
           
           {/* Sélection de Classe */}
-          <div className="md:col-span-4 space-y-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+          <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
               <span>{terminology.class || 'Classe'}</span>
               {classes.length > 0 && (
                 <span className="text-[10px] text-slate-400 font-normal">({classes.length} dispo.)</span>
@@ -617,21 +617,23 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
               colorScheme="blue"
               labelPrefix=""
               disabled={classes.length === 0}
+              className="w-full"
             />
           </div>
 
           {/* Sélecteur de Date Intelligent avec Navigation Rapide (Harmonisé DatePickerPill) */}
-          <div className="md:col-span-5 space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="sm:col-span-1 lg:col-span-5 space-y-1 min-w-0">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
                 Date de l'Appel
               </label>
               {!isToday && (
                 <button
+                  type="button"
                   onClick={() => setAttendanceDate(todayStr)}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer shrink-0"
                 >
-                  Revenir à aujourd'hui
+                  Aujourd'hui
                 </button>
               )}
             </div>
@@ -649,23 +651,24 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
           </div>
 
           {/* Recherche Instantanée */}
-          <div className="md:col-span-3 space-y-1">
-            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+          <div className="sm:col-span-2 lg:col-span-3 space-y-1 min-w-0">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate block">
               Recherche {terminology.student || 'Élève'}
             </label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
               <input
                 type="text"
                 placeholder={`Nom ou matricule...`}
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-7 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 transition-all placeholder:text-slate-400"
+                className="w-full pl-8.5 pr-7 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg sm:rounded-xl text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-slate-400"
               />
               {searchTerm && (
                 <button
+                  type="button"
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
                   <X size={13} />
                 </button>
@@ -1035,17 +1038,17 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
                       </td>
 
                       {/* Champ Motif / Commentaire */}
-                      <td className="px-3 py-1.5">
+                      <td className="px-3 py-1.5 min-w-[200px]">
                         <input
                           type="text"
                           placeholder={status !== 'PRESENT' ? "Préciser le motif..." : "Observation..."}
                           value={reason}
                           onChange={(e) => handleReasonChange(student.id, e.target.value)}
                           onBlur={() => handleReasonBlur(student.id)}
-                          className={`w-full px-2.5 py-1.5 text-xs font-medium rounded-lg border outline-none transition-all ${
+                          className={`w-full px-2.5 py-1.5 text-xs font-semibold text-slate-900 placeholder:text-slate-400 rounded-lg border outline-none transition-all ${
                             status !== 'PRESENT' && !reason
-                              ? 'bg-white border-amber-300 focus:border-amber-500 focus:ring-1 focus:ring-amber-500'
-                              : 'bg-slate-50/70 border-slate-200 focus:bg-white focus:border-blue-400 focus:ring-1 focus:ring-blue-400'
+                              ? 'bg-amber-50/40 border-amber-300 focus:bg-white focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 text-slate-900 placeholder:text-amber-800/60'
+                              : 'bg-white border-slate-200 hover:border-slate-300 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 text-slate-900 shadow-2xs'
                           }`}
                         />
                       </td>
