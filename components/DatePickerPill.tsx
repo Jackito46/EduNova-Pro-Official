@@ -132,6 +132,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
+  const [openUpward, setOpenUpward] = useState(false);
 
   // Format today string YYYY-MM-DD
   const todayStr = useMemo(() => {
@@ -174,10 +175,21 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
     } else if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
       const spaceOnRight = window.innerWidth - rect.left;
-      if (spaceOnRight < 340 && rect.right >= 340) {
+      if (spaceOnRight < 350 && rect.right >= 340) {
         setEffectiveAlign('right');
       } else {
         setEffectiveAlign('left');
+      }
+    }
+
+    if (containerRef.current && isOpen) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      if (spaceBelow < 380 && spaceAbove > spaceBelow) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
       }
     }
   }, [dropdownAlign, isOpen]);
@@ -705,7 +717,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
               /* Mobile: Centered Bottom Sheet / Card Modal */
               fixed left-3 right-3 bottom-4 max-h-[85vh] overflow-y-auto sm:overflow-visible sm:max-h-none sm:left-auto sm:right-auto sm:bottom-auto
               /* Tablet / Desktop: Anchor Floating Popover */
-              sm:absolute ${effectiveAlign === 'right' ? 'sm:right-0' : 'sm:left-0'} sm:top-full sm:mt-2
+              sm:absolute ${effectiveAlign === 'right' ? 'sm:right-0' : 'sm:left-0'} ${openUpward ? 'sm:bottom-full sm:mb-2' : 'sm:top-full sm:mt-2'}
               w-auto sm:w-[340px] max-w-full sm:max-w-[calc(100vw-2rem)] bg-white rounded-3xl shadow-2xl border border-slate-200
               p-4 z-[100] animate-in fade-in zoom-in-95 duration-150 select-none
             `}

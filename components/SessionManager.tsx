@@ -358,19 +358,19 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
   const specialCount = currentYears.filter(y => y.session_type === 'SPECIAL').length;
 
   return (
-    <div id="session-manager-root" className="space-y-8">
+    <div id="session-manager-root" className="space-y-4 sm:space-y-5">
       
       {/* 1. Header & Context Infotip */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 md:p-8 rounded-2xl border border-slate-200/80 shadow-sm">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2 text-indigo-600 font-mono text-[10px] uppercase tracking-wider font-extrabold">
-            <Sparkles size={14} className="text-indigo-500" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-xs">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-1.5 text-indigo-600 font-mono text-[10px] uppercase tracking-wider font-extrabold">
+            <Sparkles size={13} className="text-indigo-500" />
             <span>{isHigherEd ? "Moteur Multi-Sessions Parallèles" : "Cycle Classique"}</span>
           </div>
-          <h2 className="text-xl md:text-2xl font-black tracking-tight text-slate-900">
+          <h2 className="text-lg sm:text-xl font-black tracking-tight text-slate-900">
             Gestion des {terminology.academicYears}
           </h2>
-          <p className="text-slate-500 text-xs font-semibold max-w-xl leading-relaxed">
+          <p className="text-slate-500 text-xs font-medium max-w-xl leading-relaxed">
             {isHigherEd 
               ? "Exécution autonome de plusieurs sessions universitaires en parallèle."
               : `Créez et configurez l'${terminology.academicYear.toLowerCase()} active pour votre école classique.`
@@ -381,17 +381,17 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         {isHigherEd ? (
           <button 
             onClick={() => setShowArchivingGuide(true)}
-            className="px-5 py-3 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap self-start sm:self-center"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-slate-50 hover:bg-slate-100 border border-slate-200 text-slate-700 transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap self-start sm:self-center cursor-pointer shadow-2xs"
           >
-            <HelpCircle size={15} className="text-slate-500" />
+            <HelpCircle size={14} className="text-slate-500" />
             <span>Comment Archiver ?</span>
           </button>
         ) : (
           <button 
             onClick={() => setShowPassationGuide(true)}
-            className="px-5 py-3 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap self-start sm:self-center"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap self-start sm:self-center cursor-pointer shadow-2xs"
           >
-            <HelpCircle size={15} className="text-indigo-600" />
+            <HelpCircle size={14} className="text-indigo-600" />
             <span>Principes de Passation ?</span>
           </button>
         )}
@@ -626,54 +626,54 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
       </Modal>
 
       {/* 2. Metrics Grid */}
-      <div className={`grid grid-cols-1 ${isHigherEd ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2'} gap-4`}>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
+      <div className={`grid grid-cols-1 ${isHigherEd ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-2'} gap-3 sm:gap-3.5`}>
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div className="space-y-0.5">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Total {terminology.academicYears}</p>
-            <p className="text-3xl font-black text-slate-900">{totalSessionsCount}</p>
+            <p className="text-2xl font-black text-slate-900">{totalSessionsCount}</p>
           </div>
-          <div className="p-3 bg-slate-50 rounded-xl border border-slate-100 text-slate-700">
-            <Calendar size={22} />
+          <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-100 text-slate-700">
+            <Calendar size={18} />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
+        <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+          <div className="space-y-0.5">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">{terminology.academicYears} Actives</p>
-            <p className="text-3xl font-black text-emerald-600 flex items-center gap-2">
+            <p className="text-2xl font-black text-emerald-600 flex items-center gap-1.5">
               {activeSessionsCount}
               {activeSessionsCount > 0 && (
-                <span className="flex h-2.5 w-2.5 relative">
+                <span className="flex h-2 w-2 relative">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
               )}
             </p>
           </div>
-          <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100">
-            <TrendingUp size={22} />
+          <div className="p-2.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-100">
+            <TrendingUp size={18} />
           </div>
         </div>
 
         {isHigherEd && (
           <>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div className="space-y-1">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+              <div className="space-y-0.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sessions Intensives</p>
-                <p className="text-3xl font-black text-amber-600">{intensiveCount}</p>
+                <p className="text-2xl font-black text-amber-600">{intensiveCount}</p>
               </div>
-              <div className="p-3 bg-amber-50 text-amber-700 rounded-xl border border-amber-100">
-                <Zap size={22} />
+              <div className="p-2.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-100">
+                <Zap size={18} />
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-              <div className="space-y-1">
+            <div className="bg-white p-3.5 sm:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex items-center justify-between">
+              <div className="space-y-0.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">Sessions Spéciales</p>
-                <p className="text-3xl font-black text-purple-600">{specialCount}</p>
+                <p className="text-2xl font-black text-purple-600">{specialCount}</p>
               </div>
-              <div className="p-3 bg-purple-50 text-purple-700 rounded-xl border border-purple-100">
-                <Sparkles size={22} />
+              <div className="p-2.5 bg-purple-50 text-purple-700 rounded-lg border border-purple-100">
+                <Sparkles size={18} />
               </div>
             </div>
           </>
@@ -681,17 +681,17 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
       </div>
 
       {/* 3. New Session Creation Block */}
-      <div className="bg-white p-6 sm:p-7 rounded-2xl border border-slate-200/90 shadow-xs space-y-5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 shadow-2xs">
-              <Plus size={18} />
+      <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg border border-indigo-100 shadow-2xs">
+              <Plus size={16} />
             </div>
             <div>
-              <h3 className="text-base font-bold tracking-tight text-slate-900">
+              <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
                 {isHigherEd ? "Ajouter une Nouvelle Session Universitaire" : "Initialisation d'une Nouvelle Année Scolaire"}
               </h3>
-              <p className="text-xs text-slate-500 font-normal">
+              <p className="text-[11px] text-slate-500 font-normal">
                 {isHigherEd 
                   ? "Configurez les dates et le type pour votre prochaine session académique."
                   : "Définissez le libellé et les dates officielles pour entamer la passation administrative."}
@@ -701,8 +701,8 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
 
           {/* Current Active Badge for context */}
           {currentYears.find(y => y.status === 'ACTIVE' || y.is_active) && (
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 rounded-xl text-emerald-800 text-xs font-semibold self-start sm:self-auto">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-[11px] font-semibold self-start sm:self-auto">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               <span>{isHigherEd ? 'Session Active' : 'Année Active'} : <strong className="font-bold">{currentYears.find(y => y.status === 'ACTIVE' || y.is_active)?.label}</strong></span>
             </div>
           )}
@@ -710,11 +710,11 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
 
         {/* Higher-Ed Only: Templates Quick Select Pills */}
         {isHigherEd && (
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-1 block">
+          <div className="space-y-1.5">
+            <label className="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-0.5 block">
               ⚡ Modèles Universitaires & Durées Rapides
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {templates.map(tpl => {
                 const isSelected = selectedPreset === tpl.id;
                 return (
@@ -729,16 +729,16 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                         applyTemplate(tpl.months, tpl.prefix, tpl.type);
                       }
                     }}
-                    className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 ${
+                    className={`p-2.5 rounded-xl border text-left transition-all flex flex-col justify-between gap-1 cursor-pointer ${
                       isSelected 
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm' 
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
                         : 'bg-slate-50 hover:bg-slate-100/80 border-slate-200 text-slate-800'
                     }`}
                   >
-                    <span className={`text-[10px] font-black uppercase tracking-wider ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
+                    <span className={`text-[9px] font-black uppercase tracking-wider ${isSelected ? 'text-indigo-100' : 'text-slate-500'}`}>
                       {tpl.type === 'INTENSIVE' ? '⚡ Intensif' : tpl.months + ' Mois'}
                     </span>
-                    <span className="text-xs font-bold line-clamp-1 leading-snug">
+                    <span className="text-xs font-bold line-clamp-1 leading-tight">
                       {tpl.prefix}
                     </span>
                   </button>
@@ -749,15 +749,15 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         )}
 
         {/* Inputs Form */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-1">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-3 pt-0.5">
           {/* Libellé */}
-          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-4' : 'md:col-span-4'} space-y-1.5`}>
+          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-4' : 'md:col-span-4'} space-y-1`}>
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-1">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5">
                 {isHigherEd ? "Libellé de la session" : "Libellé de l'année scolaire *"}
               </label>
               {isHigherEd && (
-                <span className="text-[9px] text-indigo-600 font-extrabold uppercase tracking-wider mr-1 bg-indigo-50 px-1.5 py-0.5 rounded">
+                <span className="text-[9px] text-indigo-600 font-extrabold uppercase tracking-wider mr-0.5 bg-indigo-50 px-1 py-0.5 rounded">
                   Optionnel
                 </span>
               )}
@@ -765,24 +765,24 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             <input 
               type="text" 
               placeholder={isHigherEd ? "Ex: Session Automne 2026" : "Ex: 2025-2026"} 
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-sans"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-sans"
               value={newYearData.label}
               onChange={e => {
                 setNewYearData({...newYearData, label: e.target.value});
                 if (selectedPreset) setSelectedPreset('');
               }}
             />
-            <p className="text-[10px] text-slate-400 font-medium ml-1">
+            <p className="text-[10px] text-slate-400 font-medium ml-0.5">
               {isHigherEd ? "Sera généré d'après les dates si laissé vide" : "Format obligatoire : AAAA-AAAA (ex: 2025-2026)"}
             </p>
           </div>
 
           {/* Type of Session (Higher Ed Only) */}
           {isHigherEd && (
-            <div className="col-span-12 md:col-span-4 space-y-1.5">
-              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-1">Type de session</label>
+            <div className="col-span-12 md:col-span-4 space-y-1">
+              <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5">Type de session</label>
               <select
-                className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                 value={newYearData.sessionType}
                 onChange={e => {
                   setNewYearData({...newYearData, sessionType: e.target.value as any});
@@ -797,13 +797,13 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
           )}
 
           {/* Dates */}
-          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-1.5`}>
-            <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-1 block">
+          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-1`}>
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5 block">
               Début {isHigherEd ? 'session' : "d'année scolaire"}
             </label>
             <input 
               type="date" 
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
               value={newYearData.startDate}
               onChange={e => {
                 setNewYearData({...newYearData, startDate: e.target.value});
@@ -812,13 +812,13 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             />
           </div>
 
-          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-1.5`}>
-            <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-1 block">
+          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-1`}>
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5 block">
               Fin {isHigherEd ? 'session' : "d'année scolaire"}
             </label>
             <input 
               type="date" 
-              className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
               value={newYearData.endDate}
               onChange={e => {
                 setNewYearData({...newYearData, endDate: e.target.value});
@@ -828,9 +828,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-100">
-          <p className="text-xs text-slate-500 font-medium flex items-center gap-1.5">
-            <Info size={14} className="text-indigo-500 shrink-0" />
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2.5 border-t border-slate-100">
+          <p className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+            <Info size={13} className="text-indigo-500 shrink-0" />
             <span>
               {isHigherEd 
                 ? "La nouvelle session sera créée avec le statut Nouvelle (Vierge) prête pour la préparation."
@@ -841,9 +841,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
           <button 
             onClick={handleAddYear} 
             disabled={actionLoading === 'add_year'} 
-            className="w-full sm:w-auto px-6 h-[42px] bg-slate-900 hover:bg-black text-white rounded-xl transition-all shadow-xs active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full sm:w-auto px-5 h-[38px] bg-slate-900 hover:bg-black text-white rounded-xl transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            {actionLoading === 'add_year' ? <Loader2 size={15} className="animate-spin" /> : <Plus size={16} />}
+            {actionLoading === 'add_year' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={15} />}
             <span className="text-xs font-bold whitespace-nowrap">
               Créer {isHigherEd ? 'la session' : "l'année scolaire"}
             </span>
@@ -852,53 +852,53 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
       </div>
 
       {/* 4. Filter & View Mode Tabs */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 border-b border-slate-200 pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
         {/* View Mode Toggle */}
-        <div className="flex items-center bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+        <div className="flex items-center bg-slate-100 p-0.5 rounded-xl w-full sm:w-auto">
           <button 
             onClick={() => setViewMode('CURRENT')} 
-            className={`flex-1 sm:flex-none px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 ${viewMode === 'CURRENT' ? 'bg-white text-indigo-700 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 sm:flex-none px-4 py-2 text-[11px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${viewMode === 'CURRENT' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            <Calendar size={14} className={viewMode === 'CURRENT' ? 'text-indigo-600' : 'text-slate-500'} />
+            <Calendar size={13} className={viewMode === 'CURRENT' ? 'text-indigo-600' : 'text-slate-500'} />
             {isHigherEd ? 'Sessions Actives' : 'Années Scolaires Actives'} ({currentYears.length})
           </button>
           <button 
             onClick={() => setViewMode('ARCHIVED')} 
-            className={`flex-1 sm:flex-none px-5 py-2.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-2 ${viewMode === 'ARCHIVED' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 sm:flex-none px-4 py-2 text-[11px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${viewMode === 'ARCHIVED' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
           >
-            <Bookmark size={14} className={viewMode === 'ARCHIVED' ? 'text-slate-700' : 'text-slate-500'} />
+            <Bookmark size={13} className={viewMode === 'ARCHIVED' ? 'text-slate-700' : 'text-slate-500'} />
             Archives ({archivedYears.length})
           </button>
         </div>
 
         {/* Type Filter */}
         {isHigherEd && (
-          <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-1 rounded-xl border border-slate-100">
+          <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-0.5 rounded-xl border border-slate-100">
             <button 
               onClick={() => setActiveFilter('ALL')} 
-              className={`px-3 py-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all ${activeFilter === 'ALL' ? 'bg-white text-slate-950 shadow-sm border border-slate-200/50' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${activeFilter === 'ALL' ? 'bg-white text-slate-950 shadow-2xs border border-slate-200/50' : 'text-slate-600 hover:bg-slate-200/50'}`}
             >
               Tout
             </button>
             <button 
               onClick={() => setActiveFilter('REGULAR')} 
-              className={`px-3 py-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 ${activeFilter === 'REGULAR' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer ${activeFilter === 'REGULAR' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200/50'}`}
             >
-              <BookOpen size={12} />
+              <BookOpen size={11} />
               Normales
             </button>
             <button 
               onClick={() => setActiveFilter('INTENSIVE')} 
-              className={`px-3 py-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 ${activeFilter === 'INTENSIVE' ? 'bg-amber-500 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer ${activeFilter === 'INTENSIVE' ? 'bg-amber-500 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200/50'}`}
             >
-              <Zap size={12} />
+              <Zap size={11} />
               Intensives
             </button>
             <button 
               onClick={() => setActiveFilter('SPECIAL')} 
-              className={`px-3 py-1.5 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1.5 ${activeFilter === 'SPECIAL' ? 'bg-purple-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer ${activeFilter === 'SPECIAL' ? 'bg-purple-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200/50'}`}
             >
-              <Sparkles size={12} />
+              <Sparkles size={11} />
               Spéciales
             </button>
           </div>
@@ -906,21 +906,21 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
       </div>
 
       {/* 5. Sessions Interactive Cards Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
         <AnimatePresence mode="popLayout">
           {filteredYears.length === 0 ? (
-            <div className="md:col-span-2 py-16 text-center bg-slate-50 border border-dashed border-slate-200 rounded-3xl space-y-3">
+            <div className="md:col-span-2 py-12 text-center bg-slate-50 border border-dashed border-slate-200 rounded-2xl space-y-2">
               {viewMode === 'ARCHIVED' ? (
                 <>
-                  <Bookmark size={40} className="mx-auto text-slate-300" />
-                  <p className="text-slate-700 font-bold">Aucune archive disponible.</p>
-                  <p className="text-slate-700 text-xs">Les sessions terminées que vous archivez apparaîtront ici.</p>
+                  <Bookmark size={32} className="mx-auto text-slate-300" />
+                  <p className="text-slate-700 font-bold text-sm">Aucune archive disponible.</p>
+                  <p className="text-slate-500 text-xs">Les sessions terminées que vous archivez apparaîtront ici.</p>
                 </>
               ) : (
                 <>
-                  <Calendar size={40} className="mx-auto text-slate-300" />
-                  <p className="text-slate-700 font-bold">Aucune session active ou en préparation trouvée.</p>
-                  <p className="text-slate-700 text-xs">Créez une nouvelle session pour démarrer.</p>
+                  <Calendar size={32} className="mx-auto text-slate-300" />
+                  <p className="text-slate-700 font-bold text-sm">Aucune session active ou en préparation trouvée.</p>
+                  <p className="text-slate-500 text-xs">Créez une nouvelle session pour démarrer.</p>
                 </>
               )}
             </div>
@@ -933,55 +933,55 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                 <motion.div 
                   layout
                   key={year.id} 
-                  initial={{ opacity: 0, y: 15 }}
+                  initial={{ opacity: 0, y: 12 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.3 }}
-                  className={`flex flex-col p-6 rounded-2xl border transition-all gap-5 ${isActive ? 'bg-slate-900/[0.02] border-indigo-500/80 shadow-lg shadow-indigo-950/5 ring-1 ring-indigo-500/20' : year.status === 'FUTURE' ? 'bg-indigo-50/20 border-indigo-200/80' : 'bg-white border-slate-200/80 shadow-xs hover:shadow-md'}`}
+                  transition={{ duration: 0.25 }}
+                  className={`flex flex-col p-4 sm:p-5 rounded-2xl border transition-all gap-3.5 ${isActive ? 'bg-slate-900/[0.02] border-indigo-500/80 shadow-md shadow-indigo-950/5 ring-1 ring-indigo-500/20' : year.status === 'FUTURE' ? 'bg-indigo-50/20 border-indigo-200/80' : 'bg-white border-slate-200/80 shadow-2xs hover:shadow-xs'}`}
                 >
                   {/* Top Line: Badge, Libellé, Status */}
                   <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-2">
+                    <div className="space-y-1">
                       {isHigherEd && (
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 ${typeBadge.classes}`}>
+                        <div className="flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 ${typeBadge.classes}`}>
                             {typeBadge.icon}
                             {typeBadge.label}
                           </span>
                         </div>
                       )}
                       
-                      <h3 className="text-xl font-black text-slate-900 tracking-tight leading-snug">
+                      <h3 className="text-lg font-black text-slate-900 tracking-tight leading-snug">
                         {year.label}
                       </h3>
                       
-                      <div className="flex items-center gap-1.5 text-slate-700">
-                        <Calendar size={13} className="text-slate-700" />
-                        <span className="text-xs font-bold uppercase tracking-tight">
+                      <div className="flex items-center gap-1.5 text-slate-600">
+                        <Calendar size={12} className="text-slate-500" />
+                        <span className="text-[11px] font-bold uppercase tracking-tight">
                           {year.start_date ? new Date(year.start_date).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : 'N/A'} — {year.end_date ? new Date(year.end_date).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : 'N/A'}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1.5">
+                    <div className="flex flex-col items-end gap-1">
                       {year.status === 'ACTIVE' && (
-                        <span className="px-3 py-1 bg-slate-900 text-white rounded-xl text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5">
-                          <span className="h-2 w-2 rounded-full bg-blue-400 animate-pulse"></span>
+                        <span className="px-2.5 py-0.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-2xs flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse"></span>
                           Actif
                         </span>
                       )}
                       {year.status === 'FUTURE' && (
-                        <span className="px-2.5 py-1 bg-indigo-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
+                        <span className="px-2 py-0.5 bg-indigo-500 text-white rounded-md text-[9px] font-black uppercase tracking-wider shadow-2xs">
                           En Préparation
                         </span>
                       )}
                       {year.status === 'VIERGE' && (
-                        <span className="px-2.5 py-1 bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
+                        <span className="px-2 py-0.5 bg-amber-500 text-white rounded-md text-[9px] font-black uppercase tracking-wider shadow-2xs">
                           Nouvelle
                         </span>
                       )}
                       {year.status === 'PAST' && (
-                        <span className="px-2.5 py-1 bg-slate-400 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-sm">
+                        <span className="px-2 py-0.5 bg-slate-400 text-white rounded-md text-[9px] font-black uppercase tracking-wider shadow-2xs">
                           Archivée
                         </span>
                       )}
@@ -989,15 +989,15 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                   </div>
 
                   {/* Actions Bar */}
-                  <div className="flex flex-wrap items-center gap-2.5 pt-4 border-t border-slate-100">
+                  <div className="flex flex-wrap items-center gap-2 pt-3 border-t border-slate-100">
                     {/* Launch button */}
                     {year.status !== 'ACTIVE' && year.status !== 'PAST' && (
                       <button 
                         onClick={() => setConfirmState({ year, status: 'ACTIVE' })} 
                         disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3.5 py-2 bg-slate-900 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={12} className="animate-spin" />}
+                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin" />}
                         {isHigherEd ? 'Lancer la session' : "Lancer l'année scolaire"}
                       </button>
                     )}
@@ -1007,9 +1007,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                       <button 
                         onClick={() => setConfirmState({ year, status: 'FUTURE' })} 
                         disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3.5 py-2 bg-indigo-600 text-white rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={12} className="animate-spin" />}
+                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin" />}
                         Mettre en préparation
                       </button>
                     )}
@@ -1019,9 +1019,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                       <button 
                         onClick={() => setConfirmState({ year, status: 'PAST' })} 
                         disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3.5 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={12} className="animate-spin text-slate-700" />}
+                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin text-slate-700" />}
                         {isHigherEd ? 'Archiver la session' : "Archiver l'année"}
                       </button>
                     )}
@@ -1031,9 +1031,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                       <button 
                         onClick={() => setConfirmState({ year, status: 'PAST' })} 
                         disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3.5 py-2 bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={12} className="animate-spin text-slate-700" />}
+                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin text-slate-700" />}
                         Terminer / Archiver
                       </button>
                     )}
@@ -1042,10 +1042,10 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                     {(year.status === 'VIERGE' || year.status === 'FUTURE' || year.status === 'PAST') && (
                       <button 
                         onClick={() => setSessionToDelete(year)} 
-                        className="p-2 text-rose-600 bg-rose-50/50 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-xl transition-all ml-auto active:scale-90 flex items-center justify-center cursor-pointer"
+                        className="p-1.5 text-rose-600 bg-rose-50/50 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-lg transition-all ml-auto active:scale-90 flex items-center justify-center cursor-pointer"
                         title="Supprimer définitivement"
                       >
-                        <Trash2 size={15} />
+                        <Trash2 size={14} />
                       </button>
                     )}
                   </div>

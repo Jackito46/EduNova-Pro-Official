@@ -44,6 +44,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -51,16 +52,27 @@ export const SelectPill: React.FC<SelectPillProps> = ({
       setEffectiveAlign(dropdownAlign);
     } else if (containerRef.current) {
       const rect = containerRef.current.getBoundingClientRect();
-      if (rect.right + 180 > window.innerWidth) {
+      if (rect.right + 180 > window.innerWidth || window.innerWidth - rect.left < 280) {
         setEffectiveAlign('right');
       } else {
         setEffectiveAlign('left');
       }
     }
+
+    if (containerRef.current && isOpen) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      if (spaceBelow < 280 && spaceAbove > spaceBelow) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
   }, [dropdownAlign, isOpen]);
 
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setIsOpen(false);
       }
@@ -73,10 +85,12 @@ export const SelectPill: React.FC<SelectPillProps> = ({
 
     if (isOpen) {
       document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('touchstart', handleClickOutside);
       document.addEventListener('keydown', handleKeyDown);
     }
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('keydown', handleKeyDown);
     };
   }, [isOpen]);
@@ -217,7 +231,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
 
       {isOpen && (
         <div
-          className={`absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-64 sm:w-72 min-w-full max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-[100] animate-in fade-in zoom-in-95 duration-150`}
+          className={`absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} ${openUpward ? 'bottom-full mb-2' : 'top-full mt-2'} w-64 sm:w-72 min-w-full max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-[100] animate-in fade-in zoom-in-95 duration-150`}
         >
           {searchable && (
             <div className="p-1 mb-1">
