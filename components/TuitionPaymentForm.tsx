@@ -42,6 +42,7 @@ import { MonCashService } from '../services/moncashService';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
+import { DatePickerPill } from './DatePickerPill';
 import { tuitionPaymentSchema } from '../utils/validation';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig, PaymentMethodConfig } from '../lib/paymentMethods';
@@ -2383,20 +2384,22 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       {(paymentMethod === 'Dépôt Bancaire' || currentMethodConfig?.requires_bank) && (
                         <div className="space-y-1.5">
                           <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Date du dépôt</label>
-                          <input 
-                            type="date" 
-                            required 
-                            max={getLocalTodayString()}
-                            className="w-full px-4 py-3 border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-900 rounded-2xl text-sm outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 font-medium" 
-                            value={depositDate} 
-                            onChange={(e) => {
-                              const restriction = isRestrictedBankDate(e.target.value);
+                          <DatePickerPill
+                            selectedDate={depositDate}
+                            onSelectDate={(newDate) => {
+                              const restriction = isRestrictedBankDate(newDate);
                               if (restriction.restricted) {
                                 toast.error(`Opération impossible : ${restriction.reason}.`);
                                 return;
                               }
-                              setDepositDate(e.target.value);
-                            }} 
+                              setDepositDate(newDate);
+                            }}
+                            maxDate={getLocalTodayString()}
+                            variant="field"
+                            size="md"
+                            colorScheme="blue"
+                            showTodayBadge={true}
+                            className="w-full"
                           />
                         </div>
                       )}

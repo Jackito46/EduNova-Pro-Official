@@ -33,6 +33,7 @@ import {
   FileSpreadsheet,
   Sparkles
 } from 'lucide-react';
+import { DatePickerPill } from './DatePickerPill';
 import { toast } from 'sonner';
 import { UserProfile, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
@@ -834,15 +835,15 @@ export const DailyCashClosureModal: React.FC<DailyCashClosureModalProps> = ({
         <div className="bg-slate-50 dark:bg-slate-800/60 p-4 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 shrink-0">
           <div className="flex flex-wrap items-center gap-3">
             {/* Date Selector */}
-            <div className="flex items-center gap-2 bg-white dark:bg-slate-900 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 shadow-2xs">
-              <Calendar size={16} className="text-indigo-600 dark:text-indigo-400 shrink-0" />
-              <span className="text-xs font-bold text-slate-600 dark:text-slate-400">Date :</span>
-              <input 
-                type="date"
-                value={selectedDate}
-                max={getLocalTodayString()}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="bg-transparent text-xs font-black text-slate-900 dark:text-white border-none outline-none focus:ring-0 cursor-pointer"
+            <div className="w-full sm:w-auto min-w-[220px]">
+              <DatePickerPill
+                selectedDate={selectedDate}
+                onSelectDate={(newDate) => setSelectedDate(newDate)}
+                maxDate={getLocalTodayString()}
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                showTodayBadge={true}
               />
             </div>
 

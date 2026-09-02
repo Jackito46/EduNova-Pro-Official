@@ -23,6 +23,7 @@ import { AuditLogger } from '../utils/auditLogger';
 import { UserProfile } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
 import { expenseSchema } from '../utils/validation';
+import { DatePickerPill } from './DatePickerPill';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { getLocalTodayString } from '../utils/dateUtils';
 
@@ -336,10 +337,15 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="space-y-2">
                        <label className="text-xs font-bold text-slate-500 tracking-tight ml-1">Date d'opération</label>
-                       <div className="relative">
-                         <input type="date" required className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-200 rounded-xl text-xs font-bold  tracking-tight focus:bg-gray-50 outline-none transition-all" value={formData.expense_date} onChange={e => setFormData({...formData, expense_date: e.target.value})} />
-                         <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
-                       </div>
+                       <DatePickerPill
+                         selectedDate={formData.expense_date}
+                         onSelectDate={(newDate) => setFormData({ ...formData, expense_date: newDate })}
+                         variant="field"
+                         size="md"
+                         colorScheme="slate"
+                         showTodayBadge={true}
+                         className="w-full"
+                       />
                     </div>
                     <div className="space-y-2">
                        <label className="text-xs font-bold text-slate-500 tracking-tight ml-1">Montant & Devise</label>

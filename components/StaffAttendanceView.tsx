@@ -11,6 +11,7 @@ import { StaffMember, StaffAssignment, StaffAttendance, UserProfile, SchoolType 
 import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
+import { DatePickerPill } from './DatePickerPill';
 
 interface StaffAttendanceViewProps {
   user: UserProfile;
@@ -917,45 +918,20 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
           </div>
         </div>
 
-        {/* Date Selector Quick Bar */}
-        <div className="relative z-10 flex items-center gap-1.5 bg-white/10 backdrop-blur-md p-1.5 rounded-2xl border border-white/15 self-start md:self-auto shrink-0">
-          <button
-            type="button"
-            onClick={() => shiftDate(-1)}
-            className="p-1.5 sm:p-2 hover:bg-white/15 rounded-xl transition-all text-white/80 hover:text-white"
-            title="Jour précédent"
-          >
-            <ChevronLeft size={16} />
-          </button>
-
-          <div className="flex items-center gap-1.5 px-2 sm:px-3 py-1">
-            <Calendar size={15} className="text-indigo-300 shrink-0" />
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-white font-bold text-xs outline-none cursor-pointer text-center"
-            />
-          </div>
-
-          <button
-            type="button"
-            onClick={() => shiftDate(1)}
-            className="p-1.5 sm:p-2 hover:bg-white/15 rounded-xl transition-all text-white/80 hover:text-white"
-            title="Jour suivant"
-          >
-            <ChevronRight size={16} />
-          </button>
-
-          {!isToday && (
-            <button
-              type="button"
-              onClick={() => setSelectedDate(todayStr)}
-              className="px-2.5 sm:px-3 py-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs"
-            >
-              Aujourd'hui
-            </button>
-          )}
+        {/* Date Selector Quick Bar (Harmonisé DatePickerPill) */}
+        <div className="relative z-10 self-start md:self-auto shrink-0 w-full sm:w-auto min-w-[220px]">
+          <DatePickerPill
+            selectedDate={selectedDate}
+            onSelectDate={(newDate) => setSelectedDate(newDate)}
+            variant="compact"
+            size="sm"
+            colorScheme="indigo"
+            dropdownAlign="right"
+            showShortcuts={false}
+            showQuickArrows={true}
+            showTodayBadge={true}
+            className="w-full"
+          />
         </div>
       </div>
 

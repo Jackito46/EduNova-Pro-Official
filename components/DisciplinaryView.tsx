@@ -22,6 +22,7 @@ import * as XLSX from 'xlsx';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 
 interface DisciplinaryRecord {
   id: string;
@@ -1791,12 +1792,15 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-xs font-black text-slate-800 uppercase tracking-wider mb-1.5 block">
                   Date des faits *
                 </label>
-                <input
-                  type="date"
-                  className="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/10 transition-all"
-                  value={formData.incident_date}
-                  max={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
-                  onChange={(e) => setFormData({ ...formData, incident_date: e.target.value })}
+                <DatePickerPill
+                  selectedDate={formData.incident_date}
+                  maxDate={new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]}
+                  onSelectDate={(newDate) => setFormData({ ...formData, incident_date: newDate })}
+                  variant="field"
+                  size="md"
+                  colorScheme="rose"
+                  showTodayBadge={true}
+                  className="w-full"
                 />
               </div>
 

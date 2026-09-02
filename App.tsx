@@ -98,7 +98,7 @@ const originalToastError = toast.error;
 if (typeof window !== 'undefined') {
   console.log('--- DIAGNOSTIC SCRIPT: DEPLOYMENT INFO ---');
   console.log('Build Timestamp:', typeof __BUILD_TIMESTAMP__ !== 'undefined' ? __BUILD_TIMESTAMP__ : 'N/A');
-  console.log('Render Git Commit:', typeof __RENDER_GIT_COMMIT__ !== 'undefined' ? __RENDER_GIT_COMMIT__ : 'N/A');
+  console.log('Deployment Git Commit:', typeof __RENDER_GIT_COMMIT__ !== 'undefined' ? __RENDER_GIT_COMMIT__ : 'N/A');
   console.log('Node Env:', typeof __NODE_ENV__ !== 'undefined' ? __NODE_ENV__ : 'N/A');
   console.log('Environment variables loaded:', {
     VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? '✓ Configured' : 'Missing',
@@ -403,7 +403,7 @@ const App: React.FC = () => {
     }
     
     try {
-      // Wrap the query in a Promise.race with a 5-second timeout
+      // Wrap the query in a Promise.race with a 15-second timeout for server cold-start tolerance
       const queryPromise = supabase
         .from('profiles')
         .select('*')
@@ -412,7 +412,7 @@ const App: React.FC = () => {
         
       let timeoutId: NodeJS.Timeout;
       const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => {
-        timeoutId = setTimeout(() => reject(new Error("syncProfile timeout")), 5000);
+        timeoutId = setTimeout(() => reject(new Error("syncProfile timeout")), 15000);
       });
       
       const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
@@ -898,30 +898,26 @@ const App: React.FC = () => {
     };
   }, [user?.school_id]);
 
-  // Heartbeat Mechanism: Keep Render & Supabase connections alive
+  // Heartbeat & Pre-warm Mechanism: Keep server & database active and responsive
   useEffect(() => {
-    if (!user) return; // Only send heartbeats when logged in
-    
-    // Function to ping the server and a lightweight table
+    // Function to ping the server health endpoint and a lightweight database record
     const pingHeartbeat = async () => {
       try {
-        // Ping Node.js backend to prevent Render from sleeping
         await fetch('/api/health', { method: 'HEAD' }).catch(() => {});
-        
-        // Ping Supabase to keep connection pool active
         await supabase.from('global_settings').select('id').limit(1).maybeSingle();
-        
-        console.debug("Heartbeat sent");
       } catch (err) {
         // Silently ignore heartbeat errors
       }
     };
 
-    // 4 minutes = 240000 ms
-    const intervalId = setInterval(pingHeartbeat, 240000);
+    // Instant pre-warm on application load
+    pingHeartbeat();
+
+    // Periodic keep-alive ping every 3 minutes (180000ms)
+    const intervalId = setInterval(pingHeartbeat, 180000);
     
     return () => clearInterval(intervalId);
-  }, [user]);
+  }, [user?.id]);
 
   // Auto-logout & Concurrent Session Check
   useEffect(() => {

@@ -10,6 +10,7 @@ import { UserProfile, SchoolClass, StudentAttendance } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
 import { ClassSelectorPill } from './ClassSelectorPill';
+import { DatePickerPill } from './DatePickerPill';
 
 interface AttendanceViewProps {
   user: UserProfile;
@@ -619,47 +620,32 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
             />
           </div>
 
-          {/* Sélecteur de Date Intelligent avec Navigation Rapide */}
+          {/* Sélecteur de Date Intelligent avec Navigation Rapide (Harmonisé DatePickerPill) */}
           <div className="md:col-span-5 space-y-1">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 Date de l'Appel
               </label>
-              {isToday ? (
-                <span className="text-[10px] font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
-                  Aujourd'hui
-                </span>
-              ) : (
+              {!isToday && (
                 <button
                   onClick={() => setAttendanceDate(todayStr)}
-                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                  className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
                 >
                   Revenir à aujourd'hui
                 </button>
               )}
             </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => shiftDate(-1)}
-                title="Jour précédent"
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all shrink-0 active:scale-95"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <input
-                type="date"
-                value={attendanceDate}
-                onChange={(e) => setAttendanceDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              />
-              <button
-                onClick={() => shiftDate(1)}
-                title="Jour suivant"
-                className="p-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg border border-slate-200 transition-all shrink-0 active:scale-95"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
+            <DatePickerPill
+              selectedDate={attendanceDate}
+              onSelectDate={(newDate) => setAttendanceDate(newDate)}
+              variant="field"
+              size="sm"
+              colorScheme="blue"
+              showShortcuts={false}
+              showQuickArrows={true}
+              showTodayBadge={true}
+              className="w-full"
+            />
           </div>
 
           {/* Recherche Instantanée */}

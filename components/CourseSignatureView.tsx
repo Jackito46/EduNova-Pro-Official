@@ -4,7 +4,7 @@ import {
   AlertCircle, Loader2, Save, History, Search, Filter,
   ChevronRight, Info, ShieldCheck, Users, RefreshCw, Check, Sparkles, X, ChevronLeft,
   Building2, GraduationCap, Briefcase, FileText, CheckCheck, CalendarDays, Eye,
-  Printer, ArrowRight, UserCheck, CheckSquare, Square
+  Printer, ArrowRight, UserCheck, CheckSquare, Square, User
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { UserProfile, SchoolType } from '../types';
@@ -12,6 +12,8 @@ import { toast } from 'sonner';
 import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 
 interface CourseSignature {
   id?: string;
@@ -119,7 +121,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (isUniversity) {
       return {
         title: 'Cahier de Textes & Émargement Universitaire',
-        subtitle: 'Validation numérique des heures dispensées, émargement des professeurs et vacataires, suivi des CM/TD/TP et avancement des programmes.',
+        subtitle: 'Validation des séances et suivi pédagogique',
         formTitle: 'Feuille d\'Émargement & Cahier de Textes',
         formDesc: 'Renseignez le contenu pédagogique de la séance, les compétences abordées et validez l\'émargement.',
         topicLabel: 'Contenu Pédagogique du Cours / Thèmes & TD Abordés',
@@ -134,7 +136,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (isProfessional) {
       return {
         title: 'Journal de Bord & Émargement Professionnel',
-        subtitle: 'Validation des heures de formation, suivi des modules pratiques en atelier, émargement des formateurs et contrôle d\'assiduité.',
+        subtitle: 'Validation des modules et suivi des séances',
         formTitle: 'Fiche d\'Émargement de Module',
         formDesc: 'Consignez les modules techniques réalisés, les ateliers pratiques et validez votre intervention.',
         topicLabel: 'Contenu du Module & Compétences Pratiques Traitées',
@@ -148,7 +150,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
     return {
       title: 'Cahier de Textes & Émargement',
-      subtitle: 'Signature des cours dispensés, validation des heures effectuées, suivi du programme scolaire et contrôle des présences.',
+      subtitle: 'Émargement des séances et suivi du programme',
       formTitle: 'Formulaire d\'Émargement de Cours',
       formDesc: 'Renseignez le contenu pédagogique et validez l\'émargement de votre cours.',
       topicLabel: 'Contenu Dispensé / Titre du Chapitre',
@@ -640,12 +642,61 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return (user as any).fullName || user.full_name || user.email;
   }, [isAdmin, targetStaffId, allStaff, currentStaffProfile, user]);
 
+  // Options pour le sélecteur d'enseignants (Style Pilule)
+  const teacherSelectOptions: SelectOption[] = useMemo(() => {
+    const list: SelectOption[] = [
+      {
+        value: '',
+        label: 'Mes cours personnels',
+        description: currentStaffProfile 
+          ? formatStudentName(currentStaffProfile.last_name, currentStaffProfile.first_name).fullName 
+          : 'Mon planning & émargement actif',
+        icon: UserCheck,
+        badge: 'Personnel'
+      }
+    ];
+
+    allStaff.forEach(s => {
+      const campus = getCampusName(s.campus_id);
+      const fullName = formatStudentName(s.last_name, s.first_name).fullName;
+      list.push({
+        value: s.id,
+        label: fullName,
+        description: s.subject_specialty || s.role || (campus ? `Campus : ${campus}` : undefined),
+        icon: User,
+        badge: campus || undefined
+      });
+    });
+
+    return list;
+  }, [allStaff, currentStaffProfile, getCampusName]);
+
+  // Options pour le sélecteur de Campus / Annexes (Style Pilule)
+  const campusSelectOptions: SelectOption[] = useMemo(() => [
+    { 
+      value: 'ALL', 
+      label: 'Tous les Campus / Annexes', 
+      icon: Building2,
+      badge: campuses && campuses.length > 0 ? `${campuses.length}` : undefined 
+    },
+    ...(campuses || []).map(c => ({
+      value: c.id,
+      label: c.name,
+      description: c.address ? `📍 ${c.address}` : undefined,
+      icon: Building2,
+      badge: undefined
+    }))
+  ], [campuses]);
+
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-16">
       
       {/* Header Banner - International & Modern Multi-Tenant */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-xl border border-slate-800 relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 rounded-3xl shadow-xl border border-slate-800 relative z-20">
+        {/* Glow ambient background isolated in overflow-hidden container */}
+        <div className="absolute inset-0 rounded-3xl overflow-hidden pointer-events-none">
+          <div className="absolute top-0 right-0 -mt-10 -mr-10 w-72 h-72 bg-indigo-500/10 rounded-full blur-3xl" />
+        </div>
         
         <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           
@@ -668,55 +719,50 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </span>
               </div>
               
-              <p className="text-slate-300 text-xs font-normal leading-relaxed max-w-3xl">
+              <p className="text-slate-300 text-xs font-medium">
                 {terms.subtitle}
               </p>
             </div>
           </div>
 
-          {/* Multi-Campus / Annexe Selector & Teacher Switcher (Admins) */}
-          <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-center">
+          {/* Multi-Campus / Annexe Selector & Teacher Switcher (Admins) - Style Pilule Harmonisé */}
+          <div className="flex items-center gap-2.5 flex-wrap self-stretch lg:self-center justify-start lg:justify-end">
             
-            {/* Campus Switcher */}
+            {/* Campus Switcher Pilule */}
             {campuses && campuses.length > 0 && (
-              <div className="flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/15 text-xs text-indigo-200">
-                <Building2 size={14} className="text-indigo-400 shrink-0" />
-                <select
-                  aria-label="Filtrer par Campus ou Annexe"
+              <div className="w-full sm:w-auto min-w-[200px] sm:min-w-[230px]">
+                <SelectPill
+                  options={campusSelectOptions}
                   value={selectedCampusFilter}
-                  onChange={(e) => setSelectedCampusFilter(e.target.value)}
-                  className="bg-transparent text-white font-bold outline-none cursor-pointer pr-1 text-xs"
-                >
-                  <option value="ALL" className="text-slate-900">Tous les Campus / Annexes</option>
-                  {campuses.map(c => (
-                    <option key={c.id} value={c.id} className="text-slate-900">
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedCampusFilter(val)}
+                  variant="compact"
+                  size="sm"
+                  colorScheme="indigo"
+                  icon={Building2}
+                  dropdownAlign="right"
+                  placeholder="Tous les campus..."
+                  searchable={campuses.length > 5}
+                  className="w-full"
+                />
               </div>
             )}
 
-            {/* Admin Target Teacher Switcher */}
+            {/* Admin Target Teacher Switcher Pilule */}
             {isAdmin && (
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/15 text-xs text-white">
-                <ShieldCheck size={15} className="text-amber-400 shrink-0" />
-                <select
-                  aria-label="Sélectionner l'enseignant pour émargement"
+              <div className="w-full sm:w-auto min-w-[220px] sm:min-w-[260px]">
+                <SelectPill
+                  options={teacherSelectOptions}
                   value={targetStaffId}
-                  onChange={(e) => setTargetStaffId(e.target.value)}
-                  className="bg-transparent text-white font-bold outline-none cursor-pointer max-w-[200px] truncate text-xs"
-                >
-                  <option value="" className="text-slate-900">-- Mes cours personnels --</option>
-                  {allStaff.map(s => {
-                    const campus = getCampusName(s.campus_id);
-                    return (
-                      <option key={s.id} value={s.id} className="text-slate-900">
-                        {formatStudentName(s.last_name, s.first_name).fullName} {campus ? `(${campus})` : ''}
-                      </option>
-                    );
-                  })}
-                </select>
+                  onChange={(val) => setTargetStaffId(val)}
+                  variant="compact"
+                  size="sm"
+                  colorScheme="indigo"
+                  icon={ShieldCheck}
+                  dropdownAlign="right"
+                  placeholder="Sélectionner un enseignant..."
+                  searchable={allStaff.length > 5}
+                  className="w-full"
+                />
               </div>
             )}
           </div>
@@ -793,7 +839,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         <div className="lg:col-span-5 space-y-4">
           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-4 sm:p-5 space-y-4">
             
-            {/* Ergonomic Date Navigator */}
+            {/* Ergonomic Date Navigator (Harmonisé Style Pilule) */}
             <div className="space-y-2.5 pb-3 border-b border-slate-100">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
@@ -806,7 +852,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => shiftDate(-1)}
-                    className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 transition-all"
+                    className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 transition-all cursor-pointer"
                     title="Jour précédent"
                   >
                     <ChevronLeft size={14} />
@@ -814,7 +860,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setSelectedDate(todayStr)}
-                    className={`px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all ${
+                    className={`px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
                       isToday ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:bg-white'
                     }`}
                   >
@@ -823,7 +869,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => shiftDate(1)}
-                    className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 transition-all"
+                    className="p-1 hover:bg-white hover:shadow-xs rounded-lg text-slate-600 transition-all cursor-pointer"
                     title="Jour suivant"
                   >
                     <ChevronRight size={14} />
@@ -831,19 +877,18 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
 
-              {/* Date Input with formatted preview */}
-              <div className="flex items-center justify-between gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-200">
-                <span className="text-xs font-extrabold text-slate-800 capitalize pl-1">
-                  {formattedSelectedDate}
-                </span>
-                <input
-                  aria-label="Sélectionner une date précise"
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className="px-2.5 py-1 text-xs font-bold bg-white border border-slate-200 rounded-xl text-slate-900 outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
+              {/* DatePickerPill harmonisé */}
+              <DatePickerPill
+                selectedDate={selectedDate}
+                onSelectDate={(newDate) => setSelectedDate(newDate)}
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                showShortcuts={false}
+                showQuickArrows={false}
+                showTodayBadge={true}
+                className="w-full"
+              />
             </div>
 
             {/* Timetable Subhead */}
