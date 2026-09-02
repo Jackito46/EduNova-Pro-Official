@@ -49,6 +49,7 @@ import { UserProfile, SchoolType } from "../types";
 import { AcademicSessionPill } from "./AcademicSessionPill";
 import { ClassSelectorPill } from "./ClassSelectorPill";
 import { SubjectSelectorPill } from "./SubjectSelectorPill";
+import { SelectPill, SelectOption } from "./SelectPill";
 import Modal from "./Modal";
 import { AuditLogger } from "../utils/auditLogger";
 import { getExamsListForClass } from "../lib/evaluations";
@@ -228,6 +229,41 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   const examsList = getExamsList();
+
+  // Options mémorisées pour le Sélecteur de Campus (Style Pilule)
+  const campusSelectOptions: SelectOption[] = useMemo(() => {
+    const opts: SelectOption[] = [
+      { value: "", label: "🌐 Tous les Campus", badge: "Global" }
+    ];
+    if (campuses && campuses.length > 0) {
+      campuses.forEach((c) => {
+        opts.push({
+          value: c.id,
+          label: c.name,
+          badge: "Annexe",
+          icon: Building2
+        });
+      });
+    }
+    return opts;
+  }, [campuses]);
+
+  // Options mémorisées pour le Sélecteur de Période / Évaluation (Style Pilule)
+  const termSelectOptions: SelectOption[] = useMemo(() => {
+    const opts: SelectOption[] = examsList.map((exam) => ({
+      value: exam,
+      label: exam,
+      badge: school?.school_type === SchoolType.UNIVERSITY ? "Session" : "Évaluation",
+      icon: FileText
+    }));
+    opts.push({
+      value: "__CUSTOM__",
+      label: "➕ Autre nom d'évaluation...",
+      badge: "Personnalisé",
+      description: "Saisir un libellé sur-mesure"
+    });
+    return opts;
+  }, [examsList, school?.school_type]);
 
   useEffect(() => {
     if (!isCustomTermMode && examsList.length > 0 && !examsList.includes(selectedTerm)) {
@@ -1371,22 +1407,20 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-end">
-          {/* Campus Switcher (if multi-campus) - Harmonisé en style Pilule */}
+          {/* Campus Switcher (if multi-campus) - Harmonisé en style Pilule SelectPill */}
           {campuses && campuses.length > 0 && !user.campus_id && (user.role === 'SUPER_ADMIN' || user.role === 'DIRECTOR') && (
-            <div className="relative min-w-[170px] sm:min-w-[190px]">
-              <select
-                aria-label="Sélectionner le campus ou l'annexe"
-                className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold pl-8 pr-8 py-2 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:bg-white cursor-pointer appearance-none transition-all shadow-2xs"
+            <div className="w-full sm:w-auto min-w-[180px] sm:min-w-[210px]">
+              <SelectPill
+                options={campusSelectOptions}
                 value={currentCampusId || ''}
-                onChange={e => setCurrentCampusId(e.target.value || null)}
-              >
-                <option value="">🌐 Tous les Campus</option>
-                {campuses.map(c => (
-                  <option key={c.id} value={c.id}>📍 {c.name}</option>
-                ))}
-              </select>
-              <Building2 size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                onChange={(val) => setCurrentCampusId(val || null)}
+                variant="compact"
+                size="sm"
+                colorScheme="blue"
+                icon={Building2}
+                placeholder="Sélectionner un campus..."
+                className="w-full"
+              />
             </div>
           )}
 
@@ -1506,37 +1540,34 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* Période d'évaluation / Contrôles - Harmonisation Pilule Complète */}
-        <div className="pt-3 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2.5">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="pt-3 border-t border-slate-100 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2.5 flex-1 min-w-0">
             <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
               <FileText size={12} className="text-blue-500" />
               <span>{school?.school_type === SchoolType.UNIVERSITY ? 'Session :' : 'Évaluation :'}</span>
             </span>
 
-            {/* Sélecteur Déroulant de type Pilule (Exactement comme dans Bulletins & Feuilles de Présence) */}
-            <div className="relative min-w-[190px] sm:min-w-[220px]">
-              <select
-                aria-label="Sélectionner la période d'évaluation"
+            {/* Sélecteur Déroulant de type Pilule (SelectPill fluide) */}
+            <div className="w-full sm:w-auto min-w-[220px] max-w-full sm:max-w-xs flex-1">
+              <SelectPill
+                options={termSelectOptions}
                 value={isCustomTermMode ? "__CUSTOM__" : selectedTerm}
-                onChange={(e) => {
-                  if (e.target.value === "__CUSTOM__") {
+                onChange={(val) => {
+                  if (val === "__CUSTOM__") {
                     setIsCustomTermMode(true);
                   } else {
                     setIsCustomTermMode(false);
-                    setSelectedTerm(e.target.value);
+                    setSelectedTerm(val);
                   }
                 }}
-                className="w-full pl-8 pr-8 py-2 bg-slate-50 hover:bg-slate-100/90 focus:bg-white border border-slate-200 rounded-xl text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-blue-500 appearance-none transition-all cursor-pointer shadow-2xs"
-              >
-                {examsList.map((exam) => (
-                  <option key={exam} value={exam}>
-                    {exam}
-                  </option>
-                ))}
-                <option value="__CUSTOM__">➕ Autre nom d'évaluation personnalisé...</option>
-              </select>
-              <Calendar size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" />
-              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                variant="field"
+                size="sm"
+                colorScheme="blue"
+                icon={FileText}
+                placeholder="Choisir une période..."
+                searchable={examsList.length > 6}
+                className="w-full"
+              />
             </div>
 
             {/* Puces / Pilules de sélection rapide en 1 clic */}
@@ -1549,8 +1580,8 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     onClick={() => setSelectedTerm(exam)}
                     className={`px-3 py-1.5 rounded-full text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs ${
                       selectedTerm === exam
-                        ? "bg-blue-600 text-white ring-2 ring-blue-400/30"
-                        : "bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80"
+                        ? "bg-blue-600 text-white ring-2 ring-blue-400/30 shadow-xs"
+                        : "bg-slate-100 hover:bg-slate-200/80 text-slate-700 border border-slate-200/80"
                     }`}
                   >
                     <span>{exam}</span>
@@ -1561,18 +1592,18 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Champ personnalisé si mode custom */}
             {isCustomTermMode && (
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap">
                 <input
                   type="text"
                   value={selectedTerm}
                   onChange={(e) => setSelectedTerm(e.target.value)}
                   placeholder="Nom de l'évaluation personnalisée..."
-                  className="px-3 py-1.5 text-xs border border-blue-400 rounded-xl font-bold text-slate-800 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs"
+                  className="px-3.5 py-1.5 text-xs border border-blue-400 rounded-xl font-bold text-slate-900 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 shadow-2xs min-w-[200px]"
                 />
                 <button
                   type="button"
                   onClick={() => setIsCustomTermMode(false)}
-                  className="px-2.5 py-1.5 text-xs text-slate-500 hover:text-slate-800 rounded-xl hover:bg-slate-100 font-semibold cursor-pointer"
+                  className="px-3 py-1.5 text-xs text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 font-bold border border-slate-200 cursor-pointer shadow-2xs"
                 >
                   Annuler
                 </button>
@@ -1583,9 +1614,9 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <button
             type="button"
             onClick={() => setIsCustomTermMode(!isCustomTermMode)}
-            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer self-end md:self-auto"
+            className="text-[11px] font-bold text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1 cursor-pointer self-start lg:self-auto shrink-0"
           >
-            {isCustomTermMode ? "Revenir aux évaluations standards" : "+ Autre nom d'évaluation..."}
+            {isCustomTermMode ? "↩ Revenir aux évaluations standards" : "+ Autre nom d'évaluation..."}
           </button>
         </div>
       </div>
