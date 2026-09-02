@@ -544,69 +544,69 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
   }
 
   const stepsList = [
-    { id: 1, title: 'Identité & Profil', subtitle: 'Informations civiles', icon: User },
-    { id: 2, title: 'Contrat & Paie', subtitle: 'Poste & rémunération', icon: Briefcase },
-    { id: 3, title: 'Synthèse & Validation', subtitle: 'Certification RH', icon: ShieldCheck }
+    { id: 1, title: 'Identité', subtitle: 'Infos personnelles', icon: User },
+    { id: 2, title: 'Contrat & Paie', subtitle: 'Poste & salaire', icon: Briefcase },
+    { id: 3, title: 'Validation', subtitle: 'Synthèse finale', icon: ShieldCheck }
   ];
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 md:space-y-7 animate-in fade-in duration-300 pb-20">
+    <div className="max-w-5xl mx-auto space-y-5 md:space-y-6 animate-in fade-in duration-300 pb-20">
       
       {/* Top Banner & Modern Institutional Header */}
-      <div className="bg-white/90 backdrop-blur-md rounded-3xl shadow-xs border border-slate-200/80 p-5 md:p-7 relative overflow-hidden">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl md:rounded-3xl shadow-xs border border-slate-200/80 p-4 md:p-6 relative overflow-hidden">
         {/* Subtle Ambient Background Accents */}
-        <div className="absolute top-0 right-0 w-96 h-full bg-gradient-to-l from-indigo-50/50 via-blue-50/30 to-transparent pointer-events-none" />
-        <div className="absolute -top-12 -left-12 w-48 h-48 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-80 h-full bg-gradient-to-l from-indigo-50/40 via-blue-50/20 to-transparent pointer-events-none" />
+        <div className="absolute -top-10 -left-10 w-40 h-40 bg-blue-500/5 rounded-full blur-2xl pointer-events-none" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 relative z-10">
-          <div className="flex items-start sm:items-center gap-3.5 md:gap-4.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-3 md:gap-4">
             <button 
               type="button"
               onClick={() => navigate(-1)}
               aria-label="Retour"
-              className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-2xl border border-slate-200/80 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
+              className="p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl border border-slate-200 shadow-2xs transition-all active:scale-95 shrink-0 cursor-pointer"
             >
               <ArrowLeft size={18} />
             </button>
             
-            <div className="flex items-center gap-3.5 md:gap-4">
-              <div className={`w-12 h-12 md:w-13 md:h-13 rounded-2xl flex items-center justify-center shadow-xs shrink-0 ${
+            <div className="flex items-center gap-3 md:gap-3.5">
+              <div className={`w-11 h-11 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shadow-xs shrink-0 ${
                 isEdit 
-                  ? 'bg-gradient-to-br from-amber-500 to-amber-600 text-white' 
-                  : 'bg-gradient-to-br from-blue-600 via-indigo-600 to-indigo-700 text-white shadow-blue-500/10'
+                  ? 'bg-amber-500 text-white' 
+                  : 'bg-blue-600 text-white shadow-blue-500/10'
               }`}>
-                {isEdit ? <Edit2 size={22} /> : <User size={24} />}
+                {isEdit ? <Edit2 size={20} /> : <User size={22} />}
               </div>
               
               <div>
                 <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-                    {school?.name || 'Système RH'}
+                  <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 border border-blue-100">
+                    {school?.name || 'RH'}
                   </span>
                   {hasMultipleCampuses && (
-                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-1">
                       <School size={10} /> {selectedCampusName}
                     </span>
                   )}
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600">
                     Étape {step}/3
                   </span>
                 </div>
-                <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                  {isEdit ? 'Édition du Dossier Collaborateur' : 'Recrutement & Dossier RH'}
+                <h1 className="text-lg md:text-xl font-black text-slate-900 tracking-tight leading-tight">
+                  {isEdit ? 'Modifier le Dossier RH' : 'Recrutement & Dossier RH'}
                 </h1>
-                <p className="text-slate-500 font-medium text-xs mt-0.5">
+                <p className="text-slate-500 font-medium text-xs">
                   {isEdit 
-                    ? `Mise à jour des clauses administratives et contractuelles • ID : ${id?.slice(0, 8)}` 
-                    : 'Création du profil employé, rattachement et formule de rémunération'
+                    ? `Mise à jour des clauses contractuelles • ID : ${id?.slice(0, 8)}` 
+                    : 'Fiche d\'engagement et informations contractuelles'
                   }
                 </p>
               </div>
             </div>
           </div>
 
-          {/* Stepper horizontal compact & responsive */}
-          <div className="flex items-center gap-1.5 bg-slate-50/90 p-1.5 rounded-2xl border border-slate-200/70 self-stretch lg:self-auto justify-between sm:justify-end shadow-2xs">
+          {/* Stepper horizontal compact & fluid */}
+          <div className="flex items-center gap-1 bg-slate-50 p-1 rounded-xl border border-slate-200/80 self-stretch lg:self-auto justify-between sm:justify-end shadow-2xs">
             {stepsList.map((st) => {
               const isCurrent = step === st.id;
               const isDone = step > st.id;
@@ -619,27 +619,24 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                     if (isDone) setStep(st.id);
                   }}
                   disabled={!isDone && !isCurrent}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 md:px-3 md:py-2 rounded-xl text-left transition-all ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-left transition-all ${
                     isCurrent 
-                      ? 'bg-white text-blue-700 shadow-xs font-bold border border-blue-200/70' 
+                      ? 'bg-white text-blue-700 shadow-xs font-bold border border-blue-200' 
                       : isDone 
-                        ? 'bg-emerald-50/80 text-emerald-700 hover:bg-emerald-100/80 cursor-pointer font-semibold' 
+                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 cursor-pointer font-semibold' 
                         : 'text-slate-400 opacity-60 cursor-not-allowed font-medium'
                   }`}
                 >
-                  <div className={`w-6 h-6 md:w-7 md:h-7 rounded-lg flex items-center justify-center text-xs font-black transition-all ${
+                  <div className={`w-5 h-5 rounded-md flex items-center justify-center text-[10px] font-black transition-all ${
                     isCurrent 
-                      ? 'bg-blue-600 text-white shadow-xs' 
+                      ? 'bg-blue-600 text-white' 
                       : isDone 
                         ? 'bg-emerald-600 text-white' 
                         : 'bg-slate-200 text-slate-500'
                   }`}>
-                    {isDone ? <Check size={13} className="stroke-[3]" /> : st.id}
+                    {isDone ? <Check size={11} className="stroke-[3]" /> : st.id}
                   </div>
-                  <div className="hidden sm:block">
-                    <p className="text-xs leading-none font-bold">{st.title}</p>
-                    <p className="text-[10px] text-slate-400 leading-none mt-0.5">{st.subtitle}</p>
-                  </div>
+                  <span className="hidden sm:inline text-xs leading-none font-bold">{st.title}</span>
                 </button>
               );
             })}
@@ -647,7 +644,7 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
         </div>
 
         {/* Dynamic step progress line */}
-        <div className="w-full bg-slate-100 h-1.5 rounded-full mt-5 overflow-hidden">
+        <div className="w-full bg-slate-100 h-1 rounded-full mt-4 overflow-hidden">
           <motion.div 
             className="h-full bg-gradient-to-r from-blue-600 via-indigo-600 to-emerald-500"
             initial={{ width: '33%' }}
@@ -1452,9 +1449,9 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
               <button 
                 type="button" 
                 onClick={handleNext}
-                className="w-full sm:w-auto px-8 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2.5 active:scale-98 transition-all"
+                className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-blue-500/20 flex items-center justify-center gap-2 active:scale-98 transition-all"
               >
-                <span>Passer à l'Étape 2 : Contrat & Rémunération</span> <ArrowRight size={16} />
+                <span>Continuer : Contrat & Paie</span> <ArrowRight size={15} />
               </button>
             )}
 
@@ -1462,9 +1459,9 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
               <button 
                 type="button" 
                 onClick={handleNext}
-                className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2.5 active:scale-98 transition-all"
+                className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 flex items-center justify-center gap-2 active:scale-98 transition-all"
               >
-                <span>Vision Globale & Récapitulatif (Étape 3/3)</span> <ArrowRight size={16} />
+                <span>Continuer : Synthèse & Validation</span> <ArrowRight size={15} />
               </button>
             )}
 
@@ -1472,17 +1469,17 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
               <button 
                 type="submit"
                 disabled={isSubmitting} 
-                className="w-full sm:w-auto px-8 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-extrabold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2.5 active:scale-98 transition-all disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-98 transition-all disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
-                    <Loader2 size={18} className="animate-spin" />
-                    <span>Synchronisation Cloud en cours...</span>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Enregistrement...</span>
                   </>
                 ) : (
                   <>
-                    <Save size={18} />
-                    <span>{isEdit ? 'Valider les Modifications du Dossier' : 'Confirmer & Finaliser le Recrutement'}</span>
+                    <Save size={16} />
+                    <span>{isEdit ? 'Mettre à jour le dossier' : 'Valider le recrutement'}</span>
                   </>
                 )}
               </button>
