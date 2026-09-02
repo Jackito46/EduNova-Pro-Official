@@ -35,20 +35,101 @@ import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { getLocalTodayString } from '../utils/dateUtils';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
+import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { Layers } from 'lucide-react';
 
 import { useLocation } from 'react-router-dom';
 
-const PAYMENT_METHODS = ['Tous', 'Dépôt Bancaire', 'Cash', 'MonCash', 'Chèque'];
 const STATUSES = ['Tous', 'Validé', 'En attente', 'Annulé'];
-const DATE_FILTERS = ['Toutes les dates', "Aujourd'hui", 'Cette semaine', 'Ce mois'];
 
 const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
-  const { terminology, currentCampusId } = useSchool();
+  const { terminology, currentCampusId, activeAcademicYear } = useSchool();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('Tous');
   const [statusFilter, setStatusFilter] = useState(location.state?.filterStatus || 'Tous');
   const [dateFilter, setDateFilter] = useState(location.state?.filterStatus ? 'Toutes les dates' : "Aujourd'hui");
+  const [selectedClass, setSelectedClass] = useState<string>('all');
+  const [selectedYear, setSelectedYear] = useState<string>(activeAcademicYear?.id || 'all');
+  const [classes, setClasses] = useState<any[]>([]);
+  const [academicYears, setAcademicYears] = useState<any[]>([]);
+
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, []);
+
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+  const [customDate, setCustomDate] = useState<string>(todayStr);
+
+  const handleSetDatePreset = (preset: 'today' | 'this_week' | 'this_month' | 'this_quarter' | 'this_year' | 'clear') => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const d = now.getDate();
+
+    if (preset === 'today') {
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+      setDateFilter("Aujourd'hui");
+    } else if (preset === 'this_week') {
+      const dayOfWeek = now.getDay();
+      const diff = d - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+      const firstDay = new Date(y, m, diff);
+      const startStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`;
+      setStartDate(startStr);
+      setEndDate(todayStr);
+      setDateFilter('Cette semaine');
+    } else if (preset === 'this_month') {
+      const startStr = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+      const lastDay = new Date(y, m + 1, 0).getDate();
+      const endStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+      setStartDate(startStr);
+      setEndDate(endStr);
+      setDateFilter('Ce mois');
+    } else if (preset === 'this_quarter') {
+      const qStartMonth = Math.floor(m / 3) * 3;
+      const startStr = `${y}-${String(qStartMonth + 1).padStart(2, '0')}-01`;
+      const lastDayOfQ = new Date(y, qStartMonth + 3, 0).getDate();
+      const endStr = `${y}-${String(qStartMonth + 3).padStart(2, '0')}-${String(lastDayOfQ).padStart(2, '0')}`;
+      setStartDate(startStr);
+      setEndDate(endStr);
+      setDateFilter('Toutes les dates');
+    } else if (preset === 'this_year') {
+      const startStr = `${y}-01-01`;
+      const endStr = `${y}-12-31`;
+      setStartDate(startStr);
+      setEndDate(endStr);
+      setDateFilter('Toutes les dates');
+    } else if (preset === 'clear') {
+      setStartDate('');
+      setEndDate('');
+      setDateFilter('Toutes les dates');
+    }
+  };
+
+  const dateFilterOptions: SelectOption[] = useMemo(() => [
+    { value: "Aujourd'hui", label: "Aujourd'hui", description: "Transactions du jour" },
+    { value: 'Cette semaine', label: 'Cette semaine', description: "Depuis début de semaine" },
+    { value: 'Ce mois', label: 'Ce mois', description: "Mois civil en cours" },
+    { value: 'Date précise', label: 'Date précise', description: "Sélectionner au calendrier" },
+    { value: 'Toutes les dates', label: 'Toutes les dates', description: "Historique complet" },
+  ], []);
+
+  const methodFilterOptions: SelectOption[] = useMemo(() => [
+    { value: 'Tous', label: 'Toutes les méthodes', description: 'Tous modes de paiement' },
+    { value: 'Dépôt Bancaire', label: 'Dépôt Bancaire', badge: 'Banque' },
+    { value: 'Cash', label: 'Cash / Espèces', badge: 'Caisse' },
+    { value: 'MonCash', label: 'MonCash', badge: 'Mobile' },
+    { value: 'Chèque', label: 'Chèque', badge: 'Banque' },
+  ], []);
 
   useEffect(() => {
     if (location.state?.filterStatus) {
@@ -149,6 +230,18 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (classesError) {
         console.error("Erreur Supabase classes:", classesError);
       }
+      setClasses(classesData || []);
+
+      const { data: yearsData, error: yearsError } = await supabase
+        .from('academic_years')
+        .select('*')
+        .eq('school_id', user.school_id)
+        .order('start_date', { ascending: false });
+
+      if (yearsError) {
+        console.error("Erreur Supabase academic_years:", yearsError);
+      }
+      setAcademicYears(yearsData || []);
       
       // Create maps for quick lookup
       const classesMap = new Map();
@@ -158,7 +251,8 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       (studentsData || []).forEach(s => {
         studentsMap.set(s.id, {
           name: formatStudentName(s.last_name, s.first_name).fullName || 'Inconnu',
-          className: classesMap.get(s.class_id) || 'N/A'
+          className: classesMap.get(s.class_id) || 'N/A',
+          classId: s.class_id
         });
       });
       
@@ -201,6 +295,8 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           ref: `RCP-${p.id.substring(0, 8).toUpperCase()}`,
           studentName: studentInfo.name,
           studentId: p.student_id,
+          classId: studentInfo.classId || p.class_id,
+          academic_year_id: p.academic_year_id,
           className: studentInfo.className,
           nature: p.campaign?.name 
             ? `Campagne: ${p.campaign.name}` 
@@ -262,6 +358,8 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           studentName: studentInfo.name,
           id: s.transaction_id || s.id,
           studentId: s.student_id,
+          classId: studentInfo.classId || s.class_id,
+          academic_year_id: s.academic_year_id,
           className: studentInfo.className,
           nature: 'Fournitures',
           amount: s.total_amount,
@@ -495,32 +593,51 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
     return payments.filter(p => {
       const s = searchTerm.toLowerCase();
       const matchesSearch = 
-        p.studentName.toLowerCase().includes(s) || 
-        p.ref.toLowerCase().includes(s) || 
-        p.className.toLowerCase().includes(s);
+        !s ||
+        p.studentName?.toLowerCase().includes(s) || 
+        p.ref?.toLowerCase().includes(s) || 
+        p.className?.toLowerCase().includes(s);
         
       const matchesMethod = methodFilter === 'Tous' || p.method === methodFilter;
       const matchesStatus = statusFilter === 'Tous' || p.status === statusFilter;
       
-      let matchesDate = true;
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      
-      const paymentDate = new Date(p.dateObj);
-      paymentDate.setHours(0, 0, 0, 0);
+      const matchesClass = selectedClass === 'all' || p.classId === selectedClass;
+      const matchesYear = selectedYear === 'all' || !p.academic_year_id || p.academic_year_id === selectedYear;
 
-      if (dateFilter === "Aujourd'hui") {
-        matchesDate = paymentDate.getTime() === today.getTime();
-      } else if (dateFilter === 'Cette semaine') {
-        const firstDay = new Date(today.setDate(today.getDate() - today.getDay()));
-        matchesDate = paymentDate >= firstDay;
-      } else if (dateFilter === 'Ce mois') {
-        matchesDate = paymentDate.getMonth() === today.getMonth() && paymentDate.getFullYear() === today.getFullYear();
+      let matchesDate = true;
+      const pDate = p.dateObj ? new Date(p.dateObj) : null;
+      if (pDate) {
+        const pYear = pDate.getFullYear();
+        const pMonth = String(pDate.getMonth() + 1).padStart(2, '0');
+        const pDay = String(pDate.getDate()).padStart(2, '0');
+        const paymentDateStr = `${pYear}-${pMonth}-${pDay}`;
+
+        if (startDate || endDate) {
+          if (startDate && paymentDateStr < startDate) matchesDate = false;
+          if (endDate && paymentDateStr > endDate) matchesDate = false;
+        } else if (dateFilter === "Aujourd'hui") {
+          matchesDate = paymentDateStr === todayStr;
+        } else if (dateFilter === 'Cette semaine') {
+          const today = new Date();
+          const dayOfWeek = today.getDay();
+          const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+          const firstDay = new Date(today);
+          firstDay.setDate(diff);
+          const firstDayStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`;
+          matchesDate = paymentDateStr >= firstDayStr && paymentDateStr <= todayStr;
+        } else if (dateFilter === 'Ce mois') {
+          const today = new Date();
+          const y = today.getFullYear();
+          const m = String(today.getMonth() + 1).padStart(2, '0');
+          matchesDate = paymentDateStr.startsWith(`${y}-${m}`);
+        } else if (dateFilter === 'Date précise' && customDate) {
+          matchesDate = paymentDateStr === customDate;
+        }
       }
 
-      return matchesSearch && matchesMethod && matchesStatus && matchesDate;
+      return matchesSearch && matchesMethod && matchesStatus && matchesClass && matchesYear && matchesDate;
     });
-  }, [payments, searchTerm, methodFilter, statusFilter, dateFilter]);
+  }, [payments, searchTerm, methodFilter, statusFilter, selectedClass, selectedYear, dateFilter, customDate, startDate, endDate, todayStr]);
 
   const totalCollected = filteredPayments
     .filter(p => p.status === 'Validé')
@@ -607,7 +724,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
             
             {/* Barre de Recherche fluide */}
-            <div className="flex-1 relative group">
+            <div className="flex-1 relative group min-w-0">
               <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-indigo-600 transition-colors">
                 <Search size={18} />
               </div>
@@ -629,7 +746,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             {/* Chips Filtres par Statut */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 custom-scrollbar">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 custom-scrollbar shrink-0">
               {STATUSES.map(s => {
                 const isActive = statusFilter === s;
                 let activeColor = 'bg-slate-900 text-white border-slate-900 shadow-2xs';
@@ -655,61 +772,200 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           </div>
 
-          {/* Sous-filtres : Période, Méthode, Réinitialiser, Imprimer */}
-          <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-200/60">
-            <div className="flex flex-wrap items-center gap-3">
-              {/* Filtre Période */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Période:</span>
-                <div className="relative">
-                  <select 
-                    className="pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none appearance-none focus:border-indigo-500 cursor-pointer shadow-2xs"
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                  >
-                    {DATE_FILTERS.map(d => <option key={d} value={d}>{d}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                </div>
-              </div>
-
-              {/* Filtre Méthode */}
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-tight">Méthode:</span>
-                <div className="relative">
-                  <select 
-                    className="pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none appearance-none focus:border-indigo-500 cursor-pointer shadow-2xs"
-                    value={methodFilter}
-                    onChange={(e) => setMethodFilter(e.target.value)}
-                  >
-                    {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                </div>
-              </div>
-
-              {/* Bouton Réinitialiser */}
-              {(searchTerm || methodFilter !== 'Tous' || statusFilter !== 'Tous' || dateFilter !== "Aujourd'hui") && (
-                <button 
-                  onClick={() => { setSearchTerm(''); setMethodFilter('Tous'); setStatusFilter('Tous'); setDateFilter("Aujourd'hui"); }}
-                  className="px-3 py-1.5 bg-slate-200/80 hover:bg-slate-300 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-                >
-                  <RefreshCcw size={13} />
-                  Réinitialiser
-                </button>
-              )}
+          {/* LIGNE 2 : Sélecteurs Session Scolaire, Classe & Méthode */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-3 border-t border-slate-200/60">
+            {/* 1. Session */}
+            <div className="space-y-1.5 min-w-0">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <Calendar size={13} className="text-indigo-600 shrink-0" />
+                Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}
+              </label>
+              <AcademicSessionPill
+                academicYears={academicYears}
+                selectedYearId={selectedYear}
+                onSelectYear={(yearId) => setSelectedYear(yearId)}
+                allowAll={true}
+                allLabel="Toutes les sessions"
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                className="w-full"
+              />
             </div>
 
-            {/* Actions Rapides */}
-            <div className="flex items-center gap-2 ml-auto">
-              <button 
-                onClick={() => window.print()}
-                className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                title="Imprimer le registre"
-              >
-                <Printer size={14} />
-                <span>Imprimer</span>
-              </button>
+            {/* 2. Filtre Classe */}
+            <div className="space-y-1.5 min-w-0">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <Layers size={13} className="text-indigo-600 shrink-0" />
+                Filtre {terminology.option}
+              </label>
+              <ClassSelectorPill
+                classes={classes}
+                selectedClassId={selectedClass}
+                onSelectClass={(classId) => setSelectedClass(classId)}
+                allowAll={true}
+                allLabel={`Toutes les ${terminology.classes.toLowerCase()}`}
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                className="w-full"
+                title={`Filtrer par ${terminology.class.toLowerCase()}`}
+              />
+            </div>
+
+            {/* 3. Filtre Méthode */}
+            <div className="space-y-1.5 min-w-0 sm:col-span-2 lg:col-span-1">
+              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <CreditCard size={13} className="text-indigo-600 shrink-0" />
+                Mode de Paiement
+              </label>
+              <SelectPill
+                options={methodFilterOptions}
+                value={methodFilter}
+                onChange={(val) => setMethodFilter(val)}
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                icon={CreditCard}
+                className="w-full"
+              />
+            </div>
+          </div>
+
+          {/* LIGNE 3 : SECTEUR DE PLAGE DE DATES DÉDIÉ AVEC RACCOURCIS RAPIDES (Harmonisé) */}
+          <div className="pt-3.5 border-t border-slate-200/80 space-y-3">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar size={13} className="text-indigo-600" /> Plage de Dates des Transactions
+              </label>
+              <div className="flex items-center gap-2">
+                {(startDate || endDate || selectedClass !== 'all' || (selectedYear !== 'all' && selectedYear !== activeAcademicYear?.id) || methodFilter !== 'Tous' || statusFilter !== 'Tous' || searchTerm) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setMethodFilter('Tous');
+                      setStatusFilter('Tous');
+                      setSelectedClass('all');
+                      setSelectedYear(activeAcademicYear?.id || 'all');
+                      handleSetDatePreset('clear');
+                    }}
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors px-2 py-0.5 rounded-lg hover:bg-rose-50"
+                  >
+                    <RefreshCcw size={11} /> Réinitialiser les filtres
+                  </button>
+                )}
+                {(startDate || endDate) && (
+                  <button
+                    type="button"
+                    onClick={() => handleSetDatePreset('clear')}
+                    className="text-[11px] font-bold text-slate-600 hover:text-slate-800 flex items-center gap-1 cursor-pointer transition-colors px-2 py-0.5 rounded-lg hover:bg-slate-100"
+                  >
+                    <X size={12} /> Effacer dates
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Grille 2 colonnes spacieuse pour les dates */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+              <div className="space-y-1.5 min-w-0">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                  Du (Date Début)
+                </span>
+                <DatePickerPill
+                  selectedDate={startDate}
+                  onSelectDate={(d) => setStartDate(d)}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                  showQuickArrows={false}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="space-y-1.5 min-w-0">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                  Au (Date Fin)
+                </span>
+                <DatePickerPill
+                  selectedDate={endDate}
+                  onSelectDate={(d) => setEndDate(d)}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                  showQuickArrows={false}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Sous-ruban Raccourcis Rapides ergonomique & Actions */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2.5 border-t border-slate-200/60">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mr-1 flex items-center gap-1 shrink-0">
+                  <Clock size={12} className="text-indigo-600" /> Raccourcis :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('today')}
+                  className={`px-3 py-1.5 text-xs font-bold rounded-xl transition-all border shadow-2xs cursor-pointer active:scale-95 ${
+                    startDate === todayStr && endDate === todayStr
+                      ? 'bg-indigo-600 text-white border-indigo-600'
+                      : 'bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 border-slate-200 hover:border-indigo-300'
+                  }`}
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_week')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Cette semaine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_month')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce mois
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_quarter')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce trimestre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_year')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Cette année
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                <button 
+                  onClick={fetchPayments}
+                  disabled={loading}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-50"
+                  title="Actualiser la liste"
+                >
+                  <RefreshCcw size={13} className={loading ? 'animate-spin' : ''} />
+                  <span>Actualiser</span>
+                </button>
+                <button 
+                  onClick={() => window.print()}
+                  className="px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  title="Imprimer le registre"
+                >
+                  <Printer size={14} />
+                  <span>Imprimer</span>
+                </button>
+              </div>
             </div>
           </div>
         </div>

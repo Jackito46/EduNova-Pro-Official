@@ -113,7 +113,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
   minDate,
   maxDate,
   showShortcuts = true,
-  showQuickArrows = true,
+  showQuickArrows = false,
   showTodayBadge = true,
   title = 'Sélectionner une date'
 }) => {
@@ -418,15 +418,18 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
                 </div>
               )}
               <div className="flex items-center gap-1.5 min-w-0">
-                {/* Full date format on extra large screens, standard concise on medium/small */}
+                {/* Full date format on 2xl, standard on sm/md/lg, concise on mobile */}
                 <span className="truncate text-xs font-bold sm:font-black text-slate-900 capitalize hidden 2xl:inline">
                   {fullFormattedDisplay}
                 </span>
-                <span className="truncate text-xs font-bold sm:font-black text-slate-900 capitalize 2xl:hidden">
+                <span className="truncate text-xs font-bold sm:font-black text-slate-900 capitalize hidden sm:inline 2xl:hidden">
                   {standardFormattedDisplay}
                 </span>
+                <span className="truncate text-xs font-bold sm:font-black text-slate-900 capitalize sm:hidden">
+                  {shortFormattedDisplay}
+                </span>
                 {showTodayBadge && isToday && (
-                  <span className="shrink-0 px-1.5 py-0.5 text-[9px] sm:text-[9.5px] font-black bg-emerald-100 text-emerald-800 rounded border border-emerald-200/80 hidden xs:inline-flex">
+                  <span className="shrink-0 px-1.5 py-0.5 text-[9px] sm:text-[9.5px] font-black bg-emerald-100 text-emerald-800 rounded border border-emerald-200/80 hidden md:inline-flex">
                     Aujourd'hui
                   </span>
                 )}

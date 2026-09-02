@@ -69,6 +69,7 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
     setAutoSaving(true);
     try {
       const toUpsert: any = {
+        id: record.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`),
         school_id: user.school_id,
         student_id: record.student_id,
         class_id: record.class_id,
@@ -80,10 +81,6 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
       if (activeYearId) {
         toUpsert.academic_year_id = activeYearId;
-      }
-
-      if (record.id) {
-        toUpsert.id = record.id;
       }
 
       const { error } = await supabase
@@ -273,6 +270,7 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
       if (!hasExistingRecords && stuData && stuData.length > 0) {
         const defaultRecords = stuData.map(student => {
           const r: any = {
+            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
             school_id: user.school_id,
             student_id: student.id,
             class_id: selectedClassId,
@@ -361,6 +359,7 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
     try {
       const recordsToUpsert = Object.values(attendances).map(att => {
         const r: any = {
+          id: att.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`),
           school_id: user.school_id,
           student_id: att.student_id,
           class_id: att.class_id,
@@ -370,7 +369,6 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
           recorded_by: user.id
         };
         if (activeYearId) r.academic_year_id = activeYearId;
-        if (att.id) r.id = att.id;
         return r;
       });
 
@@ -409,7 +407,9 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
     const recordsToUpsert: any[] = [];
 
     filteredStudents.forEach(student => {
+      const existingAtt = attendances[student.id];
       const record: any = {
+        id: existingAtt?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`),
         school_id: user.school_id,
         student_id: student.id,
         class_id: selectedClassId,
@@ -420,7 +420,7 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
         record.academic_year_id = activeYearId;
       }
       newAttendances[student.id] = {
-        ...newAttendances[student.id],
+        ...existingAtt,
         ...record
       } as StudentAttendance;
       recordsToUpsert.push({ ...record, recorded_by: user.id });

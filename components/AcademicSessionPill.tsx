@@ -35,7 +35,7 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
   onSelectYear,
   allowAll = false,
   allLabel = 'Toutes les sessions',
-  labelPrefix = 'Session :',
+  labelPrefix = '',
   showIcon = true,
   variant = 'pill',
   size = 'sm',

@@ -35,7 +35,7 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
   selectedClassId,
   onSelectClass,
   activeCycle = 'ALL',
-  labelPrefix = 'Classe :',
+  labelPrefix = '',
   allLabel,
   allowAll = true,
   emptyLabel = 'Sélectionner une classe',

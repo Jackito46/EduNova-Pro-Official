@@ -41,6 +41,9 @@ import { formatStudentName } from '../utils/formatters';
 import { PrintPreviewModal } from './PrintPreviewModal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 import html2canvas from 'html2canvas';
 import { jsPDF } from 'jspdf';
 import { useSecurity } from './SecurityGuard';
@@ -694,6 +697,15 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [students, enrollmentsForGen, genClass]);
 
+  const genStudentOptions: SelectOption[] = useMemo(() => {
+    return availableStudentsForGen.map(s => ({
+      value: s.id,
+      label: s.name,
+      badge: s.id.substring(0, 6).toUpperCase(),
+      description: `ID: ${s.id.substring(0, 8)}`
+    }));
+  }, [availableStudentsForGen]);
+
   // Index de l'élève actuellement sélectionné dans le générateur
   const currentGenStudentIndex = useMemo(() => {
     if (!selectedGenStudent) return -1;
@@ -1150,17 +1162,18 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5">
                   <Layers size={12} className="text-indigo-600" /> Classe / Option
                 </label>
-                <div className="relative group">
-                  <select 
-                    className="w-full px-4 py-3 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all appearance-none cursor-pointer shadow-2xs"
-                    value={selectedClass}
-                    onChange={(e) => setSelectedClass(e.target.value)}
-                  >
-                    <option value="all" className="text-slate-900 font-bold">Toutes les classes ({classesWithEnrollmentsForBalances.length})</option>
-                    {classesWithEnrollmentsForBalances.map(c => <option key={c.id} value={c.id} className="text-slate-900 font-bold">{c.name}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-600 pointer-events-none transition-colors" size={16} />
-                </div>
+                <ClassSelectorPill
+                  classes={classesWithEnrollmentsForBalances}
+                  selectedClassId={selectedClass}
+                  onSelectClass={(id) => setSelectedClass(id)}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                  allowAll={true}
+                  allLabel={`Toutes les classes (${classesWithEnrollmentsForBalances.length})`}
+                  labelPrefix="Classe :"
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -1186,74 +1199,88 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             {/* SECTEUR DE PLAGE DE DATES (DÉBUT / FIN) */}
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar size={12} className="text-indigo-600" /> Plage de Dates des Transactions (Date Début & Fin)
+            <div className="pt-3.5 border-t border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-600" /> Plage de Dates des Transactions
                 </label>
                 {(startDate || endDate) && (
                   <button
                     type="button"
                     onClick={() => handleSetDatePreset('clear')}
-                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors px-2 py-0.5 rounded-lg hover:bg-rose-50"
                   >
-                    <X size={11} /> Effacer la période
+                    <X size={12} /> Effacer la période
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Du (Date Début)</span>
-                  <input 
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+              {/* Grille 2 colonnes spacieuse pour les dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5 min-w-0">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Du (Date Début)
+                  </span>
+                  <DatePickerPill
+                    selectedDate={startDate}
+                    onSelectDate={(d) => setStartDate(d)}
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    showQuickArrows={false}
+                    className="w-full"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Au (Date Fin)</span>
-                  <input 
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+                <div className="space-y-1.5 min-w-0">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Au (Date Fin)
+                  </span>
+                  <DatePickerPill
+                    selectedDate={endDate}
+                    onSelectDate={(d) => setEndDate(d)}
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    showQuickArrows={false}
+                    className="w-full"
                   />
                 </div>
+              </div>
 
-                <div className="lg:col-span-2 flex items-center gap-1.5 flex-wrap self-end pt-2 sm:pt-0">
-                  <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mr-1">Raccourcis :</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('today')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Aujourd'hui
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_month')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Ce mois
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_quarter')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Ce trimestre
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_year')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Cette année
-                  </button>
-                </div>
+              {/* Sous-ruban Raccourcis Rapides ergonomique */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-2.5 border-t border-slate-200/60">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mr-1 flex items-center gap-1 shrink-0">
+                  <Clock size={12} className="text-indigo-600" /> Raccourcis :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('today')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_month')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce mois
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_quarter')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce trimestre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_year')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Cette année
+                </button>
               </div>
             </div>
 
@@ -1554,87 +1581,105 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedClass}
-                  onChange={(e) => setSelectedClass(e.target.value)}
-                  className="px-4 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs cursor-pointer"
-                >
-                  <option value="all" className="text-slate-900 font-bold">Toutes les classes</option>
-                  {classes.map(c => <option key={c.id} value={c.id} className="text-slate-900 font-bold">{c.name}</option>)}
-                </select>
+              <div className="w-full sm:w-auto min-w-[200px]">
+                <ClassSelectorPill
+                  classes={classes}
+                  selectedClassId={selectedClass}
+                  onSelectClass={(id) => setSelectedClass(id)}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                  allowAll={true}
+                  allLabel="Toutes les classes"
+                  labelPrefix="Classe :"
+                  className="w-full sm:w-auto"
+                />
               </div>
             </div>
 
             {/* SECTEUR DE PLAGE DE DATES DANS FACTURÉ VS ENCAISSÉ */}
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar size={12} className="text-indigo-600" /> Plage de Dates des Transactions (Date Début & Fin)
+            <div className="pt-3.5 border-t border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-600" /> Plage de Dates des Transactions
                 </label>
                 {(startDate || endDate) && (
                   <button
                     type="button"
                     onClick={() => handleSetDatePreset('clear')}
-                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors px-2 py-0.5 rounded-lg hover:bg-rose-50"
                   >
-                    <X size={11} /> Effacer la période
+                    <X size={12} /> Effacer la période
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Du (Date Début)</span>
-                  <input 
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+              {/* Grille 2 colonnes spacieuse pour les dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5 min-w-0">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Du (Date Début)
+                  </span>
+                  <DatePickerPill 
+                    selectedDate={startDate}
+                    onSelectDate={(d) => setStartDate(d)}
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    showQuickArrows={false}
+                    className="w-full"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Au (Date Fin)</span>
-                  <input 
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+                <div className="space-y-1.5 min-w-0">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Au (Date Fin)
+                  </span>
+                  <DatePickerPill 
+                    selectedDate={endDate}
+                    onSelectDate={(d) => setEndDate(d)}
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    showQuickArrows={false}
+                    className="w-full"
                   />
                 </div>
+              </div>
 
-                <div className="lg:col-span-2 flex items-center gap-1.5 flex-wrap self-end pt-2 sm:pt-0">
-                  <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mr-1">Raccourcis :</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('today')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200 cursor-pointer"
-                  >
-                    Aujourd'hui
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_month')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200 cursor-pointer"
-                  >
-                    Ce mois
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_quarter')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200 cursor-pointer"
-                  >
-                    Ce trimestre
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_year')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200 cursor-pointer"
-                  >
-                    Cette année
-                  </button>
-                </div>
+              {/* Sous-ruban Raccourcis Rapides ergonomique */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-2.5 border-t border-slate-200/60">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mr-1 flex items-center gap-1 shrink-0">
+                  <Clock size={12} className="text-indigo-600" /> Raccourcis :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('today')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_month')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce mois
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_quarter')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce trimestre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_year')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Cette année
+                </button>
               </div>
             </div>
           </div>
@@ -1791,112 +1836,124 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5">
                   <Layers size={12} className="text-indigo-600" /> 2. {terminology.class}
                 </label>
-                <div className="relative group">
-                  <select 
-                    className="w-full px-4 py-3 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all appearance-none cursor-pointer shadow-2xs"
-                    value={genClass}
-                    onChange={(e) => { setGenClass(e.target.value); setSelectedGenStudent(null); }}
-                  >
-                    {classesWithEnrollmentsForGen.map(c => <option key={c.id} value={c.id} className="text-slate-900 font-bold">{c.name}</option>)}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-600 pointer-events-none transition-colors" size={16} />
-                </div>
+                <ClassSelectorPill
+                  classes={classesWithEnrollmentsForGen}
+                  selectedClassId={genClass}
+                  onSelectClass={(id) => { setGenClass(id); setSelectedGenStudent(null); }}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                  allowAll={false}
+                  labelPrefix="Classe :"
+                  className="w-full"
+                />
               </div>
 
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5">
                   <User size={12} className="text-indigo-600" /> 3. Choisir l'élève ({availableStudentsForGen.length})
                 </label>
-                <div className="relative group">
-                  <select 
-                    className={`w-full px-4 py-3 border rounded-xl text-xs font-bold outline-none appearance-none transition-all cursor-pointer shadow-2xs ${
-                      selectedGenStudent ? 'bg-indigo-50/90 border-indigo-500 text-indigo-950 font-black' : 'bg-white border-slate-300 text-slate-900 focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-100'
-                    }`}
-                    onChange={(e) => {
-                      const student = availableStudentsForGen.find(s => s.id === e.target.value);
-                      if (student) loadStudentAudit(student);
-                    }}
-                    value={selectedGenStudent?.id || ''}
-                  >
-                    <option value="" className="text-slate-500 font-normal">-- Choisir un étudiant / élève --</option>
-                    {availableStudentsForGen.map(s => (
-                      <option key={s.id} value={s.id} className="text-slate-900 font-bold">{s.name} (ID: {s.id.substring(0,6)})</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-600 pointer-events-none transition-colors" size={16} />
-                </div>
+                <SelectPill
+                  options={genStudentOptions}
+                  value={selectedGenStudent?.id || ''}
+                  onChange={(id) => {
+                    const student = availableStudentsForGen.find(s => s.id === id);
+                    if (student) loadStudentAudit(student);
+                  }}
+                  variant="field"
+                  size="md"
+                  colorScheme="indigo"
+                  searchable={true}
+                  placeholder="-- Choisir un étudiant / élève --"
+                  icon={User}
+                  className="w-full"
+                />
               </div>
             </div>
 
             {/* SECTEUR DE PLAGE DE DATES DANS L'AUDIT INDIVIDUEL */}
-            <div className="pt-3 border-t border-slate-100 space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                  <Calendar size={12} className="text-indigo-600" /> Filtrer l'Audit par Période de Transactions (Début & Fin)
+            <div className="pt-3.5 border-t border-slate-200/80 space-y-3">
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-600" /> Filtrer l'Audit par Période de Transactions
                 </label>
                 {(startDate || endDate) && (
                   <button
                     type="button"
                     onClick={() => handleSetDatePreset('clear')}
-                    className="text-[10px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1"
+                    className="text-[11px] font-bold text-rose-600 hover:text-rose-700 flex items-center gap-1 cursor-pointer transition-colors px-2 py-0.5 rounded-lg hover:bg-rose-50"
                   >
-                    <X size={11} /> Réinitialiser Période
+                    <X size={12} /> Réinitialiser Période
                   </button>
                 )}
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 items-center">
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Du (Date Début)</span>
-                  <input 
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+              {/* Grille 2 colonnes spacieuse pour les dates */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1.5 min-w-0">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Du (Date Début)
+                  </span>
+                  <DatePickerPill
+                    selectedDate={startDate}
+                    onSelectDate={(d) => setStartDate(d)}
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    showQuickArrows={false}
+                    className="w-full"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Au (Date Fin)</span>
-                  <input 
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-3 py-2.5 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+                <div className="space-y-1.5 min-w-0">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Au (Date Fin)
+                  </span>
+                  <DatePickerPill
+                    selectedDate={endDate}
+                    onSelectDate={(d) => setEndDate(d)}
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    showQuickArrows={false}
+                    className="w-full"
                   />
                 </div>
+              </div>
 
-                <div className="lg:col-span-2 flex items-center gap-1.5 flex-wrap self-end pt-2 sm:pt-0">
-                  <span className="text-[9px] font-extrabold text-slate-500 uppercase tracking-wider mr-1">Raccourcis :</span>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('today')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Aujourd'hui
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_month')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Ce mois
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_quarter')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Ce trimestre
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleSetDatePreset('this_year')}
-                    className="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-800 transition-colors border border-slate-200"
-                  >
-                    Cette année
-                  </button>
-                </div>
+              {/* Sous-ruban Raccourcis Rapides ergonomique */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap pt-2.5 border-t border-slate-200/60">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider mr-1 flex items-center gap-1 shrink-0">
+                  <Clock size={12} className="text-indigo-600" /> Raccourcis :
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('today')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_month')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce mois
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_quarter')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Ce trimestre
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSetDatePreset('this_year')}
+                  className="px-3 py-1.5 text-xs font-bold rounded-xl bg-white hover:bg-indigo-50 hover:text-indigo-700 text-slate-700 transition-all border border-slate-200 hover:border-indigo-300 shadow-2xs cursor-pointer active:scale-95"
+                >
+                  Cette année
+                </button>
               </div>
             </div>
 
