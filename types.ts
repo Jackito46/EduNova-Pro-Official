@@ -50,14 +50,16 @@ export type StudentDocumentsMap = Record<string, {
 
 export interface StudentAttendance {
   id: string;
+  school_id?: string;
+  academic_year_id?: string;
   student_id: string;
   class_id: string;
   date: string;
   status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
   reason?: string;
   recorded_by?: string;
-  created_at: string;
-  updated_at: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface StaffAttendance {

@@ -685,9 +685,9 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-700 pb-20">
       
       {/* PANNEAU DE CONTRÔLE CENTRALISÉ (ENTÊTE, RECHERCHE & FILTRES UNIFIÉS) */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden print:hidden">
+      <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-visible relative z-20 print:hidden">
         {/* Entête sombre avec KPI */}
-        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white">
+        <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white rounded-t-2xl">
           <div className="space-y-1">
             <div className="flex items-center gap-2 text-indigo-300 font-bold text-xs uppercase tracking-wider">
               <History size={16} className="text-indigo-400" />
@@ -720,7 +720,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* Barre de Recherche & Filtres rapides */}
-        <div className="p-5 bg-slate-50/70 space-y-4">
+        <div className="p-5 bg-slate-50/70 space-y-4 rounded-b-2xl overflow-visible">
           <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
             
             {/* Barre de Recherche fluide */}
@@ -867,12 +867,24 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
             </div>
 
-            {/* Grille 2 colonnes spacieuse pour les dates */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+            {/* Grille 2 colonnes spacieuse pour les dates - 100% responsive mobile, tablette et desktop */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 relative z-30">
               <div className="space-y-1.5 min-w-0">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
-                  Du (Date Début)
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Du (Date Début)
+                  </span>
+                  {startDate && (
+                    <button
+                      type="button"
+                      onClick={() => setStartDate('')}
+                      className="text-[10px] font-bold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Effacer la date de début"
+                    >
+                      Effacer
+                    </button>
+                  )}
+                </div>
                 <DatePickerPill
                   selectedDate={startDate}
                   onSelectDate={(d) => setStartDate(d)}
@@ -880,14 +892,28 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                   size="md"
                   colorScheme="indigo"
                   showQuickArrows={false}
+                  dropdownAlign="left"
+                  title="Date de Début"
                   className="w-full"
                 />
               </div>
 
               <div className="space-y-1.5 min-w-0">
-                <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
-                  Au (Date Fin)
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black text-slate-500 uppercase tracking-wider block">
+                    Au (Date Fin)
+                  </span>
+                  {endDate && (
+                    <button
+                      type="button"
+                      onClick={() => setEndDate('')}
+                      className="text-[10px] font-bold text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                      title="Effacer la date de fin"
+                    >
+                      Effacer
+                    </button>
+                  )}
+                </div>
                 <DatePickerPill
                   selectedDate={endDate}
                   onSelectDate={(d) => setEndDate(d)}
@@ -895,6 +921,8 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                   size="md"
                   colorScheme="indigo"
                   showQuickArrows={false}
+                  dropdownAlign="right"
+                  title="Date de Fin"
                   className="w-full"
                 />
               </div>
@@ -1121,7 +1149,13 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-gray-900 text-sm">{p.studentName}</p>
-                      <p className="text-xs text-gray-500 mt-0.5">{p.className}</p>
+                      <span 
+                        title={p.className}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-800 rounded-lg text-[11px] font-bold max-w-[160px] truncate shadow-2xs transition-colors"
+                      >
+                        <Layers size={11} className="text-indigo-600 shrink-0" />
+                        <span className="truncate">{p.className}</span>
+                      </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-700">{p.nature}</span>

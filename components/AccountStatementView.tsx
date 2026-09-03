@@ -1363,22 +1363,28 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
             </div>
             
-            <div className="overflow-x-auto print:overflow-visible">
+            <div className="overflow-x-auto print:overflow-visible custom-scrollbar">
               {isCalculatingBalances ? (
                 <div className="p-20 text-center space-y-3">
                   <RefreshCcw className="animate-spin text-indigo-600 mx-auto" size={36} />
                   <p className="text-slate-500 font-bold text-xs uppercase tracking-widest">Calcul rigoureux des soldes en cours...</p>
                 </div>
               ) : (
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse min-w-[880px]">
                   <thead>
                     <tr className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
-                      <th className="px-6 py-4">{terminology.student} & {terminology.option}</th>
-                      <th className="px-6 py-4 text-center">Progression</th>
-                      <th className="px-6 py-4 text-right">Dû Total</th>
-                      <th className="px-6 py-4 text-right">Total Payé</th>
-                      <th className="px-6 py-4 text-right">Solde Dû</th>
-                      <th className="px-6 py-4 text-center">Action</th>
+                      <th className="px-6 py-4 whitespace-nowrap">{terminology.student}</th>
+                      <th className="px-4 py-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px] md:min-w-[170px]">
+                        <div className="flex items-center gap-1.5">
+                          <Layers size={13} className="text-indigo-600 shrink-0" />
+                          <span>{terminology.option}</span>
+                        </div>
+                      </th>
+                      <th className="px-6 py-4 text-center whitespace-nowrap">Progression</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Dû Total</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Total Payé</th>
+                      <th className="px-6 py-4 text-right whitespace-nowrap">Solde Dû</th>
+                      <th className="px-6 py-4 text-center whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1387,20 +1393,31 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       return (
                         <tr key={b.id} className="group hover:bg-indigo-50/20 transition-colors">
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-3">
                               <div className="w-9 h-9 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700 font-black text-xs shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
                                 {b.last_name.charAt(0).toUpperCase()}
                               </div>
-                              <div>
-                                <p className="font-bold text-slate-900 text-xs sm:text-sm">{b.fullName}</p>
-                                <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight flex items-center gap-1">
-                                  <span>{b.className}</span>
-                                  <span>•</span>
-                                  <span className="font-mono text-slate-300">ID: {b.id.substring(0,6)}</span>
+                              <div className="min-w-0">
+                                <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">{b.fullName}</p>
+                                <p className="text-[10px] font-extrabold text-slate-400 uppercase tracking-tight flex items-center gap-1.5 mt-0.5">
+                                  <span className="font-mono text-slate-400 font-bold">ID: {b.id.substring(0,6)}</span>
+                                  <span className="lg:hidden inline-flex items-center gap-0.5 text-[9px] bg-indigo-50 border border-indigo-100/80 text-indigo-700 px-1.5 py-0.5 rounded-md font-bold truncate max-w-[110px]" title={b.className}>
+                                    <Layers size={9} className="shrink-0" />
+                                    <span className="truncate">{b.className}</span>
+                                  </span>
                                 </p>
                               </div>
                             </div>
+                          </td>
+                          <td className="px-4 py-4 whitespace-nowrap">
+                            <span 
+                              title={b.className}
+                              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-100/90 hover:bg-indigo-50 border border-slate-200/90 hover:border-indigo-200 text-slate-800 hover:text-indigo-900 rounded-lg sm:rounded-xl font-bold text-[10px] sm:text-[11px] md:text-xs max-w-[120px] sm:max-w-[160px] md:max-w-none truncate transition-colors shadow-2xs"
+                            >
+                              <Layers size={12} className="text-indigo-600 shrink-0 hidden xs:inline" />
+                              <span className="truncate">{b.className}</span>
+                            </span>
                           </td>
                           <td className="px-6 py-4 text-center">
                             <div className="flex flex-col items-center gap-1 min-w-[100px]">
@@ -1413,13 +1430,13 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <span className="text-[10px] font-bold text-slate-500">{paidPct}% payé</span>
                             </div>
                           </td>
-                          <td className="px-6 py-4 text-right font-bold text-slate-700 text-xs sm:text-sm">
+                          <td className="px-6 py-4 text-right font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">
                             {b.totalDue.toLocaleString()} G
                           </td>
-                          <td className="px-6 py-4 text-right font-bold text-emerald-600 text-xs sm:text-sm">
+                          <td className="px-6 py-4 text-right font-bold text-emerald-600 text-xs sm:text-sm whitespace-nowrap">
                             {b.paid.toLocaleString()} G
                           </td>
-                          <td className="px-6 py-4 text-right">
+                          <td className="px-6 py-4 text-right whitespace-nowrap">
                             <span className={`inline-block px-3 py-1 rounded-xl font-black text-xs ${
                               b.balance > 0 
                                 ? 'bg-rose-50 text-rose-600 border border-rose-200/60' 
@@ -1428,14 +1445,14 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               {b.balance > 0 ? `${b.balance.toLocaleString()} G` : 'SOLDE'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-center">
+                          <td className="px-6 py-4 text-center whitespace-nowrap">
                             <button 
                               onClick={() => {
                                 setActiveView('generator');
                                 setGenClass(b.classId);
                                 loadStudentAudit(b);
                               }}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-xs shadow-xs hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-xs shadow-xs hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95 whitespace-nowrap"
                             >
                               <Eye size={14} />
                               Audit Détaillé
@@ -1446,7 +1463,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     })}
                     {filteredBalances.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="p-16 text-center text-slate-400 italic font-medium">
+                        <td colSpan={7} className="p-16 text-center text-slate-400 italic font-medium">
                           Aucun(e) {terminology.student.toLowerCase()} correspondant aux critères de filtre.
                         </td>
                       </tr>
@@ -1696,20 +1713,25 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </span>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-left text-xs border-collapse min-w-[1080px]">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-100/80 text-slate-700 font-black uppercase text-[10px] tracking-wider">
-                    <th className="p-4 pl-6">Élève / Matricule</th>
-                    <th className="p-4">Classe</th>
-                    <th className="p-4 text-right">Total Facturé (HTG)</th>
-                    <th className="p-4 text-right">Réductions (HTG)</th>
-                    <th className="p-4 text-right">Net Dû (HTG)</th>
-                    <th className="p-4 text-right">Total Encaissé (HTG)</th>
-                    <th className="p-4 text-right">Solde Dû (HTG)</th>
-                    <th className="p-4 text-center">Taux (%)</th>
-                    <th className="p-4 text-center">Statut</th>
-                    <th className="p-4 text-right pr-6">Action</th>
+                    <th className="p-4 pl-6 whitespace-nowrap">Élève / Matricule</th>
+                    <th className="p-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px] md:min-w-[170px]">
+                      <div className="flex items-center gap-1.5">
+                        <Layers size={13} className="text-indigo-600 shrink-0" />
+                        <span>{terminology.option || 'Classe'}</span>
+                      </div>
+                    </th>
+                    <th className="p-4 text-right whitespace-nowrap">Total Facturé (HTG)</th>
+                    <th className="p-4 text-right whitespace-nowrap">Réductions (HTG)</th>
+                    <th className="p-4 text-right whitespace-nowrap">Net Dû (HTG)</th>
+                    <th className="p-4 text-right whitespace-nowrap">Total Encaissé (HTG)</th>
+                    <th className="p-4 text-right whitespace-nowrap">Solde Dû (HTG)</th>
+                    <th className="p-4 text-center whitespace-nowrap">Taux (%)</th>
+                    <th className="p-4 text-center whitespace-nowrap">Statut</th>
+                    <th className="p-4 text-right pr-6 whitespace-nowrap">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -1727,58 +1749,68 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       
                       return (
                         <tr key={b.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="p-4 pl-6">
-                            <div className="font-bold text-slate-900">{b.fullName}</div>
-                            <div className="text-[10px] text-slate-500 font-mono font-bold">ID: {b.id.substring(0, 8)}</div>
+                          <td className="p-4 pl-6 whitespace-nowrap">
+                            <div className="font-bold text-slate-900 text-xs sm:text-sm">{b.fullName}</div>
+                            <div className="text-[10px] text-slate-500 font-mono font-bold flex items-center gap-1.5 mt-0.5">
+                              <span>ID: {b.id.substring(0, 8)}</span>
+                              <span className="lg:hidden inline-flex items-center gap-0.5 text-[9px] bg-indigo-50 border border-indigo-100/80 text-indigo-700 px-1.5 py-0.5 rounded-md font-bold truncate max-w-[110px]" title={b.className}>
+                                <Layers size={9} className="shrink-0" />
+                                <span className="truncate">{b.className}</span>
+                              </span>
+                            </div>
                           </td>
-                          <td className="p-4">
-                            <span className="px-2.5 py-1 bg-slate-100 border border-slate-200 font-bold text-slate-800 rounded-lg text-[11px]">
-                              {b.className}
+                          <td className="p-4 whitespace-nowrap">
+                            <span 
+                              title={b.className}
+                              className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1 bg-slate-100/90 hover:bg-indigo-50 border border-slate-200/90 hover:border-indigo-200 font-bold text-slate-800 hover:text-indigo-900 rounded-lg sm:rounded-xl text-[10px] sm:text-[11px] md:text-xs max-w-[120px] sm:max-w-[160px] md:max-w-none truncate transition-colors shadow-2xs"
+                            >
+                              <Layers size={12} className="text-indigo-600 shrink-0 hidden xs:inline" />
+                              <span className="truncate">{b.className}</span>
                             </span>
                           </td>
-                          <td className="p-4 text-right font-bold text-slate-700">
+                          <td className="p-4 text-right font-bold text-slate-700 whitespace-nowrap">
                             {(b.originalDue || 0).toLocaleString()} G
                           </td>
-                          <td className="p-4 text-right font-bold text-rose-600">
+                          <td className="p-4 text-right font-bold text-rose-600 whitespace-nowrap">
                             {b.totalDiscount > 0 ? `-${b.totalDiscount.toLocaleString()} G` : '-'}
                           </td>
-                          <td className="p-4 text-right font-black text-slate-900">
+                          <td className="p-4 text-right font-black text-slate-900 whitespace-nowrap">
                             {b.totalDue.toLocaleString()} G
                           </td>
-                          <td className="p-4 text-right font-black text-emerald-700">
+                          <td className="p-4 text-right font-black text-emerald-700 whitespace-nowrap">
                             {b.paid.toLocaleString()} G
                             <div className="text-[9px] text-slate-500 font-semibold">{b.paymentCount || 0} versement(s)</div>
                           </td>
-                          <td className="p-4 text-right font-black text-rose-700">
+                          <td className="p-4 text-right font-black text-rose-700 whitespace-nowrap">
                             {b.balance.toLocaleString()} G
                           </td>
-                          <td className="p-4 text-center">
+                          <td className="p-4 text-center whitespace-nowrap">
                             <span className={`font-mono text-[11px] font-black ${isFullyPaid ? 'text-emerald-700' : isPartial ? 'text-amber-700' : 'text-rose-700'}`}>
                               {studentRate.toFixed(0)}%
                             </span>
                           </td>
-                          <td className="p-4 text-center">
+                          <td className="p-4 text-center whitespace-nowrap">
                             {isFullyPaid ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
                                 Réglé
                               </span>
                             ) : isPartial ? (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300 whitespace-nowrap">
                                 Partiel
                               </span>
                             ) : (
-                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300">
+                              <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 whitespace-nowrap">
                                 Impayé
                               </span>
                             )}
                           </td>
-                          <td className="p-4 text-right pr-6">
+                          <td className="p-4 text-right pr-6 whitespace-nowrap">
                             <button
                               onClick={() => {
                                 setActiveView('generator');
                                 loadStudentAudit(b);
                               }}
-                              className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ml-auto cursor-pointer shadow-2xs active:scale-95"
+                              className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ml-auto cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
                             >
                               <FileText size={13} />
                               Audit Élève

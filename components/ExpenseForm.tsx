@@ -15,7 +15,8 @@ import {
   ShieldCheck,
   AlertCircle,
   Edit3,
-  Building2
+  Building2,
+  X
 } from 'lucide-react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../supabase';
@@ -293,73 +294,89 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 animate-in slide-in-from-bottom duration-500 pb-12">
-      <div className="flex flex-col md:flex-row items-center justify-between gap-6 bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
-        <div className="flex items-center gap-5">
-          <div className={`p-3.5 ${isEdit ? 'bg-amber-500' : 'bg-rose-600'} text-white rounded-xl shadow-md shadow-rose-500/20`}>
-             {isEdit ? <Edit3 size={24} /> : <Plus size={24} />}
+    <div className="max-w-4xl mx-auto space-y-4 animate-in slide-in-from-bottom duration-500 pb-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
+        <div className="flex items-center gap-3.5">
+          <div className={`p-2.5 ${isEdit ? 'bg-amber-500' : 'bg-rose-600'} text-white rounded-xl shadow-md shadow-rose-500/20`}>
+             {isEdit ? <Edit3 size={20} /> : <Plus size={20} />}
           </div>
           <div>
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
               {isEdit ? "Correction Charge" : "Saisie de Charge"}
             </h2>
-            <div className="flex items-center gap-2 mt-1">
-               <span className="text-xs font-bold px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-lg border border-slate-200/80 tracking-tight">
+            <div className="flex items-center gap-2 mt-0.5">
+               <span className="text-[11px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-lg border border-slate-200/80 tracking-tight">
                  Session Cible : {activeYear?.label || 'Chargement...'}
                </span>
             </div>
           </div>
         </div>
-        <button onClick={() => navigate('/economat/depenses')} className="px-4 py-2.5 bg-white text-slate-700 hover:bg-slate-50 rounded-xl font-bold text-xs tracking-tight transition-all flex items-center gap-2 border border-slate-200 shadow-2xs cursor-pointer">
-          <ArrowLeft size={16} />
-          <span>Annuler</span>
+        <button onClick={() => navigate('/economat/depenses')} className="px-3.5 py-2 bg-white text-slate-700 hover:bg-slate-50 rounded-xl font-bold text-xs tracking-tight transition-all flex items-center gap-1.5 border border-slate-200 shadow-2xs cursor-pointer">
+          <ArrowLeft size={15} />
+          <span>Retour aux Dépenses</span>
         </button>
       </div>
 
       {error && (
-        <div className="bg-rose-50 border-l-4 border-rose-500 p-5 rounded-xl flex items-center gap-4 text-rose-700 font-bold text-xs  tracking-wider animate-in shake">
-          <AlertCircle size={20} /> {error}
+        <div className="bg-rose-50 border-l-4 border-rose-500 p-3.5 rounded-xl flex items-center gap-3 text-rose-700 font-bold text-xs tracking-wider animate-in shake">
+          <AlertCircle size={18} /> {error}
         </div>
       )}
 
       <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
         <div className={`h-1.5 ${isEdit ? 'bg-amber-500' : 'bg-rose-600'} w-full`}></div>
-        <div className="p-6 md:p-10 space-y-10">
+        <div className="p-5 sm:p-6 space-y-6">
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-            <div className="lg:col-span-7 space-y-10">
-               <div className="space-y-8">
-                 <div className="flex items-center gap-3 border-b border-gray-200 pb-4">
-                    <DollarSign size={18} className={isEdit ? 'text-amber-500' : 'text-rose-600'} />
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            <div className="lg:col-span-7 space-y-5">
+               {/* 1. DÉTAILS FINANCIERS */}
+               <div className="space-y-3.5">
+                 <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <DollarSign size={16} className={isEdit ? 'text-amber-500' : 'text-rose-600'} />
                     <h3 className="font-bold text-slate-900 text-xs tracking-tight">1. Détails Financiers</h3>
                  </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-2">
-                       <label className="text-xs font-bold text-slate-500 tracking-tight ml-1">Date d'opération</label>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                    <div className="space-y-1.5">
+                       <div className="flex items-center justify-between">
+                         <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Date d'opération</label>
+                         <button
+                           type="button"
+                           onClick={() => setFormData(p => ({ ...p, expense_date: getLocalTodayString() }))}
+                           className="text-[10px] font-bold text-rose-600 hover:text-rose-800 hover:underline cursor-pointer"
+                         >
+                           Aujourd'hui
+                         </button>
+                       </div>
                        <div className="relative">
-                         <input type="date" required className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-200 rounded-xl text-xs font-bold  tracking-tight focus:bg-gray-50 outline-none transition-all" value={formData.expense_date} onChange={e => setFormData({...formData, expense_date: e.target.value})} />
-                         <Calendar className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                         <input 
+                           type="date" 
+                           required 
+                           className="w-full pl-3 pr-8 py-2.5 bg-slate-50 hover:bg-slate-50/80 focus:bg-white text-slate-900 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-bold tracking-tight outline-none focus:ring-2 focus:ring-rose-500/15 transition-all shadow-2xs" 
+                           value={formData.expense_date} 
+                           onChange={e => setFormData({...formData, expense_date: e.target.value})} 
+                         />
+                         <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
                        </div>
                     </div>
-                    <div className="space-y-2">
-                       <label className="text-xs font-bold text-slate-500 tracking-tight ml-1">Montant & Devise</label>
+                    <div className="space-y-1.5">
+                       <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Montant & Devise</label>
                        <div className="flex gap-2">
                          <div className="relative flex-1">
                            <input 
                             type="number" 
                             required 
                             step="0.01" 
-                            className={`w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-2xl font-semibold outline-none focus:bg-gray-50 transition-all font-mono tracking-tighter ${isEdit ? 'text-amber-600' : 'text-rose-600'}`} 
+                            className={`w-full pl-3 pr-12 py-2 bg-slate-50 focus:bg-white border border-slate-200 focus:border-rose-500 rounded-xl text-xl font-bold outline-none transition-all font-mono tracking-tight shadow-2xs ${isEdit ? 'text-amber-600' : 'text-rose-600'}`} 
                             placeholder="0.00" 
                             value={formData.amount} 
                             onChange={e => setFormData({...formData, amount: e.target.value})} 
                            />
-                           <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-xs">
+                           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-xs pointer-events-none">
                              {formData.currency}
                            </div>
                          </div>
                          <select 
-                          className="w-24 px-2 py-3 bg-slate-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-900 outline-none appearance-none cursor-pointer hover:bg-slate-100 transition-all text-center"
+                          className="w-20 px-2 py-2 bg-slate-100/80 hover:bg-slate-100 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none appearance-none cursor-pointer transition-all text-center shadow-2xs"
                           value={formData.currency}
                           onChange={e => setFormData({...formData, currency: e.target.value as any})}
                          >
@@ -368,7 +385,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                          </select>
                        </div>
                        {formData.currency === 'USD' && formData.amount && (
-                         <p className="text-[10px] font-bold text-emerald-600 ml-1 animate-in fade-in slide-in-from-left-2">
+                         <p className="text-[10px] font-bold text-emerald-600 ml-0.5 animate-in fade-in slide-in-from-left-2">
                            Équivalent : {(parseFloat(formData.amount) * currentExchangeRate).toLocaleString()} HTG (Taux: {currentExchangeRate})
                          </p>
                        )}
@@ -376,42 +393,48 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                  </div>
                </div>
 
-               <div className="space-y-8">
-                 <div className="flex items-center gap-3 border-b border-gray-200 pb-4">
-                    <Tag size={18} className={isEdit ? 'text-amber-500' : 'text-rose-600'} />
-                    <h3 className="font-bold text-slate-900 text-xs tracking-tight">2. Justification</h3>
+               {/* 2. JUSTIFICATION */}
+               <div className="space-y-3.5">
+                 <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <Tag size={16} className={isEdit ? 'text-amber-500' : 'text-rose-600'} />
+                    <h3 className="font-bold text-slate-900 text-xs tracking-tight">2. Justification & Imputation</h3>
                  </div>
-                 <div className="space-y-6">
-                   <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 tracking-tight ml-1">Catégorie de Charge</label>
+                 <div className="space-y-3">
+                   <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Catégorie de Charge</label>
                       <div className="flex gap-2">
                         <div className="relative flex-1">
-                          <select required className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900  tracking-tight outline-none appearance-none cursor-pointer focus:bg-gray-50 transition-all" value={formData.category_id} onChange={e => setFormData({...formData, category_id: e.target.value})}>
+                          <select 
+                            required 
+                            className="w-full pl-3 pr-8 py-2.5 bg-slate-50 hover:bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-bold text-slate-900 tracking-tight outline-none appearance-none cursor-pointer transition-all shadow-2xs" 
+                            value={formData.category_id} 
+                            onChange={e => setFormData({...formData, category_id: e.target.value})}
+                          >
                             <option value="">-- SÉLECTIONNER CATÉGORIE --</option>
                             {categories.map(cat => (
                               <option key={cat.id} value={cat.id}>{cat.label.toUpperCase()}</option>
                             ))}
                           </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
                         </div>
                         <button 
                           type="button"
                           onClick={() => setShowQuickCatModal(true)}
-                          className="p-3 bg-slate-100 text-slate-600 rounded-xl hover:bg-slate-200 transition-all"
-                          title="Nouvelle catégorie"
+                          className="p-2.5 bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all shadow-2xs cursor-pointer"
+                          title="Ajouter une nouvelle catégorie"
                         >
-                          <Plus size={18} />
+                          <Plus size={16} />
                         </button>
                       </div>
                    </div>
                    {!user.campus_id && campuses && campuses.length > 1 && (
-                      <div className="space-y-2">
-                         <label className="text-xs font-bold text-slate-500 tracking-tight ml-1 flex items-center gap-1.5">
-                           <Building2 size={14} className="text-slate-400" /> Campus / Annexe d'affectation
+                      <div className="space-y-1.5">
+                         <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5 flex items-center gap-1.5">
+                           <Building2 size={13} className="text-slate-400" /> Campus / Annexe d'affectation
                          </label>
                          <div className="relative">
                            <select 
-                            className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-900 tracking-tight outline-none appearance-none cursor-pointer focus:bg-gray-50 transition-all"
+                            className="w-full pl-3 pr-8 py-2.5 bg-slate-50 hover:bg-slate-50/80 focus:bg-white border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-bold text-slate-900 tracking-tight outline-none appearance-none cursor-pointer transition-all shadow-2xs"
                             value={formData.campus_id}
                             onChange={e => setFormData({...formData, campus_id: e.target.value})}
                            >
@@ -419,45 +442,67 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
                              ))}
                            </select>
-                           <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                           <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
                          </div>
                       </div>
                    )}
-                   <div className="space-y-2">
-                      <label className="text-xs font-bold text-slate-500 tracking-tight ml-1">Désignation de la Charge</label>
-                      <input required type="text" placeholder="EX: MAINTENANCE TRANSFORMATEUR" className="w-full px-4 py-3 bg-white text-gray-900 border border-gray-200 rounded-xl text-xs font-bold  tracking-tight outline-none focus:bg-gray-50 transition-all" value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} />
+                   <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Désignation de la Charge</label>
+                      <input 
+                        required 
+                        type="text" 
+                        placeholder="Ex: MAINTENANCE GÉNÉRATRICE, ACHAT FOURNITURES..." 
+                        className="w-full px-3 py-2.5 bg-slate-50 hover:bg-slate-50/80 focus:bg-white text-slate-900 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-bold tracking-tight outline-none transition-all shadow-2xs" 
+                        value={formData.label} 
+                        onChange={e => setFormData({...formData, label: e.target.value})} 
+                      />
                    </div>
                  </div>
                </div>
             </div>
 
-            <div className="lg:col-span-5 space-y-8">
-               <div className="space-y-2 flex flex-col">
-                  <label className="text-xs font-bold text-slate-500 tracking-tight ml-1 flex items-center gap-2">
-                    <FileText size={14} /> Audit Note
+            <div className="lg:col-span-5 space-y-4">
+               <div className="space-y-1.5 flex flex-col">
+                  <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5 flex items-center gap-1.5">
+                    <FileText size={13} className="text-slate-400" /> Note d'Audit & Justificatif
                   </label>
-                  <textarea rows={6} className="w-full px-4 py-4 bg-white text-gray-900 border border-gray-200 rounded-xl text-xs font-bold tracking-tight outline-none focus:bg-gray-50 transition-all resize-none" placeholder="OBSERVATIONS COMPTABLES..." value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} />
+                  <textarea 
+                    rows={4} 
+                    className="w-full p-3 bg-slate-50 focus:bg-white text-slate-900 border border-slate-200 focus:border-rose-500 rounded-xl text-xs font-medium tracking-tight outline-none transition-all resize-none shadow-2xs leading-relaxed" 
+                    placeholder="Observations comptables, numéro de reçu ou pièces justificatives..." 
+                    value={formData.description} 
+                    onChange={e => setFormData({...formData, description: e.target.value})} 
+                  />
+                  <span className="text-[10px] text-slate-400 font-medium ml-0.5">Facultatif mais recommandé pour l'audit financier.</span>
                </div>
                
-               <div className="bg-slate-50 p-8 rounded-xl border border-slate-200 space-y-4">
-                  <div className="flex items-center gap-3">
-                    <ShieldCheck className="text-slate-900" size={18} />
-                    <h4 className="text-xs font-bold text-slate-900 tracking-tight">Certification Session</h4>
+               <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="text-slate-900" size={16} />
+                    <h4 className="text-xs font-bold text-slate-900 tracking-tight">Certification de Session</h4>
                   </div>
-                  <p className="text-xs font-medium text-slate-500 leading-relaxed tracking-tight">
-                    Cette charge sera irrémédiablement associée à la session {activeYear?.label || 'en cours...'}.
+                  <p className="text-[11px] font-medium text-slate-500 leading-relaxed tracking-tight">
+                    Cette charge sera enregistrée et imputée au grand livre comptable de la session <span className="font-bold text-slate-700">{activeYear?.label || 'en cours...'}</span>.
                   </p>
                </div>
             </div>
           </div>
 
-          <div className="mt-12 pt-10 flex flex-row justify-end items-center gap-4 border-t border-gray-200 relative z-10">
-             <button type="button" onClick={() => navigate('/economat/depenses')} className="px-6 py-4 text-xs font-bold text-slate-500 hover:text-slate-900 tracking-tight transition-colors uppercase">
-               Annuler l'opération
+          <div className="mt-6 pt-4 flex flex-row justify-end items-center gap-3 border-t border-slate-100 relative z-10">
+             <button 
+               type="button" 
+               onClick={() => navigate('/economat/depenses')} 
+               className="px-4 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-800 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+             >
+               Annuler
              </button>
-             <button disabled={isSubmitting || loading} type="submit" className={`px-10 py-4 ${isEdit ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-100' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-100'} text-white rounded-xl shadow-lg font-bold text-xs tracking-tight flex items-center justify-center gap-3 active:scale-95 disabled:opacity-30 transition-all`}>
-                {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} />}
-                {isEdit ? "Rectifier la Charge" : "Valider le décaissement"}
+             <button 
+               disabled={isSubmitting || loading} 
+               type="submit" 
+               className={`px-6 py-2.5 ${isEdit ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-500/20' : 'bg-rose-600 hover:bg-rose-700 shadow-rose-500/20'} text-white rounded-xl shadow-md font-bold text-xs tracking-tight flex items-center justify-center gap-2 active:scale-95 disabled:opacity-40 transition-all cursor-pointer`}
+             >
+                {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
+                <span>{isEdit ? "Mettre à jour la Charge" : "Valider le Décaissement"}</span>
              </button>
           </div>
         </div>
@@ -467,38 +512,46 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       {showQuickCatModal && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
-            <div className="p-8 border-b border-gray-100">
-              <h3 className="text-xl font-black text-gray-900 tracking-tight">Nouvelle Catégorie</h3>
-              <p className="text-xs font-bold text-gray-400 mt-1 uppercase tracking-widest">Ajout rapide au référentiel</p>
+            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-black text-slate-900 tracking-tight">Nouvelle Catégorie</h3>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Ajout rapide au référentiel</p>
+              </div>
+              <button
+                onClick={() => setShowQuickCatModal(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
-            <form onSubmit={handleQuickAddCategory} className="p-8 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Libellé de la catégorie</label>
+            <form onSubmit={handleQuickAddCategory} className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Libellé de la catégorie</label>
                 <input 
                   type="text" 
                   required 
                   autoFocus
                   placeholder="EX: SALAIRES & HONORAIRES"
-                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-rose-500/20 focus:bg-white transition-all"
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-rose-500/20 focus:bg-white transition-all"
                   value={newCatLabel}
                   onChange={e => setNewCatLabel(e.target.value)}
                 />
               </div>
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-2.5 pt-2">
                 <button 
                   type="button" 
                   onClick={() => setShowQuickCatModal(false)}
-                  className="flex-1 py-3 text-xs font-bold text-gray-500 hover:text-gray-900 transition-colors"
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-900 border border-slate-200 rounded-xl transition-colors cursor-pointer"
                 >
-                  ANNULER
+                  Annuler
                 </button>
                 <button 
                   type="submit" 
                   disabled={isSavingCat}
-                  className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold text-xs tracking-tight hover:bg-rose-700 transition-all flex items-center justify-center gap-2"
+                  className="flex-1 py-2.5 bg-rose-600 text-white rounded-xl font-bold text-xs tracking-tight hover:bg-rose-700 transition-all flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
                 >
-                  {isSavingCat ? <Loader2 className="animate-spin" size={16} /> : <Save size={16} />}
-                  ENREGISTRER
+                  {isSavingCat ? <Loader2 className="animate-spin" size={15} /> : <Save size={15} />}
+                  <span>Enregistrer</span>
                 </button>
               </div>
             </form>

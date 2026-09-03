@@ -64,39 +64,135 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
     ? (currentCampusObj ? currentCampusObj.name : 'Tous les Campus / Annexes')
     : undefined;
 
+  // Safe UUID Generator ensuring RFC4122 v4 compliance in all contexts (including HTTP, iframes, and mobile)
+  const generateUUID = (): string => {
+    if (typeof crypto !== 'undefined') {
+      if (typeof crypto.randomUUID === 'function') {
+        try {
+          const id = crypto.randomUUID();
+          if (isValidUuid(id)) return id;
+        } catch (e) {
+          // fallback below
+        }
+      }
+      if (typeof crypto.getRandomValues === 'function') {
+        try {
+          const buf = new Uint8Array(16);
+          crypto.getRandomValues(buf);
+          buf[6] = (buf[6] & 0x0f) | 0x40; // Version 4
+          buf[8] = (buf[8] & 0x3f) | 0x80; // Variant RFC4122
+          const hex = Array.from(buf, (b) => b.toString(16).padStart(2, '0')).join('');
+          const id = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+          if (isValidUuid(id)) return id;
+        } catch (e) {
+          // fallback below
+        }
+      }
+    }
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === 'x' ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  };
+
   // Single record auto-save helper
   const saveSingleRecord = async (record: any) => {
     setAutoSaving(true);
     try {
+      const safeId = (record.id && isValidUuid(record.id)) ? record.id : generateUUID();
+      const schoolId = record.school_id || user.school_id;
+      const classId = record.class_id || selectedClassId;
+      const attDate = record.date || attendanceDate;
+
+      if (!record.student_id || !classId || !attDate) {
+        console.warn("Missing required fields for attendance record:", { student_id: record.student_id, classId, attDate });
+        return;
+      }
+
       const toUpsert: any = {
-        id: record.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`),
-        school_id: user.school_id,
+        id: safeId,
+        school_id: schoolId,
         student_id: record.student_id,
-        class_id: record.class_id,
-        date: record.date,
+        class_id: classId,
+        date: attDate,
         status: record.status || 'PRESENT',
         reason: record.reason || null,
         recorded_by: user.id
       };
 
-      if (activeYearId) {
-        toUpsert.academic_year_id = activeYearId;
-      }
-
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('student_attendances')
-        .upsert(toUpsert, { onConflict: 'student_id, date' });
+        .upsert(toUpsert, { onConflict: 'student_id, date', defaultToNull: false })
+        .select('id');
       
       if (error) {
-        if (error.code === '42703' || error.code === 'PGRST204') {
-          const { academic_year_id, ...fallback } = toUpsert;
-          const { error: retryError } = await supabase
+        console.warn("Primary upsert failed, attempting safe update/insert fallback:", error);
+        // Fallback: Check if record exists by student_id and date
+        const { data: existingRows } = await supabase
+          .from('student_attendances')
+          .select('id')
+          .eq('student_id', record.student_id)
+          .eq('date', attDate)
+          .limit(1);
+
+        if (existingRows && existingRows.length > 0) {
+          const updatePayload: any = {
+            status: toUpsert.status,
+            reason: toUpsert.reason,
+            class_id: toUpsert.class_id,
+            recorded_by: toUpsert.recorded_by,
+            updated_at: new Date().toISOString()
+          };
+          if (schoolId) updatePayload.school_id = schoolId;
+          const { error: updateErr } = await supabase
             .from('student_attendances')
-            .upsert(fallback, { onConflict: 'student_id, date' });
-          if (retryError) throw retryError;
+            .update(updatePayload)
+            .eq('id', existingRows[0].id);
+          if (updateErr) throw updateErr;
+
+          setAttendances(prev => {
+            if (prev[record.student_id]) {
+              return {
+                ...prev,
+                [record.student_id]: { ...prev[record.student_id], id: existingRows[0].id }
+              };
+            }
+            return prev;
+          });
+          return;
         } else {
-          throw error;
+          const insertPayload: any = { ...toUpsert };
+          const { data: inserted, error: insertErr } = await supabase
+            .from('student_attendances')
+            .insert(insertPayload)
+            .select('id')
+            .single();
+          if (insertErr) throw insertErr;
+          if (inserted?.id) {
+            setAttendances(prev => {
+              if (prev[record.student_id]) {
+                return {
+                  ...prev,
+                  [record.student_id]: { ...prev[record.student_id], id: inserted.id }
+                };
+              }
+              return prev;
+            });
+            return;
+          }
         }
+      } else if (data && data[0]?.id) {
+        const confirmedId = data[0].id;
+        setAttendances(prev => {
+          if (prev[record.student_id] && prev[record.student_id].id !== confirmedId) {
+            return {
+              ...prev,
+              [record.student_id]: { ...prev[record.student_id], id: confirmedId }
+            };
+          }
+          return prev;
+        });
       }
     } catch (err: any) {
       console.error("Auto-save error:", err);
@@ -244,9 +340,11 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
       const attMap: Record<string, StudentAttendance> = {};
       
-      // Default: set all active students as PRESENT
+      // Default: set all active students as PRESENT with valid pre-generated UUIDs
       stuData?.forEach(student => {
         attMap[student.id] = {
+          id: generateUUID(),
+          school_id: user.school_id,
           student_id: student.id,
           class_id: selectedClassId,
           date: attendanceDate,
@@ -259,7 +357,11 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
       let hasExistingRecords = false;
       attData?.forEach(att => {
         if (attMap[att.student_id]) {
-          attMap[att.student_id] = att;
+          attMap[att.student_id] = {
+            ...attMap[att.student_id],
+            ...att,
+            id: (att.id && isValidUuid(att.id)) ? att.id : attMap[att.student_id].id
+          };
           hasExistingRecords = true;
         }
       });
@@ -268,30 +370,23 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
       // Auto-save initial default PRESENT state if new date
       if (!hasExistingRecords && stuData && stuData.length > 0) {
-        const defaultRecords = stuData.map(student => {
-          const r: any = {
-            id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-            school_id: user.school_id,
-            student_id: student.id,
-            class_id: selectedClassId,
-            date: attendanceDate,
-            status: 'PRESENT',
-            recorded_by: user.id
-          };
-          if (activeYearId) r.academic_year_id = activeYearId;
-          return r;
-        });
+        const defaultRecords = Object.values(attMap).map(att => ({
+          id: (att.id && isValidUuid(att.id)) ? att.id : generateUUID(),
+          school_id: att.school_id || user.school_id,
+          student_id: att.student_id,
+          class_id: att.class_id || selectedClassId,
+          date: attendanceDate,
+          status: 'PRESENT',
+          recorded_by: user.id
+        }));
         
-        supabase.from('student_attendances').upsert(defaultRecords, { onConflict: 'student_id, date' }).then(({error}) => {
-           if (error) {
-             if (error.code === '42703' || error.code === 'PGRST204') {
-               const fallbackRecords = defaultRecords.map(({ academic_year_id, ...rest }: any) => rest);
-               supabase.from('student_attendances').upsert(fallbackRecords, { onConflict: 'student_id, date' });
-             } else {
-               console.error("Auto-init attendance error:", error);
-             }
-           }
-        });
+        supabase.from('student_attendances')
+          .upsert(defaultRecords, { onConflict: 'student_id, date', defaultToNull: false })
+          .then(({ error }) => {
+            if (error) {
+              console.error("Auto-init attendance error:", error);
+            }
+          });
       }
 
     } catch (err: any) {
@@ -308,9 +403,12 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
   // Handle single status change
   const handleStatusChange = async (studentId: string, status: 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED') => {
-    const existing = attendances[studentId] || {};
+    const existing = attendances[studentId];
+    const safeId = (existing?.id && isValidUuid(existing.id)) ? existing.id : generateUUID();
     const record = {
       ...existing,
+      id: safeId,
+      school_id: user.school_id,
       student_id: studentId,
       class_id: selectedClassId,
       date: attendanceDate,
@@ -327,27 +425,37 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
   // Handle reason modification
   const handleReasonChange = (studentId: string, reason: string) => {
-    setAttendances(prev => ({
-      ...prev,
-      [studentId]: {
-        ...prev[studentId],
-        student_id: studentId,
-        class_id: selectedClassId,
-        date: attendanceDate,
-        reason
-      } as StudentAttendance
-    }));
+    setAttendances(prev => {
+      const existing = prev[studentId];
+      const safeId = (existing?.id && isValidUuid(existing.id)) ? existing.id : generateUUID();
+      return {
+        ...prev,
+        [studentId]: {
+          ...existing,
+          id: safeId,
+          school_id: user.school_id,
+          student_id: studentId,
+          class_id: selectedClassId,
+          date: attendanceDate,
+          reason
+        } as StudentAttendance
+      };
+    });
   };
 
   const handleReasonBlur = async (studentId: string) => {
     const att = attendances[studentId];
     if (att) {
+      const safeId = (att.id && isValidUuid(att.id)) ? att.id : generateUUID();
       await saveSingleRecord({
+        ...att,
+        id: safeId,
+        school_id: user.school_id,
         student_id: studentId,
         class_id: selectedClassId,
         date: attendanceDate,
         status: att.status || 'PRESENT',
-        reason: att.reason
+        reason: att.reason || null
       });
     }
   };
@@ -358,33 +466,66 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
     setError(null);
     try {
       const recordsToUpsert = Object.values(attendances).map(att => {
-        const r: any = {
-          id: att.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`),
-          school_id: user.school_id,
+        const safeId = (att.id && isValidUuid(att.id)) ? att.id : generateUUID();
+        return {
+          id: safeId,
+          school_id: att.school_id || user.school_id,
           student_id: att.student_id,
-          class_id: att.class_id,
-          date: att.date,
+          class_id: att.class_id || selectedClassId,
+          date: att.date || attendanceDate,
           status: att.status || 'PRESENT',
           reason: att.reason || null,
           recorded_by: user.id
         };
-        if (activeYearId) r.academic_year_id = activeYearId;
-        return r;
       });
 
       if (recordsToUpsert.length > 0) {
         const { error } = await supabase
           .from('student_attendances')
-          .upsert(recordsToUpsert, { onConflict: 'student_id, date' });
+          .upsert(recordsToUpsert, { onConflict: 'student_id, date', defaultToNull: false });
         
         if (error) {
-          if (error.code === '42703' || error.code === 'PGRST204') {
-            const fallbackRecords = recordsToUpsert.map(({ academic_year_id, ...rest }: any) => rest);
-            const { error: retryError } = await supabase
-              .from('student_attendances')
-              .upsert(fallbackRecords, { onConflict: 'student_id, date' });
-            if (retryError) throw retryError;
-          } else {
+          console.warn("Batch upsert failed, attempting individual record saves:", error);
+          let successCount = 0;
+          for (const item of recordsToUpsert) {
+            try {
+              const { error: singleErr } = await supabase
+                .from('student_attendances')
+                .upsert(item, { onConflict: 'student_id, date', defaultToNull: false });
+              if (!singleErr) {
+                successCount++;
+              } else {
+                // Check if existing record exists by (student_id, date)
+                const { data: existing } = await supabase
+                  .from('student_attendances')
+                  .select('id')
+                  .eq('student_id', item.student_id)
+                  .eq('date', item.date)
+                  .limit(1);
+                if (existing && existing.length > 0) {
+                  const { error: upErr } = await supabase
+                    .from('student_attendances')
+                    .update({
+                      status: item.status,
+                      reason: item.reason,
+                      class_id: item.class_id,
+                      recorded_by: item.recorded_by,
+                      updated_at: new Date().toISOString()
+                    })
+                    .eq('id', existing[0].id);
+                  if (!upErr) successCount++;
+                } else {
+                  const { error: insErr } = await supabase
+                    .from('student_attendances')
+                    .insert(item);
+                  if (!insErr) successCount++;
+                }
+              }
+            } catch (singleEx) {
+              console.error(`Exception saving student ${item.student_id}:`, singleEx);
+            }
+          }
+          if (successCount === 0) {
             throw error;
           }
         }
@@ -394,7 +535,7 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
       toast.success("Présences enregistrées et synchronisées avec succès !");
     } catch (err: any) {
       console.error("Error saving attendance:", err);
-      setError("Erreur lors de l'enregistrement : " + err.message);
+      setError("Erreur lors de l'enregistrement : " + (err.message || 'Erreur inconnue'));
       toast.error("Erreur lors de l'enregistrement");
     } finally {
       setSaving(false);
@@ -408,17 +549,16 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
     filteredStudents.forEach(student => {
       const existingAtt = attendances[student.id];
+      const safeId = (existingAtt?.id && isValidUuid(existingAtt.id)) ? existingAtt.id : generateUUID();
       const record: any = {
-        id: existingAtt?.id || (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `att-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`),
-        school_id: user.school_id,
+        id: safeId,
+        school_id: existingAtt?.school_id || user.school_id,
         student_id: student.id,
         class_id: selectedClassId,
         date: attendanceDate,
-        status
+        status,
+        reason: existingAtt?.reason || null
       };
-      if (activeYearId) {
-        record.academic_year_id = activeYearId;
-      }
       newAttendances[student.id] = {
         ...existingAtt,
         ...record
@@ -432,17 +572,44 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
       try {
         const { error } = await supabase
           .from('student_attendances')
-          .upsert(recordsToUpsert, { onConflict: 'student_id, date' });
+          .upsert(recordsToUpsert, { onConflict: 'student_id, date', defaultToNull: false });
         if (error) {
-          if (error.code === '42703' || error.code === 'PGRST204') {
-            const fallbackRecords = recordsToUpsert.map(({ academic_year_id, ...rest }: any) => rest);
-            const { error: retryError } = await supabase
+          console.warn("Batch markAllAs failed, falling back to individual saves:", error);
+          let successCount = 0;
+          for (const item of recordsToUpsert) {
+            const { error: singleErr } = await supabase
               .from('student_attendances')
-              .upsert(fallbackRecords, { onConflict: 'student_id, date' });
-            if (retryError) throw retryError;
-          } else {
-            throw error;
+              .upsert(item, { onConflict: 'student_id, date', defaultToNull: false });
+            if (!singleErr) {
+              successCount++;
+            } else {
+              const { data: existing } = await supabase
+                .from('student_attendances')
+                .select('id')
+                .eq('student_id', item.student_id)
+                .eq('date', item.date)
+                .limit(1);
+              if (existing && existing.length > 0) {
+                const { error: upErr } = await supabase
+                  .from('student_attendances')
+                  .update({
+                    status: item.status,
+                    reason: item.reason,
+                    class_id: item.class_id,
+                    recorded_by: item.recorded_by,
+                    updated_at: new Date().toISOString()
+                  })
+                  .eq('id', existing[0].id);
+                if (!upErr) successCount++;
+              } else {
+                const { error: insErr } = await supabase
+                  .from('student_attendances')
+                  .insert(item);
+                if (!insErr) successCount++;
+              }
+            }
           }
+          if (successCount === 0) throw error;
         }
         toast.success(`Statut mis à jour pour ${recordsToUpsert.length} ${terminology.students?.toLowerCase() || 'élèves'}`);
       } catch (err: any) {

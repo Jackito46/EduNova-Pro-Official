@@ -1,7 +1,8 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Calendar, ChevronLeft, ChevronRight, ChevronDown, 
-  RotateCcw, Sparkles, Check, Clock
+  RotateCcw, Sparkles, Check, Clock, X
 } from 'lucide-react';
 import { format, parseISO, isValid, addDays, subDays, startOfWeek, endOfWeek, isSameDay } from 'date-fns';
 import { fr } from 'date-fns/locale';
@@ -119,7 +120,21 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
+  const [popoverPos, setPopoverPos] = useState<{ top: number; left: number } | null>(null);
+  const [isMobile, setIsMobile] = useState<boolean>(() => 
+    typeof window !== 'undefined' ? window.innerWidth < 640 : false
+  );
+
+  // Detect mobile view dynamically
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Format today string YYYY-MM-DD
   const todayStr = useMemo(() => {
@@ -155,27 +170,60 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
   const scheme = COLOR_SCHEMES[colorScheme] || COLOR_SCHEMES.blue;
   const isToday = selectedDate === todayStr;
 
-  // Handle alignment detection on open
-  useEffect(() => {
-    if (dropdownAlign) {
-      setEffectiveAlign(dropdownAlign);
-    } else if (containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const popoverWidth = 340;
-      if (rect.left + popoverWidth > window.innerWidth && rect.right >= popoverWidth) {
-        setEffectiveAlign('right');
-      } else if (rect.right + 260 > window.innerWidth) {
-        setEffectiveAlign('right');
-      } else {
-        setEffectiveAlign('left');
-      }
+  // Calculate intelligent viewport-bounded coordinates for tablet & desktop
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const popoverWidth = 340;
+    const popoverHeight = 390;
+
+    // Check vertical space (open upwards if close to bottom)
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUpwards = spaceBelow < popoverHeight && spaceAbove > spaceBelow;
+
+    const top = openUpwards
+      ? Math.max(10, rect.top - popoverHeight - 6)
+      : Math.min(window.innerHeight - popoverHeight - 10, rect.bottom + 6);
+
+    // Check horizontal alignment and clamp inside viewport
+    let left = rect.left;
+    if (dropdownAlign === 'right') {
+      left = rect.right - popoverWidth;
     }
-  }, [dropdownAlign, isOpen]);
+
+    if (left + popoverWidth > window.innerWidth - 12) {
+      left = window.innerWidth - popoverWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    setPopoverPos({ top, left });
+  }, [dropdownAlign]);
+
+  // Re-anchor on open, scroll, or resize
+  useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen, updatePosition]);
 
   // Close when clicked outside or pressed Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
         setShowMonthYearPicker(false);
       }
@@ -459,209 +507,433 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
         )}
       </div>
 
-      {/* FLOATING CALENDAR DROPDOWN */}
-      {isOpen && (
-        <div 
-          className={`
-            absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2
-            w-80 sm:w-[340px] max-w-[calc(100vw-1.5rem)] bg-white rounded-3xl shadow-2xl border border-slate-200
-            p-3.5 sm:p-4 z-[200] animate-in fade-in zoom-in-95 duration-150 select-none
-          `}
-        >
-          {/* Quick Presets Bar */}
-          {showShortcuts && (
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 border-b border-slate-100 custom-scrollbar">
-              <button
-                type="button"
-                onClick={() => setQuickDate('today')}
-                className={`px-2.5 py-1 text-[11px] font-black rounded-lg transition-all whitespace-nowrap ${
-                  isToday 
-                    ? scheme.shortcutActive
-                    : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
-                }`}
-              >
-                Aujourd'hui
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate('yesterday')}
-                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
-              >
-                Hier
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate('monday')}
-                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
-              >
-                Lundi
-              </button>
-              <button
-                type="button"
-                onClick={() => setQuickDate('friday')}
-                className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
-              >
-                Vendredi
-              </button>
-            </div>
-          )}
-
-          {/* Month & Year Navigation Header */}
-          <div className="flex items-center justify-between px-1 mb-3">
-            <button
-              type="button"
-              onClick={prevMonth}
-              className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
-              title="Mois précédent"
+      {/* FLOATING CALENDAR DROPDOWN (PORTALED DIRECTLY TO BODY FOR 100% UNBLOCKABLE RESPONSIVE BEHAVIOR) */}
+      {isOpen && typeof document !== 'undefined' && createPortal(
+        isMobile ? (
+          <div className="fixed inset-0 z-[99999] flex items-center justify-center p-3 sm:p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+            <div 
+              ref={popoverRef}
+              className="w-full max-w-[340px] bg-white rounded-3xl shadow-2xl border border-slate-200 p-4 relative animate-in zoom-in-95 duration-150 select-none max-h-[92vh] overflow-y-auto"
             >
-              <ChevronLeft size={17} className="stroke-[2.5]" />
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setShowMonthYearPicker(!showMonthYearPicker)}
-              className="px-3 py-1 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5 transition-all group"
-            >
-              <span>{FRENCH_MONTHS[viewMonth]} {viewYear}</span>
-              <ChevronDown size={14} className={`text-slate-500 group-hover:text-slate-800 transition-transform ${showMonthYearPicker ? 'rotate-180' : ''}`} />
-            </button>
-
-            <button
-              type="button"
-              onClick={nextMonth}
-              className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
-              title="Mois suivant"
-            >
-              <ChevronRight size={17} className="stroke-[2.5]" />
-            </button>
-          </div>
-
-          {/* Fast Month / Year Selector Grid */}
-          {showMonthYearPicker ? (
-            <div className="py-2 space-y-3 animate-in fade-in zoom-in-95 duration-100">
-              <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
-                Choisir le mois & l'année
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100">
+                <span className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <Calendar size={13} className="text-indigo-600" />
+                  {title || labelPrefix || 'Sélectionner une date'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsOpen(false)}
+                  className="p-1 rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition-colors"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                {FRENCH_MONTHS.map((mName, idx) => (
+
+              {/* Quick Presets Bar */}
+              {showShortcuts && (
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 border-b border-slate-100 custom-scrollbar">
                   <button
-                    key={mName}
                     type="button"
-                    onClick={() => {
-                      setViewMonth(idx);
-                      setShowMonthYearPicker(false);
-                    }}
-                    className={`py-1.5 px-1 rounded-xl text-xs font-bold text-center transition-all ${
-                      viewMonth === idx 
-                        ? `${scheme.selectedBg} font-black shadow-xs` 
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-100'
+                    onClick={() => setQuickDate('today')}
+                    className={`px-2.5 py-1 text-[11px] font-black rounded-lg transition-all whitespace-nowrap ${
+                      isToday 
+                        ? scheme.shortcutActive
+                        : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
                     }`}
                   >
-                    {mName.substring(0, 4)}
+                    Aujourd'hui
                   </button>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate('yesterday')}
+                    className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+                  >
+                    Hier
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate('monday')}
+                    className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+                  >
+                    Lundi
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate('friday')}
+                    className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+                  >
+                    Vendredi
+                  </button>
+                </div>
+              )}
+
+              {/* Month & Year Navigation Header */}
+              <div className="flex items-center justify-between px-1 mb-3">
+                <button
+                  type="button"
+                  onClick={prevMonth}
+                  className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
+                  title="Mois précédent"
+                >
+                  <ChevronLeft size={17} className="stroke-[2.5]" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowMonthYearPicker(!showMonthYearPicker)}
+                  className="px-3 py-1 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5 transition-all group"
+                >
+                  <span>{FRENCH_MONTHS[viewMonth]} {viewYear}</span>
+                  <ChevronDown size={14} className={`text-slate-500 group-hover:text-slate-800 transition-transform ${showMonthYearPicker ? 'rotate-180' : ''}`} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={nextMonth}
+                  className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
+                  title="Mois suivant"
+                >
+                  <ChevronRight size={17} className="stroke-[2.5]" />
+                </button>
               </div>
 
-              {/* Year Chips */}
-              <div className="pt-2 border-t border-slate-100">
-                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1 mb-1.5">
-                  Année
+              {/* Fast Month / Year Selector Grid */}
+              {showMonthYearPicker ? (
+                <div className="py-2 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
+                    Choisir le mois & l'année
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {FRENCH_MONTHS.map((mName, idx) => (
+                      <button
+                        key={mName}
+                        type="button"
+                        onClick={() => {
+                          setViewMonth(idx);
+                          setShowMonthYearPicker(false);
+                        }}
+                        className={`py-1.5 px-1 rounded-xl text-xs font-bold text-center transition-all ${
+                          viewMonth === idx 
+                            ? `${scheme.selectedBg} font-black shadow-xs` 
+                            : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-100'
+                        }`}
+                      >
+                        {mName.substring(0, 4)}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Year Chips */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1 mb-1.5">
+                      Année
+                    </div>
+                    <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
+                      {yearOptions.map(y => (
+                        <button
+                          key={y}
+                          type="button"
+                          onClick={() => {
+                            setViewYear(y);
+                            setShowMonthYearPicker(false);
+                          }}
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all ${
+                            viewYear === y
+                              ? `${scheme.selectedBg} font-black shadow-xs`
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {y}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
-                  {yearOptions.map(y => (
+              ) : (
+                <>
+                  {/* Day of week headers */}
+                  <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                    {WEEKDAY_NAMES.map((wd, idx) => (
+                      <div 
+                        key={wd} 
+                        className={`text-[10px] font-black uppercase tracking-wider py-1 ${
+                          idx >= 5 ? 'text-rose-500/80' : 'text-slate-600'
+                        }`}
+                      >
+                        {wd}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Days Grid */}
+                  <div className="grid grid-cols-7 gap-1">
+                    {calendarDays.map((d, index) => {
+                      return (
+                        <button
+                          key={`${d.dateStr}-${index}`}
+                          type="button"
+                          disabled={d.isDisabled}
+                          onClick={() => {
+                            if (!d.isDisabled) {
+                              onSelectDate(d.dateStr);
+                              setIsOpen(false);
+                            }
+                          }}
+                          className={`
+                            h-8.5 sm:h-9 w-full rounded-xl flex flex-col items-center justify-center relative text-xs transition-all
+                            ${d.isSelected 
+                              ? `${scheme.selectedBg} font-black shadow-md shadow-blue-500/20 scale-105 z-10` 
+                              : d.isToday
+                                ? 'bg-emerald-50 text-emerald-900 font-black border-2 border-emerald-500 hover:bg-emerald-100'
+                                : d.isCurrentMonth
+                                  ? d.isWeekend
+                                    ? 'text-slate-700 hover:bg-slate-100 font-bold'
+                                    : 'text-slate-900 hover:bg-slate-100 font-bold'
+                                  : 'text-slate-300 hover:bg-slate-50 font-medium'
+                            }
+                            ${d.isDisabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
+                          `}
+                        >
+                          <span>{d.dayNumber}</span>
+                          {d.isToday && !d.isSelected && (
+                            <span className="w-1 h-1 bg-emerald-600 rounded-full absolute bottom-1" />
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {/* Footer Bar */}
+              <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+                <span className="text-[11px] font-bold text-slate-600 truncate max-w-[190px]">
+                  {shortFormattedDisplay}
+                </span>
+
+                {!isToday && (
+                  <button
+                    type="button"
+                    onClick={() => setQuickDate('today')}
+                    className="text-[11px] font-black text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                  >
+                    <RotateCcw size={11} className="stroke-[2.5]" />
+                    <span>Aujourd'hui</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div 
+            ref={popoverRef}
+            style={{
+              position: 'fixed',
+              top: popoverPos?.top ?? 60,
+              left: popoverPos?.left ?? 20,
+              zIndex: 99999,
+              width: '340px',
+              maxWidth: 'calc(100vw - 24px)'
+            }}
+            className="bg-white rounded-3xl shadow-2xl border border-slate-200 p-3.5 sm:p-4 animate-in fade-in zoom-in-95 duration-150 select-none"
+          >
+            {/* Quick Presets Bar */}
+            {showShortcuts && (
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 border-b border-slate-100 custom-scrollbar">
+                <button
+                  type="button"
+                  onClick={() => setQuickDate('today')}
+                  className={`px-2.5 py-1 text-[11px] font-black rounded-lg transition-all whitespace-nowrap ${
+                    isToday 
+                      ? scheme.shortcutActive
+                      : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-200'
+                  }`}
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickDate('yesterday')}
+                  className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+                >
+                  Hier
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickDate('monday')}
+                  className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+                >
+                  Lundi
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setQuickDate('friday')}
+                  className="px-2 py-1 text-[11px] font-bold text-slate-700 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all whitespace-nowrap border border-slate-200"
+                >
+                  Vendredi
+                </button>
+              </div>
+            )}
+
+            {/* Month & Year Navigation Header */}
+            <div className="flex items-center justify-between px-1 mb-3">
+              <button
+                type="button"
+                onClick={prevMonth}
+                className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
+                title="Mois précédent"
+              >
+                <ChevronLeft size={17} className="stroke-[2.5]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowMonthYearPicker(!showMonthYearPicker)}
+                className="px-3 py-1 hover:bg-slate-100 rounded-xl text-xs sm:text-sm font-black text-slate-900 flex items-center gap-1.5 transition-all group"
+              >
+                <span>{FRENCH_MONTHS[viewMonth]} {viewYear}</span>
+                <ChevronDown size={14} className={`text-slate-500 group-hover:text-slate-800 transition-transform ${showMonthYearPicker ? 'rotate-180' : ''}`} />
+              </button>
+
+              <button
+                type="button"
+                onClick={nextMonth}
+                className="p-1.5 hover:bg-slate-100 text-slate-700 hover:text-slate-900 rounded-xl transition-all active:scale-95"
+                title="Mois suivant"
+              >
+                <ChevronRight size={17} className="stroke-[2.5]" />
+              </button>
+            </div>
+
+            {/* Fast Month / Year Selector Grid */}
+            {showMonthYearPicker ? (
+              <div className="py-2 space-y-3 animate-in fade-in zoom-in-95 duration-100">
+                <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1">
+                  Choisir le mois & l'année
+                </div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {FRENCH_MONTHS.map((mName, idx) => (
                     <button
-                      key={y}
+                      key={mName}
                       type="button"
                       onClick={() => {
-                        setViewYear(y);
+                        setViewMonth(idx);
                         setShowMonthYearPicker(false);
                       }}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all ${
-                        viewYear === y
-                          ? `${scheme.selectedBg} font-black shadow-xs`
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                      className={`py-1.5 px-1 rounded-xl text-xs font-bold text-center transition-all ${
+                        viewMonth === idx 
+                          ? `${scheme.selectedBg} font-black shadow-xs` 
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border border-slate-100'
                       }`}
                     >
-                      {y}
+                      {mName.substring(0, 4)}
                     </button>
                   ))}
                 </div>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* Day of week headers */}
-              <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
-                {WEEKDAY_NAMES.map((wd, idx) => (
-                  <div 
-                    key={wd} 
-                    className={`text-[10px] font-black uppercase tracking-wider py-1 ${
-                      idx >= 5 ? 'text-rose-500/80' : 'text-slate-600'
-                    }`}
-                  >
-                    {wd}
+
+                {/* Year Chips */}
+                <div className="pt-2 border-t border-slate-100">
+                  <div className="text-[10px] font-black uppercase tracking-wider text-slate-500 px-1 mb-1.5">
+                    Année
                   </div>
-                ))}
+                  <div className="flex items-center gap-1 overflow-x-auto pb-1 custom-scrollbar">
+                    {yearOptions.map(y => (
+                      <button
+                        key={y}
+                        type="button"
+                        onClick={() => {
+                          setViewYear(y);
+                          setShowMonthYearPicker(false);
+                        }}
+                        className={`px-2.5 py-1 rounded-lg text-xs font-bold shrink-0 transition-all ${
+                          viewYear === y
+                            ? `${scheme.selectedBg} font-black shadow-xs`
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                        }`}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
-
-              {/* Days Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {calendarDays.map((d, index) => {
-                  return (
-                    <button
-                      key={`${d.dateStr}-${index}`}
-                      type="button"
-                      disabled={d.isDisabled}
-                      onClick={() => {
-                        if (!d.isDisabled) {
-                          onSelectDate(d.dateStr);
-                          setIsOpen(false);
-                        }
-                      }}
-                      className={`
-                        h-8.5 sm:h-9 w-full rounded-xl flex flex-col items-center justify-center relative text-xs transition-all
-                        ${d.isSelected 
-                          ? `${scheme.selectedBg} font-black shadow-md shadow-blue-500/20 scale-105 z-10` 
-                          : d.isToday
-                            ? 'bg-emerald-50 text-emerald-900 font-black border-2 border-emerald-500 hover:bg-emerald-100'
-                            : d.isCurrentMonth
-                              ? d.isWeekend
-                                ? 'text-slate-700 hover:bg-slate-100 font-bold'
-                                : 'text-slate-900 hover:bg-slate-100 font-bold'
-                              : 'text-slate-300 hover:bg-slate-50 font-medium'
-                        }
-                        ${d.isDisabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
-                      `}
+            ) : (
+              <>
+                {/* Day of week headers */}
+                <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+                  {WEEKDAY_NAMES.map((wd, idx) => (
+                    <div 
+                      key={wd} 
+                      className={`text-[10px] font-black uppercase tracking-wider py-1 ${
+                        idx >= 5 ? 'text-rose-500/80' : 'text-slate-600'
+                      }`}
                     >
-                      <span>{d.dayNumber}</span>
-                      {d.isToday && !d.isSelected && (
-                        <span className="w-1 h-1 bg-emerald-600 rounded-full absolute bottom-1" />
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
+                      {wd}
+                    </div>
+                  ))}
+                </div>
 
-          {/* Footer Bar */}
-          <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-            <span className="text-[11px] font-bold text-slate-600 truncate max-w-[190px]">
-              {shortFormattedDisplay}
-            </span>
-
-            {!isToday && (
-              <button
-                type="button"
-                onClick={() => setQuickDate('today')}
-                className="text-[11px] font-black text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
-              >
-                <RotateCcw size={11} className="stroke-[2.5]" />
-                <span>Aujourd'hui</span>
-              </button>
+                {/* Days Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {calendarDays.map((d, index) => {
+                    return (
+                      <button
+                        key={`${d.dateStr}-${index}`}
+                        type="button"
+                        disabled={d.isDisabled}
+                        onClick={() => {
+                          if (!d.isDisabled) {
+                            onSelectDate(d.dateStr);
+                            setIsOpen(false);
+                          }
+                        }}
+                        className={`
+                          h-8.5 sm:h-9 w-full rounded-xl flex flex-col items-center justify-center relative text-xs transition-all
+                          ${d.isSelected 
+                            ? `${scheme.selectedBg} font-black shadow-md shadow-blue-500/20 scale-105 z-10` 
+                            : d.isToday
+                              ? 'bg-emerald-50 text-emerald-900 font-black border-2 border-emerald-500 hover:bg-emerald-100'
+                              : d.isCurrentMonth
+                                ? d.isWeekend
+                                  ? 'text-slate-700 hover:bg-slate-100 font-bold'
+                                  : 'text-slate-900 hover:bg-slate-100 font-bold'
+                                : 'text-slate-300 hover:bg-slate-50 font-medium'
+                          }
+                          ${d.isDisabled ? 'opacity-25 cursor-not-allowed' : 'cursor-pointer active:scale-95'}
+                        `}
+                      >
+                        <span>{d.dayNumber}</span>
+                        {d.isToday && !d.isSelected && (
+                          <span className="w-1 h-1 bg-emerald-600 rounded-full absolute bottom-1" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </>
             )}
+
+            {/* Footer Bar */}
+            <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
+              <span className="text-[11px] font-bold text-slate-600 truncate max-w-[190px]">
+                {shortFormattedDisplay}
+              </span>
+
+              {!isToday && (
+                <button
+                  type="button"
+                  onClick={() => setQuickDate('today')}
+                  className="text-[11px] font-black text-blue-600 hover:text-blue-800 hover:underline flex items-center gap-1"
+                >
+                  <RotateCcw size={11} className="stroke-[2.5]" />
+                  <span>Aujourd'hui</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        ),
+        document.body
       )}
     </div>
   );
