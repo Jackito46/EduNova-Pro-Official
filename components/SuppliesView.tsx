@@ -26,6 +26,8 @@ import { PrintableInventoryModal } from './PrintableInventoryModal';
 import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 
 interface CatalogItem {
   id: string;
@@ -2150,17 +2152,21 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 )}
 
-                <div className="relative w-full sm:w-auto">
-                  <select
+                <div className="w-full sm:w-56">
+                  <SelectPill
+                    options={[
+                      { value: 'Tous', label: 'Tous les Fournisseurs' },
+                      ...knownSuppliers.map(s => ({ value: s, label: s }))
+                    ]}
                     value={supplierHistoryFilter}
-                    onChange={(e) => setSupplierHistoryFilter(e.target.value)}
-                    className="w-full sm:w-52 pl-3 pr-8 py-1.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-indigo-600"
-                  >
-                    <option value="Tous">Tous les Fournisseurs</option>
-                    {knownSuppliers.map(s => (
-                      <option key={s} value={s}>{s}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSupplierHistoryFilter(val)}
+                    icon={Truck}
+                    variant="field"
+                    size="xs"
+                    colorScheme="rose"
+                    className="w-full"
+                    searchable={knownSuppliers.length > 5}
+                  />
                 </div>
               </div>
             </div>
@@ -2586,22 +2592,30 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               <div className="md:col-span-3">
-                <input 
-                  type="date" 
-                  value={dateFilterFrom}
-                  onChange={(e) => setDateFilterFrom(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold outline-none focus:border-slate-900 transition-all"
-                  title="Date de début"
+                <DatePickerPill
+                  selectedDate={dateFilterFrom}
+                  onSelectDate={(d) => setDateFilterFrom(d)}
+                  labelPrefix="Du"
+                  placeholder="Date début"
+                  clearable
+                  variant="field"
+                  size="sm"
+                  colorScheme="slate"
+                  className="w-full"
                 />
               </div>
 
               <div className="md:col-span-3">
-                <input 
-                  type="date" 
-                  value={dateFilterTo}
-                  onChange={(e) => setDateFilterTo(e.target.value)}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold outline-none focus:border-slate-900 transition-all"
-                  title="Date de fin"
+                <DatePickerPill
+                  selectedDate={dateFilterTo}
+                  onSelectDate={(d) => setDateFilterTo(d)}
+                  labelPrefix="Au"
+                  placeholder="Date fin"
+                  clearable
+                  variant="field"
+                  size="sm"
+                  colorScheme="slate"
+                  className="w-full"
                 />
               </div>
 
@@ -2802,30 +2816,38 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 border-t border-slate-100">
-               <div className="relative">
-                 <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                 <select 
-                   value={activeCatalogCat} 
-                   onChange={(e) => setActiveCatalogCat(e.target.value)} 
-                   className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold outline-none appearance-none cursor-pointer focus:border-slate-900 transition-all"
-                 >
-                   <option value="Tous">Toutes les catégories ({CATEGORIES.length})</option>
-                   {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                 </select>
-                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+               <div>
+                 <SelectPill
+                   options={[
+                     { value: 'Tous', label: `Toutes les catégories (${CATEGORIES.length})` },
+                     ...CATEGORIES.map(cat => ({ value: cat, label: cat }))
+                   ]}
+                   value={activeCatalogCat}
+                   onChange={(val) => setActiveCatalogCat(val)}
+                   icon={Filter}
+                   variant="field"
+                   size="sm"
+                   colorScheme="slate"
+                   className="w-full"
+                   searchable={CATEGORIES.length > 6}
+                 />
                </div>
 
-               <div className="relative">
-                 <ListFilter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                 <select 
-                   value={selectedDisciplineFilter} 
-                   onChange={(e) => setSelectedDisciplineFilter(e.target.value)} 
-                   className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 text-xs font-bold outline-none appearance-none cursor-pointer focus:border-slate-900 transition-all"
-                 >
-                   <option value="Tous">Toutes les disciplines</option>
-                   {disciplinesList.map(disc => <option key={disc} value={disc}>{disc}</option>)}
-                 </select>
-                 <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+               <div>
+                 <SelectPill
+                   options={[
+                     { value: 'Tous', label: 'Toutes les disciplines' },
+                     ...disciplinesList.map(disc => ({ value: disc, label: disc }))
+                   ]}
+                   value={selectedDisciplineFilter}
+                   onChange={(val) => setSelectedDisciplineFilter(val)}
+                   icon={ListFilter}
+                   variant="field"
+                   size="sm"
+                   colorScheme="slate"
+                   className="w-full"
+                   searchable={disciplinesList.length > 6}
+                 />
                </div>
 
                <AcademicSessionPill
@@ -3040,22 +3062,31 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                     <div className="space-y-3">
                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Catégorie</label>
-                       <div className="relative">
-                          <select required className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 appearance-none shadow-sm transition-all" value={catalogFormData.category} onChange={e => setCatalogFormData({...catalogFormData, category: e.target.value})}>
-                             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                       </div>
+                       <SelectPill
+                         options={CATEGORIES.map(c => ({ value: c, label: c }))}
+                         value={catalogFormData.category}
+                         onChange={(val) => setCatalogFormData({ ...catalogFormData, category: val })}
+                         variant="field"
+                         size="md"
+                         colorScheme="indigo"
+                         className="w-full"
+                       />
                     </div>
                     <div className="space-y-3">
                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Discipline Associée (Optionnel)</label>
-                       <div className="relative">
-                          <select className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 appearance-none shadow-sm transition-all" value={catalogFormData.discipline_name || ''} onChange={e => setCatalogFormData({...catalogFormData, discipline_name: e.target.value})}>
-                             <option value="">Tous programmes / Générique</option>
-                             {disciplinesList.map(disc => <option key={disc} value={disc}>{disc}</option>)}
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                       </div>
+                       <SelectPill
+                         options={[
+                           { value: '', label: 'Tous programmes / Générique' },
+                           ...disciplinesList.map(disc => ({ value: disc, label: disc }))
+                         ]}
+                         value={catalogFormData.discipline_name || ''}
+                         onChange={(val) => setCatalogFormData({ ...catalogFormData, discipline_name: val })}
+                         variant="field"
+                         size="md"
+                         colorScheme="indigo"
+                         className="w-full"
+                         searchable={disciplinesList.length > 5}
+                       />
                     </div>
                  </div>
 
@@ -3068,13 +3099,18 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                     <div className="space-y-3">
                        <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Devise de Vente</label>
-                       <div className="relative">
-                          <select className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-indigo-500 appearance-none shadow-sm transition-all" value={catalogFormData.currency} onChange={e => setCatalogFormData({...catalogFormData, currency: e.target.value})}>
-                             <option value="HTG">Gourdes (HTG)</option>
-                             <option value="USD">Dollars (USD)</option>
-                          </select>
-                          <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={20} />
-                       </div>
+                       <SelectPill
+                         options={[
+                           { value: 'HTG', label: 'Gourdes (HTG)' },
+                           { value: 'USD', label: 'Dollars (USD)' }
+                         ]}
+                         value={catalogFormData.currency || 'HTG'}
+                         onChange={(val) => setCatalogFormData({ ...catalogFormData, currency: val })}
+                         variant="field"
+                         size="md"
+                         colorScheme="indigo"
+                         className="w-full"
+                       />
                     </div>
                  </div>
 
@@ -3090,31 +3126,34 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                  <div className="space-y-3">
                     <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Unité de Vente / Mesure</label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <select 
-                        className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 shadow-sm transition-all"
+                      <SelectPill
+                        options={[
+                          { value: 'Pièce', label: 'Pièce / Article individuel' },
+                          { value: 'Aune', label: 'Aune (Tissu / Uniforme)' },
+                          { value: 'Paquet', label: 'Paquet / Ramette' },
+                          { value: 'Mètre', label: 'Mètre (Ruban, Tissu)' },
+                          { value: 'Paire', label: 'Paire (Chaussettes, Chaussures)' },
+                          { value: 'Ensemble', label: 'Ensemble complet' },
+                          { value: 'Unité', label: 'Unité générale' },
+                          { value: 'Carton', label: 'Carton' },
+                          { value: 'Boîte', label: 'Boîte' },
+                          { value: 'Rouleau', label: 'Rouleau' },
+                          { value: 'Dozaine', label: 'Dozaine' },
+                          { value: 'Autre', label: 'Autre (Saisie libre...)' }
+                        ]}
                         value={['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure) ? catalogFormData.unit_measure : 'Autre'}
-                        onChange={e => {
-                          const val = e.target.value;
+                        onChange={(val) => {
                           if (val !== 'Autre') {
-                            setCatalogFormData({...catalogFormData, unit_measure: val});
+                            setCatalogFormData({ ...catalogFormData, unit_measure: val });
                           } else {
-                            setCatalogFormData({...catalogFormData, unit_measure: ''});
+                            setCatalogFormData({ ...catalogFormData, unit_measure: '' });
                           }
                         }}
-                      >
-                        <option value="Pièce">Pièce / Article individuel</option>
-                        <option value="Aune">Aune (Tissu / Uniforme)</option>
-                        <option value="Paquet">Paquet / Ramette</option>
-                        <option value="Mètre">Mètre (Ruban, Tissu)</option>
-                        <option value="Paire">Paire (Chaussettes, Chaussures)</option>
-                        <option value="Ensemble">Ensemble complet</option>
-                        <option value="Unité">Unité générale</option>
-                        <option value="Carton">Carton</option>
-                        <option value="Boîte">Boîte</option>
-                        <option value="Rouleau">Rouleau</option>
-                        <option value="Dozaine">Dozaine</option>
-                        <option value="Autre">Autre (Saisie libre...)</option>
-                      </select>
+                        variant="field"
+                        size="md"
+                        colorScheme="indigo"
+                        className="w-full"
+                      />
 
                       {(!['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure)) && (
                         <input
@@ -3218,16 +3257,22 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <p className="text-sm text-gray-600">
             Sélectionnez l'année scolaire source depuis laquelle vous souhaitez copier le catalogue vers la session actuelle :
           </p>
-          <select 
-            className="w-full p-4 border border-gray-200 rounded-xl font-bold text-gray-900 outline-none focus:ring-2 focus:ring-slate-500"
+          <SelectPill
+            options={[
+              { value: '', label: 'Choisir une session source...' },
+              ...academicYears.filter(y => y.id !== selectedYearId).map(y => ({
+                value: y.id,
+                label: `${y.label} ${y.is_active ? '(Active)' : ''}`
+              }))
+            ]}
             value={migrateSourceId}
-            onChange={(e) => setMigrateSourceId(e.target.value)}
-          >
-            <option value="" disabled>Choisir une session source...</option>
-            {academicYears.filter(y => y.id !== selectedYearId).map(y => (
-              <option key={y.id} value={y.id}>{y.label} {y.is_active ? '(Active)' : ''}</option>
-            ))}
-          </select>
+            onChange={(val) => setMigrateSourceId(val)}
+            placeholder="Choisir une session source..."
+            variant="field"
+            size="md"
+            colorScheme="indigo"
+            className="w-full"
+          />
         </div>
       </Modal>
 
@@ -3286,19 +3331,23 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </span>
                     )}
                   </label>
-                  <select 
-                    required
-                    className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none transition-all"
+                  <SelectPill
+                    options={[
+                      { value: '', label: 'Sélectionner un article du catalogue...' },
+                      ...catalog.map(item => ({
+                        value: item.id,
+                        label: `${item.label} — (Prix Vente: ${item.unit_price} HTG | Stock: ${item.stock_quantity || 0})`
+                      }))
+                    ]}
                     value={purchaseFormData.item_id}
-                    onChange={(e) => handleSelectPurchaseItem(e.target.value)}
-                  >
-                    <option value="">Sélectionner un article du catalogue...</option>
-                    {catalog.map(item => (
-                      <option key={item.id} value={item.id}>
-                        {item.label} — (Prix Vente: {item.unit_price} HTG | Stock: {item.stock_quantity || 0})
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => handleSelectPurchaseItem(val)}
+                    placeholder="Sélectionner un article du catalogue..."
+                    variant="field"
+                    size="md"
+                    colorScheme="indigo"
+                    className="w-full"
+                    searchable={catalog.length > 5}
+                  />
                 </div>
 
                 {/* FOURNISSEUR ET DATE */}
@@ -3306,20 +3355,23 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fournisseur</label>
                     <div className="space-y-2">
-                      <select
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                      <SelectPill
+                        options={[
+                          { value: 'AUTRE', label: '--- Saisir un fournisseur personnalisé ---' },
+                          ...knownSuppliers.map(s => ({ value: s, label: s }))
+                        ]}
                         value={knownSuppliers.includes(purchaseFormData.supplier) ? purchaseFormData.supplier : 'AUTRE'}
-                        onChange={(e) => {
-                          if (e.target.value !== 'AUTRE') {
-                            setPurchaseFormData({ ...purchaseFormData, supplier: e.target.value });
+                        onChange={(val) => {
+                          if (val !== 'AUTRE') {
+                            setPurchaseFormData({ ...purchaseFormData, supplier: val });
                           }
                         }}
-                      >
-                        <option value="AUTRE">--- Saisir un fournisseur personnalisé ---</option>
-                        {knownSuppliers.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                        variant="field"
+                        size="sm"
+                        colorScheme="slate"
+                        className="w-full"
+                        searchable={knownSuppliers.length > 5}
+                      />
 
                       <input 
                         required
@@ -3334,12 +3386,13 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date d'Achat & Décaissement</label>
-                    <input 
-                      required
-                      type="date"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none"
-                      value={purchaseFormData.date}
-                      onChange={(e) => setPurchaseFormData({ ...purchaseFormData, date: e.target.value })}
+                    <DatePickerPill
+                      selectedDate={purchaseFormData.date}
+                      onSelectDate={(d) => setPurchaseFormData({ ...purchaseFormData, date: d })}
+                      variant="field"
+                      size="md"
+                      colorScheme="indigo"
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -3458,18 +3511,21 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fournisseur du Lot</label>
                     <div className="space-y-2">
-                      <select
-                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none"
+                      <SelectPill
+                        options={[
+                          { value: 'AUTRE', label: '--- Choisir un fournisseur connu ---' },
+                          ...knownSuppliers.map(s => ({ value: s, label: s }))
+                        ]}
                         value={knownSuppliers.includes(batchSupplier) ? batchSupplier : 'AUTRE'}
-                        onChange={(e) => {
-                          if (e.target.value !== 'AUTRE') setBatchSupplier(e.target.value);
+                        onChange={(val) => {
+                          if (val !== 'AUTRE') setBatchSupplier(val);
                         }}
-                      >
-                        <option value="AUTRE">--- Choisir un fournisseur connu ---</option>
-                        {knownSuppliers.map(s => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                        variant="field"
+                        size="sm"
+                        colorScheme="slate"
+                        className="w-full"
+                        searchable={knownSuppliers.length > 5}
+                      />
 
                       <input 
                         required
@@ -3484,12 +3540,13 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   <div className="space-y-1.5">
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date de Commande</label>
-                    <input 
-                      required
-                      type="date"
-                      className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none"
-                      value={batchDate}
-                      onChange={(e) => setBatchDate(e.target.value)}
+                    <DatePickerPill
+                      selectedDate={batchDate}
+                      onSelectDate={(d) => setBatchDate(d)}
+                      variant="field"
+                      size="md"
+                      colorScheme="indigo"
+                      className="w-full"
                     />
                   </div>
                 </div>
@@ -3517,12 +3574,16 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       return (
                         <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-2">
                           <div className="flex-1 w-full">
-                            <select
-                              required
-                              className="w-full px-3 py-2 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none"
+                            <SelectPill
+                              options={[
+                                { value: '', label: 'Sélectionner un article...' },
+                                ...catalog.map(cat => ({
+                                  value: cat.id,
+                                  label: `${cat.label} (Stock: ${cat.stock_quantity || 0})`
+                                }))
+                              ]}
                               value={row.item_id}
-                              onChange={(e) => {
-                                const newId = e.target.value;
+                              onChange={(newId) => {
                                 const lastInfo = getLastPurchaseInfo(newId);
                                 const item = catalog.find(i => i.id === newId);
                                 const newRows = [...batchItems];
@@ -3530,12 +3591,13 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 newRows[idx].unit_cost = lastInfo?.unitCost ? lastInfo.unitCost.toString() : (item?.unit_price ? Math.round(item.unit_price * 0.6).toString() : '');
                                 setBatchItems(newRows);
                               }}
-                            >
-                              <option value="">Sélectionner un article...</option>
-                              {catalog.map(cat => (
-                                <option key={cat.id} value={cat.id}>{cat.label} (Stock: {cat.stock_quantity || 0})</option>
-                              ))}
-                            </select>
+                              placeholder="Sélectionner un article..."
+                              variant="field"
+                              size="sm"
+                              colorScheme="indigo"
+                              className="w-full"
+                              searchable={catalog.length > 5}
+                            />
                           </div>
 
                           <div className="w-full sm:w-24">

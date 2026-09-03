@@ -13,6 +13,8 @@ import { AuditLogger } from '../utils/auditLogger';
 import { FluidLoadingState, SkeletonCard, SkeletonTable } from './SkeletonLoader';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig } from '../lib/paymentMethods';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { SelectPill } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 
 interface AcademicYear {
   id: string;
@@ -661,42 +663,43 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           {/* Campus Filter - Only if school has multiple campuses */}
           {hasMultiCampus && (
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-              <Filter size={14} className="text-slate-400 shrink-0" />
-              <select
-                value={campusFilter}
-                onChange={(e) => setCampusFilter(e.target.value)}
-                className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
-              >
-                <option value="">🏢 Toutes les Annexes / Campus</option>
-                <option value="GLOBAL">🌐 Portée Globale (Siège)</option>
-                {campuses.map(camp => (
-                  <option key={camp.id} value={camp.id}>
-                    📍 {camp.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <SelectPill
+              options={[
+                { value: '', label: '🏢 Toutes les Annexes / Campus' },
+                { value: 'GLOBAL', label: '🌐 Portée Globale (Siège)' },
+                ...campuses.map(camp => ({
+                  value: camp.id,
+                  label: `📍 ${camp.name}`
+                }))
+              ]}
+              value={campusFilter}
+              onChange={(val) => setCampusFilter(val)}
+              icon={Filter}
+              variant="field"
+              size="sm"
+              colorScheme="slate"
+            />
           )}
 
           {/* Type Filter */}
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="bg-transparent text-xs font-bold text-slate-700 outline-none cursor-pointer"
-            >
-              <option value="">🏷️ Tous les Types d'Activités</option>
-              <option value="EXCURSION">Excursion / Visite</option>
-              <option value="CEREMONIE">Cérémonie / Graduation</option>
-              <option value="UNIFORME">Uniforme / Kit</option>
-              <option value="STAGE">Stage / Pratique</option>
-              <option value="EXAMEN">Examen / Reprise</option>
-              <option value="CANTINE">Cantine / Restauration</option>
-              <option value="TRANSPORT">Transport Scolaire</option>
-              <option value="AUTRE">Autre Frais Occasionnel</option>
-            </select>
-          </div>
+          <SelectPill
+            options={[
+              { value: '', label: "🏷️ Tous les Types d'Activités" },
+              { value: 'EXCURSION', label: 'Excursion / Visite' },
+              { value: 'CEREMONIE', label: 'Cérémonie / Graduation' },
+              { value: 'UNIFORME', label: 'Uniforme / Kit' },
+              { value: 'STAGE', label: 'Stage / Pratique' },
+              { value: 'EXAMEN', label: 'Examen / Reprise' },
+              { value: 'CANTINE', label: 'Cantine / Restauration' },
+              { value: 'TRANSPORT', label: 'Transport Scolaire' },
+              { value: 'AUTRE', label: 'Autre Frais Occasionnel' }
+            ]}
+            value={typeFilter}
+            onChange={(val) => setTypeFilter(val)}
+            variant="field"
+            size="sm"
+            colorScheme="slate"
+          />
         </div>
 
         {/* Status Filter Tabs */}
@@ -1027,50 +1030,41 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
                         Catégorie / Nature de la Charge
                       </label>
-                      <select 
-                        className="w-full border border-slate-200 bg-slate-50/50 p-3 rounded-xl font-bold text-xs text-slate-800 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all cursor-pointer" 
-                        value={formData.type} 
-                        onChange={e => setFormData({...formData, type: e.target.value})}
-                      >
-                        {isUniv ? (
-                          <>
-                            <optgroup label="🎓 Événements Académiques (Université & Prof)">
-                              <option value="STAGE">📐 Activité Spéciale / Stage Pratique</option>
-                              <option value="PROJET_MEMOIRE">📖 Mémoires & Projets de Fin d'Études</option>
-                              <option value="SEMINAIRE_COLLOQUE">🎤 Séminaire, Colloque & Conférence</option>
-                              <option value="SOUTENANCE">🏛️ Frais de Soutenance devant Jury</option>
-                              <option value="EXAMEN">📝 Examens de Reprise / Sessions Spéciales</option>
-                              <option value="INSCRIPTION_CONCOURS">🎫 Concours d'Entrée & Traitement Dossiers</option>
-                              <option value="HEBERGEMENT">🏠 Logement Étudiant / Campus Résidence</option>
-                              <option value="LABORATOIRE">🧪 Travaux Pratiques / Matériel de Labo</option>
-                            </optgroup>
-                            <optgroup label="⚙️ Infrastructures & Services Support">
-                              <option value="TECH_SALL_INFO">💻 Accès Informatique, Internet & Plateforme</option>
-                              <option value="SOUTIEN_SCOL">🧠 Tutorat & Coaching Académique</option>
-                              <option value="RETARD_SCOLARITE">⚠️ Pénalités & Retard de Paiement</option>
-                              <option value="AUTRE">📋 Autre Frais Académique Exceptionnel</option>
-                            </optgroup>
-                          </>
-                        ) : (
-                          <>
-                            <optgroup label="🎈 Sorties, Excursions & Événements">
-                              <option value="VISITE">🚌 Visite / Excursion / Sortie Pédagogique</option>
-                              <option value="SPORTS_CULTURE">⚽ Activités Sportives, Art & Culture</option>
-                              <option value="CEREMONIE">🎓 Cérémonie / Collation / Diplômes</option>
-                            </optgroup>
-                            <optgroup label="📦 Services, Matériel & Consommables">
-                              <option value="UNIFORME">👕 Uniforme Officiel, Tissu & Écusson</option>
-                              <option value="ASSURANCE">🛡️ Assurance Scolaire Obligatoire</option>
-                              <option value="TRANSPORT">Navette / Transport Scolaire</option>
-                              <option value="CANTINE">🍽️ Cantine / Restauration Scolaire</option>
-                              <option value="BIBLIOTHEQUE">📚 Bibliothèque / Manuels & Livres</option>
-                              <option value="SANTE">🩺 Cabinet Médical & Soins</option>
-                              <option value="RETARD_SCOLARITE">⚠️ Pénalités de Retard de Paiement</option>
-                              <option value="AUTRE">📋 Autre Frais Occasionnel / Ad-Hoc</option>
-                            </optgroup>
-                          </>
-                        )}
-                      </select>
+                      <SelectPill
+                        options={isUniv ? [
+                          { value: 'STAGE', label: '📐 Activité Spéciale / Stage Pratique' },
+                          { value: 'PROJET_MEMOIRE', label: "📖 Mémoires & Projets de Fin d'Études" },
+                          { value: 'SEMINAIRE_COLLOQUE', label: '🎤 Séminaire, Colloque & Conférence' },
+                          { value: 'SOUTENANCE', label: '🏛️ Frais de Soutenance devant Jury' },
+                          { value: 'EXAMEN', label: '📝 Examens de Reprise / Sessions Spéciales' },
+                          { value: 'INSCRIPTION_CONCOURS', label: "🎫 Concours d'Entrée & Traitement Dossiers" },
+                          { value: 'HEBERGEMENT', label: '🏠 Logement Étudiant / Campus Résidence' },
+                          { value: 'LABORATOIRE', label: '🧪 Travaux Pratiques / Matériel de Labo' },
+                          { value: 'TECH_SALL_INFO', label: '💻 Accès Informatique, Internet & Plateforme' },
+                          { value: 'SOUTIEN_SCOL', label: '🧠 Tutorat & Coaching Académique' },
+                          { value: 'RETARD_SCOLARITE', label: '⚠️ Pénalités & Retard de Paiement' },
+                          { value: 'AUTRE', label: '📋 Autre Frais Académique Exceptionnel' }
+                        ] : [
+                          { value: 'VISITE', label: '🚌 Visite / Excursion / Sortie Pédagogique' },
+                          { value: 'SPORTS_CULTURE', label: '⚽ Activités Sportives, Art & Culture' },
+                          { value: 'CEREMONIE', label: '🎓 Cérémonie / Collation / Diplômes' },
+                          { value: 'UNIFORME', label: '👕 Uniforme Officiel, Tissu & Écusson' },
+                          { value: 'ASSURANCE', label: '🛡️ Assurance Scolaire Obligatoire' },
+                          { value: 'TRANSPORT', label: 'Navette / Transport Scolaire' },
+                          { value: 'CANTINE', label: '🍽️ Cantine / Restauration Scolaire' },
+                          { value: 'BIBLIOTHEQUE', label: '📚 Bibliothèque / Manuels & Livres' },
+                          { value: 'SANTE', label: '🩺 Cabinet Médical & Soins' },
+                          { value: 'RETARD_SCOLARITE', label: '⚠️ Pénalités de Retard de Paiement' },
+                          { value: 'AUTRE', label: '📋 Autre Frais Occasionnel / Ad-Hoc' }
+                        ]}
+                        value={formData.type}
+                        onChange={(val) => setFormData({ ...formData, type: val })}
+                        variant="field"
+                        size="md"
+                        colorScheme="indigo"
+                        className="w-full"
+                        searchable
+                      />
                     </div>
 
                     {/* Description */}
@@ -1104,14 +1098,18 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 block">
                             Annexe / Campus *
                           </label>
-                          <select 
-                            className="w-full border border-slate-200 bg-slate-50/50 p-2.5 rounded-xl text-xs font-extrabold text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all cursor-pointer" 
-                            value={formData.campus_id} 
-                            onChange={e => setFormData({...formData, campus_id: e.target.value, class_id: ''})}
-                          >
-                            <option value="">🌐 Toutes les annexes (Portée Siège)</option>
-                            {campuses.map(c => <option key={c.id} value={c.id}>📍 {c.name}</option>)}
-                          </select>
+                          <SelectPill
+                            options={[
+                              { value: '', label: '🌐 Toutes les annexes (Portée Siège)' },
+                              ...campuses.map(c => ({ value: c.id, label: `📍 ${c.name}` }))
+                            ]}
+                            value={formData.campus_id}
+                            onChange={(val) => setFormData({ ...formData, campus_id: val, class_id: '' })}
+                            variant="field"
+                            size="md"
+                            colorScheme="indigo"
+                            className="w-full"
+                          />
                         </div>
                       )}
 
@@ -1119,16 +1117,21 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 block">
                           {terminology?.class || 'Classe'} / Promotion Spécifique
                         </label>
-                        <select 
-                          className="w-full border border-slate-200 bg-slate-50/50 p-2.5 rounded-xl text-xs font-extrabold text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all cursor-pointer" 
-                          value={formData.class_id} 
-                          onChange={e => setFormData({...formData, class_id: e.target.value})}
-                        >
-                          <option value="">🎓 Toutes les {terminology?.classes?.toLowerCase() || 'classes'}</option>
-                          {schoolClasses
-                            .filter(c => (!formData.campus_id || c.campus_id === formData.campus_id) && (classIdsWithStudents.has(c.id) || formData.class_id === c.id))
-                            .map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
+                        <SelectPill
+                          options={[
+                            { value: '', label: `🎓 Toutes les ${terminology?.classes?.toLowerCase() || 'classes'}` },
+                            ...schoolClasses
+                              .filter(c => (!formData.campus_id || c.campus_id === formData.campus_id) && (classIdsWithStudents.has(c.id) || formData.class_id === c.id))
+                              .map(c => ({ value: c.id, label: c.name }))
+                          ]}
+                          value={formData.class_id}
+                          onChange={(val) => setFormData({ ...formData, class_id: val })}
+                          variant="field"
+                          size="md"
+                          colorScheme="indigo"
+                          className="w-full"
+                          searchable={schoolClasses.length > 5}
+                        />
                       </div>
                     </div>
                   </div>
@@ -1165,15 +1168,19 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             {formData.currency}
                           </span>
                         </div>
-                        <div className="w-24">
-                          <select 
-                            className="w-full border border-slate-200 bg-slate-50/50 px-3 py-2.5 rounded-xl font-extrabold text-xs text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all cursor-pointer" 
-                            value={formData.currency} 
-                            onChange={e => setFormData({...formData, currency: e.target.value})}
-                          >
-                            <option value="HTG">HTG</option>
-                            <option value="USD">USD</option>
-                          </select>
+                        <div className="w-28">
+                          <SelectPill
+                            options={[
+                              { value: 'HTG', label: 'HTG' },
+                              { value: 'USD', label: 'USD' }
+                            ]}
+                            value={formData.currency}
+                            onChange={(val) => setFormData({ ...formData, currency: val })}
+                            variant="field"
+                            size="md"
+                            colorScheme="indigo"
+                            className="w-full"
+                          />
                         </div>
                       </div>
 
@@ -1198,11 +1205,15 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
                         Date Limite de Paiement (Échéance)
                       </label>
-                      <input 
-                        type="date" 
-                        className="w-full border border-slate-200 bg-slate-50/50 p-2.5 rounded-xl font-bold text-xs text-slate-800 focus:bg-white focus:border-indigo-500 outline-none transition-all" 
-                        value={formData.due_date} 
-                        onChange={e => setFormData({...formData, due_date: e.target.value})} 
+                      <DatePickerPill
+                        selectedDate={formData.due_date}
+                        onSelectDate={(d) => setFormData({ ...formData, due_date: d })}
+                        placeholder="Sélectionner une date..."
+                        clearable
+                        variant="field"
+                        size="md"
+                        colorScheme="indigo"
+                        className="w-full"
                       />
                     </div>
                   </div>
@@ -1218,20 +1229,28 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Début</label>
-                          <input 
-                            type="date" 
-                            className="w-full border border-slate-200 bg-white p-2.5 rounded-xl font-bold text-xs text-slate-800 focus:border-indigo-500 outline-none transition-all" 
-                            value={formData.start_date} 
-                            onChange={e => setFormData({...formData, start_date: e.target.value})} 
+                          <DatePickerPill
+                            selectedDate={formData.start_date}
+                            onSelectDate={(d) => setFormData({ ...formData, start_date: d })}
+                            placeholder="Début..."
+                            clearable
+                            variant="field"
+                            size="sm"
+                            colorScheme="indigo"
+                            className="w-full"
                           />
                         </div>
                         <div>
                           <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Fin</label>
-                          <input 
-                            type="date" 
-                            className="w-full border border-slate-200 bg-white p-2.5 rounded-xl font-bold text-xs text-slate-800 focus:border-indigo-500 outline-none transition-all" 
-                            value={formData.end_date} 
-                            onChange={e => setFormData({...formData, end_date: e.target.value})} 
+                          <DatePickerPill
+                            selectedDate={formData.end_date}
+                            onSelectDate={(d) => setFormData({ ...formData, end_date: d })}
+                            placeholder="Fin..."
+                            clearable
+                            variant="field"
+                            size="sm"
+                            colorScheme="indigo"
+                            className="w-full"
                           />
                         </div>
                       </div>
@@ -2077,27 +2096,36 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
             {/* Campus Selector */}
             {campuses.length > 0 && (
-              <select 
-                disabled={!!campaign.campus_id} 
-                className="border border-slate-200 bg-white p-3 rounded-xl font-bold text-xs text-gray-700 outline-none focus:border-indigo-500 disabled:opacity-50 w-full" 
-                value={filterCampus} 
-                onChange={e => { setFilterCampus(e.target.value); setFilterClass(''); }}
-              >
-                <option value="">Toutes les Annexes (Campuses)</option>
-                {campuses.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <SelectPill
+                disabled={!!campaign.campus_id}
+                options={[
+                  { value: '', label: 'Toutes les Annexes (Campuses)' },
+                  ...campuses.map(c => ({ value: c.id, label: c.name }))
+                ]}
+                value={filterCampus}
+                onChange={(val) => { setFilterCampus(val); setFilterClass(''); }}
+                variant="field"
+                size="md"
+                colorScheme="indigo"
+                className="w-full"
+              />
             )}
 
             {/* Class Selector */}
-            <select 
-              disabled={!!campaign.class_id} 
-              className="border border-slate-200 bg-white p-3 rounded-xl font-bold text-xs text-gray-700 outline-none focus:border-indigo-500 disabled:opacity-50 w-full" 
-              value={filterClass} 
-              onChange={e => setFilterClass(e.target.value)}
-            >
-              <option value="">Toutes les {terminology?.classes?.toLowerCase() || 'classes'}</option>
-              {classes.filter(c => filterCampus === '' || c.campus_id === filterCampus).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            <SelectPill
+              disabled={!!campaign.class_id}
+              options={[
+                { value: '', label: `Toutes les ${terminology?.classes?.toLowerCase() || 'classes'}` },
+                ...classes.filter(c => filterCampus === '' || c.campus_id === filterCampus).map(c => ({ value: c.id, label: c.name }))
+              ]}
+              value={filterClass}
+              onChange={(val) => setFilterClass(val)}
+              variant="field"
+              size="md"
+              colorScheme="indigo"
+              className="w-full"
+              searchable={classes.length > 5}
+            />
           </div>
 
           {/* Mass Actions Roster Bar */}
@@ -2772,17 +2800,19 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                           Banque de Destination *
                         </label>
                         {school?.global_settings?.banks && school?.global_settings?.banks?.length > 0 ? (
-                          <select
-                            required
+                          <SelectPill
+                            options={[
+                              { value: '', label: 'Sélectionner la banque' },
+                              ...school.global_settings.banks.map((b: string) => ({ value: b, label: b }))
+                            ]}
                             value={paymentModalBank}
-                            onChange={(e) => setPaymentModalBank(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-                          >
-                            <option value="" disabled>Sélectionner la banque</option>
-                            {school.global_settings.banks.map((b: string) => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
-                          </select>
+                            onChange={(val) => setPaymentModalBank(val)}
+                            placeholder="Sélectionner la banque"
+                            variant="field"
+                            size="sm"
+                            colorScheme="indigo"
+                            className="w-full"
+                          />
                         ) : (
                           <input
                             type="text"
@@ -2814,12 +2844,13 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                       <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider">
                         Date Effectuée sur le Bordereau *
                       </label>
-                      <input
-                        type="date"
-                        required
-                        value={paymentModalDepositDate}
-                        onChange={(e) => setPaymentModalDepositDate(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
+                      <DatePickerPill
+                        selectedDate={paymentModalDepositDate}
+                        onSelectDate={(d) => setPaymentModalDepositDate(d)}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        className="w-full"
                       />
                     </div>
 
@@ -2950,17 +2981,19 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                           Banque Émettrice *
                         </label>
                         {school?.global_settings?.banks && school?.global_settings?.banks?.length > 0 ? (
-                          <select
-                            required
+                          <SelectPill
+                            options={[
+                              { value: '', label: 'Sélectionner la banque' },
+                              ...school.global_settings.banks.map((b: string) => ({ value: b, label: b }))
+                            ]}
                             value={paymentModalBank}
-                            onChange={(e) => setPaymentModalBank(e.target.value)}
-                            className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-600"
-                          >
-                            <option value="" disabled>Sélectionner la banque</option>
-                            {school.global_settings.banks.map((b: string) => (
-                              <option key={b} value={b}>{b}</option>
-                            ))}
-                          </select>
+                            onChange={(val) => setPaymentModalBank(val)}
+                            placeholder="Sélectionner la banque"
+                            variant="field"
+                            size="sm"
+                            colorScheme="indigo"
+                            className="w-full"
+                          />
                         ) : (
                           <input
                             type="text"

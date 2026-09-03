@@ -57,12 +57,12 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
   return (
     <tr className="hover:bg-slate-50 transition-colors">
       <td className="px-4 py-3">
-        <div className="font-medium text-slate-900">{formatStudentName(member.last_name, member.first_name).fullName}</div>
-        <div className="text-xs text-slate-500">{member.phone}</div>
+        <div className="font-bold text-slate-900">{formatStudentName(member.last_name, member.first_name).fullName}</div>
+        <div className="text-xs font-semibold text-slate-600">{member.phone}</div>
       </td>
       <td className="px-4 py-3">
-        <div className="text-slate-700">{member.role}</div>
-        <div className="text-xs text-slate-500">{member.pay_type}</div>
+        <div className="font-semibold text-slate-800">{member.role}</div>
+        <div className="text-xs font-semibold text-slate-600">{member.pay_type}</div>
       </td>
       <td className="px-4 py-3">
         <input 
@@ -70,7 +70,7 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
           value={base}
           onChange={(e) => setBase(Number(e.target.value))}
           disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED'}
-          className="w-24 px-2 py-1 border border-slate-200 rounded text-right disabled:bg-slate-100"
+          className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-slate-950 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-950 disabled:[-webkit-text-fill-color:#020617] disabled:opacity-100 shadow-2xs text-xs sm:text-sm transition-all"
         />
       </td>
       <td className="px-4 py-3">
@@ -79,7 +79,7 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
           value={bonus}
           onChange={(e) => setBonus(Number(e.target.value))}
           disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED'}
-          className="w-24 px-2 py-1 border border-slate-200 rounded text-right text-emerald-600 disabled:bg-slate-100"
+          className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-emerald-800 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:text-emerald-800 disabled:[-webkit-text-fill-color:#065f46] disabled:opacity-100 shadow-2xs text-xs sm:text-sm transition-all"
         />
       </td>
       <td className="px-4 py-3">
@@ -89,19 +89,19 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
             value={deduction}
             onChange={(e) => setDeduction(Number(e.target.value))}
             disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED' || totalAdvanceAmount > 0}
-            className="w-24 px-2 py-1 border border-slate-200 rounded text-right text-red-600 disabled:bg-slate-100 disabled:cursor-not-allowed"
+            className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-rose-800 bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 disabled:bg-slate-100 disabled:text-rose-800 disabled:[-webkit-text-fill-color:#9f1239] disabled:opacity-100 disabled:cursor-not-allowed shadow-2xs text-xs sm:text-sm transition-all"
           />
           {totalAdvanceAmount > 0 && !isPaid && slip?.period?.status === 'DRAFT' && (
             <div className="flex flex-col gap-1 mt-1">
-              <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 border-amber-100`}>
+              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200`}>
                 Inclut {memberAdvances?.length === 1 ? 'avance' : 'avances'}: {totalAdvanceAmount.toLocaleString()}
               </span>
             </div>
           )}
         </div>
       </td>
-      <td className="px-4 py-3 font-bold text-slate-800 text-right">
-        {net.toLocaleString()}
+      <td className="px-4 py-3 font-extrabold text-slate-900 text-right tabular-nums text-xs sm:text-sm">
+        {net.toLocaleString()} <span className="text-[11px] font-bold text-slate-600">HTG</span>
       </td>
       <td className="px-4 py-3 text-right">
         {isPaid ? (
@@ -1199,54 +1199,63 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
     return (
       <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-slate-200/80">
           <div>
-            <h2 className="text-xl font-bold text-slate-800">
-              Préparation: {currentPeriod ? getPeriodName(currentPeriod) : ''}
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">
+              Préparation : {currentPeriod ? getPeriodName(currentPeriod) : ''}
             </h2>
-            <p className="text-sm text-slate-500">Générez les fiches de paie pour chaque employé.</p>
+            <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-0.5">Générez les fiches de paie pour chaque employé.</p>
           </div>
-          <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-            <div className="relative w-full sm:w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
+            <div className="relative flex-1 sm:w-72">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Rechercher un employé..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none shadow-2xs transition-all"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              )}
             </div>
             <button
               onClick={handlePrepareAll}
               disabled={loading || !currentPeriod || currentPeriod.status === 'VALIDATED' || currentPeriod.status === 'CLOSED'}
-              className="flex items-center justify-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50"
+              className="flex items-center justify-center gap-2 px-5 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 font-bold text-xs sm:text-sm transition-all shadow-sm active:scale-95 disabled:opacity-50 cursor-pointer shrink-0"
             >
               <Save className="w-4 h-4" />
-              {currentPeriod?.status === 'VALIDATED' || currentPeriod?.status === 'CLOSED' ? 'Période Verrouillée' : 'Préparer Tout'}
+              <span>{currentPeriod?.status === 'VALIDATED' || currentPeriod?.status === 'CLOSED' ? 'Période Verrouillée' : 'Préparer Tout'}</span>
             </button>
           </div>
         </div>
 
         {currentPeriod?.status === 'VALIDATED' && (
-          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-3 text-blue-700">
-            <Info className="w-5 h-5 shrink-0" />
-            <p className="text-sm font-medium">Cette période est <strong>validée</strong>. Les fiches ne peuvent plus être modifiées.</p>
+          <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-3 text-blue-900">
+            <Info className="w-5 h-5 shrink-0 text-blue-600" />
+            <p className="text-sm font-bold">Cette période est <strong>validée</strong>. Les fiches ne peuvent plus être modifiées.</p>
           </div>
         )}
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
+            <table className="w-full text-left text-sm min-w-[760px]">
+              <thead className="bg-slate-100 text-slate-900 font-extrabold border-b border-slate-200 uppercase text-xs tracking-wider">
                 <tr>
-                  <th className="px-4 py-3">Employé</th>
-                  <th className="px-4 py-3">Rôle / Type</th>
-                  <th className="px-4 py-3">Salaire Base (HTG)</th>
-                  <th className="px-4 py-3">Primes (HTG)</th>
-                  <th className="px-4 py-3">Déductions (HTG)</th>
-                  <th className="px-4 py-3">Net à Payer (HTG)</th>
-                  <th className="px-4 py-3 text-right">Action</th>
+                  <th className="px-4 py-3.5 text-slate-950 font-black">Employé</th>
+                  <th className="px-4 py-3.5 text-slate-950 font-black">Rôle / Type</th>
+                  <th className="px-4 py-3.5 text-slate-950 font-black">Salaire Base (HTG)</th>
+                  <th className="px-4 py-3.5 text-emerald-800 font-black">Primes (HTG)</th>
+                  <th className="px-4 py-3.5 text-rose-800 font-black">Déductions (HTG)</th>
+                  <th className="px-4 py-3.5 text-slate-950 font-black text-right">Net à Payer (HTG)</th>
+                  <th className="px-4 py-3.5 text-right text-slate-950 font-black">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1262,7 +1271,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   </tr>
                 ) : filteredStaff.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500 font-medium italic">
+                    <td colSpan={7} className="py-8 text-center text-slate-700 font-bold italic">
                       Aucun employé ne correspond aux critères.
                     </td>
                   </tr>
@@ -1346,15 +1355,24 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
             </div>
           </div>
 
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
             <input
               type="text"
               placeholder="Rechercher un employé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none transition-all shadow-2xs"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -1475,17 +1493,26 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
     return (
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 border-b border-slate-200 bg-slate-50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="text-lg font-bold text-slate-800">Historique des Paiements</h2>
-          <div className="relative w-full sm:w-64">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+        <div className="p-4 sm:p-5 border-b border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <h2 className="text-lg font-black text-slate-900 tracking-tight">Historique des Paiements</h2>
+          <div className="relative w-full sm:w-72">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
             <input
               type="text"
               placeholder="Rechercher un employé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -1601,14 +1628,23 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
           <div className="relative flex-1 w-full sm:max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
             <input
               type="text"
               placeholder="Rechercher un employé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 focus:bg-white transition-all"
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           <button
             onClick={() => setShowAdvanceModal(true)}
@@ -2115,13 +2151,13 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                                   </div>
 
                                   <div className="relative w-full sm:w-64">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-600" />
                                     <input
                                       type="text"
                                       placeholder="Filtrer par nom ou rôle..."
                                       value={periodSearchTerm}
                                       onChange={(e) => setPeriodSearchTerm(e.target.value)}
-                                      className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-xl text-xs focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                                      className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                                     />
                                   </div>
                                 </div>
@@ -2180,7 +2216,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                                                   {campusName}
                                                 </span>
                                               </td>
-                                              <td className="px-4 py-3 text-right font-mono font-bold text-slate-700">
+                                              <td className="px-4 py-3 text-right font-mono font-black text-slate-950">
                                                 {(s.base_salary || 0).toLocaleString()} HTG
                                               </td>
                                               <td className="px-4 py-3 text-right font-mono font-bold">
@@ -2582,22 +2618,22 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       {showAdvanceModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100">
-              <h3 className="font-bold text-lg text-slate-800 flex items-center gap-2">
+            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-slate-100">
+              <h3 className="font-black text-lg text-slate-900 flex items-center gap-2 tracking-tight">
                 <HandCoins className="w-5 h-5 text-blue-600" />
                 Nouvelle Demande d'Avance
               </h3>
-              <button onClick={() => setShowAdvanceModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setShowAdvanceModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <form onSubmit={handleRequestAdvance} className="p-4 space-y-4">
+            <form onSubmit={handleRequestAdvance} className="p-4 sm:p-6 space-y-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Employé</label>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Employé</label>
                 <select
                   value={advanceStaffId}
                   onChange={(e) => setAdvanceStaffId(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   required
                 >
                   <option value="">Sélectionner un employé</option>
@@ -2610,11 +2646,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   if (activeAdvances.length > 0) {
                     const totalRemaining = activeAdvances.reduce((acc, a) => acc + a.amount, 0);
                     return (
-                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg flex gap-3 text-amber-800">
-                        <AlertCircle className="w-5 h-5 shrink-0 text-amber-500" />
+                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-3 text-amber-900">
+                        <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
                         <div>
-                          <p className="text-sm font-bold text-amber-900 leading-tight">Avance(s) en cours existante(s)</p>
-                          <p className="text-xs font-medium mt-0.5">Cet employé a déjà {activeAdvances.length} avance(s) en cours, pour un reste totalisé à payer de <strong>{totalRemaining.toLocaleString('fr-HT', { style: 'currency', currency: 'HTG' })}</strong>.</p>
+                          <p className="text-sm font-bold text-amber-950 leading-tight">Avance(s) en cours existante(s)</p>
+                          <p className="text-xs font-semibold text-amber-800 mt-0.5">Cet employé a déjà {activeAdvances.length} avance(s) en cours, pour un reste totalisé à payer de <strong>{totalRemaining.toLocaleString('fr-HT', { style: 'currency', currency: 'HTG' })}</strong>.</p>
                         </div>
                       </div>
                     );
@@ -2624,23 +2660,23 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Montant (HTG)</label>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Montant (HTG)</label>
                 <input
                   type="number"
                   value={advanceAmount}
                   onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   required
                   min="1"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Raison / Motif</label>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Raison / Motif</label>
                 <textarea
                   value={advanceReason}
                   onChange={(e) => setAdvanceReason(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   rows={3}
                   placeholder="Ex: Urgence médicale, frais scolaires..."
                   required
@@ -2651,13 +2687,13 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 <button
                   type="button"
                   onClick={() => setShowAdvanceModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-700 hover:text-slate-900 border border-slate-300 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
                 >
                   Enregistrer la demande
                 </button>
@@ -2681,21 +2717,21 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               </button>
             </div>
             <form onSubmit={handleProcessAdvancePayment} className="p-4 space-y-4">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="text-sm text-slate-500">Employé</p>
-                <p className="font-bold text-slate-800">{formatStudentName(selectedAdvance.staff?.last_name, selectedAdvance.staff?.first_name).fullName}</p>
+              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                <p className="text-xs font-bold text-slate-700">Employé</p>
+                <p className="font-black text-slate-900">{formatStudentName(selectedAdvance.staff?.last_name, selectedAdvance.staff?.first_name).fullName}</p>
                 <div className="flex justify-between mt-2 pt-2 border-t border-slate-200">
-                  <span className="text-sm text-slate-500">Montant de l'avance:</span>
-                  <span className="font-bold text-blue-600">{selectedAdvance.amount.toLocaleString()} HTG</span>
+                  <span className="text-xs font-bold text-slate-700">Montant de l'avance :</span>
+                  <span className="font-black text-blue-600">{selectedAdvance.amount.toLocaleString()} HTG</span>
                 </div>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Méthode de paiement</label>
+                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Méthode de paiement</label>
                 <select
                   value={advancePaymentMethod}
                   onChange={(e) => setAdvancePaymentMethod(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                   required
                 >
                   <option value="Espèces">Espèces</option>
@@ -2707,7 +2743,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               {advancePaymentMethod === 'Chèque' && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Banque émettrice</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Banque émettrice</label>
                     <select
                       value={advancePaymentBank}
                       onChange={(e) => {
@@ -2715,7 +2751,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                         setAdvancePaymentBank(val);
                         if (advancePaymentRefNumber) verifyPayrollReference(advancePaymentRefNumber, true, val);
                       }}
-                      className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                      className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                       required
                     >
                       <option value="">-- Sélectionner --</option>
@@ -2729,7 +2765,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                     </select>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro du chèque</label>
+                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Numéro du chèque</label>
                     <div className="relative">
                       <input
                         type="text"
@@ -2739,7 +2775,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                           setAdvancePaymentRefNumber(val);
                           verifyPayrollReference(val, true, advancePaymentBank);
                         }}
-                        className={`w-full p-2 border ${advancePaymentRefError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-300 focus:ring-blue-500'} rounded-lg text-slate-900 focus:ring-2`}
+                        className={`w-full p-2.5 border ${advancePaymentRefError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-300 focus:ring-blue-500'} rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 outline-none`}
                         required
                         placeholder="Ex: 123456"
                       />
@@ -2752,13 +2788,13 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
               {advancePaymentMethod !== 'Chèque' && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">
+                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">
                     {advancePaymentMethod === 'MonCash' ? 'ID Transaction MonCash' : 'Notes (Optionnel)'}
                   </label>
                   <textarea
                     value={advancePaymentNotes}
                     onChange={(e) => setAdvancePaymentNotes(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                    className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
                     rows={3}
                     placeholder="Informations complémentaires..."
                     required={advancePaymentMethod === 'MonCash'}

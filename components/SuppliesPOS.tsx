@@ -8,7 +8,7 @@ import {
   ChevronRight, X, ChevronDown, Sparkles, Printer, Clock,
   ShoppingBag, Store, BadgeCheck, Landmark, Layers, Tag,
   CreditCard, Wallet, Check, Smartphone, Calculator, AlertCircle,
-  RefreshCw, Info
+  RefreshCw, Info, LayoutGrid, List
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
@@ -20,6 +20,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { ModernSaleReceiptModal } from './ModernSaleReceiptModal';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig } from '../lib/paymentMethods';
+import { SelectPill, SelectOption } from './SelectPill';
 
 interface SuppliesPOSProps {
   user: UserProfile;
@@ -65,6 +66,12 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
   const [isLoadingClassStudents, setIsLoadingClassStudents] = useState(false);
   const [activeClassIds, setActiveClassIds] = useState<string[]>([]);
   const [isLoadingActiveClassIds, setIsLoadingActiveClassIds] = useState(false);
+  const [studentViewMode, setStudentViewMode] = useState<'table' | 'grid'>('table');
+
+  // Step 2: Catalog
+  const [selectedCategory, setSelectedCategory] = useState('ALL');
+  const [itemSearch, setItemSearch] = useState('');
+  const [catalogViewMode, setCatalogViewMode] = useState<'grid' | 'table'>('grid');
 
   // Fetch classes with active enrollments for the selected academic year & campus (multi-tenant)
   useEffect(() => {
@@ -102,10 +109,41 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
     fetchActiveClassIds();
   }, [selectedYearId, user?.school_id, currentCampusId]);
 
-  // Filter the classes array to only include those with active registrations
+  // Filter the classes array to only include those with active registrations (with fallback to all classes)
   const filteredClassesList = useMemo(() => {
-    return classes.filter(cls => activeClassIds.includes(cls.id));
+    if (activeClassIds.length > 0) {
+      const active = classes.filter(cls => activeClassIds.includes(cls.id));
+      if (active.length > 0) return active;
+    }
+    return classes;
   }, [classes, activeClassIds]);
+
+  // Harmonized class options for SelectPill
+  const classOptions: SelectOption[] = useMemo(() => {
+    const countLabel = isLoadingActiveClassIds 
+      ? '(Chargement...)' 
+      : `(${filteredClassesList.length} ${filteredClassesList.length > 1 ? terminology.classes.toLowerCase() : terminology.class.toLowerCase()})`;
+
+    const list: SelectOption[] = [
+      {
+        value: '',
+        label: `Toutes les ${terminology.classes.toLowerCase()} ${countLabel}`,
+        badge: filteredClassesList.length > 0 ? `${filteredClassesList.length}` : undefined,
+        icon: GraduationCap
+      }
+    ];
+
+    filteredClassesList.forEach(cls => {
+      list.push({
+        value: cls.id,
+        label: cls.name,
+        icon: GraduationCap,
+        description: cls.section || cls.level ? `${cls.section || ''} ${cls.level ? '• ' + cls.level : ''}`.trim() : undefined
+      });
+    });
+
+    return list;
+  }, [filteredClassesList, isLoadingActiveClassIds, terminology.classes, terminology.class]);
 
   // Fetch students when class changes (strict Multi-Tenant & Campus)
   useEffect(() => {
@@ -118,7 +156,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
       try {
         let query = supabase
           .from('enrollments')
-          .select('student_id, students(id, first_name, last_name, code, wallet_balance_htg, wallet_balance_usd, status)')
+          .select('student_id, students(id, first_name, last_name, reference_number, wallet_balance_htg, wallet_balance_usd, gender, status)')
           .eq('class_id', selectedClassId)
           .eq('academic_year_id', selectedYearId)
           .eq('school_id', user.school_id);
@@ -127,7 +165,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
           query = query.eq('campus_id', currentCampusId);
         }
 
-        const { data, error } = await query.limit(200);
+        const { data, error } = await query.limit(300);
           
         if (error) {
           console.error("Error fetching enrolled class students:", error);
@@ -161,10 +199,6 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
     };
     fetchClassStudents();
   }, [selectedClassId, selectedYearId, user.school_id, currentCampusId]);
-
-  // Step 2: Catalog
-  const [selectedCategory, setSelectedCategory] = useState('ALL');
-  const [itemSearch, setItemSearch] = useState('');
 
   // Step 3 & 4: Cart & Payment
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -261,7 +295,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
     try {
       const { data: freshStudent } = await supabase
         .from('students')
-        .select('id, first_name, last_name, code, wallet_balance_htg, wallet_balance_usd, status')
+        .select('id, first_name, last_name, reference_number, wallet_balance_htg, wallet_balance_usd, status')
         .eq('id', selectedStudent.id)
         .maybeSingle();
       if (freshStudent) {
@@ -336,7 +370,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
     // Fetch fresh student data to guarantee fresh wallet balances
     const { data: freshStudent } = await supabase
       .from('students')
-      .select('id, first_name, last_name, code, wallet_balance_htg, wallet_balance_usd, gender, status')
+      .select('id, first_name, last_name, reference_number, wallet_balance_htg, wallet_balance_usd, gender, status')
       .eq('id', student.id)
       .maybeSingle();
 
@@ -922,34 +956,32 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
             
             {!selectedStudent ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                {/* SELECT BY CLASS */}
+                {/* SELECT BY CLASS WITH HARMONIZED SELECTPILL */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5">
-                    <GraduationCap size={14} className="text-indigo-500" />
+                  <label className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                    <GraduationCap size={14} className="text-indigo-600" />
                     Filtrer par {terminology.class}
                   </label>
-                  <div className="relative">
-                    <select 
-                      className="w-full pl-4 pr-10 py-3 bg-slate-50/70 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 appearance-none transition-all min-h-[46px]"
-                      value={selectedClassId}
-                      onChange={e => {
-                        setSelectedClassId(e.target.value);
-                        setStudentSearch('');
-                      }}
-                    >
-                      <option value="">Toutes les {terminology.classes.toLowerCase()} {isLoadingActiveClassIds ? '(Chargement...)' : `(${filteredClassesList.length} avec inscriptions)`}</option>
-                      {filteredClassesList.map(cls => (
-                        <option key={cls.id} value={cls.id}>{cls.name}</option>
-                      ))}
-                    </select>
-                    <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                  </div>
+                  <SelectPill 
+                    options={classOptions}
+                    value={selectedClassId}
+                    onChange={(val) => {
+                      setSelectedClassId(val);
+                      setStudentSearch('');
+                    }}
+                    placeholder={`Toutes les ${terminology.classes.toLowerCase()}...`}
+                    icon={GraduationCap}
+                    colorScheme="indigo"
+                    size="sm"
+                    searchable={filteredClassesList.length > 5}
+                    className="w-full"
+                  />
                 </div>
 
                 {/* SEARCH INPUT */}
                 <div className="space-y-1.5">
-                  <label className="text-[11px] font-extrabold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5">
-                    <Search size={14} className="text-indigo-500" />
+                  <label className="text-[11px] font-extrabold text-slate-700 uppercase tracking-wider ml-1 flex items-center gap-1.5">
+                    <Search size={14} className="text-indigo-600" />
                     Recherche directe (Nom ou Matricule)
                   </label>
                   <div className="relative">
@@ -957,7 +989,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                     <input 
                       type="text" 
                       placeholder="Tapez un nom, prénom ou matricule..." 
-                      className="w-full pl-10 pr-10 py-3 bg-slate-50/70 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-2xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all min-h-[46px]"
+                      className="w-full pl-10 pr-10 py-2.5 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all min-h-[42px]"
                       value={studentSearch}
                       onChange={e => {
                         setStudentSearch(e.target.value);
@@ -977,10 +1009,49 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                   </div>
                 </div>
 
-                {/* RESULTS LIST */}
+                {/* RESULTS LIST WITH DUAL VIEW: TABLEAU & CARTES GRILLES */}
                 <div className="col-span-full">
                   {(selectedClassId || studentSearch.length >= 2) && (
-                    <div className="bg-slate-50/50 border border-slate-200/90 rounded-2xl overflow-hidden max-h-[280px] overflow-y-auto shadow-inner divide-y divide-slate-100">
+                    <div className="bg-slate-50/60 border border-slate-200/90 rounded-2xl overflow-hidden shadow-inner p-3 space-y-3">
+                      {/* HEADER CONTROLS & VIEW SWITCHER */}
+                      <div className="flex items-center justify-between pb-1 px-1 border-b border-slate-200/60">
+                        <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                          {(selectedClassId ? classStudents : studentResults).length}{' '}
+                          {(selectedClassId ? classStudents : studentResults).length > 1 ? terminology.students.toLowerCase() : terminology.student.toLowerCase()}{' '}
+                          trouvé{(selectedClassId ? classStudents : studentResults).length > 1 ? 's' : ''}
+                        </p>
+
+                        <div className="flex items-center gap-1 bg-white p-1 rounded-xl border border-slate-200 shadow-2xs">
+                          <button
+                            type="button"
+                            onClick={() => setStudentViewMode('table')}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                              studentViewMode === 'table'
+                                ? 'bg-indigo-50 text-indigo-800 font-black border border-indigo-200/80 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                            title="Vue Tableau"
+                          >
+                            <List size={13} className={studentViewMode === 'table' ? 'text-indigo-600' : 'text-slate-500'} />
+                            <span>Tableau</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStudentViewMode('grid')}
+                            className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                              studentViewMode === 'grid'
+                                ? 'bg-indigo-50 text-indigo-800 font-black border border-indigo-200/80 shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                            title="Vue Cartes grilles"
+                          >
+                            <LayoutGrid size={13} className={studentViewMode === 'grid' ? 'text-indigo-600' : 'text-slate-500'} />
+                            <span>Cartes grilles</span>
+                          </button>
+                        </div>
+                      </div>
+
                       {isLoadingClassStudents || isSearchingStudent ? (
                         <div className="p-8 text-center space-y-2">
                           <Loader2 className="mx-auto animate-spin text-indigo-600" size={24} />
@@ -989,36 +1060,136 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                       ) : (
                         <>
                           {(selectedClassId ? classStudents : studentResults).length > 0 ? (
-                            (selectedClassId ? classStudents : studentResults).map(student => (
-                              <button 
-                                key={student.id}
-                                onClick={() => handleSelectStudent(student)}
-                                className="w-full text-left px-4 py-3 hover:bg-indigo-50/80 flex items-center justify-between group transition-all min-h-[52px]"
-                              >
-                                <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-50 to-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center border border-indigo-200/70 shadow-2xs group-hover:scale-105 transition-transform">
-                                    {student.last_name?.charAt(0)}
-                                  </div>
-                                  <div>
-                                    <p className="font-black text-slate-900 text-xs sm:text-sm group-hover:text-indigo-700 transition-colors">
-                                      {formatStudentName(student.last_name, student.first_name).fullName}
-                                    </p>
-                                    <div className="flex items-center gap-2 mt-0.5">
-                                      <span className="px-1.5 py-0.2 bg-slate-200/70 text-slate-700 font-mono text-[9px] font-bold rounded">
-                                        ID: {student.id.substring(0,8)}
-                                      </span>
-                                      <span className="text-[10px] font-bold text-slate-500">
-                                        • {student?.classes?.name || classes.find(c => c.id === selectedClassId)?.name || `Sans ${terminology.class.toLowerCase()}`}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-1.5 text-indigo-600 font-bold text-xs opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <span>Sélectionner</span>
-                                  <ChevronRight size={16} />
-                                </div>
-                              </button>
-                            ))
+                            studentViewMode === 'table' ? (
+                              /* VUE TABLEAU DES ÉLÈVES */
+                              <div className="overflow-x-auto max-h-[300px] overflow-y-auto rounded-xl border border-slate-200 bg-white">
+                                <table className="w-full text-left text-xs border-collapse">
+                                  <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
+                                    <tr>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">N°</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Élève</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Matricule</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Classe</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Portefeuille</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider text-right">Action</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="divide-y divide-slate-100">
+                                    {(selectedClassId ? classStudents : studentResults).map((student, idx) => {
+                                      const matricule = student.reference_number || student.code || student.id.substring(0, 8);
+                                      const className = student?.classes?.name || classes.find(c => c.id === selectedClassId)?.name || `Sans ${terminology.class.toLowerCase()}`;
+                                      const htgBal = Number(student.wallet_balance_htg) || 0;
+                                      const usdBal = Number(student.wallet_balance_usd) || 0;
+
+                                      return (
+                                        <tr 
+                                          key={student.id}
+                                          onClick={() => handleSelectStudent(student)}
+                                          className="hover:bg-indigo-50/70 transition-colors cursor-pointer group"
+                                        >
+                                          <td className="py-2.5 px-3 font-mono text-slate-400 font-bold text-[11px]">
+                                            {String(idx + 1).padStart(2, '0')}
+                                          </td>
+                                          <td className="py-2.5 px-3">
+                                            <div className="flex items-center gap-2.5">
+                                              <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center border border-indigo-200/80 shrink-0">
+                                                {student.last_name?.charAt(0) || '?'}
+                                              </div>
+                                              <span className="font-black text-slate-900 group-hover:text-indigo-700 transition-colors">
+                                                {formatStudentName(student.last_name, student.first_name).fullName}
+                                              </span>
+                                            </div>
+                                          </td>
+                                          <td className="py-2.5 px-3">
+                                            <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono text-[10px] font-bold rounded-md border border-slate-200">
+                                              #{matricule}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-slate-700 font-bold text-xs">
+                                            {className}
+                                          </td>
+                                          <td className="py-2.5 px-3">
+                                            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                                              <span className={htgBal > 0 ? 'text-emerald-700 font-black' : 'text-slate-400'}>
+                                                {htgBal.toLocaleString()} HTG
+                                              </span>
+                                              {usdBal > 0 && (
+                                                <span className="text-teal-700 font-black text-[10px]">
+                                                  • {usdBal.toLocaleString()} $
+                                                </span>
+                                              )}
+                                            </div>
+                                          </td>
+                                          <td className="py-2.5 px-3 text-right">
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                handleSelectStudent(student);
+                                              }}
+                                              className="px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] inline-flex items-center gap-1 shadow-2xs group-hover:scale-105 transition-all"
+                                            >
+                                              <span>Choisir</span>
+                                              <ChevronRight size={13} />
+                                            </button>
+                                          </td>
+                                        </tr>
+                                      );
+                                    })}
+                                  </tbody>
+                                </table>
+                              </div>
+                            ) : (
+                              /* VUE CARTES GRILLES DES ÉLÈVES */
+                              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2.5 max-h-[300px] overflow-y-auto pr-1">
+                                {(selectedClassId ? classStudents : studentResults).map(student => {
+                                  const matricule = student.reference_number || student.code || student.id.substring(0, 8);
+                                  const className = student?.classes?.name || classes.find(c => c.id === selectedClassId)?.name || `Sans ${terminology.class.toLowerCase()}`;
+                                  const htgBal = Number(student.wallet_balance_htg) || 0;
+                                  const usdBal = Number(student.wallet_balance_usd) || 0;
+
+                                  return (
+                                    <button 
+                                      key={student.id}
+                                      onClick={() => handleSelectStudent(student)}
+                                      className="w-full text-left p-3.5 bg-white hover:bg-indigo-50/70 border border-slate-200/90 hover:border-indigo-300 rounded-xl flex flex-col justify-between gap-3 group transition-all shadow-2xs hover:shadow-sm"
+                                    >
+                                      <div className="flex items-start justify-between gap-2 w-full">
+                                        <div className="flex items-center gap-2.5">
+                                          <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-indigo-50 to-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center border border-indigo-200/70 shadow-2xs group-hover:scale-105 transition-transform shrink-0">
+                                            {student.last_name?.charAt(0) || '?'}
+                                          </div>
+                                          <div>
+                                            <p className="font-black text-slate-900 text-xs sm:text-sm group-hover:text-indigo-700 transition-colors line-clamp-1">
+                                              {formatStudentName(student.last_name, student.first_name).fullName}
+                                            </p>
+                                            <span className="text-[11px] font-bold text-slate-500">
+                                              {className}
+                                            </span>
+                                          </div>
+                                        </div>
+                                        <span className="px-1.5 py-0.5 bg-slate-100 text-slate-700 font-mono text-[9px] font-bold rounded border border-slate-200 shrink-0">
+                                          #{matricule}
+                                        </span>
+                                      </div>
+
+                                      <div className="flex items-center justify-between pt-2 border-t border-slate-100 w-full">
+                                        <div className="text-[10px] font-bold text-slate-500">
+                                          Solde:{' '}
+                                          <span className={`font-mono ${htgBal > 0 ? 'text-emerald-700 font-black' : 'text-slate-400'}`}>
+                                            {htgBal.toLocaleString()} HTG
+                                          </span>
+                                        </div>
+                                        <div className="flex items-center gap-1 text-indigo-600 font-bold text-[11px] group-hover:translate-x-0.5 transition-transform">
+                                          <span>Sélectionner</span>
+                                          <ChevronRight size={14} />
+                                        </div>
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )
                           ) : (
                             <div className="p-8 text-center space-y-1">
                               <p className="text-xs font-black text-slate-600">Aucun {terminology.student.toLowerCase()} trouvé</p>
@@ -1044,14 +1215,14 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                         {formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName}
                       </h4>
                       <BadgeCheck size={16} className="text-emerald-500 shrink-0" />
-                      {selectedStudent.code && (
-                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200">
-                          #{selectedStudent.code}
+                      {(selectedStudent.reference_number || selectedStudent.code) && (
+                        <span className="text-[10px] font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
+                          #{selectedStudent.reference_number || selectedStudent.code}
                         </span>
                       )}
                     </div>
                     <p className="text-xs font-bold text-indigo-700 mt-0.5">
-                      Matricule: <span className="font-mono text-slate-700">{selectedStudent.id.substring(0,8)}</span> • Classe: <span className="font-black text-slate-900">{selectedStudent.effectiveClassName}</span>
+                      Matricule: <span className="font-mono text-slate-800 font-bold">{selectedStudent.reference_number || selectedStudent.code || selectedStudent.id.substring(0,8)}</span> • Classe: <span className="font-black text-slate-900">{selectedStudent.effectiveClassName}</span>
                     </p>
                   </div>
                 </div>
@@ -1110,21 +1281,53 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                 </div>
               </div>
 
-              {/* SEARCH INPUT */}
-              <div className="relative w-full sm:w-64">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                <input 
-                  type="text" 
-                  placeholder="Filtrer un article..." 
-                  className="w-full pl-9 pr-8 py-2.5 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all min-h-[42px]"
-                  value={itemSearch}
-                  onChange={e => setItemSearch(e.target.value)}
-                />
-                {itemSearch && (
-                  <button onClick={() => setItemSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200/60">
-                    <X size={13} />
+              {/* SEARCH INPUT & VIEW SWITCHER */}
+              <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <div className="relative flex-1 sm:w-60">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                  <input 
+                    type="text" 
+                    placeholder="Filtrer un article..." 
+                    className="w-full pl-9 pr-8 py-2 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 transition-all min-h-[38px]"
+                    value={itemSearch}
+                    onChange={e => setItemSearch(e.target.value)}
+                  />
+                  {itemSearch && (
+                    <button onClick={() => setItemSearch('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-full hover:bg-slate-200/60">
+                      <X size={13} />
+                    </button>
+                  )}
+                </div>
+
+                {/* VUE TABLEAU / VUE CARTES GRILLES */}
+                <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setCatalogViewMode('grid')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      catalogViewMode === 'grid'
+                        ? 'bg-white text-slate-950 shadow-xs border border-slate-200/80 font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Vue Cartes grilles"
+                  >
+                    <LayoutGrid size={14} className={catalogViewMode === 'grid' ? 'text-emerald-600' : 'text-slate-500'} />
+                    <span className="hidden sm:inline">Cartes grilles</span>
                   </button>
-                )}
+                  <button
+                    type="button"
+                    onClick={() => setCatalogViewMode('table')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                      catalogViewMode === 'table'
+                        ? 'bg-white text-slate-950 shadow-xs border border-slate-200/80 font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Vue Tableau"
+                  >
+                    <List size={14} className={catalogViewMode === 'table' ? 'text-emerald-600' : 'text-slate-500'} />
+                    <span className="hidden sm:inline">Tableau</span>
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1150,89 +1353,217 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
               })}
             </div>
 
-            {/* CATALOG GRID */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5">
-              {filteredCatalog.map(item => {
-                const stockQty = item.stock_quantity || 0;
-                const isOutOfStock = stockQty <= 0;
-                const isLowStock = !isOutOfStock && stockQty <= (item.low_stock_threshold || 5);
-                const isUniform = item.category?.toLowerCase().includes('uniforme');
-                const isBook = item.category?.toLowerCase().includes('livre');
+            {/* DUAL VIEW: TABLEAU OU CARTES GRILLES */}
+            {catalogViewMode === 'table' ? (
+              /* VUE TABLEAU DU CATALOGUE */
+              <div className="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-2xs">
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="bg-slate-50 border-b border-slate-200">
+                    <tr>
+                      <th className="py-3 px-4 text-[10px] font-black uppercase text-slate-500 tracking-wider">Article & Désignation</th>
+                      <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Catégorie</th>
+                      <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Prix unitaire</th>
+                      <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Stock disponible</th>
+                      <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Disponibilité</th>
+                      <th className="py-3 px-4 text-[10px] font-black uppercase text-slate-500 tracking-wider text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {filteredCatalog.map(item => {
+                      const stockQty = item.stock_quantity || 0;
+                      const isOutOfStock = stockQty <= 0;
+                      const isLowStock = !isOutOfStock && stockQty <= (item.low_stock_threshold || 5);
+                      const isUniform = item.category?.toLowerCase().includes('uniforme');
+                      const isBook = item.category?.toLowerCase().includes('livre');
 
-                return (
-                  <button 
-                    key={item.id}
-                    onClick={() => addToCart(item)}
-                    className={`p-4.5 rounded-2xl border transition-all text-left group flex flex-col justify-between h-full min-h-[136px] relative overflow-hidden active:scale-98 shadow-2xs hover:shadow-md ${
-                      isOutOfStock 
-                        ? 'bg-gradient-to-br from-amber-50/40 via-white to-amber-50/10 border-amber-200/80 hover:border-amber-400' 
-                        : isLowStock
-                        ? 'bg-white border-amber-200/60 hover:border-amber-400'
-                        : 'bg-white border-slate-200/80 hover:border-emerald-500 hover:-translate-y-0.5'
-                    }`}
-                  >
-                    <div>
-                      <div className="flex items-center justify-between gap-2 mb-2.5">
-                        <span className={`px-2.5 py-0.5 font-black text-[9px] uppercase tracking-wider rounded-lg border ${
-                          isUniform 
-                            ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
-                            : isBook 
-                            ? 'bg-amber-50 text-amber-800 border-amber-200' 
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                          {item.category}
-                        </span>
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => addToCart(item)}
+                          className="hover:bg-emerald-50/50 transition-colors cursor-pointer group"
+                        >
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center border shrink-0 ${
+                                isUniform 
+                                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                                  : isBook 
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                  : 'bg-slate-50 text-slate-700 border-slate-200'
+                              }`}>
+                                {isUniform ? <Shirt size={15} /> : isBook ? <BookOpen size={15} /> : <Package size={15} />}
+                              </div>
+                              <div>
+                                <p className="font-extrabold text-slate-900 text-xs sm:text-sm group-hover:text-emerald-700 transition-colors">
+                                  {item.label}
+                                </p>
+                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                                  Unité: {item.unit_measure || 'Pièce'}
+                                </p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2.5 py-0.5 font-black text-[9px] uppercase tracking-wider rounded-lg border inline-block ${
+                              isUniform 
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                                : isBook 
+                                ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                                : 'bg-slate-100 text-slate-700 border-slate-200'
+                            }`}>
+                              {item.category}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className="font-mono font-black text-slate-900 text-sm">
+                              {item.unit_price.toLocaleString()} <span className="text-[11px] font-bold text-slate-500">{item.currency || 'HTG'}</span>
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold inline-flex items-center gap-1.5 border ${
+                              isOutOfStock 
+                                ? 'bg-amber-100/80 text-amber-900 border-amber-300' 
+                                : isLowStock
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}></span>
+                              {stockQty} en stock
+                            </span>
+                          </td>
+                          <td className="py-3 px-3">
+                            {isOutOfStock ? (
+                              <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
+                                <Clock size={12} />
+                                Différé (0 disponible)
+                              </span>
+                            ) : (
+                              <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                                <Check size={12} />
+                                Immédiat
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            {isOutOfStock ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(item);
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 group-hover:bg-amber-500 group-hover:text-slate-950 font-black text-xs inline-flex items-center gap-1.5 border border-amber-200 shadow-2xs transition-all"
+                              >
+                                <Clock size={13} />
+                                <span>Précommander</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  addToCart(item);
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1 shadow-2xs group-hover:scale-105 transition-all"
+                              >
+                                <Plus size={14} />
+                                <span>Ajouter</span>
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              /* CATALOG GRID (VUE CARTES GRILLES) */
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5">
+                {filteredCatalog.map(item => {
+                  const stockQty = item.stock_quantity || 0;
+                  const isOutOfStock = stockQty <= 0;
+                  const isLowStock = !isOutOfStock && stockQty <= (item.low_stock_threshold || 5);
+                  const isUniform = item.category?.toLowerCase().includes('uniforme');
+                  const isBook = item.category?.toLowerCase().includes('livre');
 
-                        <span className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 border ${
-                          isOutOfStock 
-                            ? 'bg-amber-100/80 text-amber-900 border-amber-300' 
-                            : isLowStock
-                            ? 'bg-amber-50 text-amber-800 border-amber-200'
-                            : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                        }`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${
-                            isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
-                          }`}></span>
-                          {isOutOfStock ? 'Différé (0 dispo)' : `${stockQty} en stock`}
-                        </span>
-                      </div>
-
-                      <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm leading-snug group-hover:text-emerald-700 transition-colors line-clamp-2">
-                        {item.label}
-                      </h4>
-                    </div>
-
-                    <div className="pt-3 border-t border-slate-100 mt-3 flex items-end justify-between">
+                  return (
+                    <button 
+                      key={item.id}
+                      onClick={() => addToCart(item)}
+                      className={`p-4.5 rounded-2xl border transition-all text-left group flex flex-col justify-between h-full min-h-[136px] relative overflow-hidden active:scale-98 shadow-2xs hover:shadow-md ${
+                        isOutOfStock 
+                          ? 'bg-gradient-to-br from-amber-50/40 via-white to-amber-50/10 border-amber-200/80 hover:border-amber-400' 
+                          : isLowStock
+                          ? 'bg-white border-amber-200/60 hover:border-amber-400'
+                          : 'bg-white border-slate-200/80 hover:border-emerald-500 hover:-translate-y-0.5'
+                      }`}
+                    >
                       <div>
-                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Prix unitaire</p>
-                        <p className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight">
-                          {item.unit_price.toLocaleString()} <span className="text-[11px] font-bold text-slate-500">{item.currency || 'HTG'} / {item.unit_measure || 'Pièce'}</span>
-                        </p>
+                        <div className="flex items-center justify-between gap-2 mb-2.5">
+                          <span className={`px-2.5 py-0.5 font-black text-[9px] uppercase tracking-wider rounded-lg border ${
+                            isUniform 
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                              : isBook 
+                              ? 'bg-amber-50 text-amber-800 border-amber-200' 
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {item.category}
+                          </span>
+
+                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 border ${
+                            isOutOfStock 
+                              ? 'bg-amber-100/80 text-amber-900 border-amber-300' 
+                              : isLowStock
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                              isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                            }`}></span>
+                            {isOutOfStock ? 'Différé (0 dispo)' : `${stockQty} en stock`}
+                          </span>
+                        </div>
+
+                        <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm leading-snug group-hover:text-emerald-700 transition-colors line-clamp-2">
+                          {item.label}
+                        </h4>
                       </div>
 
-                      {isOutOfStock ? (
-                        <div className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors flex items-center gap-1.5 text-[11px] font-black border border-amber-200 shadow-2xs">
-                          <Clock size={13} />
-                          <span>Précommander</span>
+                      <div className="pt-3 border-t border-slate-100 mt-3 flex items-end justify-between">
+                        <div>
+                          <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Prix unitaire</p>
+                          <p className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight">
+                            {item.unit_price.toLocaleString()} <span className="text-[11px] font-bold text-slate-500">{item.currency || 'HTG'} / {item.unit_measure || 'Pièce'}</span>
+                          </p>
                         </div>
-                      ) : (
-                        <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-all flex items-center justify-center font-black border border-emerald-100 group-hover:shadow-sm group-hover:scale-105">
-                          <Plus size={18} />
-                        </div>
-                      )}
-                    </div>
-                  </button>
-                );
-              })}
 
-              {filteredCatalog.length === 0 && (
-                <div className="col-span-full py-16 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center space-y-2">
-                  <Package size={32} className="mx-auto text-slate-300" />
-                  <p className="text-xs font-black text-slate-500">Aucun article trouvé dans cette sélection</p>
-                  <p className="text-[11px] text-slate-400">Essayez un autre mot-clé ou changez de catégorie.</p>
-                </div>
-              )}
-            </div>
+                        {isOutOfStock ? (
+                          <div className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors flex items-center gap-1.5 text-[11px] font-black border border-amber-200 shadow-2xs">
+                            <Clock size={13} />
+                            <span>Précommander</span>
+                          </div>
+                        ) : (
+                          <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 group-hover:bg-emerald-500 group-hover:text-white transition-all flex items-center justify-center font-black border border-emerald-100 group-hover:shadow-sm group-hover:scale-105">
+                            <Plus size={18} />
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
+            {filteredCatalog.length === 0 && (
+              <div className="col-span-full py-16 bg-slate-50 rounded-3xl border border-dashed border-slate-200 text-center space-y-2">
+                <Package size={32} className="mx-auto text-slate-300" />
+                <p className="text-xs font-black text-slate-500">Aucun article trouvé dans cette sélection</p>
+                <p className="text-[11px] text-slate-400">Essayez un autre mot-clé ou changez de catégorie.</p>
+              </div>
+            )}
           </section>
 
         </div>
@@ -1517,7 +1848,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                       <div>
                         <h5 className="font-black text-white text-xs">Portefeuille de l'élève</h5>
                         <p className="text-[11px] text-slate-400">
-                          {formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName} (#{selectedStudent.code || selectedStudent.id.substring(0,8)})
+                          {formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName} (#{selectedStudent.reference_number || selectedStudent.code || selectedStudent.id.substring(0,8)})
                         </p>
                       </div>
                     </div>

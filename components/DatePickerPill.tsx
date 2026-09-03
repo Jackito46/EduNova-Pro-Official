@@ -13,7 +13,7 @@ export interface DatePickerPillProps {
   labelPrefix?: string;
   variant?: 'pill' | 'field' | 'compact' | 'header';
   size?: 'xs' | 'sm' | 'md' | 'lg';
-  colorScheme?: 'blue' | 'indigo' | 'emerald' | 'slate' | 'purple' | 'amber';
+  colorScheme?: 'blue' | 'indigo' | 'emerald' | 'slate' | 'purple' | 'amber' | 'rose';
   className?: string;
   dropdownAlign?: 'left' | 'right';
   disabled?: boolean;
@@ -23,9 +23,22 @@ export interface DatePickerPillProps {
   showQuickArrows?: boolean;
   showTodayBadge?: boolean;
   title?: string;
+  placeholder?: string;
+  clearable?: boolean;
 }
 
 const COLOR_SCHEMES = {
+  rose: {
+    border: 'border-rose-200 hover:border-rose-300',
+    focusBorder: 'focus:border-rose-500 focus:ring-rose-500/20',
+    selectedBg: 'bg-rose-600 text-white',
+    badge: 'bg-rose-100 text-rose-700',
+    todayBadge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+    activeRing: 'ring-rose-500',
+    iconText: 'text-rose-600',
+    shortcutActive: 'bg-rose-600 text-white shadow-xs',
+    shortcutInactive: 'bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200'
+  },
   blue: {
     border: 'border-blue-200 hover:border-blue-300',
     focusBorder: 'focus:border-blue-500 focus:ring-blue-500/20',
@@ -116,7 +129,9 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
   showShortcuts = true,
   showQuickArrows = false,
   showTodayBadge = true,
-  title = 'Sélectionner une date'
+  title = 'Sélectionner une date',
+  placeholder,
+  clearable = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -366,25 +381,25 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
 
   const standardFormattedDisplay = useMemo(() => {
     try {
-      if (!selectedDate) return 'Sélectionner une date';
+      if (!selectedDate) return placeholder || 'Sélectionner une date';
       const d = parseISO(selectedDate);
       if (!isValid(d)) return selectedDate;
       return format(d, 'EEE d MMM yyyy', { locale: fr });
     } catch {
       return selectedDate;
     }
-  }, [selectedDate]);
+  }, [selectedDate, placeholder]);
 
   const shortFormattedDisplay = useMemo(() => {
     try {
-      if (!selectedDate) return 'Date';
+      if (!selectedDate) return placeholder || 'Date';
       const d = parseISO(selectedDate);
       if (!isValid(d)) return selectedDate;
       return format(d, 'd MMM yyyy', { locale: fr });
     } catch {
       return selectedDate;
     }
-  }, [selectedDate]);
+  }, [selectedDate, placeholder]);
 
   // Quick preset actions
   const setQuickDate = (type: 'today' | 'yesterday' | 'tomorrow' | 'monday' | 'friday') => {
@@ -485,7 +500,21 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
             </div>
           </div>
 
-          <div className="flex items-center shrink-0 text-slate-500 pl-0.5">
+          <div className="flex items-center shrink-0 text-slate-500 pl-0.5 gap-1">
+            {clearable && selectedDate && !disabled && (
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectDate('');
+                }}
+                title="Effacer la date"
+                className="p-0.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors"
+              >
+                <X size={12} className="stroke-[2.5]" />
+              </span>
+            )}
             <ChevronDown 
               size={14} 
               className={`transition-transform duration-200 stroke-[2.5] ${isOpen ? 'rotate-180 text-blue-600' : ''}`} 

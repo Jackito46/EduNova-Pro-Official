@@ -443,16 +443,16 @@ const StaffManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
       <div className="bg-white p-4 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Search Input */}
         <div className="flex items-center flex-1 w-full bg-slate-50 px-4 py-2.5 rounded-2xl border border-slate-200 focus-within:ring-2 focus-within:ring-indigo-500/20 focus-within:border-indigo-500 transition-all">
-          <Search className="text-slate-400 mr-2 shrink-0" size={18} />
+          <Search className="text-slate-600 mr-2 shrink-0" size={18} />
           <input 
             type="text" 
             placeholder="Rechercher par nom, prénom, rôle ou téléphone..." 
-            className="flex-1 bg-transparent text-slate-800 font-bold text-xs outline-none placeholder:text-slate-400 placeholder:font-medium"
+            className="flex-1 bg-transparent text-slate-950 font-bold text-xs outline-none placeholder:text-slate-500 placeholder:font-semibold"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600">
+            <button onClick={() => setSearchTerm('')} className="text-slate-500 hover:text-slate-800">
               <X size={16} />
             </button>
           )}

@@ -455,13 +455,13 @@ const ExpensesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
               {/* Barre de Recherche */}
               <div className="flex-1 relative group">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-rose-600 transition-colors">
+                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-rose-600 transition-colors">
                   <Search size={18} />
                 </div>
                 <input 
                   type="text" 
                   placeholder="Chercher par libellé ou catégorie..." 
-                  className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-500/15 transition-all shadow-2xs"
+                  className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-500 outline-none focus:border-rose-500 focus:bg-white focus:ring-2 focus:ring-rose-500/15 transition-all shadow-2xs"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -885,7 +885,7 @@ const ExpensesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80">
             <div>
               <h3 className="text-base font-black text-slate-900 tracking-tight">Référentiel des Catégories</h3>
-              <p className="text-xs text-slate-500">Gestion des types et classifications de charges académiques.</p>
+              <p className="text-xs font-semibold text-slate-600">Gestion des types et classifications de charges académiques.</p>
             </div>
             <button 
               onClick={() => {
@@ -904,12 +904,12 @@ const ExpensesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             {categories.map(cat => (
               <div key={cat.id} className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between group hover:border-rose-300 transition-all">
                 <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 bg-slate-100 text-slate-500 rounded-xl flex items-center justify-center group-hover:bg-rose-50 group-hover:text-rose-600 transition-all">
+                  <div className="w-11 h-11 bg-slate-100 text-slate-700 rounded-xl flex items-center justify-center group-hover:bg-rose-50 group-hover:text-rose-600 transition-all">
                     <Tag size={18} />
                   </div>
                   <div>
                     <h4 className="font-bold text-slate-900 text-xs">{cat.label}</h4>
-                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">ID: {cat.id.substring(0,8)}</p>
+                    <p className="text-[10px] text-slate-600 font-extrabold uppercase tracking-widest">ID: {cat.id.substring(0,8)}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-all">
@@ -942,26 +942,26 @@ const ExpensesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in duration-300">
             <div className="p-5 sm:p-6 border-b border-slate-100 flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-black text-slate-900 tracking-tight">
+                <h3 className="text-lg font-black text-slate-950 tracking-tight">
                   {editingCategory ? "Modifier la Catégorie" : "Nouvelle Catégorie"}
                 </h3>
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Paramétrage du référentiel</p>
+                <p className="text-xs font-bold text-slate-700 mt-0.5">Paramétrage du référentiel</p>
               </div>
               <button 
                 onClick={() => setShowCategoryModal(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors"
+                className="p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-100 transition-colors"
               >
                 <X size={16} />
               </button>
             </div>
             <form onSubmit={handleSaveCategory} className="p-5 sm:p-6 space-y-4">
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Libellé de la catégorie</label>
+                <label className="text-xs font-bold text-slate-900 tracking-tight ml-0.5">Libellé de la catégorie</label>
                 <input 
                   type="text" 
                   required 
                   placeholder="EX: SALAIRES & HONORAIRES"
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-rose-500/20 focus:bg-white transition-all"
+                  className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-950 placeholder:text-slate-500 outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all"
                   value={categoryForm.label}
                   onChange={e => setCategoryForm({...categoryForm, label: e.target.value})}
                 />
@@ -970,7 +970,7 @@ const ExpensesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <button 
                   type="button" 
                   onClick={() => setShowCategoryModal(false)}
-                  className="flex-1 py-2.5 text-xs font-bold text-slate-500 hover:text-slate-900 border border-slate-200 rounded-xl transition-colors cursor-pointer"
+                  className="flex-1 py-2.5 text-xs font-bold text-slate-800 hover:text-slate-950 border border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>

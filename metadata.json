@@ -1,7 +1,10 @@
 {
-  "name": "Remix EduNova Pro",
-  "description": "A comprehensive educational management platform designed to streamline school administration and enhance student learning experiences.",
-  "requestFramePermissions": [],
+  "name": "EduNova Pro - Système de Gestion Scolaire",
+  "description": "Une plateforme SaaS complète pour la gestion des écoles maternelles, fondamentales et secondaires, intégrant la gestion académique, financière et une IA d'analyse pédagogique.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]
