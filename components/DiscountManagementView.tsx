@@ -42,6 +42,7 @@ import { formatStudentName } from '../utils/formatters';
 import Modal from './Modal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
 
 const discountSchema = z.object({
   category: z.string().min(1, "Veuillez sélectionner un motif de réévaluation"),
@@ -52,26 +53,132 @@ const discountSchema = z.object({
 
 export type ScholarshipRegime = 'standard' | 'complete';
 
+export interface DiscountCategoryItem {
+  id: string;
+  label: string;
+  value: number;
+  group: 'scholarship' | 'discount' | 'custom' | 'reset';
+  groupLabel: string;
+  badge: string;
+  description: string;
+}
+
 // Génère les motifs adaptés dynamiquement selon le périmètre d'assiette sélectionné
-const getDiscountCategories = (regime: ScholarshipRegime) => {
+const getDiscountCategories = (regime: ScholarshipRegime): DiscountCategoryItem[] => {
   if (regime === 'complete') {
     return [
-      { id: 'custom', label: 'Ajustement Spécial Forfaitaire (HTG)', value: 0 },
-      { id: 'excellence', label: 'Bourse d\'Excellence Intégrale (100% Scolarité + Frais Divers)', value: 100 },
-      { id: 'social', label: 'Prise en Charge Totale / Cas Social (100%)', value: 100 },
-      { id: 'social_partial', label: 'Prise en Charge Sociale Partielle (50%)', value: 50 },
-      { id: 'staff', label: 'Avantage Collaborateur Complet (50%)', value: 50 },
-      { id: 'reset', label: 'Annuler toute réévaluation / Rétablir Tarif Plein (0 HTG)', value: 0 }
+      { 
+        id: 'excellence', 
+        label: "Bourse d'Excellence Intégrale (100% Contrat Global)", 
+        value: 100,
+        group: 'scholarship',
+        groupLabel: "Bourses Scolaires",
+        badge: '100% Global',
+        description: "Exonération intégrale de la scolarité et de l'ensemble des frais obligatoires"
+      },
+      { 
+        id: 'social', 
+        label: "Prise en Charge Sociale Totale (100% Contrat Global)", 
+        value: 100,
+        group: 'scholarship',
+        groupLabel: "Bourses Scolaires",
+        badge: '100% Social',
+        description: "Prise en charge intégrale au titre d'une aide sociale ou d'un parrainage"
+      },
+      { 
+        id: 'social_partial', 
+        label: "Prise en Charge Sociale Partielle (50% Contrat Global)", 
+        value: 50,
+        group: 'scholarship',
+        groupLabel: "Bourses Scolaires",
+        badge: '50% Social',
+        description: "Aide sociale couvrant 50% de l'ensemble du contrat scolaire"
+      },
+      { 
+        id: 'staff', 
+        label: "Avantage Collaborateur Complet (50% Contrat Global)", 
+        value: 50,
+        group: 'discount',
+        groupLabel: "Réductions Conventionnelles",
+        badge: '50% Personnel',
+        description: "Tarif préférentiel personnel appliqué sur la scolarité et les frais obligatoires"
+      },
+      { 
+        id: 'custom', 
+        label: "Ajustement Spécial Forfaitaire (HTG)", 
+        value: 0,
+        group: 'custom',
+        groupLabel: "Ajustement Sur-Mesure",
+        badge: 'Fixe HTG',
+        description: "Déduction d'un montant personnalisé fixe en Gourdes sur le contrat global"
+      },
+      { 
+        id: 'reset', 
+        label: "Rétablir Tarif Plein Standard (0 HTG)", 
+        value: 0,
+        group: 'reset',
+        groupLabel: "Plein Tarif",
+        badge: 'Tarif Standard',
+        description: "Annulation de toute exonération et rétablissement du tarif contractuel nominal"
+      }
     ];
   }
 
   return [
-    { id: 'custom', label: 'Ajustement Spécial Forfaitaire (HTG)', value: 0 },
-    { id: 'sibling', label: 'Réduction Fratrie (15% Scolarité)', value: 15 },
-    { id: 'staff', label: 'Avantage Collaborateur (50% Scolarité)', value: 50 },
-    { id: 'excellence', label: 'Bourse d\'Excellence (100% Scolarité)', value: 100 },
-    { id: 'social', label: 'Prise en Charge Sociale / Partenariat (25% Scolarité)', value: 25 },
-    { id: 'reset', label: 'Annuler toute réévaluation / Rétablir Tarif Plein (0 HTG)', value: 0 }
+    { 
+      id: 'excellence', 
+      label: "Bourse d'Excellence (100% Scolarité)", 
+      value: 100,
+      group: 'scholarship',
+      groupLabel: "Bourses Scolaires",
+      badge: '100% Scolarité',
+      description: "Prise en charge intégrale des frais de scolarité annuelle"
+    },
+    { 
+      id: 'social', 
+      label: "Bourse d'Appui Social / Partenariat (25% Scolarité)", 
+      value: 25,
+      group: 'scholarship',
+      groupLabel: "Bourses Scolaires",
+      badge: '25% Social',
+      description: "Convention de partenariat ou allègement pour motif social"
+    },
+    { 
+      id: 'sibling', 
+      label: "Réduction Fratrie (15% Scolarité)", 
+      value: 15,
+      group: 'discount',
+      groupLabel: "Réductions Conventionnelles",
+      badge: '15% Fratrie',
+      description: "Remise statutaire accordée aux membres d'une même fratrie"
+    },
+    { 
+      id: 'staff', 
+      label: "Avantage Collaborateur (50% Scolarité)", 
+      value: 50,
+      group: 'discount',
+      groupLabel: "Réductions Conventionnelles",
+      badge: '50% Personnel',
+      description: "Tarif préférentiel accordé aux enfants des collaborateurs et enseignants"
+    },
+    { 
+      id: 'custom', 
+      label: "Ajustement Spécial Forfaitaire (HTG)", 
+      value: 0,
+      group: 'custom',
+      groupLabel: "Ajustement Sur-Mesure",
+      badge: 'Fixe HTG',
+      description: "Déduction d'un montant personnalisé fixe en Gourdes sur la scolarité"
+    },
+    { 
+      id: 'reset', 
+      label: "Rétablir Tarif Plein Standard (0 HTG)", 
+      value: 0,
+      group: 'reset',
+      groupLabel: "Plein Tarif",
+      badge: 'Tarif Standard',
+      description: "Annulation de toute exonération et rétablissement du tarif contractuel nominal"
+    }
   ];
 };
 
@@ -828,13 +935,31 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               {school?.name || 'Établissement'}
             </span>
             {hasMultipleCampuses && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-200">
-                {user.campus_id 
-                  ? getCampusName(user.campus_id)
-                  : selectedCampusFilterId === 'all'
-                    ? 'Tous les Campus'
-                    : getCampusName(selectedCampusFilterId)}
-              </span>
+              !user.campus_id && (user.role === 'SUPER_ADMIN' || user.role === 'DIRECTOR') ? (
+                <div className="relative min-w-[170px] sm:min-w-[190px]">
+                  <SelectPill
+                    value={selectedCampusFilterId}
+                    onChange={(val) => {
+                      setSelectedCampusFilterId(val);
+                      resetForm();
+                    }}
+                    options={[
+                      { value: 'all', label: 'Tous les Campus / Annexes', badge: campuses.length.toString() },
+                      ...campuses.map(c => ({ value: c.id, label: c.name }))
+                    ]}
+                    icon={Building2}
+                    variant="pill"
+                    size="sm"
+                    colorScheme="indigo"
+                    labelPrefix="Campus : "
+                  />
+                </div>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-slate-100 text-slate-700 font-bold text-xs rounded-lg border border-slate-200">
+                  <Building2 className="w-3.5 h-3.5 text-slate-500" />
+                  {getCampusName(user.campus_id || selectedCampusFilterId)}
+                </span>
+              )
             )}
             <span className="text-slate-500 text-xs font-mono font-bold">
               Session {activeYear?.label || 'Active'}
@@ -975,33 +1100,25 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
 
                 {targetType === 'class' && (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
-                        Sélectionner la {terminology.class.toLowerCase()} cible
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                        <GraduationCap size={14} className="text-indigo-600" />
+                        <span>Sélectionner la {terminology.class.toLowerCase()} cible</span>
                       </label>
                       <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
                         {classes.length} {classes.length > 1 ? terminology.classes.toLowerCase() : terminology.class.toLowerCase()}
                       </span>
                     </div>
-                    <SelectPill
-                      value={selectedClassId}
-                      onChange={(val) => setSelectedClassId(val)}
-                      options={[
-                        { value: '', label: `-- Choisir une ${terminology.class.toLowerCase()} --` },
-                        ...classes.map(c => ({
-                          value: c.id,
-                          label: c.name,
-                          badge: c.level || undefined,
-                          description: hasMultipleCampuses ? getCampusName(c.campus_id) : undefined
-                        }))
-                      ]}
-                      placeholder={`-- Choisir une ${terminology.class.toLowerCase()} --`}
-                      icon={GraduationCap}
+                    <ClassSelectorPill
+                      classes={classes}
+                      selectedClassId={selectedClassId}
+                      onSelectClass={(classId) => setSelectedClassId(classId)}
+                      allowAll={false}
+                      emptyLabel={`-- Choisir une ${terminology.class.toLowerCase()} --`}
                       variant="field"
                       size="md"
                       colorScheme="indigo"
-                      searchable={true}
                       className="w-full"
                     />
                   </div>
@@ -1143,12 +1260,13 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         {/* Périmètre d'Application / Assiette */}
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                              Périmètre d'Application (Assiette)
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <Layers size={13} className="text-indigo-600" />
+                              <span>Périmètre d'Application (Assiette)</span>
                             </label>
                             {targetType === 'student' && selectedStudent && (
-                              <span className="text-[10px] font-bold text-slate-400 font-mono">
-                                Plafond : {scholarshipRegime === 'complete' 
+                              <span className="text-[10px] font-bold text-slate-500 font-mono">
+                                Assiette : {scholarshipRegime === 'complete' 
                                   ? (Number(selectedStudent.tuitionTotal || 0) + Number(selectedStudent.miscTotal || 0)).toLocaleString() 
                                   : Number(selectedStudent.tuitionTotal || 0).toLocaleString()} HTG
                               </span>
@@ -1164,7 +1282,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               }}
                               className={`p-3 rounded-2xl border text-left transition-all ${
                                 scholarshipRegime === 'standard'
-                                  ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 shadow-xs'
+                                  ? 'bg-indigo-50/90 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 shadow-xs'
                                   : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100/80'
                               }`}
                             >
@@ -1180,11 +1298,11 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 </span>
                               </div>
                               <p className="text-[10px] leading-snug text-slate-500">
-                                S'applique uniquement sur les frais d'études (exclut frais divers et admission)
+                                S'applique exclusivement sur les frais d'études (exclut frais divers et admission)
                               </p>
                               {targetType === 'student' && selectedStudent && (
                                 <p className="text-[10px] font-mono font-bold text-indigo-700 mt-1.5">
-                                  Assiette : {Number(selectedStudent.tuitionTotal || 0).toLocaleString()} HTG
+                                  Base éligible : {Number(selectedStudent.tuitionTotal || 0).toLocaleString()} HTG
                                 </p>
                               )}
                             </button>
@@ -1197,7 +1315,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               }}
                               className={`p-3 rounded-2xl border text-left transition-all ${
                                 scholarshipRegime === 'complete'
-                                  ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs'
+                                  ? 'bg-amber-50/90 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs'
                                   : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100/80'
                               }`}
                             >
@@ -1217,23 +1335,49 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               </p>
                               {targetType === 'student' && selectedStudent && (
                                 <p className="text-[10px] font-mono font-bold text-amber-700 mt-1.5">
-                                  Assiette : {(Number(selectedStudent.tuitionTotal || 0) + Number(selectedStudent.miscTotal || 0)).toLocaleString()} HTG
+                                  Base éligible : {(Number(selectedStudent.tuitionTotal || 0) + Number(selectedStudent.miscTotal || 0)).toLocaleString()} HTG
                                 </p>
                               )}
                             </button>
                           </div>
                         </div>
 
-                        {/* Motif de Réévaluation */}
-                        <div className="space-y-1.5">
+                        {/* Motif de Réévaluation - Choix Moderne et Fluide */}
+                        <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
-                              Motif de Réévaluation
+                            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                              <Award size={13} className="text-indigo-600" />
+                              <span>Motif de Réévaluation</span>
                             </label>
                             <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
                               {scholarshipRegime === 'complete' ? 'Assiette : Contrat Global' : 'Assiette : Scolarité Seule'}
                             </span>
                           </div>
+
+                          {/* Raccourcis Rapides en Pilules / Catégories */}
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {currentCategories.map(cat => (
+                              <button
+                                key={cat.id}
+                                type="button"
+                                onClick={() => setSelectedCategory(cat.id)}
+                                disabled={(targetType === 'student' && !selectedStudent) || (targetType === 'class' && !selectedClassId)}
+                                className={`text-[11px] px-2.5 py-1 rounded-xl font-bold transition-all border flex items-center gap-1.5 ${
+                                  selectedCategory === cat.id
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                    : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100'
+                                } disabled:opacity-50 disabled:cursor-not-allowed`}
+                              >
+                                {cat.group === 'scholarship' && <Award size={12} className={selectedCategory === cat.id ? 'text-indigo-200' : 'text-indigo-600'} />}
+                                {cat.group === 'discount' && <Users size={12} className={selectedCategory === cat.id ? 'text-indigo-200' : 'text-blue-600'} />}
+                                {cat.group === 'custom' && <DollarSign size={12} className={selectedCategory === cat.id ? 'text-indigo-200' : 'text-amber-600'} />}
+                                {cat.group === 'reset' && <CheckCircle2 size={12} className={selectedCategory === cat.id ? 'text-indigo-200' : 'text-slate-500'} />}
+                                <span>{cat.badge}</span>
+                              </button>
+                            ))}
+                          </div>
+
+                          {/* Liste déroulante SelectPill harmonisée */}
                           <SelectPill
                             value={selectedCategory}
                             onChange={(val) => setSelectedCategory(val)}
@@ -1242,7 +1386,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               ...currentCategories.map(cat => ({
                                 value: cat.id,
                                 label: cat.label,
-                                badge: cat.value > 0 ? `${cat.value}%` : cat.id === 'custom' ? 'Montant HTG' : '0 HTG'
+                                badge: cat.badge,
+                                description: cat.description
                               }))
                             ]}
                             placeholder="-- Sélectionner le motif de réévaluation --"
@@ -1457,46 +1602,53 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Table Toolbar / Controls */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full md:w-auto flex-1">
+          {/* Table Toolbar / Controls - Harmonisé avec Journal des Évaluations */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full md:w-auto flex-1">
               {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                  type="text"
-                  placeholder={`Rechercher par ${terminology.student.toLowerCase()} ou motif...`}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all min-h-[36px]"
-                  value={registerSearchTerm}
-                  onChange={(e) => setRegisterSearchTerm(e.target.value)}
-                />
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Search size={12} className="text-indigo-500" />
+                  <span>Recherche Rapide</span>
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                  <input 
+                    type="text"
+                    placeholder={`Rechercher ${terminology.student.toLowerCase()}, motif...`}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[38px]"
+                    value={registerSearchTerm}
+                    onChange={(e) => setRegisterSearchTerm(e.target.value)}
+                  />
+                </div>
               </div>
 
-              {/* Class Filter - Style Pilule Harmonisé */}
-              <div className="w-full">
-                <SelectPill
-                  value={registerClassFilter}
-                  onChange={(val) => setRegisterClassFilter(val)}
-                  options={[
-                    { value: 'all', label: `Toutes les ${terminology.classes.toLowerCase()}`, badge: classes.length.toString() },
-                    ...classes.map(c => ({
-                      value: c.id,
-                      label: c.name,
-                      badge: c.level || undefined
-                    }))
-                  ]}
-                  icon={GraduationCap}
+              {/* Class Filter - Style Pilule Harmonisé avec Journal des Évaluations */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <GraduationCap size={12} className="text-indigo-500" />
+                  <span>{terminology.class}</span>
+                </label>
+                <ClassSelectorPill
+                  classes={classes}
+                  selectedClassId={registerClassFilter}
+                  onSelectClass={(classId) => setRegisterClassFilter(classId)}
+                  allowAll={true}
+                  allLabel={`Toutes les ${terminology.classes.toLowerCase()}`}
                   variant="field"
                   size="sm"
                   colorScheme="indigo"
-                  searchable={true}
                   className="w-full"
                 />
               </div>
 
               {/* Campus Filter (ONLY if multi-campus) - Style Pilule Harmonisé */}
               {!user.campus_id && hasMultipleCampuses && (
-                <div className="w-full">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                    <Building2 size={12} className="text-indigo-500" />
+                    <span>Campus / Annexe</span>
+                  </label>
                   <SelectPill
                     value={registerCampusFilter}
                     onChange={(val) => setRegisterCampusFilter(val)}
@@ -1689,46 +1841,53 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Report Toolbar & Filters - All Dropdowns in Pill Style */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full md:w-auto flex-1">
+          {/* Report Toolbar & Filters - Harmonisé avec Journal des Évaluations */}
+          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full md:w-auto flex-1">
               {/* Search */}
-              <div className="relative">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                  type="text"
-                  placeholder={`Filtrer par ${terminology.student.toLowerCase()}, matricule ou motif...`}
-                  className="w-full pl-10 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all min-h-[36px]"
-                  value={registerSearchTerm}
-                  onChange={(e) => setRegisterSearchTerm(e.target.value)}
-                />
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <Search size={12} className="text-indigo-500" />
+                  <span>Recherche & Filtre</span>
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                  <input 
+                    type="text"
+                    placeholder={`Filtrer par ${terminology.student.toLowerCase()}, matricule...`}
+                    className="w-full pl-9 pr-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[38px]"
+                    value={registerSearchTerm}
+                    onChange={(e) => setRegisterSearchTerm(e.target.value)}
+                  />
+                </div>
               </div>
 
-              {/* Class Filter - Style Pilule */}
-              <div className="w-full">
-                <SelectPill
-                  value={registerClassFilter}
-                  onChange={(val) => setRegisterClassFilter(val)}
-                  options={[
-                    { value: 'all', label: `Toutes les ${terminology.classes.toLowerCase()}`, badge: classes.length.toString() },
-                    ...classes.map(c => ({
-                      value: c.id,
-                      label: c.name,
-                      badge: c.level || undefined
-                    }))
-                  ]}
-                  icon={GraduationCap}
+              {/* Class Filter - Style Pilule Harmonisé */}
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                  <GraduationCap size={12} className="text-indigo-500" />
+                  <span>{terminology.class}</span>
+                </label>
+                <ClassSelectorPill
+                  classes={classes}
+                  selectedClassId={registerClassFilter}
+                  onSelectClass={(classId) => setRegisterClassFilter(classId)}
+                  allowAll={true}
+                  allLabel={`Toutes les ${terminology.classes.toLowerCase()}`}
                   variant="field"
                   size="sm"
                   colorScheme="indigo"
-                  searchable={true}
                   className="w-full"
                 />
               </div>
 
-              {/* Campus Filter - Style Pilule (if multi-campus) */}
+              {/* Campus Filter (ONLY if multi-campus) - Style Pilule Harmonisé */}
               {!user.campus_id && hasMultipleCampuses ? (
-                <div className="w-full">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1">
+                    <Building2 size={12} className="text-indigo-500" />
+                    <span>Campus / Annexe</span>
+                  </label>
                   <SelectPill
                     value={registerCampusFilter}
                     onChange={(val) => setRegisterCampusFilter(val)}

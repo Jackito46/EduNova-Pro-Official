@@ -70,20 +70,15 @@ const getFeeRowDetails = (
   }
 
   const rate = exchangeRate || 132.50;
-  let isSettled = false;
-  let paidUSD = paidHTGEquiv / rate;
-
-  if (nativeUSD > 0 && nativeHTG === 0) {
-    const impliedRate = paidHTGEquiv / nativeUSD;
-    if (impliedRate >= 50 && (impliedRate <= 300 || paidHTGEquiv >= (nativeUSD * rate - 100))) {
-      if (paidUSD >= nativeUSD - 0.05 || impliedRate >= 100) {
-        isSettled = true;
-        paidUSD = nativeUSD;
-      }
-    }
-  }
-
   const totalHTGEquiv = nativeHTG + (nativeUSD * rate);
+  const paidUSD = nativeUSD > 0 ? (paidHTGEquiv / rate) : 0;
+
+  let isSettled = false;
+  if (nativeUSD > 0 && nativeHTG === 0) {
+    isSettled = paidUSD >= nativeUSD - 0.05 || paidHTGEquiv >= (totalHTGEquiv - 1.0);
+  } else {
+    isSettled = paidHTGEquiv >= (totalHTGEquiv - 1.0);
+  }
 
   let plannedNative = '';
   let plannedEquiv = '';

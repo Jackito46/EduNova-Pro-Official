@@ -48,12 +48,6 @@ export function computeFeeCategoryBalance(
       pRate = Number(p.exchange_rate_applied);
     } else if (isUSD && p.amount_htg_equivalent && amount > 0) {
       pRate = Number(p.amount_htg_equivalent) / amount;
-    } else if (!isUSD && plannedUSD > 0 && plannedHTG === 0 && amount > 0) {
-      // Si payé en Gourdes pour un frais planifié en USD, déduire le taux implicite
-      const implied = amount / plannedUSD;
-      if (implied >= 50 && implied <= 300) {
-        pRate = implied;
-      }
     }
 
     if (isUSD) {
@@ -72,8 +66,9 @@ export function computeFeeCategoryBalance(
     const effectiveUSD = Math.max(0, plannedUSD - discountUSD);
     const diffUSD = effectiveUSD - totalPaidUSD;
     
-    // Marge de tolérance de 5 centimes ou équivalent pour les arrondis de division
-    const isPaid = diffUSD <= 0.05 || (effectiveUSD > 0 && totalPaidUSD >= effectiveUSD - 0.05);
+    // Marge de tolérance de 5 centimes (ou équivalent HTG) pour les arrondis de division
+    // La dette n'est considérée acquittée (Réglée) que si le versement couvre effectivement la totalité due
+    const isPaid = diffUSD <= 0.05 || (effectiveUSD > 0 && totalPaidUSD >= effectiveUSD - 0.05) || (effectiveUSD > 0 && totalPaidHTG >= (effectiveUSD * rate - 1.0));
     const remainingUSD = isPaid ? 0 : Math.max(0, diffUSD);
     const remainingHTG = isPaid ? 0 : Math.round(remainingUSD * rate);
     const effectiveDueHTG = isPaid ? totalPaidHTG : (totalPaidHTG + remainingHTG);
@@ -85,9 +80,9 @@ export function computeFeeCategoryBalance(
       effectiveDueHTG,
       effectiveDueUSD: effectiveUSD,
       paidHTGEquiv: totalPaidHTG,
-      paidUSDVal: isPaid ? effectiveUSD : totalPaidUSD,
+      paidUSDVal: isPaid ? effectiveUSD : Math.round(totalPaidUSD * 100) / 100,
       remainingHTG,
-      remainingUSD,
+      remainingUSD: Math.round(remainingUSD * 100) / 100,
       isPaid
     };
   }

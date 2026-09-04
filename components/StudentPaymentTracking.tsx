@@ -57,21 +57,17 @@ const getFeeRowDetails = (
   }
 
   const rate = exchangeRate || 135;
-  let isSettled = false;
-  let paidUSD = paidHTGEquiv / rate;
-
-  if (nativeUSD > 0 && nativeHTG === 0) {
-    const impliedRate = paidHTGEquiv / nativeUSD;
-    if (impliedRate >= 50 && (impliedRate <= 300 || paidHTGEquiv >= (nativeUSD * rate - 100))) {
-      if (paidUSD >= nativeUSD - 0.05 || impliedRate >= 100) {
-        isSettled = true;
-        paidUSD = nativeUSD;
-      }
-    }
-  }
-
   const rawTotalHTGEquiv = nativeHTG + (nativeUSD * rate);
   const totalHTGEquiv = Math.max(0, rawTotalHTGEquiv - discountHTG);
+  const paidUSD = nativeUSD > 0 ? (paidHTGEquiv / rate) : 0;
+
+  let isSettled = false;
+  if (nativeUSD > 0 && nativeHTG === 0) {
+    const effectiveUSD = Math.max(0, nativeUSD - (discountHTG > 0 ? discountHTG / rate : 0));
+    isSettled = paidUSD >= effectiveUSD - 0.05 || paidHTGEquiv >= (totalHTGEquiv - 1.0);
+  } else {
+    isSettled = paidHTGEquiv >= (totalHTGEquiv - 1.0);
+  }
 
   let plannedNative = '';
   let plannedEquiv = '';
@@ -1545,6 +1541,11 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold whitespace-nowrap" title={`Taux historique appliqué : 1 USD = ${appliedRate} HTG`}>
                                 <ArrowRightLeft size={11} className="text-amber-600 shrink-0" />
                                 <span>1 USD = {appliedRate} HTG</span>
+                              </span>
+                            ) : (appliedRate > 1 || (selectedStudent.miscNativeUSD > 0 && (t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers')))) ? (
+                              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold whitespace-nowrap" title={`Taux de conversion vers barème USD : 1 USD = ${appliedRate > 1 ? appliedRate : (selectedStudent.exchangeRate || 140)} HTG`}>
+                                <ArrowRightLeft size={11} className="text-blue-600 shrink-0" />
+                                <span>1 USD = {appliedRate > 1 ? appliedRate : (selectedStudent.exchangeRate || 140)} HTG</span>
                               </span>
                             ) : (
                               <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap inline-block">
