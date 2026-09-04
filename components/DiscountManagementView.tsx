@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { z } from 'zod';
 import { 
   Search, 
@@ -22,9 +22,18 @@ import {
   TrendingDown,
   Layers,
   ListFilter,
-  Edit3
+  Edit3,
+  GraduationCap,
+  Printer,
+  Calendar,
+  Eye,
+  Check,
+  FileText,
+  Clock,
+  BookOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { useSchool } from '../contexts/SchoolContext';
 import { supabase } from '../supabase';
 import { UserProfile } from '../types';
@@ -32,6 +41,7 @@ import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
 import Modal from './Modal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
+import { SelectPill, SelectOption } from './SelectPill';
 
 const discountSchema = z.object({
   category: z.string().min(1, "Veuillez sélectionner un motif de réévaluation"),
@@ -42,31 +52,31 @@ const discountSchema = z.object({
 
 export type ScholarshipRegime = 'standard' | 'complete';
 
-// Génère les motifs adaptés dynamiquement selon le régime de bourse sélectionné
+// Génère les motifs adaptés dynamiquement selon le périmètre d'assiette sélectionné
 const getDiscountCategories = (regime: ScholarshipRegime) => {
   if (regime === 'complete') {
     return [
-      { id: 'excellence', label: 'Bourse Complète Excellence (100% Scolarité + Frais Divers)', value: 100 },
-      { id: 'social', label: 'Cas Social / Prise en Charge Totale (100%)', value: 100 },
-      { id: 'social_partial', label: 'Cas Social / Partenariat Partiel (50%)', value: 50 },
+      { id: 'custom', label: 'Ajustement Spécial Forfaitaire (HTG)', value: 0 },
+      { id: 'excellence', label: 'Bourse d\'Excellence Intégrale (100% Scolarité + Frais Divers)', value: 100 },
+      { id: 'social', label: 'Prise en Charge Totale / Cas Social (100%)', value: 100 },
+      { id: 'social_partial', label: 'Prise en Charge Sociale Partielle (50%)', value: 50 },
       { id: 'staff', label: 'Avantage Collaborateur Complet (50%)', value: 50 },
-      { id: 'custom', label: 'Exonération Forfaitaire Personnalisée (HTG)', value: 0 },
-      { id: 'reset', label: 'Annuler toute réévaluation / Rétablir Tarif Plein (0%)', value: 0 }
+      { id: 'reset', label: 'Annuler toute réévaluation / Rétablir Tarif Plein (0 HTG)', value: 0 }
     ];
   }
 
   return [
-    { id: 'excellence', label: 'Bourse Excellence (100% Scolarité)', value: 100 },
-    { id: 'staff', label: 'Avantage Collaborateur (50% Scolarité)', value: 50 },
-    { id: 'social', label: 'Cas Social / Partenariat (25% Scolarité)', value: 25 },
-    { id: 'sibling', label: 'Réduction Fratrie (15% Scolarité)', value: 15 },
     { id: 'custom', label: 'Ajustement Spécial Forfaitaire (HTG)', value: 0 },
-    { id: 'reset', label: 'Annuler toute réévaluation / Rétablir Tarif Plein (0%)', value: 0 }
+    { id: 'sibling', label: 'Réduction Fratrie (15% Scolarité)', value: 15 },
+    { id: 'staff', label: 'Avantage Collaborateur (50% Scolarité)', value: 50 },
+    { id: 'excellence', label: 'Bourse d\'Excellence (100% Scolarité)', value: 100 },
+    { id: 'social', label: 'Prise en Charge Sociale / Partenariat (25% Scolarité)', value: 25 },
+    { id: 'reset', label: 'Annuler toute réévaluation / Rétablir Tarif Plein (0 HTG)', value: 0 }
   ];
 };
 
 type TargetType = 'student' | 'class' | 'school';
-type ViewTab = 'form' | 'register';
+type ViewTab = 'form' | 'register' | 'report';
 
 const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { school, terminology, currentCampusId, campuses } = useSchool();
@@ -418,6 +428,38 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     ? Math.max(0, (selectedStudent.netContractTotal ?? selectedStudent.initialTotal) - discountValue) 
     : 0;
 
+  // Calcul du solde restant dû après application de l'ajustement
+  const newRemainingDebt = targetType === 'student' && selectedStudent
+    ? Math.max(0, finalTotal - Number(selectedStudent.paidAmount || 0))
+    : 0;
+
+  // Libellé dynamique précis et contextuel sans mention abusive de "Bourse" s'il n'y en a pas
+  const discountSummaryLabel = useMemo(() => {
+    if (!selectedCategory || selectedCategory === 'reset') {
+      return 'Tarif Plein Rétabli (0 HTG)';
+    }
+    if (discountValue === 0) {
+      return 'Aucune Déduction Appliquée';
+    }
+    const cat = currentCategories.find(c => c.id === selectedCategory);
+    if (cat?.id === 'custom') {
+      return `Déduction Forfaitaire (${scholarshipRegime === 'complete' ? 'Contrat Global' : 'Scolarité Seule'})`;
+    }
+    if (cat?.id === 'sibling') {
+      return 'Réduction Fratrie Accordée';
+    }
+    if (cat?.id === 'staff') {
+      return 'Avantage Collaborateur Accordé';
+    }
+    if (cat?.id === 'excellence') {
+      return scholarshipRegime === 'complete' ? 'Bourse d\'Excellence Intégrale' : 'Bourse d\'Excellence Accordée';
+    }
+    if (cat?.id === 'social' || cat?.id === 'social_partial') {
+      return 'Prise en Charge Sociale';
+    }
+    return `Déduction Accordée (${cat?.label || 'Ajustement'})`;
+  }, [selectedCategory, discountValue, scholarshipRegime, currentCategories]);
+
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   const [pendingSubmit, setPendingSubmit] = useState<any>(null);
 
@@ -736,6 +778,37 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     toast.success("Registre des réévaluations exporté avec succès.");
   };
 
+  // Exportation Excel du registre
+  const handleExportRegisterExcel = () => {
+    if (filteredRegisterStudents.length === 0) {
+      toast.error("Aucune donnée à exporter.");
+      return;
+    }
+
+    const data = filteredRegisterStudents.map((st, idx) => {
+      const row: any = {
+        'N°': idx + 1,
+        [terminology.student]: formatStudentName(st.last_name, st.first_name).fullName,
+        'Matricule / ID': st.id?.substring(0, 8) || 'N/A',
+        [terminology.class]: st.class?.name || 'N/A',
+      };
+      if (hasMultipleCampuses) {
+        row['Campus / Annexe'] = getCampusName(st.campus_id);
+      }
+      row['Motif de Réévaluation'] = st.discount_label || 'Ajustement';
+      row['Montant Remise (HTG)'] = Number(st.discount_amount || 0);
+      row['Statut'] = 'Scellé & Validé';
+      row['Session Académique'] = activeYear?.label || 'Active';
+      return row;
+    });
+
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Audit Réévaluations');
+    XLSX.writeFile(wb, `Registre_Audit_Reevaluations_${school?.name || 'etablissement'}_${activeYear?.label || 'active'}.xlsx`);
+    toast.success("Registre exporté en Excel avec succès.");
+  };
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 px-3 sm:px-4 md:px-0">
       {/* Header Banner - Concise & Ergonomic */}
@@ -769,19 +842,25 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Navigation Tabs */}
+        {/* Navigation Tabs - 3 Onglets Harmonieux */}
         <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 relative z-10 shadow-inner w-full md:w-auto">
           <button
             onClick={() => setActiveTab('form')}
-            className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'form' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 md:flex-none px-4 sm:px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'form' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
           >
             <Edit3 size={15} /> Acte de Réévaluation
           </button>
           <button
             onClick={() => setActiveTab('register')}
-            className={`flex-1 md:flex-none px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'register' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 md:flex-none px-4 sm:px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'register' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
           >
             <Award size={15} /> Registre & Audit ({discountedStudents.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('report')}
+            className={`flex-1 md:flex-none px-4 sm:px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'report' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+          >
+            <FileSpreadsheet size={15} /> Grand Livre & Rapport ({filteredRegisterStudents.length})
           </button>
         </div>
       </div>
@@ -802,7 +881,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   onClick={() => { setTargetType(t); resetForm(); }}
                   className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${targetType === t ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
                 >
-                  {t === 'student' ? 'Révision Individuelle' : t === 'class' ? `Ajustement ${terminology.class}` : 'Souveraineté École'}
+                  {t === 'student' ? `Révision Individuelle (${terminology.student})` : t === 'class' ? `Ajustement ${terminology.class}` : 'Souveraineté Établissement'}
                 </button>
               ))}
             </div>
@@ -818,25 +897,24 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <h3 className="text-base font-bold text-gray-900">Ciblage du Périmètre</h3>
                   </div>
 
-                  {/* Multi-Campus Selector inside Form (if applicable) */}
+                  {/* Multi-Campus Selector inside Form (if applicable) - Harmonisé Style Pilule */}
                   {!user.campus_id && hasMultipleCampuses && (
-                    <div className="relative">
-                      <select 
-                        className="pl-8 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-700 outline-none appearance-none cursor-pointer hover:bg-slate-100"
-                        value={selectedCampusFilterId}
-                        onChange={(e) => {
-                          setSelectedCampusFilterId(e.target.value);
-                          resetForm();
-                        }}
-                      >
-                        <option value="all">TOUS LES CAMPUS</option>
-                        {campuses.map(c => (
-                          <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
-                        ))}
-                      </select>
-                      <Building2 className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-                      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={13} />
-                    </div>
+                    <SelectPill
+                      value={selectedCampusFilterId}
+                      onChange={(val) => {
+                        setSelectedCampusFilterId(val);
+                        resetForm();
+                      }}
+                      options={[
+                        { value: 'all', label: 'Tous les Campus / Annexes', badge: campuses.length.toString() },
+                        ...campuses.map(c => ({ value: c.id, label: c.name }))
+                      ]}
+                      icon={Building2}
+                      variant="pill"
+                      size="sm"
+                      colorScheme="indigo"
+                      labelPrefix="Campus : "
+                    />
                   )}
                 </div>
                 
@@ -883,12 +961,12 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <div>
                             <h4 className="text-lg font-bold">{formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName}</h4>
                             <p className="text-xs font-medium text-indigo-100 mt-0.5">
-                              ID-{selectedStudent.id.substring(0,8)} • {selectedStudent.class?.name || 'Classe non définie'}
+                              ID-{selectedStudent.id.substring(0,8)} • {selectedStudent.class?.name || `${terminology.class} non définie`}
                               {hasMultipleCampuses && ` • ${getCampusName(selectedStudent.campus_id)}`}
                             </p>
                           </div>
                         </div>
-                        <button onClick={resetForm} className="p-2 hover:bg-white/20 rounded-xl transition-colors text-white" title="Changer d'élève">
+                        <button onClick={resetForm} className="p-2 hover:bg-white/20 rounded-xl transition-colors text-white" title={`Changer d'${terminology.student.toLowerCase()}`}>
                           <X size={20} />
                         </button>
                       </div>
@@ -898,22 +976,34 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {targetType === 'class' && (
                   <div className="space-y-2">
-                    <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">Sélectionner la {terminology.class.toLowerCase()} cible</label>
-                    <div className="relative">
-                      <select 
-                        className="w-full px-4 py-3.5 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 appearance-none transition-all"
-                        value={selectedClassId}
-                        onChange={(e) => setSelectedClassId(e.target.value)}
-                      >
-                        <option value="">-- Choisir une {terminology.class.toLowerCase()} --</option>
-                        {classes.map(c => (
-                          <option key={c.id} value={c.id}>
-                            {c.name} ({c.level}) {hasMultipleCampuses ? ` - [${getCampusName(c.campus_id)}]` : ''}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={16} />
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider block">
+                        Sélectionner la {terminology.class.toLowerCase()} cible
+                      </label>
+                      <span className="text-[10px] font-bold px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full border border-indigo-100">
+                        {classes.length} {classes.length > 1 ? terminology.classes.toLowerCase() : terminology.class.toLowerCase()}
+                      </span>
                     </div>
+                    <SelectPill
+                      value={selectedClassId}
+                      onChange={(val) => setSelectedClassId(val)}
+                      options={[
+                        { value: '', label: `-- Choisir une ${terminology.class.toLowerCase()} --` },
+                        ...classes.map(c => ({
+                          value: c.id,
+                          label: c.name,
+                          badge: c.level || undefined,
+                          description: hasMultipleCampuses ? getCampusName(c.campus_id) : undefined
+                        }))
+                      ]}
+                      placeholder={`-- Choisir une ${terminology.class.toLowerCase()} --`}
+                      icon={GraduationCap}
+                      variant="field"
+                      size="md"
+                      colorScheme="indigo"
+                      searchable={true}
+                      className="w-full"
+                    />
                   </div>
                 )}
 
@@ -1049,10 +1139,22 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <h3 className="text-sm font-bold text-gray-900">Ajustement Souverain</h3>
                       </div>
 
-                      <div className="space-y-3.5">
-                        {/* Regime Selection */}
+                      <div className="space-y-4">
+                        {/* Périmètre d'Application / Assiette */}
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Catégorie / Régime de Bourse</label>
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Périmètre d'Application (Assiette)
+                            </label>
+                            {targetType === 'student' && selectedStudent && (
+                              <span className="text-[10px] font-bold text-slate-400 font-mono">
+                                Plafond : {scholarshipRegime === 'complete' 
+                                  ? (Number(selectedStudent.tuitionTotal || 0) + Number(selectedStudent.miscTotal || 0)).toLocaleString() 
+                                  : Number(selectedStudent.tuitionTotal || 0).toLocaleString()} HTG
+                              </span>
+                            )}
+                          </div>
+                          
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             <button
                               type="button"
@@ -1060,19 +1162,31 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 setScholarshipRegime('standard');
                                 setSelectedCategory('');
                               }}
-                              className={`p-2.5 rounded-xl border text-left transition-all ${
+                              className={`p-3 rounded-2xl border text-left transition-all ${
                                 scholarshipRegime === 'standard'
-                                  ? 'bg-indigo-50 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 shadow-sm'
-                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                  ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/20 text-indigo-950 shadow-xs'
+                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100/80'
                               }`}
                             >
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-xs font-black">Option Standard</span>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${scholarshipRegime === 'standard' ? 'bg-indigo-200/60 text-indigo-900' : 'bg-slate-200 text-slate-600'}`}>Scolarité</span>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-black flex items-center gap-1.5">
+                                  <GraduationCap size={14} className={scholarshipRegime === 'standard' ? 'text-indigo-600' : 'text-slate-400'} />
+                                  Scolarité Seule
+                                </span>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                  scholarshipRegime === 'standard' ? 'bg-indigo-200/70 text-indigo-900' : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                  Standard
+                                </span>
                               </div>
-                              <p className="text-[10px] leading-tight text-slate-500">
-                                Bourse sur Scolarité (Exclut les frais divers)
+                              <p className="text-[10px] leading-snug text-slate-500">
+                                S'applique uniquement sur les frais d'études (exclut frais divers et admission)
                               </p>
+                              {targetType === 'student' && selectedStudent && (
+                                <p className="text-[10px] font-mono font-bold text-indigo-700 mt-1.5">
+                                  Assiette : {Number(selectedStudent.tuitionTotal || 0).toLocaleString()} HTG
+                                </p>
+                              )}
                             </button>
 
                             <button
@@ -1081,54 +1195,88 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 setScholarshipRegime('complete');
                                 setSelectedCategory('');
                               }}
-                              className={`p-2.5 rounded-xl border text-left transition-all ${
+                              className={`p-3 rounded-2xl border text-left transition-all ${
                                 scholarshipRegime === 'complete'
-                                  ? 'bg-amber-50 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-sm'
-                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                                  ? 'bg-amber-50/80 border-amber-500 ring-2 ring-amber-500/20 text-amber-950 shadow-xs'
+                                  : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100/80'
                               }`}
                             >
-                              <div className="flex items-center justify-between mb-0.5">
-                                <span className="text-xs font-black">Option Complète</span>
-                                <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${scholarshipRegime === 'complete' ? 'bg-amber-200/60 text-amber-900' : 'bg-slate-200 text-slate-600'}`}>Complète</span>
+                              <div className="flex items-center justify-between mb-1">
+                                <span className="text-xs font-black flex items-center gap-1.5">
+                                  <Layers size={14} className={scholarshipRegime === 'complete' ? 'text-amber-600' : 'text-slate-400'} />
+                                  Contrat Global
+                                </span>
+                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                                  scholarshipRegime === 'complete' ? 'bg-amber-200/70 text-amber-900' : 'bg-slate-200 text-slate-600'
+                                }`}>
+                                  Intégral
+                                </span>
                               </div>
-                              <p className="text-[10px] leading-tight text-slate-500">
-                                Bourse Complète / Sociale (Scolarité + Frais Divers)
+                              <p className="text-[10px] leading-snug text-slate-500">
+                                Prise en charge étendue (scolarité + ensemble des frais obligatoires)
                               </p>
+                              {targetType === 'student' && selectedStudent && (
+                                <p className="text-[10px] font-mono font-bold text-amber-700 mt-1.5">
+                                  Assiette : {(Number(selectedStudent.tuitionTotal || 0) + Number(selectedStudent.miscTotal || 0)).toLocaleString()} HTG
+                                </p>
+                              )}
                             </button>
                           </div>
                         </div>
 
+                        {/* Motif de Réévaluation */}
                         <div className="space-y-1.5">
-                          <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">Motif de Réévaluation</label>
-                          <div className="relative">
-                            <select 
-                              required 
-                              disabled={(targetType === 'student' && !selectedStudent) || (targetType === 'class' && !selectedClassId)} 
-                              className="w-full px-3.5 py-2.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:ring-2 focus:ring-indigo-100 focus:border-indigo-500 appearance-none disabled:opacity-50 transition-all cursor-pointer" 
-                              value={selectedCategory} 
-                              onChange={(e) => setSelectedCategory(e.target.value)}
-                            >
-                              <option value="" className="bg-white text-slate-700">-- Choisir le Motif de l'Acte ({scholarshipRegime === 'complete' ? 'Bourse Complète' : 'Bourse Scolarité'}) --</option>
-                              {currentCategories.map(cat => (
-                                <option key={cat.id} value={cat.id} className="bg-white text-slate-900 font-medium py-1">
-                                  {cat.label}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={15} />
+                          <div className="flex items-center justify-between">
+                            <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Motif de Réévaluation
+                            </label>
+                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                              {scholarshipRegime === 'complete' ? 'Assiette : Contrat Global' : 'Assiette : Scolarité Seule'}
+                            </span>
                           </div>
+                          <SelectPill
+                            value={selectedCategory}
+                            onChange={(val) => setSelectedCategory(val)}
+                            options={[
+                              { value: '', label: '-- Sélectionner le motif de réévaluation --' },
+                              ...currentCategories.map(cat => ({
+                                value: cat.id,
+                                label: cat.label,
+                                badge: cat.value > 0 ? `${cat.value}%` : cat.id === 'custom' ? 'Montant HTG' : '0 HTG'
+                              }))
+                            ]}
+                            placeholder="-- Sélectionner le motif de réévaluation --"
+                            disabled={(targetType === 'student' && !selectedStudent) || (targetType === 'class' && !selectedClassId)}
+                            icon={Award}
+                            variant="field"
+                            size="md"
+                            colorScheme="indigo"
+                            searchable={false}
+                            className="w-full"
+                          />
                         </div>
 
+                        {/* Montant Forfaitaire Personnalisé (HTG) */}
                         {selectedCategory === 'custom' && (
-                          <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
-                            <label className="text-[11px] font-bold text-amber-800 uppercase tracking-wider block">Montant à déduire (HTG)</label>
+                          <div className="space-y-2 p-3.5 bg-amber-50/70 border border-amber-200/80 rounded-2xl animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
+                                Montant Forfaitaire à Déduire (HTG)
+                              </label>
+                              {eligibleBaseAmount > 0 && (
+                                <span className="text-[10px] text-amber-700 font-medium">
+                                  Plafond : <strong>{eligibleBaseAmount.toLocaleString()} HTG</strong>
+                                </span>
+                              )}
+                            </div>
                             <div className="relative">
                               <input 
                                 type="number" 
                                 min="0" 
+                                max={eligibleBaseAmount > 0 ? eligibleBaseAmount : undefined}
                                 required 
-                                className="w-full px-3.5 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-sm font-bold text-amber-950 outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all" 
-                                placeholder="0.00" 
+                                className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-sm font-black text-amber-950 outline-none focus:ring-2 focus:ring-amber-500/30 focus:border-amber-500 transition-all font-mono" 
+                                placeholder="ex: 10000" 
                                 value={customAmount} 
                                 onChange={(e) => {
                                   const val = parseFloat(e.target.value);
@@ -1138,9 +1286,33 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               />
                               <DollarSign className="absolute right-3.5 top-1/2 -translate-y-1/2 text-amber-600" size={16} />
                             </div>
+
+                            {/* Raccourcis rapides ergonomiques */}
+                            {eligibleBaseAmount > 0 && (
+                              <div className="flex items-center gap-1.5 pt-1 flex-wrap">
+                                <span className="text-[10px] text-amber-700 font-bold uppercase mr-1">Suggestions :</span>
+                                {[5000, 10000, 15000, eligibleBaseAmount]
+                                  .filter(val => val <= eligibleBaseAmount)
+                                  .map((val, idx) => (
+                                    <button
+                                      key={idx}
+                                      type="button"
+                                      onClick={() => setCustomAmount(val.toString())}
+                                      className={`text-[10px] px-2 py-0.5 rounded-lg border font-mono font-bold transition-all ${
+                                        customAmount === val.toString()
+                                          ? 'bg-amber-600 text-white border-amber-600 shadow-2xs'
+                                          : 'bg-white text-amber-900 border-amber-200 hover:bg-amber-100'
+                                      }`}
+                                    >
+                                      {val === eligibleBaseAmount ? 'Totalité Assiette' : `${val.toLocaleString()} G`}
+                                    </button>
+                                  ))}
+                              </div>
+                            )}
                           </div>
                         )}
                         
+                        {/* Synthèse Visuelle Moderne pour l'Élève */}
                         {targetType === 'student' && selectedStudent && (
                           <div className="space-y-3 pt-1">
                             {isCapped && (
@@ -1155,18 +1327,56 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               </div>
                             )}
 
-                            <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl space-y-3 shadow-lg border border-slate-800 text-white">
-                               <div>
-                                 <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">Engagement Final de l'Élève</p>
-                                 <p className="text-2xl lg:text-3xl font-black tracking-tight tabular-nums">{finalTotal.toLocaleString()} <span className="text-xs font-medium text-slate-400">HTG</span></p>
-                               </div>
-                               <div className="flex items-center justify-between pt-2.5 border-t border-slate-800 text-emerald-400">
-                                 <div className="flex items-center gap-1.5">
-                                   <Sparkles size={13} />
-                                   <p className="text-[10px] font-bold uppercase tracking-widest">Économie Accordée ({scholarshipRegime === 'complete' ? 'Bourse Complète' : 'Bourse Scolarité'})</p>
-                                 </div>
-                                 <p className="text-base lg:text-lg font-black tabular-nums">-{discountValue.toLocaleString()} HTG</p>
+                            {/* Carte Sombre Moderne Récapitulative */}
+                            <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl space-y-3.5 shadow-xl border border-slate-800 text-white animate-in fade-in duration-200">
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-widest mb-0.5">
+                                    Contrat Net Réévalué
+                                  </p>
+                                  <p className="text-2xl lg:text-3xl font-black tracking-tight tabular-nums font-mono">
+                                    {finalTotal.toLocaleString()} <span className="text-xs font-medium text-slate-400">HTG</span>
+                                  </p>
+                                  <span className="text-[10px] text-slate-400 font-medium block mt-0.5">
+                                    Brut initial : {selectedStudent.initialTotal?.toLocaleString()} HTG
+                                  </span>
                                 </div>
+
+                                {Number(selectedStudent.paidAmount || 0) > 0 && (
+                                  <div className="text-right bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700/60">
+                                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">
+                                      Nouveau Reste à Payer
+                                    </p>
+                                    <p className="text-lg font-black text-amber-400 tabular-nums font-mono">
+                                      {newRemainingDebt.toLocaleString()} <span className="text-[10px] font-semibold text-amber-300/80">HTG</span>
+                                    </p>
+                                    <span className="text-[9px] text-emerald-400 font-medium block mt-0.5">
+                                      Déjà versé : {Number(selectedStudent.paidAmount).toLocaleString()} HTG
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Ligne d'ajustement dynamique et contextuelle */}
+                              <div className="flex items-center justify-between pt-3 border-t border-slate-800 text-xs">
+                                <div className="flex items-center gap-1.5">
+                                  {selectedCategory === 'reset' || discountValue === 0 ? (
+                                    <CheckCircle2 size={14} className="text-slate-400 shrink-0" />
+                                  ) : (
+                                    <Sparkles size={14} className="text-emerald-400 shrink-0" />
+                                  )}
+                                  <p className={`text-[10px] font-bold uppercase tracking-wider ${
+                                    discountValue > 0 ? 'text-emerald-400' : 'text-slate-400'
+                                  }`}>
+                                    {discountSummaryLabel}
+                                  </p>
+                                </div>
+                                <p className={`text-base lg:text-lg font-black tabular-nums font-mono ${
+                                  discountValue > 0 ? 'text-emerald-400' : 'text-slate-400'
+                                }`}>
+                                  {discountValue > 0 ? `-${discountValue.toLocaleString()} HTG` : '0 HTG'}
+                                </p>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -1255,49 +1465,56 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
                 <input 
                   type="text"
-                  placeholder="Rechercher par nom ou motif..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all"
+                  placeholder={`Rechercher par ${terminology.student.toLowerCase()} ou motif...`}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all min-h-[36px]"
                   value={registerSearchTerm}
                   onChange={(e) => setRegisterSearchTerm(e.target.value)}
                 />
               </div>
 
-              {/* Class Filter */}
-              <div className="relative">
-                <Filter className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <select 
-                  className="w-full pl-10 pr-8 py-2.5 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none appearance-none cursor-pointer focus:bg-white focus:border-indigo-500 transition-all"
+              {/* Class Filter - Style Pilule Harmonisé */}
+              <div className="w-full">
+                <SelectPill
                   value={registerClassFilter}
-                  onChange={(e) => setRegisterClassFilter(e.target.value)}
-                >
-                  <option value="all">TOUTES LES CLASSES</option>
-                  {classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-                <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+                  onChange={(val) => setRegisterClassFilter(val)}
+                  options={[
+                    { value: 'all', label: `Toutes les ${terminology.classes.toLowerCase()}`, badge: classes.length.toString() },
+                    ...classes.map(c => ({
+                      value: c.id,
+                      label: c.name,
+                      badge: c.level || undefined
+                    }))
+                  ]}
+                  icon={GraduationCap}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  searchable={true}
+                  className="w-full"
+                />
               </div>
 
-              {/* Campus Filter (ONLY if multi-campus) */}
+              {/* Campus Filter (ONLY if multi-campus) - Style Pilule Harmonisé */}
               {!user.campus_id && hasMultipleCampuses && (
-                <div className="relative">
-                  <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                  <select 
-                    className="w-full pl-10 pr-8 py-2.5 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none appearance-none cursor-pointer focus:bg-white focus:border-indigo-500 transition-all"
+                <div className="w-full">
+                  <SelectPill
                     value={registerCampusFilter}
-                    onChange={(e) => setRegisterCampusFilter(e.target.value)}
-                  >
-                    <option value="all">TOUS LES CAMPUS</option>
-                    {campuses.map(c => (
-                      <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
-                    ))}
-                  </select>
-                  <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" size={14} />
+                    onChange={(val) => setRegisterCampusFilter(val)}
+                    options={[
+                      { value: 'all', label: 'Tous les Campus / Annexes', badge: campuses.length.toString() },
+                      ...campuses.map(c => ({ value: c.id, label: c.name }))
+                    ]}
+                    icon={Building2}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
               <button 
                 onClick={fetchRegisterData} 
                 className="p-2.5 text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"
@@ -1307,10 +1524,19 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </button>
 
               <button 
-                onClick={handleExportRegisterCSV}
-                className="px-4 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                onClick={handleExportRegisterExcel}
+                className="px-3.5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                title="Exporter le registre au format Excel (.xlsx)"
               >
-                <FileSpreadsheet size={15} /> Export Grand Livre CSV
+                <FileSpreadsheet size={15} /> Export Excel
+              </button>
+
+              <button 
+                onClick={handleExportRegisterCSV}
+                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                title="Exporter au format CSV"
+              >
+                <FileText size={15} /> Grand Livre CSV
               </button>
             </div>
           </div>
@@ -1355,7 +1581,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        <span className="font-bold text-slate-800">{st.class?.name || 'Non assignée'}</span>
+                        <span className="font-bold text-slate-800">{st.class?.name || `${terminology.class} non assignée`}</span>
                       </td>
                       {hasMultipleCampuses && (
                         <td className="px-6 py-4">
@@ -1385,7 +1611,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               loadStudentPricing(st);
                             }}
                             className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
-                            title="Ajuster la réévaluation"
+                            title={`Ajuster la réévaluation de cet(te) ${terminology.student.toLowerCase()}`}
                           >
                             <Edit3 size={16} />
                           </button>
@@ -1415,6 +1641,251 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </table>
             </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 3: GRAND LIVRE & RAPPORT OFFICIEL DES RÉÉVALUATIONS */}
+      {activeTab === 'report' && (
+        <div className="space-y-6 animate-in fade-in duration-300">
+          {/* Statistical KPI Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+              <div className="p-4 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 shrink-0">
+                <TrendingDown size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Volume Total Allégé</p>
+                <p className="text-2xl font-black text-slate-900 tracking-tight font-mono mt-0.5">
+                  -{totalRegisterDiscountHTG.toLocaleString()} <span className="text-xs text-slate-400 font-sans">HTG</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+              <div className="p-4 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 shrink-0">
+                <Users size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">{terminology.students} Scellé(e)s & Acté(e)s</p>
+                <p className="text-2xl font-black text-slate-900 tracking-tight font-mono mt-0.5">
+                  {filteredRegisterStudents.length} <span className="text-xs text-slate-400 font-sans">{terminology.students.toLowerCase()}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-4">
+              <div className="p-4 bg-amber-50 text-amber-600 rounded-2xl border border-amber-100 shrink-0">
+                <Award size={24} />
+              </div>
+              <div>
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Moyenne Déduite / {terminology.student}</p>
+                <p className="text-2xl font-black text-slate-900 tracking-tight font-mono mt-0.5">
+                  {filteredRegisterStudents.length > 0 
+                    ? Math.round(totalRegisterDiscountHTG / filteredRegisterStudents.length).toLocaleString() 
+                    : 0} <span className="text-xs text-slate-400 font-sans">HTG</span>
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Report Toolbar & Filters - All Dropdowns in Pill Style */}
+          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 w-full md:w-auto flex-1">
+              {/* Search */}
+              <div className="relative">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <input 
+                  type="text"
+                  placeholder={`Filtrer par ${terminology.student.toLowerCase()}, matricule ou motif...`}
+                  className="w-full pl-10 pr-4 py-2 bg-gray-50 text-gray-900 border border-gray-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-indigo-500 transition-all min-h-[36px]"
+                  value={registerSearchTerm}
+                  onChange={(e) => setRegisterSearchTerm(e.target.value)}
+                />
+              </div>
+
+              {/* Class Filter - Style Pilule */}
+              <div className="w-full">
+                <SelectPill
+                  value={registerClassFilter}
+                  onChange={(val) => setRegisterClassFilter(val)}
+                  options={[
+                    { value: 'all', label: `Toutes les ${terminology.classes.toLowerCase()}`, badge: classes.length.toString() },
+                    ...classes.map(c => ({
+                      value: c.id,
+                      label: c.name,
+                      badge: c.level || undefined
+                    }))
+                  ]}
+                  icon={GraduationCap}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  searchable={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Campus Filter - Style Pilule (if multi-campus) */}
+              {!user.campus_id && hasMultipleCampuses ? (
+                <div className="w-full">
+                  <SelectPill
+                    value={registerCampusFilter}
+                    onChange={(val) => setRegisterCampusFilter(val)}
+                    options={[
+                      { value: 'all', label: 'Tous les Campus / Annexes', badge: campuses.length.toString() },
+                      ...campuses.map(c => ({ value: c.id, label: c.name }))
+                    ]}
+                    icon={Building2}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
+                </div>
+              ) : <div className="hidden md:block" />}
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end flex-wrap">
+              <button 
+                onClick={fetchRegisterData} 
+                className="p-2.5 text-slate-500 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all"
+                title="Rafraîchir"
+              >
+                <RefreshCcw size={16} className={registerLoading ? "animate-spin text-indigo-600" : ""} />
+              </button>
+
+              <button 
+                onClick={() => window.print()}
+                className="px-3.5 py-2.5 bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                title="Imprimer l'état officiel"
+              >
+                <Printer size={15} /> Imprimer
+              </button>
+
+              <button 
+                onClick={handleExportRegisterExcel}
+                className="px-3.5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                title="Exporter au format Excel (.xlsx)"
+              >
+                <FileSpreadsheet size={15} /> Export Excel
+              </button>
+
+              <button 
+                onClick={handleExportRegisterCSV}
+                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                title="Exporter au format Grand Livre CSV"
+              >
+                <FileText size={15} /> Grand Livre CSV
+              </button>
+            </div>
+          </div>
+
+          {/* Grand Livre Table */}
+          <div className="bg-white rounded-3xl border border-gray-200 shadow-sm overflow-hidden print:border-none print:shadow-none">
+            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-slate-50/50">
+              <div>
+                <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                  <FileSpreadsheet size={18} className="text-indigo-600" />
+                  Grand Livre Analytique & État Scellé des Dérogations
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Extrait certifié conforme pour l'audit comptable et le contrôle de gestion • Session {activeYear?.label || 'Active'}
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-black uppercase tracking-wider px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-xl">
+                  {filteredRegisterStudents.length} acte{filteredRegisterStudents.length > 1 ? 's' : ''} scellé{filteredRegisterStudents.length > 1 ? 's' : ''}
+                </span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-900 text-slate-100 text-[11px] font-black uppercase tracking-wider border-b border-slate-800">
+                    <th scope="col" className="px-6 py-4 text-slate-100 font-black">N°</th>
+                    <th scope="col" className="px-6 py-4 text-slate-100 font-black">{terminology.student}</th>
+                    <th scope="col" className="px-6 py-4 text-slate-100 font-black">{terminology.class}</th>
+                    {hasMultipleCampuses && <th scope="col" className="px-6 py-4 text-slate-100 font-black">Campus / Annexe</th>}
+                    <th scope="col" className="px-6 py-4 text-slate-100 font-black">Motif & Catégorie</th>
+                    <th scope="col" className="px-6 py-4 text-right text-slate-100 font-black">Montant Alloué</th>
+                    <th scope="col" className="px-6 py-4 text-center text-slate-100 font-black">Certificat</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 text-xs font-medium text-slate-700">
+                  {filteredRegisterStudents.map((st, idx) => (
+                    <tr key={st.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-6 py-4 font-mono font-bold text-slate-400 text-xs">{idx + 1}</td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-700 font-bold flex items-center justify-center text-xs">
+                            {st.last_name.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-900 text-sm">
+                              {formatStudentName(st.last_name, st.first_name).fullName}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono">ID-{st.id.substring(0,8)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="font-bold text-slate-800">{st.class?.name || `${terminology.class} non assignée`}</span>
+                      </td>
+                      {hasMultipleCampuses && (
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-xs font-semibold border border-slate-200">
+                            <Building2 className="w-3 h-3 text-slate-400" />
+                            {getCampusName(st.campus_id)}
+                          </span>
+                        </td>
+                      )}
+                      <td className="px-6 py-4">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 text-indigo-700 rounded-full text-xs font-bold border border-indigo-100">
+                          <Award className="w-3 h-3 text-indigo-600" />
+                          {st.discount_label || 'Ajustement Spécial'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <span className="font-mono text-sm font-black text-rose-600">
+                          -{Number(st.discount_amount).toLocaleString()} HTG
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-center">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          <Check size={11} className="text-emerald-600" /> Scellé
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+
+                  {filteredRegisterStudents.length === 0 && (
+                    <tr>
+                      <td colSpan={hasMultipleCampuses ? 7 : 6} className="py-20 text-center text-slate-400">
+                        <Award size={36} className="mx-auto text-slate-200 mb-2" />
+                        <p className="font-bold text-xs">Aucune entrée trouvée pour les filtres sélectionnés</p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {filteredRegisterStudents.length > 0 && (
+                  <tfoot>
+                    <tr className="bg-slate-50 font-black text-slate-900 border-t-2 border-slate-200">
+                      <td colSpan={hasMultipleCampuses ? 5 : 4} className="px-6 py-4 text-right uppercase text-xs">
+                        Total Général Allégé :
+                      </td>
+                      <td className="px-6 py-4 text-right font-mono text-base text-rose-600">
+                        -{totalRegisterDiscountHTG.toLocaleString()} HTG
+                      </td>
+                      <td className="px-6 py-4 text-center text-[10px] text-slate-500 font-mono">
+                        {filteredRegisterStudents.length} dossiers
+                      </td>
+                    </tr>
+                  </tfoot>
+                )}
+              </table>
+            </div>
           </div>
         </div>
       )}

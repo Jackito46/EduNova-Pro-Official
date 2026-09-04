@@ -417,11 +417,17 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
       
       if (isDeferred) {
         const msg = available <= 0
-          ? `📦 ${item.label} : Article en rupture de stock (0 dispo). Vente enregistrée en Livraison Différée / Précommande.`
-          : `📦 ${item.label} : Stock physique insuf. (${available} dispo). Vente enregistrée en Livraison Différée.`;
+          ? `📦 ${item.label} : Article en rupture de stock. Ajouté en Précommande / Livraison Différée.`
+          : `📦 ${item.label} : Stock physique immédiat atteint (${available} dispo). Article ajouté en Précommande / Livraison Différée.`;
         toast.warning(msg, {
           id: `deferred-toast-${item.id}`,
-          duration: 4000
+          duration: 3500
+        });
+      } else {
+        const remaining = available - nextQty;
+        toast.success(`✓ ${item.label} ajouté au panier (${remaining} restant en stock immédiat).`, {
+          id: `stock-toast-${item.id}`,
+          duration: 2000
         });
       }
 
@@ -1363,16 +1369,20 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                       <th className="py-3 px-4 text-[10px] font-black uppercase text-slate-500 tracking-wider">Article & Désignation</th>
                       <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Catégorie</th>
                       <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Prix unitaire</th>
-                      <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Stock disponible</th>
+                      <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Stock instantané</th>
                       <th className="py-3 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Disponibilité</th>
                       <th className="py-3 px-4 text-[10px] font-black uppercase text-slate-500 tracking-wider text-right">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {filteredCatalog.map(item => {
-                      const stockQty = item.stock_quantity || 0;
-                      const isOutOfStock = stockQty <= 0;
-                      const isLowStock = !isOutOfStock && stockQty <= (item.low_stock_threshold || 5);
+                      const cartItem = cart.find(c => c.catalog_item_id === item.id);
+                      const inCartQty = cartItem ? cartItem.quantity : 0;
+                      const initialStock = Number(item.stock_quantity ?? 0);
+                      // Instant stock dynamically reduced by items currently in the cart
+                      const instantStock = Math.max(0, initialStock - inCartQty);
+                      const isOutOfStock = instantStock <= 0;
+                      const isLowStock = !isOutOfStock && instantStock <= (item.low_stock_threshold || 5);
                       const isUniform = item.category?.toLowerCase().includes('uniforme');
                       const isBook = item.category?.toLowerCase().includes('livre');
 
@@ -1380,7 +1390,9 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                         <tr
                           key={item.id}
                           onClick={() => addToCart(item)}
-                          className="hover:bg-emerald-50/50 transition-colors cursor-pointer group"
+                          className={`hover:bg-emerald-50/50 transition-colors cursor-pointer group ${
+                            inCartQty > 0 ? 'bg-indigo-50/30' : ''
+                          }`}
                         >
                           <td className="py-3 px-4">
                             <div className="flex items-center gap-3">
@@ -1397,9 +1409,16 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                                 <p className="font-extrabold text-slate-900 text-xs sm:text-sm group-hover:text-emerald-700 transition-colors">
                                   {item.label}
                                 </p>
-                                <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-                                  Unité: {item.unit_measure || 'Pièce'}
-                                </p>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[10px] font-bold text-slate-400">
+                                    Unité: {item.unit_measure || 'Pièce'}
+                                  </span>
+                                  {inCartQty > 0 && (
+                                    <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-800 text-[10px] font-black rounded-md border border-indigo-200">
+                                      {inCartQty} au panier
+                                    </span>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </td>
@@ -1420,29 +1439,36 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                             </span>
                           </td>
                           <td className="py-3 px-3">
-                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold inline-flex items-center gap-1.5 border ${
-                              isOutOfStock 
-                                ? 'bg-amber-100/80 text-amber-900 border-amber-300' 
-                                : isLowStock
-                                ? 'bg-amber-50 text-amber-800 border-amber-200'
-                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                            }`}>
-                              <span className={`w-1.5 h-1.5 rounded-full ${
-                                isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
-                              }`}></span>
-                              {stockQty} en stock
-                            </span>
+                            <div className="flex flex-col gap-0.5">
+                              <span className={`px-2.5 py-1 rounded-lg text-[10px] font-mono font-bold inline-flex items-center gap-1.5 border w-fit ${
+                                isOutOfStock 
+                                  ? 'bg-amber-100/80 text-amber-900 border-amber-300' 
+                                  : isLowStock
+                                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                  : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                              }`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${
+                                  isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                                }`}></span>
+                                {instantStock > 0 ? `${instantStock} en stock` : '0 disponible'}
+                              </span>
+                              {inCartQty > 0 && (
+                                <span className="text-[9px] font-bold text-slate-500 ml-1">
+                                  Initial: {initialStock}
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-3 px-3">
                             {isOutOfStock ? (
-                              <span className="text-[11px] font-bold text-amber-700 flex items-center gap-1">
-                                <Clock size={12} />
-                                Différé (0 disponible)
+                              <span className="text-[11px] font-bold text-amber-800 flex items-center gap-1">
+                                <Clock size={12} className="text-amber-600 shrink-0" />
+                                <span>Précommande active</span>
                               </span>
                             ) : (
                               <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                                <Check size={12} />
-                                Immédiat
+                                <Check size={12} className="shrink-0" />
+                                <span>Immédiat</span>
                               </span>
                             )}
                           </td>
@@ -1454,7 +1480,8 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                                   e.stopPropagation();
                                   addToCart(item);
                                 }}
-                                className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 group-hover:bg-amber-500 group-hover:text-slate-950 font-black text-xs inline-flex items-center gap-1.5 border border-amber-200 shadow-2xs transition-all"
+                                className="px-3 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-950 font-black text-xs inline-flex items-center gap-1.5 border border-amber-300 shadow-2xs transition-all cursor-pointer"
+                                title="Ajouter en précommande / livraison différée"
                               >
                                 <Clock size={13} />
                                 <span>Précommander</span>
@@ -1466,7 +1493,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                                   e.stopPropagation();
                                   addToCart(item);
                                 }}
-                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1 shadow-2xs group-hover:scale-105 transition-all"
+                                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs inline-flex items-center gap-1 shadow-2xs group-hover:scale-105 transition-all cursor-pointer"
                               >
                                 <Plus size={14} />
                                 <span>Ajouter</span>
@@ -1483,9 +1510,13 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
               /* CATALOG GRID (VUE CARTES GRILLES) */
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 gap-3.5">
                 {filteredCatalog.map(item => {
-                  const stockQty = item.stock_quantity || 0;
-                  const isOutOfStock = stockQty <= 0;
-                  const isLowStock = !isOutOfStock && stockQty <= (item.low_stock_threshold || 5);
+                  const cartItem = cart.find(c => c.catalog_item_id === item.id);
+                  const inCartQty = cartItem ? cartItem.quantity : 0;
+                  const initialStock = Number(item.stock_quantity ?? 0);
+                  // Instant stock dynamically reduced by items currently in the cart
+                  const instantStock = Math.max(0, initialStock - inCartQty);
+                  const isOutOfStock = instantStock <= 0;
+                  const isLowStock = !isOutOfStock && instantStock <= (item.low_stock_threshold || 5);
                   const isUniform = item.category?.toLowerCase().includes('uniforme');
                   const isBook = item.category?.toLowerCase().includes('livre');
 
@@ -1493,11 +1524,15 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                     <button 
                       key={item.id}
                       onClick={() => addToCart(item)}
-                      className={`p-4.5 rounded-2xl border transition-all text-left group flex flex-col justify-between h-full min-h-[136px] relative overflow-hidden active:scale-98 shadow-2xs hover:shadow-md ${
+                      className={`p-4.5 rounded-2xl border transition-all text-left group flex flex-col justify-between h-full min-h-[142px] relative overflow-hidden active:scale-98 shadow-2xs hover:shadow-md cursor-pointer ${
+                        inCartQty > 0
+                          ? 'ring-2 ring-indigo-500/20 bg-indigo-50/20'
+                          : ''
+                      } ${
                         isOutOfStock 
-                          ? 'bg-gradient-to-br from-amber-50/40 via-white to-amber-50/10 border-amber-200/80 hover:border-amber-400' 
+                          ? 'bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20 border-amber-200/90 hover:border-amber-400' 
                           : isLowStock
-                          ? 'bg-white border-amber-200/60 hover:border-amber-400'
+                          ? 'bg-white border-amber-200/70 hover:border-amber-400'
                           : 'bg-white border-slate-200/80 hover:border-emerald-500 hover:-translate-y-0.5'
                       }`}
                     >
@@ -1513,18 +1548,25 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                             {item.category}
                           </span>
 
-                          <span className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 border ${
-                            isOutOfStock 
-                              ? 'bg-amber-100/80 text-amber-900 border-amber-300' 
-                              : isLowStock
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                              isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
-                            }`}></span>
-                            {isOutOfStock ? 'Différé (0 dispo)' : `${stockQty} en stock`}
-                          </span>
+                          <div className="flex items-center gap-1.5">
+                            {inCartQty > 0 && (
+                              <span className="px-2 py-0.5 rounded-lg text-[9px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                {inCartQty} panier
+                              </span>
+                            )}
+                            <span className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold flex items-center gap-1.5 border ${
+                              isOutOfStock 
+                                ? 'bg-amber-100/90 text-amber-900 border-amber-300' 
+                                : isLowStock
+                                ? 'bg-amber-50 text-amber-800 border-amber-200'
+                                : 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                isOutOfStock ? 'bg-amber-600 animate-pulse' : isLowStock ? 'bg-amber-500' : 'bg-emerald-500'
+                              }`}></span>
+                              {instantStock > 0 ? `${instantStock} dispo` : '0 dispo (Différé)'}
+                            </span>
+                          </div>
                         </div>
 
                         <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm leading-snug group-hover:text-emerald-700 transition-colors line-clamp-2">
@@ -1541,7 +1583,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                         </div>
 
                         {isOutOfStock ? (
-                          <div className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-900 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors flex items-center gap-1.5 text-[11px] font-black border border-amber-200 shadow-2xs">
+                          <div className="px-3 py-1.5 rounded-xl bg-amber-100 text-amber-950 group-hover:bg-amber-500 group-hover:text-slate-950 transition-colors flex items-center gap-1.5 text-[11px] font-black border border-amber-300 shadow-2xs">
                             <Clock size={13} />
                             <span>Précommander</span>
                           </div>

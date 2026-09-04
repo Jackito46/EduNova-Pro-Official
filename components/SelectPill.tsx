@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { ChevronDown, Check, LucideIcon } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { ChevronDown, Check, LucideIcon, Search, X } from 'lucide-react';
 
 export interface SelectOption {
   value: string;
@@ -24,6 +25,7 @@ export interface SelectPillProps {
   className?: string;
   disabled?: boolean;
   searchable?: boolean;
+  portal?: boolean;
 }
 
 export const SelectPill: React.FC<SelectPillProps> = ({
@@ -39,22 +41,80 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   dropdownAlign,
   className = '',
   disabled = false,
-  searchable = false
+  searchable = false,
+  portal = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Minimum width matches button, or at least 240px
+    const minWidth = variant === 'field' ? Math.max(rect.width, 240) : Math.max(rect.width, 240);
+    const popoverWidth = Math.min(minWidth, Math.max(viewportWidth - 24, 200));
+
+    // Vertical space calculation (open upward if less than 230px below and more room above)
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const preferUpward = spaceBelow < 230 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(140, Math.min(280, preferUpward ? spaceAbove - 12 : spaceBelow - 12));
+
+    // Horizontal alignment calculation
+    let left = rect.left;
+    if (dropdownAlign === 'right' || effectiveAlign === 'right') {
+      left = rect.right - popoverWidth;
+    }
+
+    // Clamp inside viewport
+    if (left + popoverWidth > viewportWidth - 12) {
+      left = viewportWidth - popoverWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    if (preferUpward) {
+      setPopoverCoords({
+        bottom: viewportHeight - rect.top + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: true
+      });
+    } else {
+      setPopoverCoords({
+        top: rect.bottom + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: false
+      });
+    }
+  }, [dropdownAlign, effectiveAlign, variant]);
 
   useEffect(() => {
     if (dropdownAlign) {
       setEffectiveAlign(dropdownAlign);
-    } else if (containerRef.current) {
+    } else if (containerRef.current && typeof window !== 'undefined') {
       const rect = containerRef.current.getBoundingClientRect();
       const popoverWidth = 280;
       if (rect.left + popoverWidth > window.innerWidth && rect.right >= popoverWidth) {
-        setEffectiveAlign('right');
-      } else if (rect.right + 180 > window.innerWidth) {
         setEffectiveAlign('right');
       } else {
         setEffectiveAlign('left');
@@ -63,8 +123,25 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   }, [dropdownAlign, isOpen]);
 
   useEffect(() => {
+    if (isOpen) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen, updatePosition]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      if (
+        containerRef.current && !containerRef.current.contains(target) &&
+        popoverRef.current && !popoverRef.current.contains(target)
+      ) {
         setIsOpen(false);
       }
     };
@@ -160,10 +237,10 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   const scheme = colorMap[colorScheme] || colorMap.indigo;
 
   const sizeClasses = {
-    xs: 'px-2.5 py-1 text-xs gap-1.5 min-h-[30px]',
-    sm: 'px-3 py-1.5 text-xs gap-2 min-h-[36px]',
-    md: 'px-3.5 py-2.5 text-xs sm:text-sm gap-2 min-h-[42px]',
-    lg: 'px-4 py-3 text-sm gap-2.5 min-h-[46px]'
+    xs: 'px-2 py-1 text-xs gap-1.5 min-h-[28px]',
+    sm: 'px-2.5 py-1.5 text-xs gap-1.5 min-h-[34px]',
+    md: 'px-3 py-2 text-xs sm:text-sm gap-2 min-h-[38px]',
+    lg: 'px-3.5 py-2.5 text-sm gap-2.5 min-h-[44px]'
   }[size];
 
   const getButtonClass = () => {
@@ -183,15 +260,117 @@ export const SelectPill: React.FC<SelectPillProps> = ({
     }`;
   };
 
+  const popoverContent = (
+    <div
+      ref={popoverRef}
+      style={portal && popoverCoords ? {
+        position: 'fixed',
+        ...(popoverCoords.openUpward ? { bottom: popoverCoords.bottom } : { top: popoverCoords.top }),
+        left: popoverCoords.left,
+        width: popoverCoords.width,
+        zIndex: 99999
+      } : undefined}
+      className={`${portal ? '' : `absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-1.5 w-64 sm:w-72 min-w-full max-w-[calc(100vw-1.5rem)] z-[200]`} bg-white rounded-2xl shadow-2xl border border-slate-200/90 p-1.5 animate-in fade-in zoom-in-95 duration-150 select-none`}
+    >
+      {searchable && (
+        <div className="p-1 mb-1 border-b border-slate-100">
+          <div className="relative">
+            <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Rechercher une option..."
+              autoFocus
+              className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      <div
+        style={portal && popoverCoords ? { maxHeight: popoverCoords.maxHeight } : undefined}
+        className="max-h-60 overflow-y-auto space-y-0.5 custom-scrollbar p-0.5"
+      >
+        {filteredOptions.length === 0 ? (
+          <div className="py-4 px-3 text-center text-slate-500 text-xs font-semibold">
+            Aucune option correspondante
+          </div>
+        ) : (
+          filteredOptions.map((opt) => {
+            const isSelected = value === opt.value;
+            const OptIcon = opt.icon;
+
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => {
+                  onChange(opt.value);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                  isSelected
+                    ? scheme.highlightBg + ' shadow-2xs font-bold'
+                    : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-300'}`} />
+                  {OptIcon && <OptIcon size={14} className={scheme.iconText} />}
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-slate-900 tracking-tight block truncate">
+                      {opt.label}
+                    </span>
+                    {opt.description && (
+                      <span className="text-[10px] font-medium text-slate-500 block truncate">
+                        {opt.description}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0 ml-2">
+                  {opt.badge && (
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                      {opt.badge}
+                    </span>
+                  )}
+                  {isSelected && (
+                    <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                  )}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${className}`} ref={containerRef}>
       <button
         type="button"
         disabled={disabled}
-        onClick={() => setIsOpen(prev => !prev)}
+        onClick={() => {
+          if (!disabled) {
+            setSearch('');
+            setIsOpen(prev => !prev);
+          }
+        }}
         className={`${getButtonClass()} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {IconComponent && (
             <IconComponent size={size === 'xs' ? 12 : size === 'lg' ? 15 : 13} className={`shrink-0 ${scheme.iconText}`} />
           )}
@@ -200,7 +379,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
               {labelPrefix}
             </span>
           )}
-          <span className="font-extrabold text-slate-900 tracking-tight truncate">
+          <span className="font-extrabold text-slate-900 tracking-tight truncate text-left">
             {selectedOption ? selectedOption.label : placeholder}
           </span>
         </div>
@@ -219,76 +398,9 @@ export const SelectPill: React.FC<SelectPillProps> = ({
       </button>
 
       {isOpen && (
-        <div
-          className={`absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-64 sm:w-72 min-w-full max-w-[calc(100vw-1.5rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 p-1.5 z-[200] animate-in fade-in zoom-in-95 duration-150`}
-        >
-          {searchable && (
-            <div className="p-1 mb-1">
-              <input
-                type="text"
-                value={search}
-                onChange={e => setSearch(e.target.value)}
-                placeholder="Rechercher..."
-                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-500 outline-none focus:bg-white focus:border-indigo-500"
-              />
-            </div>
-          )}
-
-          <div className="max-h-60 overflow-y-auto space-y-0.5 custom-scrollbar">
-            {filteredOptions.length === 0 ? (
-              <div className="p-3 text-center text-slate-600 text-xs font-semibold">
-                Aucune option
-              </div>
-            ) : (
-              filteredOptions.map((opt) => {
-                const isSelected = value === opt.value;
-                const OptIcon = opt.icon;
-
-                return (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => {
-                      onChange(opt.value);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                      isSelected
-                        ? scheme.highlightBg + ' shadow-2xs font-bold'
-                        : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-400'}`} />
-                      {OptIcon && <OptIcon size={14} className={scheme.iconText} />}
-                      <div className="min-w-0">
-                        <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
-                          {opt.label}
-                        </span>
-                        {opt.description && (
-                          <span className="text-[10px] font-bold text-slate-600 block truncate">
-                            {opt.description}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1 shrink-0 ml-2">
-                      {opt.badge && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200">
-                          {opt.badge}
-                        </span>
-                      )}
-                      {isSelected && (
-                        <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+        portal && typeof document !== 'undefined'
+          ? createPortal(popoverContent, document.body)
+          : popoverContent
       )}
     </div>
   );

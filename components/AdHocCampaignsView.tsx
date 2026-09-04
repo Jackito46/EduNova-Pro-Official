@@ -893,26 +893,27 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
 
+      {/* Modal Formulaire Créer / Modifier une Campagne */}
       {showForm && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-3 md:p-6 overflow-y-auto">
-          <div className="bg-white max-w-2xl md:max-w-4xl lg:max-w-5xl w-full rounded-2xl md:rounded-3xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
+          <div className="bg-white max-w-2xl md:max-w-4xl lg:max-w-5xl w-full rounded-2xl md:rounded-3xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden my-auto max-h-[94vh] flex flex-col">
             
-            {/* Modal Modern Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-6 py-4 md:py-5 border-b border-slate-100 bg-slate-50/80 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-2xl shadow-md shadow-indigo-200 shrink-0">
-                  <Rocket size={20} />
+            {/* Modal Modern Compact Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 bg-slate-50/90 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-xl shadow-xs shrink-0">
+                  <Rocket size={18} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-lg md:text-xl font-black text-slate-900 tracking-tight">
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
                       {formData.id ? 'Modifier la Campagne' : 'Créer une Nouvelle Campagne'}
                     </h3>
-                    <span className="hidden md:inline-block text-[10px] font-black px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                    <span className="hidden sm:inline-block text-[9px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
                       Frais Occasionnel
                     </span>
                   </div>
-                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                  <p className="text-[11px] text-slate-500 font-medium">
                     Paramétrage de tarification, échéancier et ciblage d'étudiants
                   </p>
                 </div>
@@ -920,13 +921,13 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               <div className="flex items-center gap-2 self-end sm:self-center">
                 {/* Status Switcher in Form Header */}
-                <div className="flex bg-slate-200/80 p-1 rounded-xl gap-1">
+                <div className="flex bg-slate-200/80 p-0.5 rounded-xl gap-0.5">
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, status: 'DRAFT' })}
-                    className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${
+                    className={`px-2 py-1 text-[9.5px] font-black rounded-lg transition-all ${
                       (formData.status || 'DRAFT') === 'DRAFT'
-                        ? 'bg-white text-slate-800 shadow-sm'
+                        ? 'bg-white text-slate-800 shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -935,9 +936,9 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, status: 'PROGRESS' })}
-                    className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${
+                    className={`px-2 py-1 text-[9.5px] font-black rounded-lg transition-all ${
                       formData.status === 'PROGRESS'
-                        ? 'bg-blue-600 text-white shadow-sm'
+                        ? 'bg-blue-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -946,9 +947,9 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, status: 'COMPLETED' })}
-                    className={`px-2.5 py-1 text-[10px] font-black rounded-lg transition-all ${
+                    className={`px-2 py-1 text-[9.5px] font-black rounded-lg transition-all ${
                       formData.status === 'COMPLETED'
-                        ? 'bg-emerald-600 text-white shadow-sm'
+                        ? 'bg-emerald-600 text-white shadow-xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -959,44 +960,44 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <button 
                   type="button" 
                   onClick={() => setShowForm(false)} 
-                  className="p-2 hover:bg-slate-200/60 rounded-xl text-slate-400 hover:text-slate-700 transition-all cursor-pointer active:scale-95"
+                  className="p-1.5 hover:bg-slate-200/70 rounded-xl text-slate-400 hover:text-slate-700 transition-all cursor-pointer active:scale-95"
                   title="Fermer"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
             </div>
 
-            {/* Modal Form Body */}
+            {/* Modal Form Body with Compact Spacing */}
             <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-5 p-5 md:p-8 overflow-y-auto flex-1 bg-slate-50/30">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1 bg-slate-50/40">
                 
-                {/* Profile & Multi-Tenant Context Banner */}
-                <div className="md:col-span-12 bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-slate-100 text-slate-600 rounded-xl">
-                      <ShieldCheck size={18} />
+                {/* Profile & Multi-Tenant Context Banner (Streamlined) */}
+                <div className="md:col-span-12 bg-white/90 px-3.5 py-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 bg-slate-100 text-slate-600 rounded-lg shrink-0">
+                      <ShieldCheck size={16} />
                     </div>
                     <div>
-                      <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block">Contexte Établissement & Multi-Tenant</span>
-                      <p className="text-xs font-bold text-slate-800 mt-0.5">
-                        Calibrage : <span className="text-indigo-600 font-black">{isUniv ? 'Enseignement Supérieur & Professionnel (Soutenances, Stages, Labos...)' : 'Enseignement Général / Classique (Excursions, Uniformes, Examens...)'}</span>
+                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Contexte Établissement</span>
+                      <p className="text-[11px] font-bold text-slate-800 leading-tight">
+                        Calibrage : <span className="text-indigo-600 font-black">{isUniv ? 'Enseignement Supérieur & Professionnel' : 'Enseignement Général / Classique'}</span>
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2 flex-wrap shrink-0">
-                    <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black tracking-wider uppercase ${isUniv ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
-                      {isUniv ? '🎓 SUPÉRIEUR / UNIV' : '🎒 CLASSIQUE / SCOLAIRE'}
+                  <div className="flex items-center gap-1.5 flex-wrap shrink-0">
+                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black tracking-wider uppercase ${isUniv ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                      {isUniv ? '🎓 SUPÉRIEUR' : '🎒 CLASSIQUE'}
                     </span>
                     {hasMultiCampus && (
                       formData.campus_id ? (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
                           📍 {campuses.find(c => c.id === formData.campus_id)?.name || 'Annexe Dédiée'}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[10px] font-black bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">
-                          🌐 Portée Siège / Global
+                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">
+                          🌐 Portée Siège
                         </span>
                       )
                     )}
@@ -1004,22 +1005,22 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* Left Panel: Identité & Ciblage Structure (7 cols) */}
-                <div className="md:col-span-7 space-y-5">
-                  <div className="bg-white p-5 rounded-2xl border border-slate-100 space-y-4 shadow-sm">
-                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><FileText size={14} /></span>
+                <div className="md:col-span-7 space-y-3 sm:space-y-3.5">
+                  <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-3 shadow-2xs">
+                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                      <span className="p-1 bg-indigo-50 text-indigo-600 rounded-md"><FileText size={13} /></span>
                       <span>Informations Générales de l'Événement</span>
                     </h4>
 
                     {/* Name field */}
                     <div>
-                      <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Nom de la Campagne / Intitulé du Frais *
                       </label>
                       <input 
                         required 
                         placeholder={isUniv ? "Ex: Frais de Soutenance PFE 2026, Stage Pratique..." : "Ex: Excursion Botanique, Kits Uniformes, Frais de Labo..."} 
-                        className="w-full border border-slate-200 bg-slate-50/50 p-3 rounded-xl font-bold text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-400" 
+                        className="w-full border border-slate-200 bg-slate-50/50 px-3 py-2 rounded-xl font-bold text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-400" 
                         value={formData.name} 
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
@@ -1027,7 +1028,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Type selection */}
                     <div>
-                      <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Catégorie / Nature de la Charge
                       </label>
                       <SelectPill
@@ -1069,13 +1070,13 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Description */}
                     <div>
-                      <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Description / Notes pour l'Économat et les Parents
                       </label>
                       <textarea 
-                        rows={3} 
+                        rows={2} 
                         placeholder="Précisez les détails logistiques, conditions de participation ou matériel inclus..." 
-                        className="w-full border border-slate-200 bg-slate-50/50 p-3 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" 
+                        className="w-full border border-slate-200 bg-slate-50/50 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" 
                         value={formData.description} 
                         onChange={e => setFormData({...formData, description: e.target.value})} 
                       />
@@ -1083,19 +1084,21 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   {/* Ciblage de Structure / Scope */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-100 space-y-4 shadow-sm">
-                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><Users2 size={14} /></span>
-                      <span>🎯 Périmètre de Ciblage (Rattachement)</span>
-                    </h4>
-                    <p className="text-xs text-slate-500 font-medium -mt-1 leading-relaxed">
-                      Restreignez la campagne à un campus/annexe spécifique ou à une classe donnée.
-                    </p>
+                  <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                      <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
+                        <span className="p-1 bg-emerald-50 text-emerald-600 rounded-md"><Users2 size={13} /></span>
+                        <span>🎯 Périmètre de Ciblage (Rattachement)</span>
+                      </h4>
+                      <span className="text-[10px] font-bold text-slate-400">
+                        Optionnel
+                      </span>
+                    </div>
 
-                    <div className={`grid gap-4 ${hasMultiCampus ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                    <div className={`grid gap-2.5 sm:gap-3 ${hasMultiCampus ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                       {hasMultiCampus && (
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 block">
+                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
                             Annexe / Campus *
                           </label>
                           <SelectPill
@@ -1114,15 +1117,19 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       )}
 
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1.5 block">
+                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
                           {terminology?.class || 'Classe'} / Promotion Spécifique
                         </label>
                         <SelectPill
                           options={[
                             { value: '', label: `🎓 Toutes les ${terminology?.classes?.toLowerCase() || 'classes'}` },
                             ...schoolClasses
-                              .filter(c => (!formData.campus_id || c.campus_id === formData.campus_id) && (classIdsWithStudents.has(c.id) || formData.class_id === c.id))
-                              .map(c => ({ value: c.id, label: c.name }))
+                              .filter(c => !formData.campus_id || c.campus_id === formData.campus_id)
+                              .map(c => ({
+                                value: c.id,
+                                label: c.name,
+                                badge: classIdsWithStudents.has(c.id) ? 'Inscrits' : undefined
+                              }))
                           ]}
                           value={formData.class_id}
                           onChange={(val) => setFormData({ ...formData, class_id: val })}
@@ -1130,7 +1137,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           size="md"
                           colorScheme="indigo"
                           className="w-full"
-                          searchable={schoolClasses.length > 5}
+                          searchable={schoolClasses.length > 4}
                         />
                       </div>
                     </div>
@@ -1138,18 +1145,18 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* Right Panel: Finance & Period (5 cols) */}
-                <div className="md:col-span-5 space-y-5">
+                <div className="md:col-span-5 space-y-3 sm:space-y-3.5">
                   
                   {/* Financial Configuration */}
-                  <div className="bg-white p-5 rounded-2xl border border-slate-100 space-y-4 shadow-sm">
-                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-3">
-                      <span className="p-1.5 bg-purple-50 text-purple-600 rounded-lg"><Settings2 size={14} /></span>
+                  <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-3 shadow-2xs">
+                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
+                      <span className="p-1 bg-purple-50 text-purple-600 rounded-md"><Settings2 size={13} /></span>
                       <span>💰 Tarification & Échéance</span>
                     </h4>
 
                     {/* Amount & Currency */}
                     <div>
-                      <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Montant du Frais Exigé *
                       </label>
                       <div className="flex gap-2">
@@ -1160,15 +1167,15 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             min="0" 
                             step="any"
                             placeholder="0.00" 
-                            className="w-full border border-slate-200 bg-slate-50/50 pl-4 pr-12 py-2.5 rounded-xl font-black text-base focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-mono text-slate-900" 
+                            className="w-full border border-slate-200 bg-slate-50/50 pl-3.5 pr-12 py-2 rounded-xl font-black text-sm sm:text-base focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-mono text-slate-900" 
                             value={formData.amount} 
                             onChange={e => setFormData({...formData, amount: e.target.value})} 
                           />
-                          <span className="absolute right-3 top-3 text-xs font-black text-indigo-600 font-mono">
+                          <span className="absolute right-3 top-2 text-xs font-black text-indigo-600 font-mono">
                             {formData.currency}
                           </span>
                         </div>
-                        <div className="w-28">
+                        <div className="w-24 sm:w-28">
                           <SelectPill
                             options={[
                               { value: 'HTG', label: 'HTG' },
@@ -1185,14 +1192,14 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
 
                       {/* Quick Presets */}
-                      <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+                      <div className="mt-2 flex items-center gap-1 flex-wrap">
                         <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 mr-1">Raccourcis :</span>
                         {(formData.currency === 'HTG' ? [500, 1000, 2500, 5000, 10000] : [10, 25, 50, 100, 250]).map(val => (
                           <button
                             type="button"
                             key={val}
                             onClick={() => setFormData({ ...formData, amount: val.toString() })}
-                            className="px-2 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded-lg text-[10px] font-black font-mono transition-all border border-slate-200/60"
+                            className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded-md text-[9.5px] font-black font-mono transition-all border border-slate-200/60"
                           >
                             +{val} {formData.currency}
                           </button>
@@ -1202,7 +1209,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Payment Due Date */}
                     <div>
-                      <label className="text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5 block">
+                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Date Limite de Paiement (Échéance)
                       </label>
                       <DatePickerPill
@@ -1220,15 +1227,15 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   {/* Period Planning Block */}
                   {TYPES_WITH_DATES.includes(formData.type) ? (
-                    <div className="bg-indigo-50/50 p-5 rounded-2xl border border-indigo-100 space-y-4 shadow-sm animate-in fade-in duration-300">
-                      <h4 className="text-xs font-black uppercase text-indigo-900 tracking-wider flex items-center gap-2 border-b border-indigo-100 pb-2.5">
-                        <CalendarDays size={16} className="text-indigo-600" />
+                    <div className="bg-indigo-50/50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-indigo-100 space-y-3 shadow-2xs animate-in fade-in duration-300">
+                      <h4 className="text-xs font-black uppercase text-indigo-900 tracking-wider flex items-center gap-2 border-b border-indigo-100/80 pb-2">
+                        <CalendarDays size={14} className="text-indigo-600" />
                         <span>📅 Plage de Dates & Durée</span>
                       </h4>
                       
-                      <div className="grid grid-cols-2 gap-3">
+                      <div className="grid grid-cols-2 gap-2.5">
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Début</label>
+                          <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Début</label>
                           <DatePickerPill
                             selectedDate={formData.start_date}
                             onSelectDate={(d) => setFormData({ ...formData, start_date: d })}
@@ -1241,7 +1248,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           />
                         </div>
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Fin</label>
+                          <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Fin</label>
                           <DatePickerPill
                             selectedDate={formData.end_date}
                             onSelectDate={(d) => setFormData({ ...formData, end_date: d })}
@@ -1256,69 +1263,71 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
 
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Durée Évaluée (Jours)</label>
+                        <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Durée Évaluée (Jours)</label>
                         <div className="relative">
                           <input 
                             type="number" 
                             min="1" 
                             placeholder="Auto-calculé..." 
-                            className="w-full border border-indigo-200 bg-white p-2.5 pr-16 rounded-xl font-black text-xs text-indigo-950 focus:border-indigo-500 outline-none transition-all" 
+                            className="w-full border border-indigo-200 bg-white px-3 py-1.5 pr-14 rounded-xl font-black text-xs text-indigo-950 focus:border-indigo-500 outline-none transition-all" 
                             value={formData.duration_days} 
                             onChange={e => setFormData({...formData, duration_days: e.target.value})} 
                           />
-                          <span className="absolute right-2 top-2.5 text-[8px] font-black tracking-widest text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-md uppercase">
+                          <span className="absolute right-2 top-1.5 text-[8px] font-black tracking-widest text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded-md uppercase">
                             Auto
                           </span>
                         </div>
                       </div>
 
-                      <p className="text-[10px] text-indigo-700 font-semibold flex items-center gap-1.5">
-                        <Info size={12} className="shrink-0 text-indigo-500" />
+                      <p className="text-[9.5px] text-indigo-700 font-semibold flex items-center gap-1.5">
+                        <Info size={11} className="shrink-0 text-indigo-500" />
                         Calcul automatique en fonction de la période saisie.
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-white p-5 rounded-2xl border border-slate-100 flex flex-col items-center justify-center text-center p-6 space-y-2 shadow-sm">
-                      <div className="p-3 bg-slate-50 text-slate-400 rounded-2xl">
-                        <CalendarDays size={24} />
+                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/70 flex items-center gap-2.5 shadow-2xs">
+                      <div className="p-2 bg-white text-slate-400 rounded-lg shrink-0 border border-slate-200/60">
+                        <CalendarDays size={16} />
                       </div>
-                      <p className="text-xs font-black text-slate-700 uppercase tracking-wider">Planification Périodique</p>
-                      <p className="text-[11px] text-slate-400 max-w-xs font-medium">
-                        Ce type de frais est ponctuel. Aucune plage de dates de début/fin n'est requise.
-                      </p>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider leading-tight">Frais ponctuel</p>
+                        <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                          Aucune plage de dates requise pour cette catégorie.
+                        </p>
+                      </div>
                     </div>
                   )}
 
                 </div>
               </div>
 
-              {/* Action Buttons Sticky Footer */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-5 md:px-8 md:py-5 bg-slate-50/90 border-t border-slate-100 shrink-0">
+              {/* Action Buttons Sticky Footer with Compact Ergonomics */}
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-50/90 border-t border-slate-200/80 shrink-0">
                 <button 
                   type="button" 
                   onClick={() => setShowForm(false)} 
-                  className="w-full sm:w-auto px-6 py-2.5 bg-slate-200/80 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition-all cursor-pointer text-center active:scale-95"
+                  className="w-full sm:w-auto px-5 py-2 bg-slate-200/80 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition-all cursor-pointer text-center active:scale-95"
                 >
                   Annuler et Fermer
                 </button>
 
-                <div className="flex items-center gap-3 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <button 
                     type="submit" 
                     disabled={isSubmitting} 
-                    className="w-full sm:w-auto px-8 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="w-full sm:w-auto px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <>
-                        <RefreshCw size={15} className="animate-spin" /> Enregistrement en cours...
+                        <RefreshCw size={14} className="animate-spin" /> Enregistrement...
                       </>
                     ) : formData.id ? (
                       <>
-                        <Save size={15} /> Enregistrer les Modifications
+                        <Save size={14} /> Enregistrer les Modifications
                       </>
                     ) : (
                       <>
-                        <Rocket size={15} /> Créer et Publier la Campagne
+                        <Rocket size={14} /> Créer et Publier la Campagne
                       </>
                     )}
                   </button>
@@ -2466,21 +2475,21 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
       {/* Dynamic Payment Collection Modal */}
       {paymentModalStudent && (
-        <div className="fixed inset-0 z-[110] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white max-w-xl w-full rounded-3xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden flex flex-col my-6 max-h-[92vh]">
+        <div className="fixed inset-0 z-[110] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white max-w-xl w-full rounded-2xl sm:rounded-3xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden flex flex-col my-auto max-h-[94vh]">
             {/* Header */}
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/70 flex justify-between items-center shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-200">
-                  <Banknote size={20} />
+            <div className="px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 bg-slate-50/80 flex justify-between items-center shrink-0">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Banknote size={18} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[9px] font-black uppercase tracking-widest text-indigo-700 bg-indigo-100/70 px-2 py-0.5 rounded-md">
                       Encaissement Campagne
                     </span>
                   </div>
-                  <h3 className="text-base font-black text-slate-900 leading-tight font-sans mt-0.5">
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 leading-tight font-sans mt-0.5">
                     Nouveau versement
                   </h3>
                 </div>
@@ -2488,13 +2497,13 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
               <button
                 type="button"
                 onClick={() => setPaymentModalStudent(null)}
-                className="p-2 bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer border border-slate-200 shadow-2xs"
+                className="p-1.5 bg-white hover:bg-slate-100 text-slate-400 hover:text-slate-700 rounded-xl transition-all cursor-pointer border border-slate-200 shadow-2xs"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleRegisterCampaignPayment} className="p-6 space-y-5 overflow-y-auto flex-1">
+            <form onSubmit={handleRegisterCampaignPayment} className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 overflow-y-auto flex-1">
               {/* Student and Campaign Bento Summary */}
               {(() => {
                 const customAmt = assignments[paymentModalStudent.id]?.custom_amount;
@@ -2506,34 +2515,34 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                 const initials = `${(paymentModalStudent.first_name || '')[0] || ''}${(paymentModalStudent.last_name || '')[0] || ''}`.toUpperCase() || 'EL';
 
                 return (
-                  <div className="bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 p-4 rounded-2xl border border-indigo-100/80 space-y-3.5 shadow-2xs">
+                  <div className="bg-gradient-to-br from-indigo-50/80 via-white to-slate-50 p-3 sm:p-3.5 rounded-xl border border-indigo-100/80 space-y-2.5 shadow-2xs">
                     {/* Student Identity */}
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-100 text-indigo-700 font-black text-sm flex items-center justify-center border border-indigo-200 shrink-0">
+                    <div className="flex items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-indigo-100 text-indigo-700 font-black text-xs sm:text-sm flex items-center justify-center border border-indigo-200 shrink-0">
                           {initials}
                         </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h4 className="text-sm font-black text-slate-900 leading-none">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight truncate">
                               {paymentModalStudent.last_name} {paymentModalStudent.first_name}
                             </h4>
                             {paymentModalStudent.code && (
-                              <span className="text-[10px] font-mono font-bold text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                              <span className="text-[9px] font-mono font-bold text-slate-500 bg-white px-1 py-0.5 rounded border border-slate-200">
                                 #{paymentModalStudent.code}
                               </span>
                             )}
                           </div>
-                          <p className="text-[11px] text-slate-500 font-semibold mt-1">
+                          <p className="text-[10px] sm:text-[11px] text-slate-500 font-semibold truncate mt-0.5">
                             {terminology.class} : <span className="text-slate-800 font-bold">{studentClass}</span>
                           </p>
                         </div>
                       </div>
-                      <div className="text-right">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
+                      <div className="text-right shrink-0">
+                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
                           Événement
                         </span>
-                        <span className="text-xs font-black text-indigo-950 block truncate max-w-[140px]" title={campaign.name}>
+                        <span className="text-xs font-black text-indigo-950 block truncate max-w-[120px] sm:max-w-[160px]" title={campaign.name}>
                           {campaign.name}
                         </span>
                       </div>
@@ -2541,11 +2550,11 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
                     {/* Progress Bar */}
                     <div className="space-y-1">
-                      <div className="flex justify-between items-center text-[10px] font-bold text-slate-500">
+                      <div className="flex justify-between items-center text-[9.5px] font-bold text-slate-500">
                         <span>Progression du règlement</span>
                         <span className="font-black text-indigo-700">{progressPct}%</span>
                       </div>
-                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 p-0.5">
+                      <div className="w-full h-1.5 sm:h-2 bg-slate-100 rounded-full overflow-hidden border border-slate-200/60 p-0.5">
                         <div
                           className="h-full bg-gradient-to-r from-indigo-500 to-emerald-500 rounded-full transition-all duration-300"
                           style={{ width: `${progressPct}%` }}
@@ -2554,31 +2563,31 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                     </div>
 
                     {/* Financial 3-Pill Stat Grid */}
-                    <div className="grid grid-cols-3 gap-2 pt-1">
-                      <div className="bg-white/90 p-2.5 rounded-xl border border-slate-200/70 text-center shadow-2xs">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 pt-0.5">
+                      <div className="bg-white/90 p-2 rounded-lg sm:rounded-xl border border-slate-200/70 text-center shadow-2xs">
+                        <span className="text-[8.5px] font-bold uppercase tracking-wider text-slate-400 block">
                           Frais Exigé
                         </span>
-                        <span className="text-xs font-black text-slate-800 block mt-0.5 font-sans">
-                          {expectedAmt.toLocaleString()} <span className="text-[10px] font-bold text-slate-500">{campaign.currency}</span>
+                        <span className="text-[11px] sm:text-xs font-black text-slate-800 block mt-0.5 font-sans">
+                          {expectedAmt.toLocaleString()} <span className="text-[9px] font-bold text-slate-500">{campaign.currency}</span>
                         </span>
                       </div>
 
-                      <div className="bg-emerald-50/70 p-2.5 rounded-xl border border-emerald-200/70 text-center shadow-2xs">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-700 block flex items-center justify-center gap-1">
-                          <Check size={10} /> Déjà Versé
+                      <div className="bg-emerald-50/70 p-2 rounded-lg sm:rounded-xl border border-emerald-200/70 text-center shadow-2xs">
+                        <span className="text-[8.5px] font-bold uppercase tracking-wider text-emerald-700 block flex items-center justify-center gap-0.5">
+                          <Check size={9} /> Déjà Versé
                         </span>
-                        <span className="text-xs font-black text-emerald-800 block mt-0.5 font-sans">
-                          {paid.toLocaleString()} <span className="text-[10px] font-bold text-emerald-600">{campaign.currency}</span>
+                        <span className="text-[11px] sm:text-xs font-black text-emerald-800 block mt-0.5 font-sans">
+                          {paid.toLocaleString()} <span className="text-[9px] font-bold text-emerald-600">{campaign.currency}</span>
                         </span>
                       </div>
 
-                      <div className="bg-rose-50/80 p-2.5 rounded-xl border border-rose-200/80 text-center shadow-2xs">
-                        <span className="text-[9px] font-bold uppercase tracking-wider text-rose-700 block">
+                      <div className="bg-rose-50/80 p-2 rounded-lg sm:rounded-xl border border-rose-200/80 text-center shadow-2xs">
+                        <span className="text-[8.5px] font-bold uppercase tracking-wider text-rose-700 block">
                           Reste Dû
                         </span>
-                        <span className="text-xs font-black text-rose-700 block mt-0.5 font-sans">
-                          {remaining.toLocaleString()} <span className="text-[10px] font-bold text-rose-600">{campaign.currency}</span>
+                        <span className="text-[11px] sm:text-xs font-black text-rose-700 block mt-0.5 font-sans">
+                          {remaining.toLocaleString()} <span className="text-[9px] font-bold text-rose-600">{campaign.currency}</span>
                         </span>
                       </div>
                     </div>
@@ -2596,9 +2605,9 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                 const isOverRemaining = currentNum > remaining;
 
                 return (
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
-                      <label className="block text-[11px] font-black uppercase text-slate-600 tracking-wider">
+                      <label className="block text-[10px] sm:text-[11px] font-black uppercase text-slate-600 tracking-wider">
                         Montant à Encaisser ({campaign.currency}) *
                       </label>
                       <div className="flex items-center gap-1">
@@ -2614,7 +2623,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                               key={btn.label}
                               type="button"
                               onClick={() => setPaymentModalAmount(btn.val.toString())}
-                              className={`px-2.5 py-1 text-[10px] font-extrabold rounded-lg transition-all cursor-pointer ${
+                              className={`px-2 py-0.5 text-[9.5px] font-extrabold rounded-md transition-all cursor-pointer ${
                                 isActive
                                   ? 'bg-indigo-600 text-white shadow-xs'
                                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -2628,8 +2637,8 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                     </div>
 
                     <div className="relative">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
-                        <span className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center">
+                      <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 pointer-events-none">
+                        <span className="w-6 h-6 rounded-md bg-indigo-100 text-indigo-700 font-black text-[11px] flex items-center justify-center">
                           {campaign.currency === 'USD' ? '$' : 'G'}
                         </span>
                       </div>
@@ -2640,7 +2649,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                         step="any"
                         value={paymentModalAmount}
                         onChange={(e) => setPaymentModalAmount(e.target.value)}
-                        className={`w-full pl-13 pr-4 py-3.5 bg-slate-50 border rounded-2xl focus:outline-none focus:ring-2 text-slate-900 font-black text-base transition-all ${
+                        className={`w-full pl-11 pr-4 py-2 sm:py-2.5 bg-slate-50 border rounded-xl focus:outline-none focus:ring-2 text-slate-900 font-black text-sm sm:text-base transition-all ${
                           isOverRemaining
                             ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/30'
                             : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-600'
@@ -2650,8 +2659,8 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                     </div>
 
                     {isOverRemaining && (
-                      <p className="text-[11px] text-rose-600 font-bold flex items-center gap-1 animate-in fade-in duration-150">
-                        <AlertCircle size={13} />
+                      <p className="text-[10px] text-rose-600 font-bold flex items-center gap-1 animate-in fade-in duration-150">
+                        <AlertCircle size={12} />
                         Le montant dépasse le solde restant dû ({remaining.toLocaleString()} {campaign.currency}).
                       </p>
                     )}
@@ -2660,21 +2669,21 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
               })()}
 
               {/* Payment Method Modern Selector (Interactive Cards) */}
-              <div className="space-y-2">
-                <label className="block text-[11px] font-black uppercase text-slate-600 tracking-wider">
+              <div className="space-y-1.5">
+                <label className="block text-[10px] sm:text-[11px] font-black uppercase text-slate-600 tracking-wider">
                   Mode de Paiement *
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
                   {activePaymentMethods.map((m) => {
                     const isSelected = paymentModalMethod === m.code;
                     const getIcon = () => {
-                      if (m.code === 'Cash') return <Banknote size={16} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
-                      if (m.code === 'Dépôt Bancaire') return <Landmark size={16} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
-                      if (m.code === 'MonCash') return <Smartphone size={16} className={isSelected ? 'text-rose-600' : 'text-rose-500'} />;
-                      if (m.code === 'Natcash') return <Smartphone size={16} className={isSelected ? 'text-amber-600' : 'text-amber-500'} />;
-                      if (m.code === 'Chèque') return <Receipt size={16} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
-                      if (m.code === 'Carte') return <CreditCard size={16} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
-                      return <Wallet size={16} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
+                      if (m.code === 'Cash') return <Banknote size={15} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
+                      if (m.code === 'Dépôt Bancaire') return <Landmark size={15} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
+                      if (m.code === 'MonCash') return <Smartphone size={15} className={isSelected ? 'text-rose-600' : 'text-rose-500'} />;
+                      if (m.code === 'Natcash') return <Smartphone size={15} className={isSelected ? 'text-amber-600' : 'text-amber-500'} />;
+                      if (m.code === 'Chèque') return <Receipt size={15} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
+                      if (m.code === 'Carte') return <CreditCard size={15} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
+                      return <Wallet size={15} className={isSelected ? 'text-indigo-600' : 'text-slate-500'} />;
                     };
 
                     return (
@@ -2688,14 +2697,14 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                             setPaymentModalRef('');
                           }
                         }}
-                        className={`p-3 rounded-2xl border text-left flex flex-col justify-between gap-1.5 transition-all cursor-pointer relative ${
+                        className={`p-2 sm:p-2.5 rounded-xl border text-left flex flex-col justify-between gap-1 transition-all cursor-pointer relative ${
                           isSelected
                             ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs'
                             : 'bg-white hover:bg-slate-50 border-slate-200/90 text-slate-700'
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <div className={`p-1.5 rounded-xl ${isSelected ? 'bg-white shadow-2xs' : 'bg-slate-100'}`}>
+                          <div className={`p-1 rounded-lg ${isSelected ? 'bg-white shadow-2xs' : 'bg-slate-100'}`}>
                             {getIcon()}
                           </div>
                           {m.code === 'MonCash' && (
@@ -2709,11 +2718,11 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                             </span>
                           )}
                           {isSelected && (
-                            <div className="w-2 h-2 rounded-full bg-indigo-600 ring-2 ring-indigo-200" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-600 ring-2 ring-indigo-200" />
                           )}
                         </div>
                         <div>
-                          <span className={`text-xs font-black block leading-tight ${isSelected ? 'text-indigo-950' : 'text-slate-800'}`}>
+                          <span className={`text-[11px] sm:text-xs font-black block leading-tight ${isSelected ? 'text-indigo-950' : 'text-slate-800'}`}>
                             {m.name}
                           </span>
                         </div>
@@ -2724,19 +2733,19 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
               </div>
 
               {/* Dynamic Contextual Panels per Payment Method */}
-              <div className="space-y-3">
+              <div className="space-y-2 sm:space-y-2.5">
                 {/* 1. CASH / ESPÈCES */}
                 {paymentModalMethod === 'Cash' && (
-                  <div className="p-4 bg-emerald-50/60 border border-emerald-200/80 rounded-2xl space-y-3 animate-in fade-in duration-200">
-                    <div className="flex items-start gap-2.5">
-                      <div className="p-1.5 bg-emerald-100 text-emerald-700 rounded-lg shrink-0 mt-0.5">
-                        <Banknote size={16} />
+                  <div className="p-3 sm:p-3.5 bg-emerald-50/60 border border-emerald-200/80 rounded-xl space-y-2.5 animate-in fade-in duration-200">
+                    <div className="flex items-start gap-2">
+                      <div className="p-1 bg-emerald-100 text-emerald-700 rounded-md shrink-0 mt-0.5">
+                        <Banknote size={14} />
                       </div>
                       <div>
-                        <p className="text-xs font-bold text-emerald-950">
+                        <p className="text-[11px] sm:text-xs font-bold text-emerald-950">
                           Encaissement en Espèces à la Caisse
                         </p>
-                        <p className="text-[11px] text-emerald-800/90 leading-relaxed font-medium mt-0.5">
+                        <p className="text-[10px] sm:text-[10.5px] text-emerald-800/90 leading-relaxed font-medium">
                           Vérifier l’authenticité des billets et remettre immédiatement le reçu à l'élève ou au tuteur.
                         </p>
                       </div>
@@ -3103,27 +3112,27 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
               </div>
 
               {/* Actions Footer inside form */}
-              <div className="flex items-center gap-3 pt-4 border-t border-slate-100 bg-white shrink-0">
+              <div className="flex items-center gap-2.5 pt-3 border-t border-slate-100 bg-white shrink-0">
                 <button
                   type="button"
                   onClick={() => setPaymentModalStudent(null)}
                   disabled={paymentModalIsSubmitting}
-                  className="flex-1 py-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-2xl transition-all cursor-pointer text-center"
+                  className="flex-1 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={paymentModalIsSubmitting || !Number(paymentModalAmount) || Number(paymentModalAmount) <= 0}
-                  className="flex-2 py-3.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-xs uppercase tracking-wider rounded-2xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-lg shadow-indigo-100 active:scale-[0.98]"
+                  className="flex-2 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-200 disabled:text-slate-400 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                 >
                   {paymentModalIsSubmitting ? (
                     <>
-                      <Loader2 size={15} className="animate-spin" /> Enregistrement en cours...
+                      <Loader2 size={14} className="animate-spin" /> Enregistrement...
                     </>
                   ) : (
                     <>
-                      <ArrowRight size={15} />
+                      <ArrowRight size={14} />
                       <span>
                         Enregistrer {Number(paymentModalAmount) > 0 ? `${Number(paymentModalAmount).toLocaleString()} ${campaign.currency}` : 'le versement'}
                       </span>
@@ -3138,14 +3147,14 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
       {/* Dynamic Adjustment Modal */}
       {adjustmentModal && (
-        <div className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden flex flex-col my-8">
-            <div className="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+        <div className="fixed inset-0 z-[120] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto">
+          <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden flex flex-col my-auto max-h-[92vh]">
+            <div className="px-4 sm:px-5 py-3 border-b border-slate-100 bg-slate-50/60 flex justify-between items-center shrink-0">
               <div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-md">
+                <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
                   ✏️ AJUSTEMENT DES FRAIS
                 </span>
-                <h3 className="text-base font-black text-slate-950 mt-1 leading-tight font-sans">
+                <h3 className="text-sm sm:text-base font-black text-slate-950 mt-0.5 leading-tight font-sans">
                   Modifier le frais exigé
                 </h3>
               </div>
@@ -3158,8 +3167,8 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="bg-indigo-50/40 border border-indigo-100/50 rounded-2xl p-4 space-y-2 text-xs">
+            <div className="p-3.5 sm:p-5 space-y-3 overflow-y-auto flex-1">
+              <div className="bg-indigo-50/40 border border-indigo-100/50 rounded-xl p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between">
                   <span className="text-slate-400 font-bold">{terminology.student} :</span>
                   <span className="font-extrabold text-slate-800">
@@ -3170,7 +3179,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                   <span className="text-slate-400 font-bold">Campagne :</span>
                   <span className="font-extrabold text-slate-800">{campaign.name}</span>
                 </div>
-                <div className="flex justify-between border-t border-indigo-100/50 pt-2">
+                <div className="flex justify-between border-t border-indigo-100/50 pt-1.5">
                   <span className="text-slate-400 font-bold">Frais de base :</span>
                   <span className="font-extrabold text-slate-800">
                     {campaign.amount.toLocaleString()} {campaign.currency}
@@ -3186,7 +3195,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
               {/* Amount Field */}
               <div className="space-y-1">
-                <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider">
                   Nouveau montant requis ({campaign.currency})
                 </label>
                 <input
@@ -3195,10 +3204,10 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                   step="0.01"
                   value={adjustmentModal.currentCustomAmount}
                   onChange={(e) => setAdjustmentModal(prev => prev ? { ...prev, currentCustomAmount: e.target.value } : null)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-black text-sm"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-black text-xs sm:text-sm"
                   placeholder={`Laissez vide pour le montant standard (${campaign.amount})`}
                 />
-                <p className="text-[10px] text-slate-400">
+                <p className="text-[9.5px] text-slate-400">
                   Laissez ce champ vide pour réinitialiser au frais standard de la campagne.
                 </p>
               </div>
@@ -3216,8 +3225,8 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                 const remaining = val - paid;
 
                 return (
-                  <div className="mt-2 bg-slate-50 border border-slate-200/50 rounded-2xl p-4 space-y-2 text-xs">
-                    <p className="font-extrabold text-[10px] uppercase tracking-wider text-slate-400">
+                  <div className="mt-1.5 bg-slate-50 border border-slate-200/50 rounded-xl p-3 space-y-1.5 text-xs">
+                    <p className="font-extrabold text-[9.5px] uppercase tracking-wider text-slate-400">
                       💡 APERÇU DE L'AJUSTEMENT :
                     </p>
                     <div className="flex justify-between">
@@ -3228,24 +3237,24 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                     </div>
                     {diff > 0 ? (
                       <div className="flex justify-between">
-                        <span className="text-slate-500 font-medium">Rabais / Réduction accordé :</span>
-                        <span className="font-extrabold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                        <span className="text-slate-500 font-medium">Rabais accordé :</span>
+                        <span className="font-extrabold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded text-[11px]">
                           - {diff.toLocaleString()} {campaign.currency} ({Math.round((diff / originalAmt) * 100)}%)
                         </span>
                       </div>
                     ) : diff < 0 ? (
                       <div className="flex justify-between">
-                        <span className="text-slate-500 font-medium">Majoration de frais :</span>
-                        <span className="font-extrabold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
+                        <span className="text-slate-500 font-medium">Majoration :</span>
+                        <span className="font-extrabold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]">
                           + {Math.abs(diff).toLocaleString()} {campaign.currency}
                         </span>
                       </div>
                     ) : null}
-                    <div className="flex justify-between border-t border-slate-200/50 pt-2 font-bold">
+                    <div className="flex justify-between border-t border-slate-200/50 pt-1.5 font-bold">
                       <span className="text-slate-600">Nouveau solde restant dû :</span>
                       {remaining < 0 ? (
-                        <span className="text-rose-600 font-extrabold bg-rose-50 px-2 py-0.5 rounded-md">
-                          Invalide (Trop-perçu de {Math.abs(remaining).toLocaleString()} {campaign.currency})
+                        <span className="text-rose-600 font-extrabold bg-rose-50 px-1.5 py-0.5 rounded text-[11px]">
+                          Trop-perçu ({Math.abs(remaining).toLocaleString()} {campaign.currency})
                         </span>
                       ) : (
                         <span className="text-slate-800 font-black">
@@ -3254,8 +3263,8 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                       )}
                     </div>
                     {remaining < 0 && (
-                      <div className="mt-2 text-[10px] text-rose-600 font-bold bg-rose-50 p-2.5 rounded-xl border border-rose-100">
-                        ⚠️ Erreur : Le nouveau montant requis ne peut pas être inférieur au montant déjà payé par l'{terminology.student?.toLowerCase() || 'élève'} ({paid.toLocaleString()} {campaign.currency}).
+                      <div className="mt-1 text-[9.5px] text-rose-600 font-bold bg-rose-50 p-2 rounded-lg border border-rose-100">
+                        ⚠️ Erreur : Le nouveau montant requis ne peut pas être inférieur au montant déjà payé ({paid.toLocaleString()} {campaign.currency}).
                       </div>
                     )}
                   </div>
@@ -3264,25 +3273,25 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
               {/* Adjustment Reason */}
               <div className="space-y-1">
-                <label className="block text-[11px] font-black uppercase text-slate-400 tracking-wider">
+                <label className="block text-[10px] font-black uppercase text-slate-500 tracking-wider">
                   Motif de l'ajustement *
                 </label>
                 <textarea
                   required={adjustmentModal.currentCustomAmount.trim() !== ''}
                   value={adjustmentModal.reason}
                   onChange={(e) => setAdjustmentModal(prev => prev ? { ...prev, reason: e.target.value } : null)}
-                  className="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-medium text-sm min-h-[80px]"
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-800 font-medium text-xs min-h-[60px]"
                   placeholder="Ex: Réduction accordée par la direction, majoration de retard..."
                 />
               </div>
 
               {/* Actions Footer */}
-              <div className="flex border-t border-slate-100 pt-5 gap-3 bg-white">
+              <div className="flex border-t border-slate-100 pt-3 gap-2 bg-white">
                 <button
                   type="button"
                   onClick={() => setAdjustmentModal(null)}
                   disabled={isSavingAdjustment}
-                  className="flex-1 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[11px] uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center"
+                  className="flex-1 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] uppercase tracking-wider rounded-xl transition-all cursor-pointer text-center"
                 >
                   Annuler
                 </button>
@@ -3290,14 +3299,14 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                   type="button"
                   onClick={handleSaveAdjustment}
                   disabled={isSavingAdjustment}
-                  className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 transition-all cursor-pointer shadow-md shadow-indigo-100 active:scale-[0.98]"
+                  className="flex-1 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[10px] uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-[0.98]"
                 >
                   {isSavingAdjustment ? (
                     <>
                       <Loader2 size={12} className="animate-spin" /> Enregistrement...
                     </>
                   ) : (
-                    '💾 Confirmer l\'ajustement'
+                    '💾 Confirmer'
                   )}
                 </button>
               </div>

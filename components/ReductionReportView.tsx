@@ -26,6 +26,8 @@ import { formatStudentName } from '../utils/formatters';
 import { fixOklchForCanvas } from '../utils/pdfFix';
 import * as XLSX from 'xlsx';
 import { useSchool } from '../contexts/SchoolContext';
+import { SelectPill } from './SelectPill';
+import { GraduationCap } from 'lucide-react';
 
 const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { terminology, currentCampusId, campuses, school } = useSchool();
@@ -280,35 +282,44 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
               />
             </div>
 
-            {/* Class Filter Dropdown */}
-            <div className="relative w-full sm:w-auto min-w-[170px]">
-              <Filter size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <select
+            {/* Class Filter Dropdown - Style Pilule Harmonisé */}
+            <div className="w-full sm:w-auto min-w-[200px]">
+              <SelectPill
                 value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                className="w-full pl-8 pr-7 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold text-xs outline-none focus:border-amber-500 transition-all cursor-pointer shadow-2xs"
-              >
-                <option value="ALL">Toutes les classes ({classes.length})</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+                onChange={(val) => setSelectedClassId(val)}
+                options={[
+                  { value: 'ALL', label: `Toutes les ${terminology.classes.toLowerCase()}`, badge: classes.length.toString() },
+                  ...classes.map(c => ({
+                    value: c.id,
+                    label: c.name,
+                    badge: c.level || undefined
+                  }))
+                ]}
+                icon={GraduationCap}
+                variant="field"
+                size="sm"
+                colorScheme="amber"
+                searchable={true}
+                className="w-full"
+              />
             </div>
 
-            {/* Campus Filter Dropdown (ONLY if multi-campus or multi-tenant annexes) */}
+            {/* Campus Filter Dropdown (ONLY if multi-campus or multi-tenant annexes) - Style Pilule Harmonisé */}
             {hasMultipleCampuses && !user.campus_id && (
-              <div className="relative w-full sm:w-auto min-w-[170px]">
-                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                <select
+              <div className="w-full sm:w-auto min-w-[200px]">
+                <SelectPill
                   value={selectedCampusFilter}
-                  onChange={(e) => setSelectedCampusFilter(e.target.value)}
-                  className="w-full pl-8 pr-7 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-800 font-bold text-xs outline-none focus:border-amber-500 transition-all cursor-pointer shadow-2xs uppercase"
-                >
-                  <option value="ALL">Tous les Campus</option>
-                  {campuses.map(c => (
-                    <option key={c.id} value={c.id}>{c.name.toUpperCase()}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedCampusFilter(val)}
+                  options={[
+                    { value: 'ALL', label: 'Tous les Campus / Annexes', badge: campuses.length.toString() },
+                    ...campuses.map(c => ({ value: c.id, label: c.name }))
+                  ]}
+                  icon={Building2}
+                  variant="field"
+                  size="sm"
+                  colorScheme="amber"
+                  className="w-full"
+                />
               </div>
             )}
           </div>

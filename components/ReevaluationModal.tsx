@@ -29,6 +29,7 @@ import {
 import * as XLSX from 'xlsx';
 import { formatStudentName } from '../utils/formatters';
 import { UserProfile } from '../types';
+import { SelectPill } from './SelectPill';
 
 export interface ReevaluatedStudentItem {
   studentId: string;
@@ -552,20 +553,24 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                   )}
                 </div>
 
-                <div className="relative">
-                  <select
+                <div className="w-auto min-w-[190px]">
+                  <SelectPill
                     value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as SortOption)}
-                    className="appearance-none pl-3 pr-7 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl text-slate-700 hover:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer transition-all"
-                  >
-                    <option value="reduction-desc">Déduction Décroissante</option>
-                    <option value="reduction-asc">Déduction Croissante</option>
-                    <option value="net-desc">Net Exigible Décroissant</option>
-                    <option value="net-asc">Net Exigible Croissant</option>
-                    <option value="name-asc">Nom (A → Z)</option>
-                    <option value="class-asc">Classe (A → Z)</option>
-                  </select>
-                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    onChange={(val) => setSortBy(val as SortOption)}
+                    options={[
+                      { value: 'reduction-desc', label: 'Déduction Décroissante' },
+                      { value: 'reduction-asc', label: 'Déduction Croissante' },
+                      { value: 'net-desc', label: 'Net Exigible Décroissant' },
+                      { value: 'net-asc', label: 'Net Exigible Croissant' },
+                      { value: 'name-asc', label: `Nom ${terminology.student} (A → Z)` },
+                      { value: 'class-asc', label: `${terminology.class} (A → Z)` },
+                    ]}
+                    icon={ArrowUpDown}
+                    variant="pill"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
                 </div>
               </div>
             </div>
@@ -575,10 +580,10 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
               <div className="flex items-center justify-between mb-2">
                 <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
                   <Sliders size={13} className="text-indigo-600" />
-                  Ventilation par Classe ({availableClasses.length})
+                  Ventilation par {terminology.class} ({availableClasses.length})
                 </span>
-                <span className="text-[11px] text-slate-500">
-                  {filteredStudents.length} élève{filteredStudents.length > 1 ? 's' : ''} affiché{filteredStudents.length > 1 ? 's' : ''}
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {filteredStudents.length} {filteredStudents.length > 1 ? terminology.students.toLowerCase() : terminology.student.toLowerCase()} affiché{filteredStudents.length > 1 ? 's' : ''}
                 </span>
               </div>
 
