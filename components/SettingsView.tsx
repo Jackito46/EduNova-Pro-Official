@@ -1733,19 +1733,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
       <div className="lg:col-span-8 xl:col-span-9">
        {activeTab === 'school' && (
-         <div className="space-y-6 animate-in slide-in-from-right duration-500">
+         <div className="space-y-3 sm:space-y-3.5 animate-in slide-in-from-right duration-500">
            {!canManageAllCampuses && (
-             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
-               <div className="flex items-start gap-4">
-                 <span className="p-3 bg-amber-100 text-amber-800 rounded-xl leading-none shrink-0"><Lock size={20} /></span>
+             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-2.5 sm:p-3 rounded-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 shadow-xs">
+               <div className="flex items-start gap-2.5">
+                 <span className="p-1.5 bg-amber-100 text-amber-800 rounded-lg leading-none shrink-0"><Lock size={16} /></span>
                  <div>
-                   <h4 className="text-sm font-bold text-amber-900 font-sans tracking-tight">Droits d'élaboration limités (Annexe)</h4>
-                   <p className="text-xs text-amber-700/90 font-medium mt-1 leading-relaxed">
+                   <h4 className="text-xs sm:text-sm font-bold text-amber-900 font-sans tracking-tight">Droits d'élaboration limités (Annexe)</h4>
+                   <p className="text-[11px] sm:text-xs text-amber-700/90 font-medium mt-0.5 leading-relaxed">
                      Votre compte est rattaché à l'annexe <strong className="font-bold">"{userCampus?.name || 'Inconnue'}"</strong>. Les informations de l'identité globale de l'établissement ne peuvent être gérées que par les administrateurs du <strong className="font-bold">Siège Social</strong>.
                    </p>
                  </div>
                </div>
-               <span className="px-3 py-1.5 bg-amber-100/50 text-amber-800 text-[10px] font-black rounded-lg uppercase tracking-widest block whitespace-nowrap">
+               <span className="px-2 py-0.5 bg-amber-100/60 text-amber-800 text-[10px] font-black rounded-md uppercase tracking-widest block whitespace-nowrap">
                  Lecture Seule
                </span>
              </div>
@@ -1753,20 +1753,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
            <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
              {/* Header */}
-             <div className="p-6 md:p-8 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-50/50 gap-4">
-               <div className="flex items-center gap-4">
-                 <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 shrink-0">
-                   <Building2 size={24} />
+             <div className="px-3.5 sm:px-5 py-2.5 sm:py-3 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between bg-slate-50/50 gap-2.5 sm:gap-3">
+               <div className="flex items-center gap-3">
+                 <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl border border-indigo-100 shrink-0">
+                   <Building2 size={20} />
                  </div>
                  <div>
                    <div className="flex items-center gap-2">
-                       <h3 className="text-lg font-bold tracking-tight text-slate-900">Identité de l'Établissement</h3>
-                      {school?.has_multi_campus ? (
-                       <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold rounded-full flex items-center gap-1">
+                     <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Identité de l'Établissement</h3>
+                     {school?.has_multi_campus ? (
+                       <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 text-[10px] font-bold rounded-full flex items-center gap-1">
                          <Layers size={10} /> Multi-Annexes
                        </span>
                      ) : (
-                       <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full">
+                       <span className="px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full">
                          Site Unique
                        </span>
                      )}
@@ -1778,630 +1778,631 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                <button 
                  onClick={handleUpdateSchool} 
                  disabled={saving || !canManageAllCampuses} 
-                 className="w-full sm:w-auto px-6 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                 className="w-full sm:w-auto px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                >
-                 {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
                  <span>Enregistrer</span>
                </button>
              </div>
 
-          <div className="p-6 md:p-10 space-y-10 md:space-y-12">
-             {!canManageAllCampuses && userCampus && (
-               <div className="space-y-6 bg-indigo-50/20 border border-indigo-100/60 p-6 md:p-8 rounded-3xl relative overflow-hidden">
-                 <div className="absolute right-0 top-0 p-8 text-indigo-500/10 pointer-events-none">
-                   <MapPin size={80} />
+             <div className="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
+               {!canManageAllCampuses && userCampus && (
+                 <div className="space-y-2 bg-indigo-50/20 border border-indigo-100/60 p-2.5 sm:p-3 rounded-xl relative overflow-hidden">
+                   <div className="absolute right-0 top-0 p-2 text-indigo-500/10 pointer-events-none">
+                     <MapPin size={48} />
+                   </div>
+                   <div className="flex items-center gap-2 pb-1 border-b border-indigo-100/40">
+                     <div className="w-1.5 h-3.5 bg-indigo-600 rounded-full"></div>
+                     <h4 className="text-[10px] sm:text-[11px] font-black text-indigo-900 uppercase tracking-wider">Votre Identité d'Annexe d'Attache</h4>
+                   </div>
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5 relative z-10">
+                     <div className="space-y-0.5">
+                       <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Nom de l'Annexe</label>
+                       <input 
+                         type="text" 
+                         disabled
+                         className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold shadow-2xs disabled:opacity-95"
+                         value={userCampus.name}
+                       />
+                     </div>
+                     <div className="space-y-0.5">
+                       <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Type de Structure</label>
+                       <input 
+                         type="text" 
+                         disabled
+                         className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold shadow-2xs disabled:opacity-95"
+                         value="Annexe Régionale Autonome"
+                       />
+                     </div>
+                     <div className="md:col-span-2">
+                       <p className="text-[11px] sm:text-xs font-semibold text-indigo-950 leading-relaxed italic bg-indigo-50/55 border border-indigo-100/40 p-2 sm:p-2.5 rounded-xl">
+                         💡 Informations locales rattachées : Vos actions d'inscription, de saisie de notes et de perception de scolarités sont centralisées ou consolidées sous le nom géographique de l'annexe <strong className="font-bold">"{userCampus.name}"</strong>. Toute modification structurelle ou d'adresse locale doit faire l'objet d'une validation auprès du Siège Social.
+                       </p>
+                     </div>
+                   </div>
                  </div>
-                 <div className="flex items-center gap-3 pb-2 border-b border-indigo-100/40">
-                   <div className="w-1.5 h-6 bg-indigo-600 rounded-full"></div>
-                   <h4 className="text-[11px] font-black text-indigo-900 uppercase tracking-[0.2em]">Votre Identité d'Annexe d'Attache</h4>
+               )}
+
+               {/* Groupe: Informations Générales */}
+               <div className="space-y-2">
+                 <div className="flex items-center gap-2 pb-1 border-b border-slate-100 group">
+                   <div className="w-1.5 h-3.5 bg-slate-900 rounded-full"></div>
+                   <h4 className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider">Informations Générales</h4>
                  </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 relative z-10">
-                   <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Nom de l'Annexe</label>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Nom de l'Établissement</label>
                      <input 
                        type="text" 
-                       disabled
-                       className="w-full px-5 py-3.5 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-bold shadow-sm disabled:opacity-95"
-                       value={userCampus.name}
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.name || ''}
+                       onChange={e => setSchoolData({...schoolData, name: e.target.value})}
+                       disabled={!canManageAllCampuses}
                      />
                    </div>
-                   <div className="space-y-2">
-                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Type de Structure</label>
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Signataire Officiel</label>
                      <input 
                        type="text" 
-                       disabled
-                       className="w-full px-5 py-3.5 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-bold shadow-sm disabled:opacity-95"
-                       value="Annexe Régionale Autonome"
+                       placeholder="Ex: Jacques ETIENNE"
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.director_name || ''}
+                       onChange={e => setSchoolData({...schoolData, director_name: e.target.value})}
+                       disabled={!canManageAllCampuses}
                      />
                    </div>
-                   <div className="md:col-span-2">
-                     <p className="text-xs font-semibold text-indigo-950 leading-relaxed italic bg-indigo-50/55 border border-indigo-100/40 p-4 rounded-xl">
-                       💡 Informations locales rattachées : Vos actions d'inscription, de saisie de notes et de perception de scolarités sont centralisées ou consolidées sous le nom géographique de l'annexe <strong className="font-bold">"{userCampus.name}"</strong>. Toute modification structurelle ou d'adresse locale doit faire l'objet d'une validation auprès du Siège Social.
-                     </p>
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Titre du Signataire</label>
+                     <input 
+                       type="text" 
+                       placeholder="Ex: La Direction Pédagogique, Le Doyen, Le Rectorat..."
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.global_settings?.signature_title || ''}
+                       onChange={e => {
+                         const currentGs = typeof schoolData.global_settings === 'object' ? (schoolData.global_settings || {}) : {};
+                         setSchoolData({
+                           ...schoolData,
+                           global_settings: {
+                             ...currentGs,
+                             signature_title: e.target.value
+                           }
+                         });
+                       }}
+                       disabled={!canManageAllCampuses}
+                     />
+                   </div>
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Langue & Format Date</label>
+                     <select
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.global_settings?.locale || 'fr-FR'}
+                       onChange={e => {
+                         const currentGs = typeof schoolData.global_settings === 'object' ? (schoolData.global_settings || {}) : {};
+                         setSchoolData({
+                           ...schoolData,
+                           global_settings: {
+                             ...currentGs,
+                             locale: e.target.value
+                           }
+                         });
+                       }}
+                       disabled={!canManageAllCampuses}
+                     >
+                       <option value="fr-FR">Français (ex: 16 août 2026 - Fait à ...)</option>
+                       <option value="ht-HT">Kreyòl Ayisyen (ex: 16 out 2026 - Fèt nan ...)</option>
+                       <option value="en-US">English (ex: August 16, 2026 - Issued in ...)</option>
+                       <option value="es-ES">Español (ex: 16 de agosto de 2026 - Expedido en ...)</option>
+                     </select>
+                   </div>
+                   <div className="md:col-span-2 space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Devise / Slogan</label>
+                     <input 
+                       type="text" 
+                       placeholder="Ex: Excellence - Savoir - Discipline"
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.motto || ''}
+                       onChange={e => setSchoolData({...schoolData, motto: e.target.value})}
+                       disabled={!canManageAllCampuses}
+                     />
                    </div>
                  </div>
                </div>
-             )}
 
-            {/* Groupe: Informations Générales */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 pb-2 border-b border-slate-50 group">
-                <div className="w-1.5 h-6 bg-slate-900 rounded-full"></div>
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em]">Informations Générales</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Nom de l'Établissement</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.name || ''}
-                    onChange={e => setSchoolData({...schoolData, name: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Signataire Officiel</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: Jacques ETIENNE"
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.director_name || ''}
-                    onChange={e => setSchoolData({...schoolData, director_name: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Titre du Signataire</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: La Direction Pédagogique, Le Doyen, Le Rectorat..."
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.global_settings?.signature_title || ''}
-                    onChange={e => {
-                      const currentGs = typeof schoolData.global_settings === 'object' ? (schoolData.global_settings || {}) : {};
-                      setSchoolData({
-                        ...schoolData,
-                        global_settings: {
-                          ...currentGs,
-                          signature_title: e.target.value
-                        }
-                      });
-                    }}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Langue & Format Date</label>
-                  <select
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.global_settings?.locale || 'fr-FR'}
-                    onChange={e => {
-                      const currentGs = typeof schoolData.global_settings === 'object' ? (schoolData.global_settings || {}) : {};
-                      setSchoolData({
-                        ...schoolData,
-                        global_settings: {
-                          ...currentGs,
-                          locale: e.target.value
-                        }
-                      });
-                    }}
-                    disabled={!canManageAllCampuses}
-                  >
-                    <option value="fr-FR">Français (ex: 16 août 2026 - Fait à ...)</option>
-                    <option value="ht-HT">Kreyòl Ayisyen (ex: 16 out 2026 - Fèt nan ...)</option>
-                    <option value="en-US">English (ex: August 16, 2026 - Issued in ...)</option>
-                    <option value="es-ES">Español (ex: 16 de agosto de 2026 - Expedido en ...)</option>
-                  </select>
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Devise / Slogan</label>
-                  <input 
-                    type="text" 
-                    placeholder="Ex: Excellence - Savoir - Discipline"
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.motto || ''}
-                    onChange={e => setSchoolData({...schoolData, motto: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Groupe: Identification Légale & Fondation */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 pb-2 border-b border-slate-50">
-                <div className="w-1.5 h-6 bg-slate-900 rounded-full"></div>
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em]">Identification Légale & Fondation</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">Année de Fondation</label>
-                  <input 
-                    type="number" 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.foundation_year || ''}
-                    onChange={e => setSchoolData({...schoolData, foundation_year: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">NIF (Fiscal)</label>
-                  <input 
-                    type="text" 
-                    placeholder="000-000-000-0"
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.nif || ''}
-                    onChange={e => setSchoolData({...schoolData, nif: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 block truncate">N° Agrément / Licence</label>
-                  <input 
-                    type="text" 
-                    placeholder="MENFP-..."
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.license_number || ''}
-                    onChange={e => setSchoolData({...schoolData, license_number: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Groupe: Coordonnées & Contact */}
-            <div className="space-y-6">
-              <div className="flex items-center gap-3 pb-2 border-b border-slate-50">
-                <div className="w-1.5 h-6 bg-slate-900 rounded-full"></div>
-                <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-[0.2em]">Coordonnées & Contact</h4>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><MapPin size={12} /> Adresse Physique</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
-                    value={schoolData.address || ''}
-                    onChange={e => setSchoolData({...schoolData, address: e.target.value})}
-                    disabled={!canManageAllCampuses}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><Phone size={12} /> Téléphone</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all"
-                    value={schoolData.phone || ''}
-                    onChange={e => setSchoolData({...schoolData, phone: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><Mail size={12} /> Email</label>
-                  <input 
-                    type="email" 
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all"
-                    value={schoolData.email || ''}
-                    onChange={e => setSchoolData({...schoolData, email: e.target.value})}
-                  />
-                </div>
-                <div className="md:col-span-2 space-y-2">
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-2 truncate"><Globe size={12} /> Site Web</label>
-                  <input 
-                    type="text" 
-                    placeholder="https://www.ecole.com"
-                    className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-slate-900 focus:ring-4 focus:ring-slate-100 shadow-sm transition-all font-mono"
-                    value={schoolData.website || ''}
-                    onChange={e => setSchoolData({...schoolData, website: e.target.value})}
-                  />
-                </div>
-              </div>
-            </div>
-
-             {/* Option Multi-Annexes */}
-             <div className="pt-8 border-t border-slate-100">
-               <div className="flex items-center justify-between p-4 sm:p-5 bg-slate-50/80 rounded-xl border border-slate-200/80 gap-4">
-                 <div className="flex items-center gap-3.5">
-                   <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
-                     <Layers size={20} />
+               {/* Groupe: Identification Légale & Fondation */}
+               <div className="space-y-2">
+                 <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                   <div className="w-1.5 h-3.5 bg-slate-900 rounded-full"></div>
+                   <h4 className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider">Identification Légale & Fondation</h4>
+                 </div>
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 sm:gap-2.5">
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Année de Fondation</label>
+                     <input 
+                       type="number" 
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.foundation_year || ''}
+                       onChange={e => setSchoolData({...schoolData, foundation_year: e.target.value})}
+                       disabled={!canManageAllCampuses}
+                     />
                    </div>
-                   <div>
-                     <div className="flex items-center gap-2">
-                       <p className="text-xs font-bold text-slate-900">Gestion Multi-Annexes / Campus</p>
-                       {(isSuperAdmin ? schoolData.has_multi_campus : school?.has_multi_campus) ? (
-                         <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[10px] font-bold rounded-md">Actif</span>
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">NIF (Fiscal)</label>
+                     <input 
+                       type="text" 
+                       placeholder="000-000-000-0"
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.nif || ''}
+                       onChange={e => setSchoolData({...schoolData, nif: e.target.value})}
+                       disabled={!canManageAllCampuses}
+                     />
+                   </div>
+                   <div className="space-y-0.5 sm:col-span-2 md:col-span-1">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">N° Agrément / Licence</label>
+                     <input 
+                       type="text" 
+                       placeholder="MENFP-..."
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.license_number || ''}
+                       onChange={e => setSchoolData({...schoolData, license_number: e.target.value})}
+                       disabled={!canManageAllCampuses}
+                     />
+                   </div>
+                 </div>
+               </div>
+
+               {/* Groupe: Coordonnées & Contact */}
+               <div className="space-y-2">
+                 <div className="flex items-center gap-2 pb-1 border-b border-slate-100">
+                   <div className="w-1.5 h-3.5 bg-slate-900 rounded-full"></div>
+                   <h4 className="text-[10px] sm:text-[11px] font-black text-slate-800 uppercase tracking-wider">Coordonnées & Contact</h4>
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
+                   <div className="md:col-span-2 space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 flex items-center gap-1.5 truncate"><MapPin size={12} /> Adresse Physique</label>
+                     <input 
+                       type="text" 
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 disabled:cursor-not-allowed"
+                       value={schoolData.address || ''}
+                       onChange={e => setSchoolData({...schoolData, address: e.target.value})}
+                       disabled={!canManageAllCampuses}
+                     />
+                   </div>
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 flex items-center gap-1.5 truncate"><Phone size={12} /> Téléphone</label>
+                     <input 
+                       type="text" 
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all"
+                       value={schoolData.phone || ''}
+                       onChange={e => setSchoolData({...schoolData, phone: e.target.value})}
+                     />
+                   </div>
+                   <div className="space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 flex items-center gap-1.5 truncate"><Mail size={12} /> Email</label>
+                     <input 
+                       type="email" 
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all"
+                       value={schoolData.email || ''}
+                       onChange={e => setSchoolData({...schoolData, email: e.target.value})}
+                     />
+                   </div>
+                   <div className="md:col-span-2 space-y-0.5">
+                     <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 flex items-center gap-1.5 truncate"><Globe size={12} /> Site Web</label>
+                     <input 
+                       type="text" 
+                       placeholder="https://www.ecole.com"
+                       className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold outline-none focus:border-slate-900 focus:ring-2 focus:ring-slate-100 shadow-2xs transition-all font-mono"
+                       value={schoolData.website || ''}
+                       onChange={e => setSchoolData({...schoolData, website: e.target.value})}
+                     />
+                   </div>
+                 </div>
+               </div>
+
+               {/* Option Multi-Annexes */}
+               <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
+                 <div className="flex items-center justify-between p-2.5 sm:p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 gap-2.5">
+                   <div className="flex items-center gap-2.5">
+                     <div className="p-1.5 sm:p-2 bg-indigo-50 text-indigo-600 rounded-xl shrink-0">
+                       <Layers size={16} />
+                     </div>
+                     <div>
+                       <div className="flex items-center gap-2">
+                         <p className="text-xs font-bold text-slate-900">Gestion Multi-Annexes / Campus</p>
+                         {(isSuperAdmin ? schoolData.has_multi_campus : school?.has_multi_campus) ? (
+                           <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-bold rounded-md">Actif</span>
+                         ) : (
+                           <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-bold rounded-md">Campus unique</span>
+                         )}
+                       </div>
+                       <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5">
+                         {isSuperAdmin 
+                           ? "Activer ou désactiver l'architecture multi-sites pour cet établissement."
+                           : school?.has_multi_campus 
+                             ? "Votre établissement dispose de la gestion multi-annexes active."
+                             : "Pour débloquer la gestion multi-annexes, contactez votre chargé de compte EduNova."
+                         }
+                       </p>
+                     </div>
+                   </div>
+
+                   {isSuperAdmin ? (
+                     <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                       <input 
+                         type="checkbox" 
+                         className="sr-only peer" 
+                         checked={!!schoolData.has_multi_campus}
+                         onChange={e => setSchoolData({...schoolData, has_multi_campus: e.target.checked})}
+                       />
+                       <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                     </label>
+                   ) : (
+                     <div className="shrink-0">
+                       {school?.has_multi_campus ? (
+                         <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                           <CheckCircle2 size={13} /> Activé
+                         </span>
                        ) : (
-                         <span className="px-2 py-0.5 bg-slate-200 text-slate-600 text-[10px] font-bold rounded-md">Campus unique</span>
+                         <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                           <Lock size={13} /> Restreint
+                         </span>
                        )}
                      </div>
-                     <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                       {isSuperAdmin 
-                         ? "Activer ou désactiver l'architecture multi-sites pour cet établissement."
-                         : school?.has_multi_campus 
-                           ? "Votre établissement dispose de la gestion multi-annexes active."
-                           : "Pour débloquer la gestion multi-annexes, contactez votre chargé de compte EduNova."
-                       }
-                     </p>
+                   )}
+                 </div>
+               </div>
+
+               {/* Logo Section */}
+               <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg"><Upload size={13} /></div>
+                   <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-wider">Identité Visuelle</h4>
+                 </div>
+                 
+                 <div className="bg-slate-50/50 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 border-dashed">
+                   <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+                     <input 
+                       type="file" 
+                       id="logo-upload" 
+                       className="hidden" 
+                       accept="image/*" 
+                       onChange={handleLogoUpload} 
+                     />
+                     <div 
+                       className="w-16 h-16 sm:w-18 sm:h-18 bg-white border-2 border-white rounded-2xl flex items-center justify-center overflow-hidden shadow-xs relative group cursor-pointer ring-1 ring-slate-200 shrink-0"
+                       onClick={() => document.getElementById('logo-upload')?.click()}
+                     >
+                       <Logo src={schoolData.logo_url} size="md" className="p-1.5" />
+                       <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                         <Camera className="text-white" size={16} />
+                       </div>
+                     </div>
+
+                     <div className="flex-1 space-y-1.5 w-full">
+                       <div>
+                         <h5 className="text-xs sm:text-[13px] font-bold text-slate-900">Logo de l'Établissement</h5>
+                         <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium italic">Format carré (PNG ou JPG), max 2 Mo.</p>
+                       </div>
+                       
+                       <div className="flex flex-wrap gap-1.5">
+                         <button 
+                           type="button" 
+                           onClick={() => document.getElementById('logo-upload')?.click()}
+                           className="px-2.5 py-1 bg-slate-900 text-white text-[11px] font-bold rounded-lg transition-all hover:bg-black shadow-2xs flex items-center gap-1.5 active:scale-95"
+                         >
+                           <Upload size={12} /> Changer le logo
+                         </button>
+                         {schoolData.logo_url && (
+                           <button 
+                             type="button" 
+                             onClick={() => setSchoolData({...schoolData, logo_url: null})}
+                             className="px-2.5 py-1 bg-rose-50 text-rose-700 text-[11px] font-bold rounded-lg transition-all hover:bg-rose-100 flex items-center gap-1.5 active:scale-95"
+                           >
+                             <Trash2 size={12} /> Supprimer
+                           </button>
+                         )}
+                       </div>
+                       
+                       <div className="relative group">
+                         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-slate-800 transition-colors">
+                           <Link size={11} />
+                         </div>
+                         <input 
+                           type="text" 
+                           placeholder="OU coller l'URL de votre logo ici..."
+                           className="w-full pl-7 pr-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-medium outline-none focus:border-slate-900 transition-all font-mono"
+                           value={schoolData.logo_url && !schoolData.logo_url.startsWith('data:') ? schoolData.logo_url : ''}
+                           onChange={e => setSchoolData({...schoolData, logo_url: e.target.value})}
+                         />
+                       </div>
+                     </div>
                    </div>
                  </div>
+               </div>
 
-                 {isSuperAdmin ? (
-                   <label className="relative inline-flex items-center cursor-pointer shrink-0">
-                     <input 
-                       type="checkbox" 
-                       className="sr-only peer"
-                       checked={!!schoolData.has_multi_campus}
-                       onChange={e => setSchoolData({...schoolData, has_multi_campus: e.target.checked})}
-                     />
-                     <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
-                   </label>
-                 ) : (
-                   <div className="shrink-0">
-                     {school?.has_multi_campus ? (
-                       <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
-                         <CheckCircle2 size={14} /> Activé
-                       </span>
-                     ) : (
-                       <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
-                         <Lock size={14} /> Restreint
-                       </span>
-                     )}
+               {/* Configuration des Modules */}
+               <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><ShieldCheck size={13} /></div>
+                   <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-wider">Configuration des Modules</h4>
+                 </div>
+
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-2.5">
+                   {/* Module Présences */}
+                   <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200 flex items-start gap-2.5">
+                     <div className="relative inline-flex items-center mt-0.5 shrink-0">
+                       <input 
+                         type="checkbox" 
+                         id="module_presences_toggle"
+                         className="sr-only peer" 
+                         checked={schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')}
+                         onChange={e => handleToggleModule('presences', e.target.checked)}
+                         disabled={!canManageAllCampuses}
+                       />
+                       <div onClick={() => {
+                         if (canManageAllCampuses) {
+                           const currentVal = schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL');
+                           handleToggleModule('presences', !currentVal);
+                         }
+                       }} className={`w-9 h-5 rounded-full cursor-pointer relative transition-all duration-300 ${(schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'bg-indigo-600' : 'bg-slate-200'} ${!canManageAllCampuses ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                         <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-all duration-300 shadow-xs ${(schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'left-[18px]' : 'left-[2px]'}`}></div>
+                       </div>
+                     </div>
+                     <div>
+                       <label htmlFor="module_presences_toggle" className="text-xs font-bold text-slate-900 cursor-pointer block">Module Présences</label>
+                       <p className="text-[11px] text-slate-600 mt-0.5 font-medium leading-relaxed">
+                         Activer le registre d'appel quotidien, les feuilles de présences et le suivi d'assiduité.
+                       </p>
+                     </div>
                    </div>
+
+                   {/* Module Discipline */}
+                   <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200 flex items-start gap-2.5">
+                     <div className="relative inline-flex items-center mt-0.5 shrink-0">
+                       <input 
+                         type="checkbox" 
+                         id="module_discipline_toggle"
+                         className="sr-only peer" 
+                         checked={schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')}
+                         onChange={e => handleToggleModule('discipline', e.target.checked)}
+                         disabled={!canManageAllCampuses}
+                       />
+                       <div onClick={() => {
+                         if (canManageAllCampuses) {
+                           const currentVal = schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL');
+                           handleToggleModule('discipline', !currentVal);
+                         }
+                       }} className={`w-9 h-5 rounded-full cursor-pointer relative transition-all duration-300 ${(schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'bg-indigo-600' : 'bg-slate-200'} ${!canManageAllCampuses ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                         <div className={`w-4 h-4 bg-white rounded-full absolute top-[2px] transition-all duration-300 shadow-xs ${(schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'left-[18px]' : 'left-[2px]'}`}></div>
+                       </div>
+                     </div>
+                     <div>
+                       <label htmlFor="module_discipline_toggle" className="text-xs font-bold text-slate-900 cursor-pointer block">Module Discipline</label>
+                       <p className="text-[11px] text-slate-600 mt-0.5 font-medium leading-relaxed">
+                         Activer le suivi disciplinaire, blâmes, retenues, suspensions et incidents.
+                       </p>
+                     </div>
+                   </div>
+                 </div>
+               </div>
+
+               {/* Pièces Justificatives Exigées à l'Inscription */}
+               <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
+                   <div className="flex items-center gap-2">
+                     <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><FileCheck size={13} /></div>
+                     <div>
+                       <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-wider">Pièces Exigées à l'Inscription</h4>
+                       <p className="text-[11px] text-slate-600 font-medium mt-0.5">
+                         Personnalisez les documents requis lors de l'admission d'un {terminology.student.toLowerCase()} pour votre établissement.
+                       </p>
+                     </div>
+                   </div>
+
+                   {canManageAllCampuses && (
+                     <button
+                       type="button"
+                       onClick={handleResetDocsToDefault}
+                       disabled={isSavingDocs}
+                       className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shrink-0"
+                     >
+                       <RefreshCw size={11} className={isSavingDocs ? "animate-spin" : ""} />
+                       <span>Par défaut ({schoolData.school_type === 'UNIVERSITY' ? 'Université' : schoolData.school_type === 'PROFESSIONAL' ? 'Formation Pro' : 'École Fondamentale'})</span>
+                     </button>
+                   )}
+                 </div>
+
+                 {/* Form to add a new document requirement */}
+                 {canManageAllCampuses && (
+                   <form onSubmit={handleAddCustomDocument} className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 mb-2 space-y-2">
+                     <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                       <Plus size={12} className="text-indigo-600" />
+                       <span>Ajouter une nouvelle pièce ou exigence</span>
+                     </div>
+
+                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                       <div className="sm:col-span-6 space-y-0.5">
+                         <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Nom de la pièce *</label>
+                         <input
+                           type="text"
+                           placeholder="Ex: Certificat Médical Récent, Billet d'Ordre..."
+                           value={newDocName}
+                           onChange={e => setNewDocName(e.target.value)}
+                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
+                         />
+                       </div>
+                       <div className="sm:col-span-6 space-y-0.5">
+                         <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Description / Précisions (optionnel)</label>
+                         <input
+                           type="text"
+                           placeholder="Ex: Délivré depuis moins de 3 mois..."
+                           value={newDocDescription}
+                           onChange={e => setNewDocDescription(e.target.value)}
+                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
+                         />
+                       </div>
+                     </div>
+
+                     <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                       <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                         <input
+                           type="checkbox"
+                           checked={newDocRequired}
+                           onChange={e => setNewDocRequired(e.target.checked)}
+                           className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                         />
+                         <span>Document obligatoire par défaut</span>
+                       </label>
+
+                       <button
+                         type="submit"
+                         disabled={isSavingDocs || !newDocName.trim()}
+                         className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                       >
+                         <Plus size={12} />
+                         Ajouter au dossier
+                       </button>
+                     </div>
+                   </form>
                  )}
+
+                 {/* List of configured documents */}
+                 <div className="space-y-1">
+                   {currentConfiguredDocs.length === 0 ? (
+                     <div className="p-3 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs font-medium">
+                       Aucune pièce justificative configurée pour cet établissement.
+                     </div>
+                   ) : (
+                     currentConfiguredDocs.map((doc, idx) => (
+                       <div 
+                         key={doc.id || idx}
+                         className="bg-white p-2 sm:p-2.5 rounded-lg border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 shadow-2xs hover:border-slate-300 transition-all"
+                       >
+                         <div className="flex items-start gap-2">
+                           <div className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                             {idx + 1}
+                           </div>
+                           <div>
+                             <div className="flex items-center gap-2 flex-wrap">
+                               <h5 className="text-xs font-bold text-slate-900">{doc.name}</h5>
+                               <button
+                                 type="button"
+                                 onClick={() => canManageAllCampuses && handleToggleDocRequired(doc.id, !!doc.required)}
+                                 disabled={!canManageAllCampuses || isSavingDocs}
+                                 className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ${
+                                   doc.required 
+                                     ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100' 
+                                     : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                 } ${!canManageAllCampuses ? 'cursor-default' : 'cursor-pointer'}`}
+                               >
+                                 {doc.required ? 'Obligatoire' : 'Facultatif'}
+                               </button>
+                             </div>
+                             {doc.description && (
+                               <p className="text-[10px] text-slate-500 font-medium mt-0.5">
+                                 {doc.description}
+                               </p>
+                             )}
+                           </div>
+                         </div>
+
+                         {canManageAllCampuses && (
+                           <div className="flex items-center gap-1.5 self-end sm:self-center">
+                             <button
+                               type="button"
+                               onClick={() => handleRemoveCustomDocument(doc.id)}
+                               disabled={isSavingDocs}
+                               className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                               title="Supprimer cette pièce"
+                             >
+                               <Trash2 size={12} />
+                             </button>
+                           </div>
+                         )}
+                       </div>
+                     ))
+                   )}
+                 </div>
                </div>
+
+               {/* Zone de Danger */}
+               {canManageAllCampuses && (
+                 <div className="pt-2 sm:pt-2.5 border-t border-rose-100">
+                   <div className="flex items-center gap-2 mb-2">
+                     <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg"><AlertTriangle size={13} /></div>
+                     <h4 className="text-[10px] sm:text-[11px] font-black text-rose-900 uppercase tracking-wider">Zone de Danger</h4>
+                   </div>
+
+                   {isPrimaryAdmin ? (
+                     <div className="bg-rose-50/40 p-2.5 sm:p-3 rounded-xl border border-rose-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 shadow-2xs">
+                       <div className="space-y-0.5">
+                         <div className="flex items-center gap-2">
+                           <h5 className="text-xs sm:text-[13px] font-bold text-rose-950">Vider les informations de l'établissement</h5>
+                           <span className="px-1.5 py-0.5 bg-rose-100 text-rose-800 text-[9px] font-black rounded-md flex items-center gap-1 border border-rose-200">
+                             <Crown size={9} /> Droit Fondateur
+                           </span>
+                         </div>
+                         <p className="text-[11px] text-rose-700 font-medium leading-relaxed max-w-2xl">
+                           Cette action supprimera de manière définitive toutes les données opérationnelles associées à cet établissement tout en conservant la structure générale de votre école.
+                         </p>
+                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-900 pt-0.5">
+                           <ShieldCheck size={12} className="text-rose-600" />
+                           <span>Privilège vérifié : <span className="underline">{user.email}</span> (1er Administrateur Système)</span>
+                         </div>
+                       </div>
+                       <button
+                         type="button"
+                         onClick={() => {
+                           setConfirmSchoolName('');
+                           setConfirmUserEmail('');
+                           setIsCleanModalOpen(true);
+                         }}
+                         className="w-full md:w-auto px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-1.5 shadow-xs shrink-0 active:scale-95 cursor-pointer"
+                       >
+                         <Trash2 size={13} />
+                         Vider les données
+                       </button>
+                     </div>
+                   ) : (
+                     <div className="bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 opacity-85">
+                       <div className="space-y-0.5">
+                         <div className="flex items-center gap-2">
+                           <h5 className="text-xs sm:text-[13px] font-bold text-slate-900">Réinitialisation Verrouillée (Accès Sécurisé)</h5>
+                           <span className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded-md flex items-center gap-1">
+                             <Lock size={9} /> Restreint
+                           </span>
+                         </div>
+                         <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-2xl">
+                           La réinitialisation globale des données est réservée au <strong>Premier Administrateur Système (Fondateur)</strong> {primaryAdmin?.full_name ? `(${primaryAdmin.full_name})` : ''} ou au Super-Admin EduNova.
+                         </p>
+                       </div>
+                       <div className="px-2.5 py-1 bg-slate-200/80 text-slate-700 rounded-lg text-[11px] font-bold shrink-0 flex items-center gap-1.5">
+                         <ShieldAlert size={12} /> Accès non autorisé
+                       </div>
+                     </div>
+                   )}
+                 </div>
+               )}
+
+               {/* Bottom Action Bar */}
+               <div className="pt-2 sm:pt-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-slate-100">
+                 <div className="flex items-center gap-2">
+                   <div className="p-1 bg-amber-50 text-amber-600 rounded-lg"><AlertCircle size={13} /></div>
+                   <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tight">Vérifiez vos informations avant de confirmer.</p>
+                 </div>
+                 <button 
+                   onClick={handleUpdateSchool} 
+                   disabled={saving || !canManageAllCampuses} 
+                   className="w-full sm:w-auto px-5 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs tracking-wide uppercase flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                   title={!canManageAllCampuses ? "Modification réservée au Siège Social" : "Enregistrer les modifications"}
+                 >
+                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                   Enregistrer les modifications
+                 </button>
+               </div>
+
              </div>
-
-            {/* Logo Section */}
-            <div className="pt-8 border-t border-slate-100">
-               <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg"><Upload size={16} /></div>
-                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Identité Visuelle</h4>
-               </div>
-               
-               <div className="bg-slate-50/50 p-6 rounded-2xl border border-slate-100 border-dashed">
-                <div className="flex flex-col md:flex-row gap-8 items-start md:items-center">
-                  <input 
-                    type="file" 
-                    id="logo-upload" 
-                    className="hidden" 
-                    accept="image/*" 
-                    onChange={handleLogoUpload} 
-                  />
-                  <div 
-                    className="w-32 h-32 bg-white border-2 border-white rounded-3xl flex items-center justify-center overflow-hidden shadow-xl shadow-slate-200/50 relative group cursor-pointer ring-4 ring-slate-50 flex-shrink-0"
-                    onClick={() => document.getElementById('logo-upload')?.click()}
-                  >
-                    <Logo src={schoolData.logo_url} size="xl" className="p-3" />
-                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <Camera className="text-white" size={24} />
-                    </div>
-                  </div>
-
-                  <div className="flex-1 space-y-4">
-                    <div>
-                      <h5 className="text-sm font-bold text-slate-900">Logo de l'Établissement</h5>
-                      <p className="text-xs text-slate-700 mt-1 font-medium italic">Format carré (PNG ou JPG), max 2 Mo.</p>
-                    </div>
-                    
-                    <div className="flex flex-wrap gap-3">
-                      <button 
-                        type="button" 
-                        onClick={() => document.getElementById('logo-upload')?.click()}
-                        className="px-4 py-2 bg-slate-900 text-white text-[10px] font-bold rounded-xl transition-all hover:bg-black shadow-sm flex items-center gap-2 active:scale-95"
-                      >
-                        <Upload size={14} /> Changer le logo
-                      </button>
-                      {schoolData.logo_url && (
-                        <button 
-                          type="button" 
-                          onClick={() => setSchoolData({...schoolData, logo_url: null})}
-                          className="px-4 py-2 bg-rose-50 text-rose-600 text-[10px] font-bold rounded-xl transition-all hover:bg-rose-100 flex items-center gap-2 active:scale-95"
-                        >
-                          <Trash2 size={14} /> Supprimer
-                        </button>
-                      )}
-                    </div>
-                    
-                    <div className="relative group">
-                      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-700 group-focus-within:text-slate-900 transition-colors">
-                        <Link size={12} />
-                      </div>
-                      <input 
-                        type="text" 
-                        placeholder="OU coller l'URL de votre logo ici..."
-                        className="w-full pl-10 pr-4 py-3 bg-white border border-slate-200 rounded-xl text-[10px] font-bold outline-none focus:border-slate-900 transition-all font-mono"
-                        value={schoolData.logo_url && !schoolData.logo_url.startsWith('data:') ? schoolData.logo_url : ''}
-                        onChange={e => setSchoolData({...schoolData, logo_url: e.target.value})}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Configuration des Modules */}
-            <div className="pt-8 border-t border-slate-100">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><ShieldCheck size={16} /></div>
-                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Configuration des Modules</h4>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Module Présences */}
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-start gap-4">
-                  <div className="relative inline-flex items-center mt-1 shrink-0">
-                    <input 
-                      type="checkbox" 
-                      id="module_presences_toggle"
-                      className="sr-only peer" 
-                      checked={schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')}
-                      onChange={e => handleToggleModule('presences', e.target.checked)}
-                      disabled={!canManageAllCampuses}
-                    />
-                    <div onClick={() => {
-                      if (canManageAllCampuses) {
-                        const currentVal = schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL');
-                        handleToggleModule('presences', !currentVal);
-                      }
-                    }} className={`w-11 h-6 rounded-full cursor-pointer relative transition-all duration-300 ${(schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'bg-indigo-600' : 'bg-slate-200'} ${!canManageAllCampuses ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full absolute top-[2px] transition-all duration-300 shadow-md ${(schoolData.global_settings?.modules?.presences ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'left-[22px]' : 'left-[2px]'}`}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="module_presences_toggle" className="text-sm font-bold text-slate-900 cursor-pointer block">Module Présences</label>
-                    <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
-                      Activer le registre d'appel quotidien, les feuilles de présences pour les cours, et le suivi d'assiduité.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Module Discipline */}
-                <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex items-start gap-4">
-                  <div className="relative inline-flex items-center mt-1 shrink-0">
-                    <input 
-                      type="checkbox" 
-                      id="module_discipline_toggle"
-                      className="sr-only peer" 
-                      checked={schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')}
-                      onChange={e => handleToggleModule('discipline', e.target.checked)}
-                      disabled={!canManageAllCampuses}
-                    />
-                    <div onClick={() => {
-                      if (canManageAllCampuses) {
-                        const currentVal = schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL');
-                        handleToggleModule('discipline', !currentVal);
-                      }
-                    }} className={`w-11 h-6 rounded-full cursor-pointer relative transition-all duration-300 ${(schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'bg-indigo-600' : 'bg-slate-200'} ${!canManageAllCampuses ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                      <div className={`w-5 h-5 bg-white rounded-full absolute top-[2px] transition-all duration-300 shadow-md ${(schoolData.global_settings?.modules?.discipline ?? (schoolData.school_type !== 'UNIVERSITY' && schoolData.school_type !== 'PROFESSIONAL')) ? 'left-[22px]' : 'left-[2px]'}`}></div>
-                    </div>
-                  </div>
-                  <div>
-                    <label htmlFor="module_discipline_toggle" className="text-sm font-bold text-slate-900 cursor-pointer block">Module Discipline</label>
-                    <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
-                      Activer le suivi disciplinaire, les blâmes, retenues, suspensions et le registre des incidents.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Pièces Justificatives Exigées à l'Inscription */}
-            <div className="pt-8 border-t border-slate-100">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-indigo-50 text-indigo-600 rounded-lg"><FileCheck size={16} /></div>
-                  <div>
-                    <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em]">Pièces Exigées à l'Inscription</h4>
-                    <p className="text-xs text-slate-500 font-medium mt-0.5">
-                      Personnalisez les documents requis lors de l'admission d'un {terminology.student.toLowerCase()} pour votre établissement.
-                    </p>
-                  </div>
-                </div>
-
-                {canManageAllCampuses && (
-                  <button
-                    type="button"
-                    onClick={handleResetDocsToDefault}
-                    disabled={isSavingDocs}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 self-start sm:self-auto"
-                  >
-                    <RefreshCw size={13} className={isSavingDocs ? "animate-spin" : ""} />
-                    Réinitialiser par défaut ({schoolData.school_type === 'UNIVERSITY' ? 'Université' : schoolData.school_type === 'PROFESSIONAL' ? 'Formation Pro' : 'École Fondamentale'})
-                  </button>
-                )}
-              </div>
-
-              {/* Form to add a new document requirement */}
-              {canManageAllCampuses && (
-                <form onSubmit={handleAddCustomDocument} className="bg-slate-50/80 p-4 sm:p-5 rounded-2xl border border-slate-200/80 mb-6 space-y-4">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
-                    <Plus size={14} className="text-indigo-600" />
-                    <span>Ajouter une nouvelle pièce ou exigence</span>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
-                    <div className="md:col-span-6">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Nom de la pièce *</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Certificat Médical Récent, Billet d'Ordre..."
-                        value={newDocName}
-                        onChange={e => setNewDocName(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
-                      />
-                    </div>
-                    <div className="md:col-span-6">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Description / Précisions (optionnel)</label>
-                      <input
-                        type="text"
-                        placeholder="Ex: Délivré depuis moins de 3 mois..."
-                        value={newDocDescription}
-                        onChange={e => setNewDocDescription(e.target.value)}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
-                    <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-                      <input
-                        type="checkbox"
-                        checked={newDocRequired}
-                        onChange={e => setNewDocRequired(e.target.checked)}
-                        className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                      />
-                      <span>Document obligatoire par défaut</span>
-                    </label>
-
-                    <button
-                      type="submit"
-                      disabled={isSavingDocs || !newDocName.trim()}
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-2 shadow-xs"
-                    >
-                      <Plus size={14} />
-                      Ajouter au dossier
-                    </button>
-                  </div>
-                </form>
-              )}
-
-              {/* List of configured documents */}
-              <div className="space-y-3">
-                {currentConfiguredDocs.length === 0 ? (
-                  <div className="p-8 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-400 text-xs font-medium">
-                    Aucune pièce justificative configurée pour cet établissement.
-                  </div>
-                ) : (
-                  currentConfiguredDocs.map((doc, idx) => (
-                    <div 
-                      key={doc.id || idx}
-                      className="bg-white p-4 rounded-xl border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs hover:border-slate-300 transition-all"
-                    >
-                      <div className="flex items-start gap-3">
-                        <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                          {idx + 1}
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <h5 className="text-xs font-bold text-slate-900">{doc.name}</h5>
-                            <button
-                              type="button"
-                              onClick={() => canManageAllCampuses && handleToggleDocRequired(doc.id, !!doc.required)}
-                              disabled={!canManageAllCampuses || isSavingDocs}
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all ${
-                                doc.required 
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100' 
-                                  : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                              } ${!canManageAllCampuses ? 'cursor-default' : 'cursor-pointer'}`}
-                            >
-                              {doc.required ? 'Obligatoire' : 'Facultatif'}
-                            </button>
-                          </div>
-                          {doc.description && (
-                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                              {doc.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {canManageAllCampuses && (
-                        <div className="flex items-center gap-2 self-end sm:self-center">
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveCustomDocument(doc.id)}
-                            disabled={isSavingDocs}
-                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                            title="Supprimer cette pièce"
-                          >
-                            <Trash2 size={15} />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            {/* Zone de Danger */}
-            {canManageAllCampuses && (
-              <div className="pt-8 border-t border-rose-100">
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="p-2 bg-rose-50 text-rose-600 rounded-lg"><AlertTriangle size={16} /></div>
-                  <h4 className="text-[11px] font-black text-rose-900 uppercase tracking-[0.2em]">Zone de Danger</h4>
-                </div>
-
-                {isPrimaryAdmin ? (
-                  <div className="bg-rose-50/40 p-6 rounded-2xl border border-rose-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 shadow-xs">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <h5 className="text-sm font-bold text-rose-950">Vider les informations de l'établissement</h5>
-                        <span className="px-2.5 py-0.5 bg-rose-100 text-rose-800 text-[10px] font-black rounded-md flex items-center gap-1 border border-rose-200">
-                          <Crown size={10} /> Droit Fondateur
-                        </span>
-                      </div>
-                      <p className="text-xs text-rose-700 font-medium leading-relaxed max-w-2xl">
-                        Cette action supprimera de manière définitive toutes les données opérationnelles associées à cet établissement (élèves, notes, présences, frais, paiements, dépenses, etc.) tout en conservant la structure générale de votre école.
-                      </p>
-                      <div className="flex items-center gap-2 text-[11px] font-bold text-rose-900 pt-1">
-                        <ShieldCheck size={14} className="text-rose-600" />
-                        <span>Privilège vérifié : <span className="underline">{user.email}</span> (1er Administrateur Système)</span>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setConfirmSchoolName('');
-                        setConfirmUserEmail('');
-                        setIsCleanModalOpen(true);
-                      }}
-                      className="w-full md:w-auto px-6 py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 shrink-0 active:scale-95"
-                    >
-                      <Trash2 size={16} />
-                      Vider les données
-                    </button>
-                  </div>
-                ) : (
-                  <div className="bg-slate-50 p-6 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 opacity-85">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2">
-                        <h5 className="text-sm font-bold text-slate-900">Réinitialisation Verrouillée (Accès Sécurisé)</h5>
-                        <span className="px-2.5 py-0.5 bg-slate-200 text-slate-700 text-[10px] font-bold rounded-md flex items-center gap-1">
-                          <Lock size={10} /> Restreint
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-600 font-medium leading-relaxed max-w-2xl">
-                        La réinitialisation globale des données est une opération à haut risque. Elle est exclusivement réservée au <strong>Premier Administrateur Système (Fondateur)</strong> de cet établissement {primaryAdmin?.full_name ? `(${primaryAdmin.full_name})` : ''} ou au Super-Admin EduNova.
-                      </p>
-                    </div>
-                    <div className="px-4 py-2 bg-slate-200/80 text-slate-700 rounded-xl text-xs font-bold shrink-0 flex items-center gap-2">
-                      <ShieldAlert size={14} /> Accès non autorisé
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Bottom Action Bar */}
-            <div className="pt-8 flex flex-col md:flex-row items-center justify-between gap-6 border-t border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-amber-50 text-amber-600 rounded-lg"><AlertCircle size={16} /></div>
-                <p className="text-[10px] font-bold text-slate-700 leading-relaxed uppercase tracking-tight">Vérifiez vos informations avant de confirmer.</p>
-              </div>
-              <button 
-                onClick={handleUpdateSchool} 
-                disabled={saving || !canManageAllCampuses} 
-                className="w-full md:w-auto px-10 py-4 bg-slate-900 text-white rounded-xl font-bold text-xs tracking-widest uppercase flex items-center justify-center gap-3 hover:bg-black transition-all shadow-xl shadow-slate-200 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                title={!canManageAllCampuses ? "Modification réservée au Siège Social" : "Enregistrer les modifications"}
-              >
-                {saving ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-                Enregistrer les modifications
-              </button>
-            </div>
-          </div>
+           </div>
          </div>
-        </div>
        )}
 
        {activeTab === 'campuses' && (

@@ -203,7 +203,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
   // Step 3 & 4: Cart & Payment
   const [cart, setCart] = useState<CartItem[]>([]);
   const [paymentCurrency, setPaymentCurrency] = useState<'HTG' | 'USD'>('HTG');
-  const [paymentMethod, setPaymentMethod] = useState<string>('Dépôt Bancaire');
+  const [paymentMethod, setPaymentMethod] = useState<string>('Cash');
   const [bankName, setBankName] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [depositDate, setDepositDate] = useState(getLocalTodayString());
@@ -226,10 +226,11 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
     return getPaymentMethodConfig(paymentMethod, schoolDetails || school);
   }, [paymentMethod, schoolDetails, school]);
 
-  // Synchroniser la méthode par défaut si la sélectionnée est inactive
+  // Synchroniser la méthode par défaut (privilégie Cash/Espèces pour la vente directe) si la sélectionnée est inactive
   useEffect(() => {
     if (activePaymentMethods.length > 0 && !activePaymentMethods.some(m => m.code === paymentMethod)) {
-      setPaymentMethod(activePaymentMethods[0].code);
+      const defaultMethod = activePaymentMethods.find(m => m.code === 'Cash' || m.id === 'CASH') || activePaymentMethods[0];
+      setPaymentMethod(defaultMethod.code);
     }
   }, [activePaymentMethods, paymentMethod]);
   

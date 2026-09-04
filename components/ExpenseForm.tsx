@@ -264,7 +264,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     return (
       <div className="flex h-[60vh] flex-col items-center justify-center gap-4">
         <Loader2 className="animate-spin text-rose-600" size={40} />
-        <p className="text-sm font-medium text-gray-500">Authentification de la session active...</p>
+        <p className="text-sm font-bold text-slate-800">Authentification de la session active...</p>
       </div>
     );
   }
@@ -369,7 +369,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                             type="number" 
                             required 
                             step="0.01" 
-                            className={`w-full pl-3 pr-12 py-2 bg-white focus:bg-white border border-slate-300 focus:border-rose-500 rounded-xl text-xl font-black outline-none transition-all font-mono tracking-tight shadow-2xs ${isEdit ? 'text-amber-700' : 'text-rose-700'}`} 
+                            className={`w-full pl-3 pr-12 py-2 bg-white focus:bg-white border border-slate-300 focus:border-rose-500 rounded-xl text-xl font-black outline-none transition-all font-mono tracking-tight shadow-2xs ${isEdit ? 'text-amber-800' : 'text-rose-800'}`} 
                             placeholder="0.00" 
                             value={formData.amount} 
                             onChange={e => setFormData({...formData, amount: e.target.value})} 
@@ -467,7 +467,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         required 
                         type="text" 
                         placeholder="Ex: MAINTENANCE GÉNÉRATRICE, ACHAT FOURNITURES..." 
-                        className="w-full px-3 py-2.5 bg-white hover:bg-slate-50 focus:bg-white text-slate-950 placeholder:text-slate-500 border border-slate-300 focus:border-rose-500 rounded-xl text-xs font-bold tracking-tight outline-none transition-all shadow-2xs" 
+                        className="w-full px-3 py-2.5 bg-white hover:bg-slate-50 focus:bg-white text-slate-950 placeholder:text-slate-600 border border-slate-300 focus:border-rose-500 rounded-xl text-xs sm:text-sm font-bold tracking-tight outline-none transition-all shadow-2xs" 
                         value={formData.label} 
                         onChange={e => setFormData({...formData, label: e.target.value})} 
                       />
@@ -483,12 +483,12 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </label>
                   <textarea 
                     rows={4} 
-                    className="w-full p-3 bg-white focus:bg-white text-slate-950 placeholder:text-slate-500 border border-slate-300 focus:border-rose-500 rounded-xl text-xs font-semibold tracking-tight outline-none transition-all resize-none shadow-2xs leading-relaxed" 
+                    className="w-full p-3 bg-white focus:bg-white text-slate-950 placeholder:text-slate-600 border border-slate-300 focus:border-rose-500 rounded-xl text-xs sm:text-sm font-bold tracking-tight outline-none transition-all resize-none shadow-2xs leading-relaxed" 
                     placeholder="Observations comptables, numéro de reçu ou pièces justificatives..." 
                     value={formData.description} 
                     onChange={e => setFormData({...formData, description: e.target.value})} 
                   />
-                  <span className="text-xs text-slate-700 font-semibold ml-0.5">Facultatif mais recommandé pour l'audit financier.</span>
+                  <span className="text-xs text-slate-800 font-bold ml-0.5">Facultatif mais recommandé pour l'audit financier.</span>
                </div>
                
                <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-1.5">
@@ -507,7 +507,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
              <button 
                type="button" 
                onClick={() => navigate('/economat/depenses')} 
-               className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-800 hover:text-slate-950 border border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-center"
+               className="w-full sm:w-auto px-4 py-2.5 text-xs font-bold text-slate-900 font-black hover:text-black border border-slate-300 bg-slate-50 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer text-center"
              >
                Annuler
              </button>
@@ -530,7 +530,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="p-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-black text-slate-950 tracking-tight">Nouvelle Catégorie</h3>
-                <p className="text-xs font-bold text-slate-700 mt-0.5">Ajout rapide au référentiel</p>
+                <p className="text-xs font-bold text-slate-900 mt-0.5">Ajout rapide au référentiel</p>
               </div>
               <button
                 onClick={() => setShowQuickCatModal(false)}

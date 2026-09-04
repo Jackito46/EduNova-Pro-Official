@@ -270,7 +270,8 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   useEffect(() => {
     if (activePaymentMethods.length > 0 && !activePaymentMethods.some(m => m.code === inscriptionPaymentMethod)) {
-      setInscriptionPaymentMethod(activePaymentMethods[0].code);
+      const defaultMethod = activePaymentMethods.find(m => m.code === 'Cash' || m.id === 'CASH') || activePaymentMethods[0];
+      setInscriptionPaymentMethod(defaultMethod.code);
     }
   }, [activePaymentMethods, inscriptionPaymentMethod]);
 

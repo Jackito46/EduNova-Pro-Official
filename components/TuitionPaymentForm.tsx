@@ -131,7 +131,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   // Nouveaux états pour le multi-devises et types de frais
   const [currency, setCurrency] = useState<'HTG' | 'USD'>('HTG');
   const [feeType, setFeeType] = useState<string>('SCOLARITE');
-  const [paymentMethod, setPaymentMethod] = useState<string>('Dépôt Bancaire');
+  const [paymentMethod, setPaymentMethod] = useState<string>('Cash');
   const [bankName, setBankName] = useState('');
   const [referenceNumber, setReferenceNumber] = useState('');
   const [depositDate, setDepositDate] = useState(getLocalTodayString());
@@ -148,10 +148,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     return getPaymentMethodConfig(paymentMethod, schoolDetails || school);
   }, [paymentMethod, schoolDetails, school]);
 
-  // Synchroniser la méthode par défaut si celle sélectionnée est désactivée
+  // Synchroniser la méthode par défaut (privilégie Cash/Espèces pour le guichet) si celle sélectionnée est désactivée
   useEffect(() => {
     if (activePaymentMethods.length > 0 && !activePaymentMethods.some(m => m.code === paymentMethod)) {
-      setPaymentMethod(activePaymentMethods[0].code);
+      const defaultMethod = activePaymentMethods.find(m => m.code === 'Cash' || m.id === 'CASH') || activePaymentMethods[0];
+      setPaymentMethod(defaultMethod.code);
     }
   }, [activePaymentMethods, paymentMethod]);
 

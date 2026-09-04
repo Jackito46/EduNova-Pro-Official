@@ -19,6 +19,9 @@ import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { AuditLogger } from '../utils/auditLogger';
 import Modal from './Modal';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
 
 interface ReportsViewProps {
   user: UserProfile;
@@ -40,6 +43,18 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
   // Effective campus ID used for DB filtering
   const effectiveCampusId = user.campus_id ? user.campus_id : (selectedCampusFilter === 'ALL' ? null : selectedCampusFilter);
+
+  // Options mémoïsées pour les menus déroulants harmonisés (SelectPill)
+  const campusOptions: SelectOption[] = useMemo(() => {
+    return [
+      { value: 'ALL', label: 'Toutes les Annexes (Siège)', badge: 'Siège' },
+      ...(campuses || []).map(c => ({
+        value: c.id,
+        label: c.name,
+        badge: 'Annexe'
+      }))
+    ];
+  }, [campuses]);
 
   // Finance State
   const [dateRange, setDateRange] = useState<DateRange>('TODAY');
@@ -823,47 +838,60 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
               {/* Multi-Campus / Annexe Filter (If multi-campus school) */}
               {hasMultiCampus && !user.campus_id && (
-                <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2 shrink-0">
-                  <Building2 size={16} className="text-indigo-600 shrink-0" />
-                  <span className="text-xs font-black text-slate-600 uppercase tracking-wider shrink-0">Annexe :</span>
-                  <select
+                <div className="shrink-0 w-full lg:w-auto">
+                  <SelectPill
+                    options={campusOptions}
                     value={selectedCampusFilter}
-                    onChange={(e) => setSelectedCampusFilter(e.target.value)}
-                    className="bg-transparent text-xs font-extrabold text-slate-800 outline-none cursor-pointer pr-2"
-                  >
-                    <option value="ALL">🌐 Toutes les Annexes (Siège)</option>
-                    {campuses.map(c => (
-                      <option key={c.id} value={c.id}>📍 {c.name}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setSelectedCampusFilter(val)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    icon={Building2}
+                    labelPrefix="Annexe :"
+                    className="w-full sm:min-w-[220px]"
+                  />
                 </div>
               )}
             </div>
 
-            {/* Custom Date Pickers if CUSTOM selected */}
+            {/* Custom Date Pickers if CUSTOM selected (Harmonisé DatePickerPill) */}
             {dateRange === 'CUSTOM' && (
-              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-end gap-4 animate-in fade-in duration-200">
-                <div className="space-y-1.5 flex-1">
-                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Date de Début</label>
-                  <input 
-                    type="date"
-                    value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-end gap-3 sm:gap-4 animate-in fade-in duration-200">
+                <div className="space-y-1.5 flex-1 w-full sm:w-auto min-w-0">
+                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block">
+                    Date de Début
+                  </label>
+                  <DatePickerPill
+                    selectedDate={startDate}
+                    onSelectDate={(newDate) => setStartDate(newDate)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    showShortcuts={false}
+                    showQuickArrows={true}
+                    showTodayBadge={true}
+                    className="w-full"
                   />
                 </div>
-                <div className="space-y-1.5 flex-1">
-                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider">Date de Fin</label>
-                  <input 
-                    type="date"
-                    value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                <div className="space-y-1.5 flex-1 w-full sm:w-auto min-w-0">
+                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block">
+                    Date de Fin
+                  </label>
+                  <DatePickerPill
+                    selectedDate={endDate}
+                    onSelectDate={(newDate) => setEndDate(newDate)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    showShortcuts={false}
+                    showQuickArrows={true}
+                    showTodayBadge={true}
+                    className="w-full"
                   />
                 </div>
                 <button 
                   onClick={fetchFinanceData}
-                  className="px-6 py-2.5 bg-indigo-600 text-white rounded-xl font-extrabold text-xs hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer h-[40px] w-full sm:w-auto"
+                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-extrabold text-xs hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer h-[38px] sm:h-[40px] w-full sm:w-auto shrink-0"
                 >
                   <Filter size={14} /> Actualiser
                 </button>
@@ -1277,40 +1305,43 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
       {activeTab === 'STUDENTS' && (
         <div className="space-y-6">
           
-          {/* FILTERS */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-4">
+          {/* FILTERS (Harmonisé ClassSelectorPill / SelectPill) */}
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
             
-            <div className="flex items-center gap-3 w-full sm:w-auto flex-1 max-w-md">
-              <span className="text-xs font-black text-slate-600 uppercase tracking-wider shrink-0">
-                Filtrer par {terminology.option} :
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto flex-1 max-w-lg min-w-0">
+              <span className="text-xs font-black text-slate-600 uppercase tracking-wider shrink-0 hidden sm:inline">
+                Filtrer par {terminology.option || 'classe'} :
               </span>
-              <select 
-                value={selectedClassId}
-                onChange={(e) => setSelectedClassId(e.target.value)}
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-slate-900 font-bold text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer"
-              >
-                <option value="ALL">Toutes les classes</option>
-                {classes.map(c => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <div className="w-full flex-1 min-w-0">
+                <ClassSelectorPill
+                  classes={classes}
+                  selectedClassId={selectedClassId}
+                  onSelectClass={(id) => setSelectedClassId(id)}
+                  allowAll={true}
+                  allLabel="Toutes les classes"
+                  labelPrefix=""
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  className="w-full"
+                />
+              </div>
             </div>
 
             {/* Multi-Campus selector for Students tab if global user */}
             {hasMultiCampus && !user.campus_id && (
-              <div className="flex items-center gap-2 bg-slate-50 border border-slate-200/80 rounded-2xl px-3.5 py-2 shrink-0">
-                <Building2 size={16} className="text-indigo-600 shrink-0" />
-                <span className="text-xs font-black text-slate-600 uppercase tracking-wider shrink-0">Annexe :</span>
-                <select
+              <div className="shrink-0 w-full sm:w-auto">
+                <SelectPill
+                  options={campusOptions}
                   value={selectedCampusFilter}
-                  onChange={(e) => setSelectedCampusFilter(e.target.value)}
-                  className="bg-transparent text-xs font-extrabold text-slate-800 outline-none cursor-pointer"
-                >
-                  <option value="ALL">🌐 Toutes les Annexes</option>
-                  {campuses.map(c => (
-                    <option key={c.id} value={c.id}>📍 {c.name}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setSelectedCampusFilter(val)}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  icon={Building2}
+                  labelPrefix="Annexe :"
+                  className="w-full sm:min-w-[200px]"
+                />
               </div>
             )}
           </div>

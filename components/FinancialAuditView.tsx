@@ -13,6 +13,8 @@ import { supabase } from '../supabase';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
+import { SelectPill, SelectOption } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 
 interface AuditLog {
   id: string;

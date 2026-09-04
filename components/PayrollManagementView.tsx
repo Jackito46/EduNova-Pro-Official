@@ -28,6 +28,148 @@ interface StaffPayrollRowProps {
   onDelete?: (slip: PayrollSlip) => void;
 }
 
+const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete }) => {
+  const isPaid = slip?.status === 'PAID';
+  const totalAdvanceAmount = (memberAdvances || []).filter(a => 
+    !slip || !slip.created_at || new Date(a.approved_at || a.requested_at).getTime() <= new Date(slip.created_at).getTime()
+  ).reduce((sum, a) => sum + a.amount, 0);
+
+  const getInitialDeduction = () => {
+    if (slip) return slip.deductions;
+    const computedBase = member.calculated_base_salary ?? member.amount ?? 0;
+    return Math.min(totalAdvanceAmount, computedBase);
+  };
+
+  const [base, setBase] = useState(slip?.base_salary ?? member.calculated_base_salary ?? member.amount ?? 0);
+  const [bonus, setBonus] = useState(slip?.bonuses ?? 0);
+  const [deduction, setDeduction] = useState(getInitialDeduction());
+  const net = base + bonus - deduction;
+
+  useEffect(() => {
+    setBase(slip?.base_salary ?? member.calculated_base_salary ?? member.amount ?? 0);
+    setBonus(slip?.bonuses ?? 0);
+    setDeduction(getInitialDeduction());
+  }, [slip, member.calculated_base_salary, member.amount, totalAdvanceAmount]);
+
+  const isDisabled = isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED';
+
+  return (
+    <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3.5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h4 className="font-bold text-slate-900 text-sm">{formatStudentName(member.last_name, member.first_name).fullName}</h4>
+          <div className="flex flex-wrap items-center gap-2 mt-1">
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-900 text-xs font-bold rounded-lg border border-slate-200">{member.role}</span>
+            <span className="text-xs font-bold text-slate-800">{member.pay_type}</span>
+            {member.phone && <span className="text-xs font-semibold text-slate-700">• {member.phone}</span>}
+          </div>
+        </div>
+        <div>
+          {isPaid ? (
+            <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-black bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-full">
+              <CheckCircle className="w-3.5 h-3.5" /> Payé
+            </span>
+          ) : slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED' ? (
+            <span className="inline-flex items-center gap-1 text-slate-900 text-xs font-black bg-slate-100 border border-slate-300 px-2.5 py-1 rounded-full">
+              <Check className="w-3.5 h-3.5" /> Validé
+            </span>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
+        <div>
+          <label className="block text-[11px] font-black text-slate-950 uppercase tracking-tight mb-1">
+            Salaire Base (HTG)
+          </label>
+          <div className="relative flex items-center">
+            <input 
+              type="number" 
+              value={base}
+              onChange={(e) => setBase(Number(e.target.value))}
+              disabled={isDisabled}
+              style={{ color: '#020617', WebkitTextFillColor: '#020617' }}
+              className="w-full pr-9 pl-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-slate-950 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:!text-slate-950 disabled:opacity-100 shadow-2xs text-xs sm:text-sm"
+            />
+            <span className="absolute right-2 text-[10px] font-black text-slate-900 pointer-events-none">HTG</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-black text-emerald-900 uppercase tracking-tight mb-1">
+            Primes (HTG)
+          </label>
+          <div className="relative flex items-center">
+            <input 
+              type="number" 
+              value={bonus}
+              onChange={(e) => setBonus(Number(e.target.value))}
+              disabled={isDisabled}
+              style={{ color: '#065f46', WebkitTextFillColor: '#065f46' }}
+              className="w-full pr-9 pl-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-emerald-800 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:!text-emerald-800 disabled:opacity-100 shadow-2xs text-xs sm:text-sm"
+            />
+            <span className="absolute right-2 text-[10px] font-black text-emerald-800 pointer-events-none">HTG</span>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-black text-rose-900 uppercase tracking-tight mb-1">
+            Déductions (HTG)
+          </label>
+          <div className="relative flex items-center">
+            <input 
+              type="number" 
+              value={deduction}
+              onChange={(e) => setDeduction(Number(e.target.value))}
+              disabled={isDisabled || totalAdvanceAmount > 0}
+              style={{ color: '#9f1239', WebkitTextFillColor: '#9f1239' }}
+              className="w-full pr-9 pl-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-rose-800 bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 disabled:bg-slate-100 disabled:!text-rose-800 disabled:opacity-100 disabled:cursor-not-allowed shadow-2xs text-xs sm:text-sm"
+            />
+            <span className="absolute right-2 text-[10px] font-black text-rose-800 pointer-events-none">HTG</span>
+          </div>
+          {totalAdvanceAmount > 0 && !isPaid && slip?.period?.status === 'DRAFT' && (
+            <span className="block text-[10px] font-bold px-1.5 py-0.5 mt-1 rounded border bg-amber-50 text-amber-900 border-amber-200">
+              Inclut avances: {totalAdvanceAmount.toLocaleString()} HTG
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+        <div>
+          <span className="text-[11px] font-black text-slate-800 uppercase tracking-wider block">Net à Payer</span>
+          <span className="text-base font-black text-slate-950 tabular-nums">
+            {net.toLocaleString()} <span className="text-xs font-black text-slate-900">HTG</span>
+          </span>
+        </div>
+
+        {!isDisabled && (
+          <div className="flex items-center gap-2">
+            {slip && onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(slip)}
+                className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors"
+                title="Supprimer la fiche"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => onSave(member.id, base, bonus, deduction)}
+              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+            >
+              <Save className="w-3.5 h-3.5" />
+              <span>{slip ? 'Mettre à jour' : 'Enregistrer'}</span>
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete }) => {
   const isPaid = slip?.status === 'PAID';
   
@@ -58,58 +200,70 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
     <tr className="hover:bg-slate-50 transition-colors">
       <td className="px-4 py-3">
         <div className="font-bold text-slate-900">{formatStudentName(member.last_name, member.first_name).fullName}</div>
-        <div className="text-xs font-semibold text-slate-600">{member.phone}</div>
+        <div className="text-xs font-semibold text-slate-700">{member.phone}</div>
       </td>
       <td className="px-4 py-3">
-        <div className="font-semibold text-slate-800">{member.role}</div>
-        <div className="text-xs font-semibold text-slate-600">{member.pay_type}</div>
+        <div className="font-bold text-slate-900">{member.role}</div>
+        <div className="text-xs font-bold text-slate-700">{member.pay_type}</div>
       </td>
       <td className="px-4 py-3">
-        <input 
-          type="number" 
-          value={base}
-          onChange={(e) => setBase(Number(e.target.value))}
-          disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED'}
-          className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-slate-950 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:text-slate-950 disabled:[-webkit-text-fill-color:#020617] disabled:opacity-100 shadow-2xs text-xs sm:text-sm transition-all"
-        />
+        <div className="flex items-center gap-1.5 justify-end">
+          <input 
+            type="number" 
+            value={base}
+            onChange={(e) => setBase(Number(e.target.value))}
+            disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED'}
+            style={{ color: '#020617', WebkitTextFillColor: '#020617' }}
+            className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-slate-950 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-slate-100 disabled:!text-slate-950 disabled:opacity-100 shadow-2xs text-xs sm:text-sm transition-all"
+          />
+          <span className="text-[11px] font-black text-slate-950 shrink-0">HTG</span>
+        </div>
       </td>
       <td className="px-4 py-3">
-        <input 
-          type="number" 
-          value={bonus}
-          onChange={(e) => setBonus(Number(e.target.value))}
-          disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED'}
-          className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-emerald-800 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:text-emerald-800 disabled:[-webkit-text-fill-color:#065f46] disabled:opacity-100 shadow-2xs text-xs sm:text-sm transition-all"
-        />
+        <div className="flex items-center gap-1.5 justify-end">
+          <input 
+            type="number" 
+            value={bonus}
+            onChange={(e) => setBonus(Number(e.target.value))}
+            disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED'}
+            style={{ color: '#065f46', WebkitTextFillColor: '#065f46' }}
+            className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-emerald-800 bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 disabled:bg-slate-100 disabled:!text-emerald-800 disabled:opacity-100 shadow-2xs text-xs sm:text-sm transition-all"
+          />
+          <span className="text-[11px] font-black text-emerald-800 shrink-0">HTG</span>
+        </div>
       </td>
       <td className="px-4 py-3">
         <div className="flex flex-col gap-1">
-          <input 
-            type="number" 
-            value={deduction}
-            onChange={(e) => setDeduction(Number(e.target.value))}
-            disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED' || totalAdvanceAmount > 0}
-            className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-rose-800 bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 disabled:bg-slate-100 disabled:text-rose-800 disabled:[-webkit-text-fill-color:#9f1239] disabled:opacity-100 disabled:cursor-not-allowed shadow-2xs text-xs sm:text-sm transition-all"
-          />
+          <div className="flex items-center gap-1.5 justify-end">
+            <input 
+              type="number" 
+              value={deduction}
+              onChange={(e) => setDeduction(Number(e.target.value))}
+              disabled={isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED' || totalAdvanceAmount > 0}
+              style={{ color: '#9f1239', WebkitTextFillColor: '#9f1239' }}
+              className="w-24 sm:w-28 px-2.5 py-1.5 border border-slate-300 rounded-lg text-right font-black text-rose-800 bg-white focus:ring-2 focus:ring-rose-500 focus:border-rose-500 disabled:bg-slate-100 disabled:!text-rose-800 disabled:opacity-100 disabled:cursor-not-allowed shadow-2xs text-xs sm:text-sm transition-all"
+            />
+            <span className="text-[11px] font-black text-rose-800 shrink-0">HTG</span>
+          </div>
           {totalAdvanceAmount > 0 && !isPaid && slip?.period?.status === 'DRAFT' && (
             <div className="flex flex-col gap-1 mt-1">
-              <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-800 border-amber-200`}>
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-900 border-amber-200">
                 Inclut {memberAdvances?.length === 1 ? 'avance' : 'avances'}: {totalAdvanceAmount.toLocaleString()}
               </span>
             </div>
           )}
         </div>
       </td>
-      <td className="px-4 py-3 font-extrabold text-slate-900 text-right tabular-nums text-xs sm:text-sm">
-        {net.toLocaleString()} <span className="text-[11px] font-bold text-slate-600">HTG</span>
+      <td className="px-4 py-3 font-extrabold text-slate-950 text-right tabular-nums text-xs sm:text-sm">
+        {net.toLocaleString()} <span className="text-[11px] font-black text-slate-900">HTG</span>
       </td>
       <td className="px-4 py-3 text-right">
         {isPaid ? (
-          <span className="inline-flex items-center gap-1 text-emerald-600 text-xs font-medium bg-emerald-50 px-2 py-1 rounded-full">
+          <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
             <CheckCircle className="w-3 h-3" /> Payé
           </span>
         ) : slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED' ? (
-          <span className="inline-flex items-center gap-1 text-slate-500 text-xs font-medium bg-slate-50 px-2 py-1 rounded-full">
+          <span className="inline-flex items-center gap-1 text-slate-800 text-xs font-bold bg-slate-100 px-2 py-1 rounded-full border border-slate-300">
             <Check className="w-3 h-3" /> Validé
           </span>
         ) : (
@@ -117,7 +271,7 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
             {slip && onDelete && (
               <button
                 onClick={() => onDelete(slip)}
-                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded transition-colors"
+                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
                 title="Supprimer la fiche"
               >
                 <Trash2 className="w-3.5 h-3.5" />
@@ -125,7 +279,7 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
             )}
             <button
               onClick={() => onSave(member.id, base, bonus, deduction)}
-              className="flex items-center gap-1 px-3 py-1.5 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg text-sm font-medium transition-colors"
+              className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-sm font-bold transition-colors cursor-pointer shadow-2xs"
             >
               <Save className="w-4 h-4" />
               {slip ? 'Mettre à jour' : 'Enregistrer'}
@@ -1207,20 +1361,20 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
             <p className="text-xs sm:text-sm font-semibold text-slate-600 mt-0.5">Générez les fiches de paie pour chaque employé.</p>
           </div>
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full md:w-auto">
-            <div className="relative flex-1 sm:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
+            <div className="relative w-full sm:w-64 md:w-72 lg:w-80">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-700 pointer-events-none" />
               <input
                 type="text"
                 placeholder="Rechercher un employé..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none shadow-2xs transition-all"
+                className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none shadow-2xs transition-all"
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-900 rounded-md transition-colors cursor-pointer"
                 >
                   <X size={14} />
                 </button>
@@ -1245,15 +1399,16 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         )}
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="overflow-x-auto">
+          {/* Desktop Table View */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-sm min-w-[760px]">
               <thead className="bg-slate-100 text-slate-900 font-extrabold border-b border-slate-200 uppercase text-xs tracking-wider">
                 <tr>
                   <th className="px-4 py-3.5 text-slate-950 font-black">Employé</th>
                   <th className="px-4 py-3.5 text-slate-950 font-black">Rôle / Type</th>
-                  <th className="px-4 py-3.5 text-slate-950 font-black">Salaire Base (HTG)</th>
-                  <th className="px-4 py-3.5 text-emerald-800 font-black">Primes (HTG)</th>
-                  <th className="px-4 py-3.5 text-rose-800 font-black">Déductions (HTG)</th>
+                  <th className="px-4 py-3.5 text-slate-950 font-black text-right">Salaire Base (HTG)</th>
+                  <th className="px-4 py-3.5 text-emerald-900 font-black text-right">Primes (HTG)</th>
+                  <th className="px-4 py-3.5 text-rose-900 font-black text-right">Déductions (HTG)</th>
                   <th className="px-4 py-3.5 text-slate-950 font-black text-right">Net à Payer (HTG)</th>
                   <th className="px-4 py-3.5 text-right text-slate-950 font-black">Action</th>
                 </tr>
@@ -1271,7 +1426,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   </tr>
                 ) : filteredStaff.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-700 font-bold italic">
+                    <td colSpan={7} className="py-8 text-center text-slate-900 font-bold italic">
                       Aucun employé ne correspond aux critères.
                     </td>
                   </tr>
@@ -1299,6 +1454,43 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 })}
               </tbody>
             </table>
+          </div>
+
+          {/* Mobile & Tablet Card View */}
+          <div className="md:hidden divide-y divide-slate-100 p-3 sm:p-4 space-y-3 bg-slate-50/50">
+            {loading ? (
+              <div className="py-8">
+                <FluidLoadingState 
+                  message="Chargement de la gestion de paie & salaires..." 
+                  subtext="Calcul des émoluments, retenues, cotisations et bulletins de paie..." 
+                />
+                <SkeletonTable rows={4} />
+              </div>
+            ) : filteredStaff.length === 0 ? (
+              <div className="py-8 text-center text-slate-900 font-bold italic bg-white p-6 rounded-2xl border border-slate-200">
+                Aucun employé ne correspond aux critères.
+              </div>
+            ) : filteredStaff.map(member => {
+              const slip = slips.find(s => s.period_id === selectedPeriodId && s.staff_id === member.id);
+              const memberAdvances = advances.filter(a => 
+                a.staff_id === member.id && 
+                (a.status === 'APPROVED' || a.status === 'PAID') &&
+                (!a.deduction_period_id || a.deduction_period_id === selectedPeriodId)
+              );
+              const eligibleAdvances = memberAdvances.filter(a => 
+                !slip || !slip.created_at || new Date(a.approved_at || a.requested_at).getTime() <= new Date(slip.created_at).getTime()
+              );
+              return (
+                <StaffPayrollCard 
+                  key={member.id} 
+                  member={member} 
+                  slip={slip} 
+                  memberAdvances={eligibleAdvances}
+                  onSave={handleSaveSlip} 
+                  onDelete={setSlipToDelete}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
@@ -1362,7 +1554,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               placeholder="Rechercher un employé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none transition-all shadow-2xs"
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none transition-all shadow-2xs"
             />
             {searchTerm && (
               <button
@@ -1502,7 +1694,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               placeholder="Rechercher un employé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
             />
             {searchTerm && (
               <button
@@ -1634,7 +1826,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               placeholder="Rechercher un employé..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-500 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
+              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
             />
             {searchTerm && (
               <button
@@ -2676,7 +2868,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 <textarea
                   value={advanceReason}
                   onChange={(e) => setAdvanceReason(e.target.value)}
-                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-600 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
                   rows={3}
                   placeholder="Ex: Urgence médicale, frais scolaires..."
                   required

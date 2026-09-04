@@ -201,7 +201,7 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
           <div className={`flex items-center gap-1 shrink-0 ${scheme.iconText}`}>
             <User size={size === 'xs' ? 12 : size === 'lg' ? 15 : 13} className="stroke-[2.4]" />
             {labelPrefix && (
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-800">
                 {labelPrefix}
               </span>
             )}
@@ -217,13 +217,13 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
                 {getDisplayName(selectedStaff)}
               </span>
               {(selectedStaff.specialty || selectedStaff.subject_specialty) && (
-                <span className="text-[9px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-black shrink-0 hidden sm:inline">
+                <span className="text-[9px] px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded font-black shrink-0 hidden sm:inline">
                   {selectedStaff.specialty || selectedStaff.subject_specialty}
                 </span>
               )}
             </div>
           ) : (
-            <span className="font-semibold text-slate-500 tracking-tight truncate">
+            <span className="font-semibold text-slate-700 tracking-tight truncate">
               {emptyLabel}
             </span>
           )}
@@ -235,14 +235,14 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
               Sélection
             </span>
           ) : (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200">
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-800 border border-slate-200">
               {staffList.length}
             </span>
           )}
 
           <ChevronDown
             size={size === 'xs' ? 12 : 14}
-            className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? `rotate-180 ${scheme.iconText}` : ''}`}
+            className={`text-slate-500 transition-transform duration-200 shrink-0 ${isOpen ? `rotate-180 ${scheme.iconText}` : ''}`}
           />
         </div>
       </button>
@@ -253,31 +253,31 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
         >
           {/* Header */}
           <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
               <Users size={12} className={scheme.iconText} />
               Enseignants
             </span>
-            <span className="text-[10px] font-bold text-slate-600">
+            <span className="text-[10px] font-bold text-slate-800">
               {staffList.length} disponible{staffList.length > 1 ? 's' : ''}
             </span>
           </div>
 
           {/* Search */}
           <div className="relative mb-2">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700" />
             <input
               type="text"
               autoFocus
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Rechercher par nom ou spécialité..."
-              className={`w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-500 rounded-xl border border-slate-200 ${scheme.focusBorder} focus:ring-2 outline-none transition-all`}
+              className={`w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-bold text-slate-950 placeholder:text-slate-600 rounded-xl border border-slate-200 ${scheme.focusBorder} focus:ring-2 outline-none transition-all`}
             />
             {searchQuery && (
               <button
                 type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 p-0.5"
               >
                 <X size={12} />
               </button>
@@ -295,16 +295,16 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
                 className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
                   isAllSelected
                     ? scheme.highlightBg + ' shadow-2xs font-bold'
-                    : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                    : 'hover:bg-slate-50 text-slate-800 border border-transparent'
                 }`}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAllSelected ? scheme.dotColor : 'bg-slate-300'}`} />
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAllSelected ? scheme.dotColor : 'bg-slate-400'}`} />
                   <div className="min-w-0">
-                    <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
+                    <span className="text-xs font-black text-slate-950 tracking-tight block truncate">
                       {allLabel}
                     </span>
-                    <span className="text-[10px] font-medium text-slate-500 block">
+                    <span className="text-[10px] font-semibold text-slate-700 block">
                       Afficher tous les créneaux ou professeurs
                     </span>
                   </div>
@@ -316,7 +316,7 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
             )}
 
             {filteredStaff.length === 0 ? (
-              <div className="p-3 text-center text-slate-500 text-xs font-medium">
+              <div className="p-3 text-center text-slate-700 text-xs font-bold">
                 Aucun enseignant trouvé
               </div>
             ) : (
@@ -336,11 +336,11 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
                     className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
                       isSelected
                         ? scheme.highlightBg + ' shadow-2xs font-bold'
-                        : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                        : 'hover:bg-slate-50 text-slate-800 border border-transparent'
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-300'}`} />
+                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-400'}`} />
                       <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
                         {s.photo_url ? (
                           <img src={s.photo_url} alt="" className="w-full h-full object-cover" />
@@ -353,8 +353,8 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
                           {displayName}
                         </span>
                         {spec && (
-                          <span className="text-[10px] font-semibold text-slate-500 block truncate flex items-center gap-1">
-                            <BookOpen size={10} className="text-slate-400" />
+                          <span className="text-[10px] font-bold text-slate-700 block truncate flex items-center gap-1">
+                            <BookOpen size={10} className="text-slate-500" />
                             {spec}
                           </span>
                         )}
