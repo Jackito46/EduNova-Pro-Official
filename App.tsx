@@ -309,6 +309,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
               {/* <Route path="/guide" element={<GuideView />} /> */}
               
               {/* Communication Routes */}
+              <Route path="/communication" element={<Navigate to="/communication/whatsapp" replace />} />
               <Route path="/communication/whatsapp" element={<RoleGuard user={user} allowedRoles={adminRoles}><WhatsAppModule user={user} /></RoleGuard>} />
               <Route path="/communication/email" element={<RoleGuard user={user} allowedRoles={adminRoles}><EmailModule user={user} /></RoleGuard>} />
               <Route path="/communication/sms" element={<RoleGuard user={user} allowedRoles={adminRoles}><SmsModule user={user} /></RoleGuard>} />

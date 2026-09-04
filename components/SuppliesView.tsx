@@ -385,7 +385,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   useEffect(() => {
     const loadStudents = async () => {
-      if (modalClassId) {
+      if (modalClassId && modalClassId.toLowerCase() !== 'all') {
         const { data } = await supabase
           .from('students')
           .select('id, first_name, last_name')

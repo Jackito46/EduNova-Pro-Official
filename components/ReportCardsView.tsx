@@ -196,7 +196,7 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   // Fetch Students for selected class
   useEffect(() => {
     const fetchStudents = async () => {
-      if (!selectedClassId || !user.school_id) {
+      if (!selectedClassId || selectedClassId.toLowerCase() === 'all' || !user.school_id) {
         setStudents([]);
         return;
       }

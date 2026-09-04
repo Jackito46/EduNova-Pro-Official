@@ -659,7 +659,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       } else {
         // Bulk Reevaluation
         let query = supabase.from('students').select('id, class_id, first_name, last_name, discount_amount, campus_id, is_foreign').eq('school_id', user.school_id);
-        if (targetType === 'class') query = query.eq('class_id', selectedClassId);
+        if (targetType === 'class' && selectedClassId && selectedClassId.toLowerCase() !== 'all') query = query.eq('class_id', selectedClassId);
         
         const activeCampusId = user.campus_id || (selectedCampusFilterId !== 'all' ? selectedCampusFilterId : null);
         if (activeCampusId) query = query.eq('campus_id', activeCampusId);

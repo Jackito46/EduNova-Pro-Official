@@ -93,8 +93,8 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
     };
   }, [isOpen]);
 
-  const isAllSelected = allowAll && (!selectedClassId || selectedClassId === 'all');
-  const selectedClass = (!selectedClassId || selectedClassId === 'all') ? null : classes.find(c => c.id === selectedClassId);
+  const isAllSelected = allowAll && (!selectedClassId || selectedClassId.toLowerCase() === 'all');
+  const selectedClass = (!selectedClassId || selectedClassId.toLowerCase() === 'all') ? null : classes.find(c => c.id === selectedClassId);
 
   const defaultAllLabel = allLabel || (activeCycle && activeCycle !== 'ALL' ? `Toutes (${activeCycle})` : 'Toutes (Total)');
 

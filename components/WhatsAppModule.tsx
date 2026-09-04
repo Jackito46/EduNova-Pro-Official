@@ -12,6 +12,9 @@ import CommunicationHistory from './CommunicationHistory';
 import CommunicationSettings from './CommunicationSettings';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
+import { SelectPill, SelectOption } from './SelectPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { CommunicationTabBar } from './CommunicationTabBar';
 
 interface WhatsAppModuleProps {
   user: UserProfile;
@@ -50,7 +53,18 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
   
   const [settings, setSettings] = useState<any>(null);
   const [sentStatuses, setSentStatuses] = useState<Record<string, boolean>>({});
-  const [showGuideModal, setShowGuideModal] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+
+  // Categories for official templates
+  const templateCategories = [
+    { id: 'all', label: 'Tous les modèles' },
+    { id: 'Finances', label: 'Finances & Scolarité' },
+    { id: 'Discipline', label: 'Discipline & Présence' },
+    { id: 'Pédagogie', label: 'Pédagogie & Notes' },
+    { id: 'Vie Scolaire', label: 'Vie Scolaire' },
+    { id: 'Excellence', label: 'Félicitations' }
+  ];
 
   // Quick message variable tags
   const variableTags = [
@@ -66,23 +80,37 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
     {
       id: 'scolarite',
       category: 'Finances',
-      title: 'Rappel Écolage / Scolarité',
+      title: 'Rappel Scolarité / Écolage',
       icon: '💰',
       content: `Bonjour {nom_parent},\n\nSauf erreur de notre part, le paiement de la scolarité pour {nom_eleve} (Classe: {classe}) est actuellement en attente.\n\nMerci de vous présenter à l'économat de {ecole} pour régulariser la situation.\n\nCordialement,\nLa Direction`
     },
     {
+      id: 'frais_examen',
+      category: 'Finances',
+      title: 'Frais d\'Examens & Inscription',
+      icon: '📑',
+      content: `Bonjour {nom_parent},\n\nNous vous rappelons que l'échéance pour le règlement des frais d'examens de {nom_eleve} ({classe}) approche.\n\nMerci de finaliser ce versement auprès de l'économat de {ecole}.\n\nDirection Administrative`
+    },
+    {
       id: 'absence',
       category: 'Discipline',
-      title: 'Alerte Absence Urgente',
+      title: 'Alerte Absence du Jour',
       icon: '🚨',
-      content: `Avis Important - {ecole}\n\nBonjour {nom_parent}, nous vous informons que l'élève {nom_eleve} ({classe}) est constaté(e) absent(e) ce jour ({date}).\n\nMerci de contacter la direction dans les plus brefs délais pour justifier cette absence.\n\nMerci de votre collaboration.`
+      content: `Avis Important - {ecole}\n\nBonjour {nom_parent}, nous vous informons que l'élève {nom_eleve} ({classe}) a été constaté(e) absent(e) ce jour ({date}).\n\nMerci de contacter la direction dans les plus brefs délais pour justifier cette absence.\n\nMerci de votre collaboration.`
+    },
+    {
+      id: 'retard',
+      category: 'Discipline',
+      title: 'Avis de Retard Répété',
+      icon: '⏱️',
+      content: `Bonjour {nom_parent},\n\nNous constatons des retards répétés pour {nom_eleve} ({classe}).\n\nLa ponctualité étant essentielle à la réussite scolaire, nous sollicitons votre concours pour veiller à l'heure d'arrivée à {ecole}.\n\nLa Direction Pédagogique`
     },
     {
       id: 'bulletin',
       category: 'Pédagogie',
-      title: 'Publication des Notes / Bulletins',
+      title: 'Publication des Bulletins & Résultats',
       icon: '📜',
-      content: `Chers parents,\n\nLes résultats et bulletins scolaires de {nom_eleve} ({classe}) sont désormais disponibles sur la plateforme de {ecole}.\n\nVous pouvez les consulter sur l'application ou vous rendre à l'établissement.\n\nDirection Pédagogique`
+      content: `Chers parents,\n\nLes résultats et bulletins scolaires de {nom_eleve} ({classe}) sont désormais disponibles sur la plateforme de {ecole}.\n\nVous pouvez les consulter sur votre espace en ligne ou vous rendre à l'établissement.\n\nDirection Pédagogique`
     },
     {
       id: 'reunion',
@@ -92,13 +120,24 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
       content: `Bonjour {nom_parent},\n\nUne réunion d'information importante pour la classe de {classe} aura lieu ce vendredi à {ecole}.\n\nVotre présence est vivement souhaitée pour aborder le parcours académique de {nom_eleve}.\n\nMerci d'avance.`
     },
     {
+      id: 'fermeture',
+      category: 'Vie Scolaire',
+      title: 'Avis Congé / Fermeture Exceptionnelle',
+      icon: '📢',
+      content: `Chers parents d'élèves,\n\nNous vous informons que {ecole} sera fermée le ({date}) conformément au calendrier officiel. Les cours reprendront normalement le jour ouvré suivant.\n\nLa Direction`
+    },
+    {
       id: 'felicitations',
       category: 'Excellence',
-      title: 'Félicitations Académiques',
+      title: 'Tableau d\'Honneur & Félicitations',
       icon: '🎉',
-      content: `Chers parents de {nom_eleve},\n\nC'est avec grande fierté que {ecole} vous félicite pour les excellents résultats et la conduite exemplaire de votre enfant en {classe}.\n\nContinuez ainsi !`
+      content: `Chers parents de {nom_eleve},\n\nC'est avec une grande fierté que {ecole} vous félicite pour les excellents résultats et la conduite exemplaire de votre enfant en {classe}.\n\nContinuez ainsi !`
     }
   ];
+
+  const filteredTemplates = selectedCategory === 'all'
+    ? templates
+    : templates.filter(t => t.category === selectedCategory);
 
   // Fetch classes
   useEffect(() => {
@@ -350,71 +389,60 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-in fade-in duration-300">
-      {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 p-8 rounded-3xl text-white shadow-xl relative overflow-hidden">
+    <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 pb-10 animate-in fade-in duration-300">
+      {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
+      <CommunicationTabBar activeChannel="whatsapp" />
+
+      {/* HEADER SECTION COMPACT */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 p-4 sm:p-5 rounded-2xl text-white shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-        <div className="space-y-2 relative z-10">
+        <div className="space-y-1 relative z-10">
           <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-400/30 text-emerald-300 shadow-inner">
-              <MessageCircle size={28} />
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-500/20 rounded-xl flex items-center justify-center border border-emerald-400/30 text-emerald-300 shadow-inner shrink-0">
+              <MessageCircle size={22} />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-2xl sm:text-3xl font-black tracking-tight">Communication WhatsApp</h1>
-                <span className="px-2.5 py-0.5 bg-emerald-500/30 text-emerald-200 text-[10px] font-black uppercase tracking-widest rounded-full border border-emerald-400/30">
-                  Direct & Cloud API
-                </span>
-              </div>
-              <p className="text-emerald-100 text-sm mt-0.5">
-                Diffusion instantanée vers WhatsApp Web / Mobile avec personnalisation dynamique des messages.
+              <h1 className="text-xl sm:text-2xl font-black tracking-tight">Communication WhatsApp</h1>
+              <p className="text-emerald-100/90 text-xs sm:text-sm mt-0.5">
+                Diffusion ciblée et notifications officielles aux familles et au personnel.
               </p>
             </div>
           </div>
         </div>
 
-        {/* TAB BUTTONS & GUIDE */}
-        <div className="flex flex-wrap items-center gap-2 bg-emerald-950/60 p-1.5 rounded-2xl border border-emerald-700/40 backdrop-blur-md self-start md:self-auto relative z-10">
-          <button
-            type="button"
-            onClick={() => setShowGuideModal(true)}
-            className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl font-bold text-xs bg-emerald-400/20 text-emerald-200 hover:bg-emerald-400/30 border border-emerald-400/30 transition-all"
-            title="Guide de configuration du numéro WhatsApp"
-          >
-            <BookOpen size={15} className="text-emerald-300" />
-            <span className="hidden sm:inline">Guide Config</span>
-          </button>
+        {/* TAB BUTTONS (INTERNATIONAL STANDARD) */}
+        <div className="flex items-center gap-1.5 bg-emerald-950/70 p-1 sm:p-1.5 rounded-xl border border-emerald-700/40 backdrop-blur-md self-start md:self-auto relative z-10">
           <button
             onClick={() => setActiveTab('send')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold text-xs transition-all ${
               activeTab === 'send'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
+                ? 'bg-emerald-500 text-white shadow-xs'
                 : 'text-emerald-200 hover:text-white hover:bg-emerald-800/50'
             }`}
           >
-            <Send size={15} />
-            Lancement WhatsApp
+            <Send size={14} />
+            Envoi
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold text-xs transition-all ${
               activeTab === 'history'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
+                ? 'bg-emerald-500 text-white shadow-xs'
                 : 'text-emerald-200 hover:text-white hover:bg-emerald-800/50'
             }`}
           >
-            <History size={15} />
+            <History size={14} />
             Historique
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold text-xs transition-all ${
               activeTab === 'settings'
-                ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-600/30'
+                ? 'bg-emerald-500 text-white shadow-xs'
                 : 'text-emerald-200 hover:text-white hover:bg-emerald-800/50'
             }`}
           >
-            <Settings size={15} />
+            <Settings size={14} />
             Paramètres
           </button>
         </div>
@@ -422,7 +450,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
 
       {/* TAB CONTENT: HISTORY & SETTINGS REUSE */}
       {activeTab === 'history' && (
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200 shadow-sm">
           <CommunicationHistory user={user} />
         </div>
       )}
@@ -433,46 +461,98 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
 
       {/* TAB CONTENT: SEND MODULE */}
       {activeTab === 'send' && (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
           
           {/* LEFT COLUMN: TEMPLATES & COMPOSER (7 cols) */}
-          <div className="lg:col-span-7 space-y-6">
+          <div className="lg:col-span-7 space-y-3.5 sm:space-y-4">
             
             {/* TEMPLATE PRESETS */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles size={18} className="text-emerald-600" />
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <Sparkles size={16} className="text-emerald-600" />
                   Modèles de Messages Officiels
                 </h3>
-                <span className="text-xs text-slate-400 font-medium">{templates.length} modèles prêts</span>
+                <span className="text-xs text-slate-500 font-medium">
+                  {filteredTemplates.length} / {templates.length} modèles
+                </span>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {templates.map(tmpl => (
+              {/* CATEGORY FILTER PILLS */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {templateCategories.map(cat => (
                   <button
-                    key={tmpl.id}
-                    onClick={() => setMessage(tmpl.content)}
-                    className="text-left p-3.5 rounded-2xl border border-slate-100 bg-slate-50/70 hover:bg-emerald-50/60 hover:border-emerald-200 transition-all group"
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
+                      selectedCategory === cat.id
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                    }`}
                   >
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="text-lg">{tmpl.icon}</span>
-                      <span className="font-bold text-xs text-slate-800 group-hover:text-emerald-800 truncate">{tmpl.title}</span>
-                    </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-2 leading-relaxed font-normal">
-                      {tmpl.content}
-                    </p>
+                    {cat.label}
                   </button>
                 ))}
+              </div>
+
+              {/* TEMPLATES GRID */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
+                {filteredTemplates.map(tmpl => {
+                  const isApplied = selectedTemplateId === tmpl.id;
+                  return (
+                    <div
+                      key={tmpl.id}
+                      onClick={() => {
+                        setMessage(tmpl.content);
+                        setSelectedTemplateId(tmpl.id);
+                      }}
+                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between gap-2 ${
+                        isApplied
+                          ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400'
+                          : 'bg-slate-50/70 border-slate-200/80 hover:bg-white hover:border-emerald-300 hover:shadow-xs'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-1.5">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <span className="text-base shrink-0">{tmpl.icon}</span>
+                            <h4 className="font-bold text-xs text-slate-900 truncate">{tmpl.title}</h4>
+                          </div>
+                          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full shrink-0">
+                            {tmpl.category}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed font-normal">
+                          {tmpl.content}
+                        </p>
+                      </div>
+                      <div className="flex items-center justify-end pt-1">
+                        <span className={`text-[11px] font-bold flex items-center gap-1 ${
+                          isApplied ? 'text-emerald-700' : 'text-slate-500 group-hover:text-emerald-700'
+                        }`}>
+                          {isApplied ? (
+                            <>
+                              <CheckCircle2 size={12} className="text-emerald-600" />
+                              Appliqué
+                            </>
+                          ) : (
+                            'Insérer le modèle →'
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
 
             {/* MESSAGE EDITOR */}
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <label className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <MessageCircle size={18} className="text-emerald-600" />
-                  Rédiger le Message WhatsApp
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <label className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <MessageCircle size={16} className="text-emerald-600" />
+                  Rédiger le Message
                 </label>
                 <span className="text-xs font-mono text-slate-400 font-bold">
                   {message.length} caractères
@@ -480,9 +560,9 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
               </div>
 
               {/* VARIABLE TAG INJECTORS */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
-                  Balises Dynamiques Personnalisées :
+                  Champs dynamiques :
                 </span>
                 <div className="flex flex-wrap gap-1.5">
                   {variableTags.map(v => (
@@ -499,28 +579,30 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
               </div>
 
               {/* TEXTAREA */}
-              <div className="relative">
+              <div>
                 <textarea
-                  rows={5}
+                  rows={4}
                   value={message}
-                  onChange={e => setMessage(e.target.value)}
-                  placeholder="Écrivez votre message ici... ex: Bonjour {nom_parent}, rappel de scolarité pour {nom_eleve}."
-                  className="w-full p-4 rounded-2xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all resize-none leading-relaxed"
+                  onChange={e => {
+                    setMessage(e.target.value);
+                    setSelectedTemplateId(null);
+                  }}
+                  placeholder="Écrivez votre message ici... Utilisez les balises dynamiques pour personnaliser l'envoi."
+                  className="w-full p-3.5 rounded-xl border border-slate-200 bg-slate-50/50 text-slate-900 text-xs sm:text-sm font-medium placeholder:text-slate-400 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none transition-all resize-none leading-relaxed"
                 />
               </div>
 
               {/* LIVE WHATSAPP CHAT PREVIEW SIMULATOR */}
-              <div className="bg-[#efeae2] rounded-2xl p-4 border border-emerald-200/80 shadow-inner relative overflow-hidden space-y-3">
+              <div className="bg-[#efeae2] rounded-xl p-3.5 border border-emerald-200/80 shadow-inner relative overflow-hidden space-y-2.5">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-300/60">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs shadow-sm">
+                    <div className="w-6 h-6 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-[11px] shadow-sm">
                       {school?.name?.charAt(0) || 'E'}
                     </div>
                     <div>
                       <p className="text-xs font-bold text-slate-900 leading-tight">{school?.name || 'EduNova Pro'}</p>
-                      <p className="text-[9px] text-emerald-800 font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                        Aperçu interactif du bulle WhatsApp
+                      <p className="text-[9px] text-emerald-800 font-bold">
+                        Aperçu du message
                       </p>
                     </div>
                   </div>
@@ -529,7 +611,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                   </span>
                 </div>
 
-                <div className="bg-[#dcf8c6] text-slate-900 p-3.5 rounded-2xl rounded-tr-none shadow-sm max-w-[95%] ml-auto text-xs leading-relaxed font-sans whitespace-pre-wrap border border-emerald-200/50">
+                <div className="bg-[#dcf8c6] text-slate-900 p-3 rounded-xl rounded-tr-none shadow-sm max-w-[95%] ml-auto text-xs leading-relaxed font-sans whitespace-pre-wrap border border-emerald-200/50">
                   {message ? (
                     personalizeMessage(message, {
                       parent_name: 'M. Jean Dupont',
@@ -538,7 +620,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                       name: 'M. Jean Dupont'
                     })
                   ) : (
-                    <span className="italic text-slate-500">Votre message apparaîtra ici avec la mise en forme dynamique...</span>
+                    <span className="italic text-slate-400">Votre message apparaîtra ici avec la mise en forme dynamique...</span>
                   )}
                   <div className="flex items-center justify-end gap-1 text-[9px] text-slate-500 mt-1 font-mono">
                     <span>{new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
@@ -547,42 +629,35 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 </div>
               </div>
 
-              {/* DISPATCH MODE SELECTION */}
-              <div className="pt-3 border-t border-slate-100 space-y-3">
-                <span className="text-xs font-black text-slate-700 uppercase tracking-wider block">
-                  Mode d'envoi WhatsApp :
-                </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* DISPATCH MODE SELECTION (INTERNATIONAL STANDARD) */}
+              <div className="pt-2 border-t border-slate-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-700">Mode de diffusion :</span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setDispatchMode('direct_wame')}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all flex items-start gap-3 ${
+                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       dispatchMode === 'direct_wame'
-                        ? 'border-emerald-600 bg-emerald-50/50 text-emerald-950 font-bold'
-                        : 'border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-200'
+                        ? 'bg-white text-emerald-900 shadow-xs border border-slate-200/80'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <ExternalLink size={18} className="text-emerald-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-black">Liens Directs wa.me (Gratuit)</p>
-                      <p className="text-[11px] text-slate-500 font-normal">Génère un bouton personnalisé vers WhatsApp Web/App pour chaque parent.</p>
-                    </div>
+                    <ExternalLink size={14} className="text-emerald-600" />
+                    WhatsApp Web / App
                   </button>
-
                   <button
                     type="button"
                     onClick={() => setDispatchMode('api')}
-                    className={`p-3.5 rounded-2xl border-2 text-left transition-all flex items-start gap-3 ${
+                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       dispatchMode === 'api'
-                        ? 'border-emerald-600 bg-emerald-50/50 text-emerald-950 font-bold'
-                        : 'border-slate-100 bg-slate-50 text-slate-600 hover:border-slate-200'
+                        ? 'bg-white text-emerald-900 shadow-xs border border-slate-200/80'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Send size={18} className="text-teal-600 shrink-0 mt-0.5" />
-                    <div>
-                      <p className="text-xs font-black">API WhatsApp Automatisée</p>
-                      <p className="text-[11px] text-slate-500 font-normal">Envoi direct en arrière-plan via API WhatsApp Cloud / Twilio.</p>
-                    </div>
+                    <Send size={14} className="text-teal-600" />
+                    API WhatsApp
                   </button>
                 </div>
               </div>
@@ -590,12 +665,13 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
               {/* ACTION BUTTON FOR API MODE */}
               {dispatchMode === 'api' && (
                 <button
+                  type="button"
                   onClick={handleSendViaApi}
                   disabled={isSending || activeRecipients.length === 0}
-                  className="w-full py-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-50"
+                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
-                  {isSending ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
-                  Diffuser via API WhatsApp ({activeRecipients.length} destinataires)
+                  {isSending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                  Envoyer via API ({activeRecipients.length} destinataire{activeRecipients.length > 1 ? 's' : ''})
                 </button>
               )}
             </div>
@@ -603,27 +679,27 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
           </div>
 
           {/* RIGHT COLUMN: RECIPIENT SELECTION & WA LAUNCHER (5 cols) */}
-          <div className="lg:col-span-5 space-y-6">
+          <div className="lg:col-span-5 space-y-3.5 sm:space-y-4">
 
-            <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-5">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <h3 className="text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
-                  <Users size={18} className="text-emerald-600" />
+            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3.5">
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <h3 className="text-xs sm:text-sm font-black text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                  <Users size={16} className="text-emerald-600" />
                   Sélection des Destinataires
                 </h3>
-                <span className="text-xs font-bold px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-full">
+                <span className="text-xs font-bold px-2.5 py-0.5 bg-emerald-100 text-emerald-800 rounded-full">
                   {selectedIndividuals.length} / {filteredIndividuals.length}
                 </span>
               </div>
 
               {/* RECIPIENT TYPE SELECTOR */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setRecipientType('parents')}
-                  className={`py-2 px-3 rounded-xl font-bold text-xs transition-all ${
+                  className={`py-1.5 sm:py-2 px-2.5 rounded-xl font-bold text-xs transition-all ${
                     recipientType === 'parents'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -632,9 +708,9 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setRecipientType('teachers')}
-                  className={`py-2 px-3 rounded-xl font-bold text-xs transition-all ${
+                  className={`py-1.5 sm:py-2 px-2.5 rounded-xl font-bold text-xs transition-all ${
                     recipientType === 'teachers'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -643,9 +719,9 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setRecipientType('students')}
-                  className={`py-2 px-3 rounded-xl font-bold text-xs transition-all ${
+                  className={`py-1.5 sm:py-2 px-2.5 rounded-xl font-bold text-xs transition-all ${
                     recipientType === 'students'
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                   }`}
                 >
@@ -653,42 +729,55 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 </button>
               </div>
 
-              {/* SCOPE SELECTOR */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <select
+              {/* SCOPE SELECTOR (PILL STYLE) */}
+              <div className="space-y-2.5">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Portée de l'envoi
+                  </label>
+                  <SelectPill
+                    options={[
+                      { value: 'all', label: `Tous les ${recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'membres du staff' : terminology.students}` },
+                      { value: 'class', label: 'Par classe spécifique' },
+                      { value: 'individual', label: 'Sélection individuelle libre' }
+                    ]}
                     value={recipientScope}
-                    onChange={e => setRecipientScope(e.target.value as any)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 text-xs font-bold outline-none"
-                  >
-                    <option value="all">Tous les {recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'membres du staff' : terminology.students}</option>
-                    <option value="class">Par classe spécifique</option>
-                    <option value="individual">Sélection individuelle libre</option>
-                  </select>
+                    onChange={(val) => setRecipientScope(val as any)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="emerald"
+                    className="w-full"
+                  />
                 </div>
 
                 {recipientScope === 'class' && (
-                  <select
-                    value={selectedClass}
-                    onChange={e => setSelectedClass(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/50 text-emerald-900 text-xs font-bold outline-none"
-                  >
-                    <option value="">-- Choisir une classe --</option>
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <div className="space-y-1 animate-in fade-in slide-in-from-top-1 duration-150">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Classe sélectionnée
+                    </label>
+                    <ClassSelectorPill
+                      classes={classes}
+                      selectedClassId={selectedClass}
+                      onSelectClass={(id) => setSelectedClass(id === 'all' ? '' : id)}
+                      allowAll={false}
+                      emptyLabel="Choisir une classe..."
+                      variant="field"
+                      size="sm"
+                      colorScheme="emerald"
+                      className="w-full"
+                    />
+                  </div>
                 )}
 
                 {/* SEARCH INPUT */}
-                <div className="relative">
-                  <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <div className="relative pt-0.5">
+                  <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Chercher par nom, téléphone..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50 text-xs text-slate-800 placeholder:text-slate-400 outline-none"
+                    className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-200 bg-slate-50/70 focus:bg-white text-xs text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all font-medium"
                   />
                 </div>
               </div>

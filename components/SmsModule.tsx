@@ -7,6 +7,9 @@ import CommunicationHistory from './CommunicationHistory';
 import CommunicationSettings from './CommunicationSettings';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
+import { SelectPill } from './SelectPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { CommunicationTabBar } from './CommunicationTabBar';
 
 interface SmsModuleProps {
   user: UserProfile;
@@ -331,44 +334,48 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-amber-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-amber-600/20 rotate-3 hover:rotate-0 transition-transform duration-500">
-            <MessageSquare size={32} />
+    <div className="space-y-3.5 sm:space-y-4 pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
+      <CommunicationTabBar activeChannel="sms" />
+
+      {/* HEADER COMPACT */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-amber-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-amber-600/20 shrink-0">
+            <MessageSquare size={22} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Communication SMS</h1>
-            <p className="text-slate-500 font-medium">Envoyez des messages courts et urgents aux parents et professeurs.</p>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Communication SMS</h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">Envoyez des messages courts et alertes urgentes aux parents et professeurs.</p>
           </div>
         </div>
 
-        <div className="flex items-center bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200 self-start md:self-auto">
           <button
             onClick={() => setActiveTab('send')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'send' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-500 hover:bg-slate-50'
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'send' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <Send size={18} />
+            <Send size={14} />
             Envoi
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'history' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-500 hover:bg-slate-50'
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'history' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <History size={18} />
+            <History size={14} />
             Historique
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'settings' ? 'bg-amber-600 text-white shadow-lg shadow-amber-600/20' : 'text-slate-500 hover:bg-slate-50'
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'settings' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <Settings size={18} />
+            <Settings size={14} />
             Paramètres
           </button>
         </div>
@@ -378,106 +385,111 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
       {activeTab === 'settings' && <CommunicationSettings user={user} />}
 
       {activeTab === 'send' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
           {/* Form Section */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-3.5 sm:space-y-4">
             {(!settings || settings.sms_provider === 'none' || !settings.sms_api_key) && (
-              <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3 animate-in fade-in slide-in-from-top-2">
-                <Info className="text-amber-600 shrink-0" size={20} />
+              <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-1">
+                <Info className="text-amber-600 shrink-0" size={18} />
                 <div>
-                  <p className="text-sm font-bold text-amber-900">Configuration SMS manquante</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Vos paramètres SMS ne sont pas encore configurés. Les envois seront simulés. 
-                    <button onClick={() => setActiveTab('settings')} className="ml-1 underline font-bold hover:text-amber-900">Configurer maintenant</button>
+                  <p className="text-xs font-bold text-amber-900">Configuration SMS</p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    Vos paramètres SMS de passerelle ne sont pas encore configurés. Les envois seront simulés. 
+                    <button onClick={() => setActiveTab('settings')} className="ml-1 underline font-bold hover:text-amber-900">Configurer dans Paramètres</button>
                   </p>
                 </div>
               </div>
             )}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <form onSubmit={handleSend} className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 sm:p-5">
+            <form onSubmit={handleSend} className="space-y-4">
               
               {/* Recipient Selection */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Destinataires</label>
-                <div className="grid grid-cols-3 gap-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Destinataires</label>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setRecipientType('parents')}
-                    className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-3 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
                       recipientType === 'parents' 
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-600/20' 
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs ring-2 ring-blue-600/20' 
                         : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl ${recipientType === 'parents' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={20} />
+                    <div className={`p-1.5 rounded-lg ${recipientType === 'parents' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Users size={16} />
                     </div>
-                    Parents
+                    <span>Parents</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecipientType('teachers')}
-                    className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-3 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
                       recipientType === 'teachers' 
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md ring-2 ring-indigo-600/20' 
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs ring-2 ring-indigo-600/20' 
                         : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl ${recipientType === 'teachers' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={20} />
+                    <div className={`p-1.5 rounded-lg ${recipientType === 'teachers' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Users size={16} />
                     </div>
-                    Professeurs
+                    <span>Professeurs</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecipientType('students')}
-                    className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-3 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
                       recipientType === 'students' 
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-md ring-2 ring-emerald-600/20' 
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-xs ring-2 ring-emerald-600/20' 
                         : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl ${recipientType === 'students' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={20} />
+                    <div className={`p-1.5 rounded-lg ${recipientType === 'students' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Users size={16} />
                     </div>
-                    Élèves
+                    <span>Élèves</span>
                   </button>
                 </div>
                 
-                {/* Scope Selection */}
-                <div className="mt-6 space-y-5 border-t border-slate-100 pt-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Portée de l'envoi</label>
-                    <select
+                {/* Scope Selection (PILL STYLE) */}
+                <div className="mt-4 space-y-3.5 border-t border-slate-100 pt-3.5">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">Portée de l'envoi</label>
+                    <SelectPill
+                      options={[
+                        { value: 'all', label: `Tous les ${recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'professeurs' : studentsTerm}` },
+                        { value: 'class', label: 'Par classe spécifique' },
+                        { value: 'individual', label: 'Sélection individuelle' }
+                      ]}
                       value={recipientScope}
-                      onChange={(e) => setRecipientScope(e.target.value)}
-                      className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-medium"
-                    >
-                      <option value="all">Tous les {recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'professeurs' : studentsTerm}</option>
-                      <option value="class">Par classe</option>
-                      <option value="individual">Sélection individuelle</option>
-                    </select>
+                      onChange={(val) => setRecipientScope(val as any)}
+                      variant="field"
+                      size="sm"
+                      colorScheme="amber"
+                      className="w-full"
+                    />
                   </div>
 
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-150">
                     {recipientScope === 'class' && (
-                      <div className="mb-5">
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Sélectionner une classe</label>
-                        <select
-                          value={selectedClass}
-                          onChange={(e) => setSelectedClass(e.target.value)}
-                          className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-medium"
-                        >
-                          <option value="">Choisir une classe...</option>
-                          {classes.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
+                      <div className="mb-3.5 space-y-1">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">Sélectionner une classe</label>
+                        <ClassSelectorPill
+                          classes={classes}
+                          selectedClassId={selectedClass}
+                          onSelectClass={(id) => setSelectedClass(id === 'all' ? '' : id)}
+                          allowAll={false}
+                          emptyLabel="Choisir une classe..."
+                          variant="field"
+                          size="sm"
+                          colorScheme="amber"
+                          className="w-full"
+                        />
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-bold text-slate-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-700">
                         {recipientScope === 'all' ? `Liste des ${recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'professeurs' : studentsTerm}` : 
                          recipientScope === 'class' ? 'Vérifier les destinataires de la classe' : 'Sélectionner les destinataires'}
                       </label>
@@ -485,7 +497,7 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
                         <button 
                           type="button" 
                           onClick={selectAllFiltered}
-                          className="text-[10px] font-bold text-blue-600 hover:underline uppercase tracking-wider"
+                          className="text-[10px] font-bold text-amber-600 hover:underline uppercase tracking-wider"
                         >
                           Tout sélectionner
                         </button>
@@ -500,35 +512,37 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
                       </div>
                     </div>
                     
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-2.5">
                       {recipientScope === 'individual' && recipientType !== 'teachers' && (
-                        <div className="flex-1">
-                          <select
-                            value={selectedClassFilter}
-                            onChange={(e) => setSelectedClassFilter(e.target.value)}
-                            className="w-full px-4 py-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm font-medium"
-                          >
-                            <option value="">Toutes les classes</option>
-                            {classes.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
+                        <div className="w-full sm:w-1/2">
+                          <ClassSelectorPill
+                            classes={classes}
+                            selectedClassId={selectedClassFilter}
+                            onSelectClass={(id) => setSelectedClassFilter(id === 'all' ? '' : id)}
+                            allowAll={true}
+                            allLabel="Toutes les classes"
+                            variant="field"
+                            size="sm"
+                            colorScheme="slate"
+                            className="w-full"
+                          />
                         </div>
                       )}
-                      <div className={`relative ${(recipientScope === 'individual' || recipientScope === 'all') && recipientType !== 'teachers' ? 'flex-[2]' : 'w-full'}`}>
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" size={16} />
                         <input
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder={`Rechercher un ${recipientType === 'parents' ? 'parent' : recipientType === 'teachers' ? 'professeur' : studentTerm}...`}
-                          className="w-full pl-11 pr-10 py-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 placeholder:text-slate-500 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm font-medium"
+                          className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-slate-300 bg-white text-slate-900 placeholder:text-slate-500 font-semibold focus:border-amber-600 focus:ring-2 focus:ring-amber-500/20 outline-none transition-all text-xs sm:text-sm shadow-2xs"
                         />
                         {searchQuery && (
                           <button 
                             type="button"
                             onClick={() => setSearchQuery('')}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-600"
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
+                            title="Effacer la recherche"
                           >
                             <X size={14} />
                           </button>
@@ -538,19 +552,19 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
                     
                     <div className="max-h-60 overflow-y-auto border border-slate-200 rounded-xl bg-white divide-y divide-slate-100 custom-scrollbar shadow-inner">
                       {isLoadingData ? (
-                        <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center justify-center gap-3">
-                          <Loader2 size={24} className="animate-spin text-blue-600" />
-                          <span>Chargement de la liste...</span>
+                        <div className="p-8 text-center text-slate-600 text-sm flex flex-col items-center justify-center gap-3">
+                          <Loader2 size={24} className="animate-spin text-amber-600" />
+                          <span className="font-semibold text-slate-700">Chargement de la liste...</span>
                         </div>
                       ) : individuals.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center gap-2">
-                          <Users size={24} className="text-slate-300" />
-                          <span>Aucun {recipientType === 'parents' ? 'parent' : recipientType === 'teachers' ? 'professeur' : studentTerm} trouvé.</span>
+                        <div className="p-8 text-center text-slate-600 text-sm flex flex-col items-center gap-2">
+                          <Users size={24} className="text-slate-400" />
+                          <span className="font-medium text-slate-700">Aucun {recipientType === 'parents' ? 'parent' : recipientType === 'teachers' ? 'professeur' : studentTerm} trouvé.</span>
                         </div>
                       ) : filteredIndividuals.length === 0 ? (
-                        <div className="p-8 text-center text-slate-500 text-sm flex flex-col items-center gap-2">
-                          <Search size={24} className="text-slate-300" />
-                          <span>Aucun résultat pour "{searchQuery}"</span>
+                        <div className="p-8 text-center text-slate-600 text-sm flex flex-col items-center gap-2">
+                          <Search size={24} className="text-slate-400" />
+                          <span className="font-medium text-slate-800">Aucun résultat pour "{searchQuery}"</span>
                         </div>
                       ) : (
                         filteredIndividuals.map(ind => (
@@ -565,34 +579,34 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
                             </div>
                             <div className="flex flex-col min-w-0 flex-1">
                               <div className="flex items-center justify-between gap-2">
-                                <span className={`text-sm font-extrabold truncate ${selectedIndividuals.includes(ind.id) ? 'text-amber-950' : 'text-slate-800'}`}>
+                                <span className={`text-sm font-extrabold truncate ${selectedIndividuals.includes(ind.id) ? 'text-amber-950' : 'text-slate-900'}`}>
                                   {recipientType === 'parents' 
                                     ? ind.parent_name
                                     : formatStudentName(ind.last_name, ind.first_name).fullName
                                   }
                                 </span>
                                 {ind.campus_name && (
-                                  <span className="shrink-0 px-2 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-black rounded-md border border-slate-200/60">
+                                  <span className="shrink-0 px-2 py-0.5 bg-slate-100 text-slate-700 text-[10px] font-black rounded-md border border-slate-200">
                                     📍 {ind.campus_name}
                                   </span>
                                 )}
                               </div>
-                              <span className="text-[11px] text-slate-500 truncate flex flex-col gap-0.5 mt-0.5">
+                              <span className="text-[11px] text-slate-700 truncate flex flex-col gap-0.5 mt-0.5">
                                 {recipientType === 'parents' && (
                                   <>
-                                    <span className="text-amber-700 font-semibold">{ind.parent_phone || 'Pas de téléphone'}</span>
-                                    <span className="truncate font-medium text-slate-500" title={ind.students?.join(', ')}>
+                                    <span className="text-amber-800 font-bold">{ind.parent_phone || 'Pas de numéro'}</span>
+                                    <span className="truncate font-semibold text-slate-700" title={ind.students?.join(', ')}>
                                       Élève(s): {ind.students?.join(', ')}
                                     </span>
                                   </>
                                 )}
                                 {recipientType === 'teachers' && (
-                                  <span className="text-amber-700 font-semibold">{ind.phone || 'Pas de téléphone'}</span>
+                                  <span className="text-amber-800 font-bold">{ind.phone || 'Pas de numéro'}</span>
                                 )}
                                 {recipientType === 'students' && (
                                   <>
-                                    <span className="text-amber-700 font-semibold">{ind.parent_phone || 'Pas de téléphone parent'}</span>
-                                    <span>Élève: {formatStudentName(ind.last_name, ind.first_name).fullName}</span>
+                                    <span className="text-amber-800 font-bold">{ind.parent_phone || 'Pas de numéro parent'}</span>
+                                    <span className="font-semibold text-slate-700">Élève: {formatStudentName(ind.last_name, ind.first_name).fullName}</span>
                                   </>
                                 )}
                               </span>
@@ -601,9 +615,9 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
                         ))
                       )}
                     </div>
-                    <div className="mt-3 flex items-center justify-between px-1">
-                      <div className="text-xs font-medium text-slate-500">
-                        <span className="text-blue-600 font-bold">{selectedIndividuals.length}</span> sélectionné(s) sur {individuals.length}
+                    <div className="mt-2.5 flex items-center justify-between px-1">
+                      <div className="text-xs font-semibold text-slate-700">
+                        <span className="text-amber-700 font-bold">{selectedIndividuals.length}</span> sélectionné(s) sur {individuals.length}
                       </div>
                     </div>
 

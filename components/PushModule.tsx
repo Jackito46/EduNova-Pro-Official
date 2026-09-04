@@ -5,6 +5,8 @@ import { UserProfile } from '../types';
 import { subscribeToPush } from '../utils/pushHelper';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { CommunicationTabBar } from './CommunicationTabBar';
 
 interface PushModuleProps {
   user: UserProfile;
@@ -140,167 +142,189 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-        <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Notifications Push</h2>
-          <p className="text-slate-700 mt-2 font-medium text-sm tracking-tight">
-            Envoyez des alertes instantanées sur les téléphones et navigateurs de vos utilisateurs
-          </p>
-        </div>
-        <div className="p-4 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center shadow-sm">
-          <Bell size={28} />
+    <div className="space-y-3.5 sm:space-y-4 pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
+      <CommunicationTabBar activeChannel="push" />
+
+      {/* HEADER COMPACT */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-indigo-600/20 shrink-0">
+            <Bell size={22} />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Notifications Push</h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">
+              Envoyez des alertes instantanées sur les téléphones et navigateurs de vos utilisateurs.
+            </p>
+          </div>
         </div>
       </div>
 
       {pushStatus !== 'granted' && (
-        <div className="bg-indigo-50 border border-indigo-100 rounded-2xl p-6 mb-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div>
-            <h3 className="font-bold text-indigo-900 flex items-center gap-2">
-              <Smartphone size={18} />
+        <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <h3 className="font-bold text-xs sm:text-sm text-indigo-900 flex items-center gap-1.5">
+              <Smartphone size={16} className="text-indigo-600" />
               Enregistrer cet appareil
             </h3>
-            <p className="text-sm text-indigo-800/80 mt-1">
-              Statut actuel: <strong className="uppercase">{pushStatus}</strong>
+            <p className="text-xs text-indigo-800/80 mt-0.5">
+              Statut actuel : <strong className="uppercase font-bold">{pushStatus}</strong>
             </p>
             {pushStatus === 'denied' ? (
-              <p className="text-xs text-red-600 font-medium mt-2 bg-red-50 p-2 rounded-lg border border-red-100 flex items-start gap-1">
-                <ShieldAlert size={14} className="mt-0.5 flex-shrink-0" />
-                <span>Vous avez bloqué les notifications ou l'environnement ne les permet pas (ex: iframe Ai Studio). Ouvrez l'app dans un nouvel onglet, ou cliquez sur l'icône de cadenas près de l'URL ({window.location.host}) pour les autoriser.</span>
+              <p className="text-[11px] text-red-600 font-medium mt-1.5 bg-red-50 p-2 rounded-lg border border-red-100 flex items-start gap-1">
+                <ShieldAlert size={14} className="mt-0.5 shrink-0" />
+                <span>Vous avez bloqué les notifications. Ouvrez l'application dans un nouvel onglet ou autorisez-les dans les réglages du navigateur.</span>
               </p>
             ) : (
-              <p className="text-xs text-indigo-700 mt-1">
-                Vous devez autoriser les notifications dans votre navigateur pour tester la réception.
+              <p className="text-[11px] text-indigo-700 mt-0.5">
+                Autorisez les notifications dans votre navigateur pour tester la réception en temps réel.
               </p>
             )}
           </div>
           <button
             onClick={handleSelfSubscribe}
             disabled={testLoading}
-            className="px-5 py-2.5 font-bold rounded-lg transition-colors shadow-sm flex flex-shrink-0 items-center gap-2 disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700"
+            className="px-3.5 py-2 text-xs font-bold rounded-xl transition-all shadow-xs flex shrink-0 items-center gap-1.5 disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
           >
-            {testLoading && <Loader2 size={16} className="animate-spin" />}
+            {testLoading && <Loader2 size={14} className="animate-spin" />}
             Autoriser et S'abonner
           </button>
         </div>
       )}
 
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-        <form onSubmit={handleSend} className="p-6 md:p-8 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-slate-50 border border-slate-100 rounded-xl">
-            <div className="md:col-span-2 space-y-4">
-              <div>
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 block flex items-center justify-between">
-                  <span>Modèles de messages rapides</span>
-                </label>
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
-                  {templates.map((t, index) => (
-                    <button
-                      key={index}
-                      type="button"
-                      onClick={() => applyTemplate(t)}
-                      className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-[11px] font-bold whitespace-nowrap transition-colors flex items-center gap-1.5"
-                    >
-                      <Copy size={12} />
-                      {t.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 block mt-2">Cibles (Rôles)</label>
-                <div className="flex flex-wrap gap-2">
-                  {roles.map(r => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      onClick={() => handleToggleRole(r.id)}
-                      className={`px-4 py-2 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors ${
-                        roleFilters.includes(r.id) 
-                          ? 'bg-indigo-600 text-white shadow-sm' 
-                          : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
-                      }`}
-                    >
-                      <UserCheck size={16} />
-                      {r.label}
-                    </button>
-                  ))}
-                </div>
-                <p className="text-xs text-slate-500 mt-1.5 flex items-center gap-1 italic">
-                  Si aucun rôle n'est sélectionné, la notification sera envoyée à tout le monde.
-                </p>
-              </div>
-
-              {((roleFilters.length === 0) || roleFilters.includes('STUDENT') || roleFilters.includes('PARENT')) && (
-                <div className="pt-3 border-t border-slate-100">
-                  <label className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-2 flex items-center gap-2">
-                    <GraduationCap size={16} className="text-indigo-600" />
-                    Filtrer par Classe (Optionnel)
-                  </label>
-                  <select
-                    value={classId}
-                    onChange={(e) => setClassId(e.target.value)}
-                    className="w-full md:w-1/2 px-4 py-3 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-medium focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500"
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+        <form onSubmit={handleSend} className="p-4 sm:p-5 space-y-4">
+          <div className="space-y-3.5 p-3.5 sm:p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
+            {/* Quick Templates */}
+            <div>
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                Modèles de messages rapides
+              </label>
+              <div className="flex gap-1.5 overflow-x-auto pb-1.5 scrollbar-none">
+                {templates.map((t, index) => (
+                  <button
+                    key={index}
+                    type="button"
+                    onClick={() => applyTemplate(t)}
+                    className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 shadow-xs"
                   >
-                    <option value="">Toutes les classes</option>
-                    {classes.map(c => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+                    <Copy size={12} className="text-blue-500" />
+                    {t.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Titre de la notification</label>
+            {/* Target Roles */}
+            <div className="pt-2 border-t border-slate-100">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-1.5 block">
+                Cibles (Rôles)
+              </label>
+              <div className="flex flex-wrap gap-1.5 sm:gap-2">
+                {roles.map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => handleToggleRole(r.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                      roleFilters.includes(r.id) 
+                        ? 'bg-indigo-600 text-white shadow-xs' 
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <UserCheck size={14} />
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-[11px] text-slate-500 mt-1 italic">
+                Si aucun rôle n'est sélectionné, la notification sera envoyée à l'ensemble des utilisateurs enregistrés.
+              </p>
+            </div>
+
+            {/* Filter by class with ClassSelectorPill */}
+            {((roleFilters.length === 0) || roleFilters.includes('STUDENT') || roleFilters.includes('PARENT')) && (
+              <div className="pt-2.5 border-t border-slate-100 space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <GraduationCap size={15} className="text-indigo-600" />
+                  Filtrer par Classe (Optionnel)
+                </label>
+                <div className="w-full sm:w-1/2">
+                  <ClassSelectorPill
+                    classes={classes}
+                    selectedClassId={classId}
+                    onSelectClass={(id) => setClassId(id === 'all' ? '' : id)}
+                    allowAll={true}
+                    allLabel="Toutes les classes"
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                Titre de la notification
+              </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Ex: Alerte de retard, Bulletin Disponible..."
-                className="w-full px-4 py-3 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-bold focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500"
+                placeholder="Ex: Alerte de retard, Bulletin disponible..."
+                className="w-full px-3 py-2 bg-slate-50/50 focus:bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 required
               />
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider">Message</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                Message
+              </label>
               <textarea
                 value={body}
                 onChange={(e) => setBody(e.target.value)}
                 placeholder="Ex: Les bulletins du trimestre sont maintenant disponibles sur le portail."
                 rows={3}
-                className="w-full px-4 py-3 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-medium focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500"
+                className="w-full px-3 py-2 bg-slate-50/50 focus:bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all resize-none"
                 required
               />
             </div>
 
-            <div className="md:col-span-2 space-y-2">
-              <label className="text-xs font-bold text-slate-800 uppercase tracking-wider mb-1 block">Lien de redirection (Optionnel)</label>
-              <p className="text-[11px] text-slate-500 mb-2 italic">Ce lien s'ouvrira automatiquement quand l'utilisateur cliquera sur la notification.</p>
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                  Lien de redirection (Optionnel)
+                </label>
+                <span className="text-[10px] text-slate-400 italic">Ouvert au clic</span>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  <LinkIcon className="h-4 w-4 text-slate-400" />
+                  <LinkIcon className="h-3.5 w-3.5 text-slate-400" />
                 </div>
                 <input
                   type="text"
                   value={url}
                   onChange={(e) => setUrl(e.target.value)}
                   placeholder="Ex: /bulletins ou https://..."
-                  className="w-full pl-10 pr-4 py-3 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500"
+                  className="w-full pl-8 pr-3 py-2 bg-slate-50/50 focus:bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all"
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex justify-end pt-4 border-t border-slate-100">
+          <div className="flex justify-end pt-3 border-t border-slate-100">
             <button
               type="submit"
               disabled={loading}
-              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-bold flex items-center gap-3 hover:bg-black transition-all shadow-md active:scale-95 disabled:opacity-50"
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all shadow-xs active:scale-95 disabled:opacity-50"
             >
-              {loading ? <Loader2 size={18} className="animate-spin" /> : <Send size={18} />}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               Envoyer la notification
             </button>
           </div>

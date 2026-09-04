@@ -294,7 +294,7 @@ const AttendanceView: React.FC<AttendanceViewProps> = ({ user }) => {
 
   // Load attendance data for selected class & date
   const loadAttendanceData = useCallback(async () => {
-    if (!selectedClassId || !attendanceDate || !activeYearId) {
+    if (!selectedClassId || selectedClassId.toLowerCase() === 'all' || !attendanceDate || !activeYearId) {
       setLoading(false);
       return;
     }

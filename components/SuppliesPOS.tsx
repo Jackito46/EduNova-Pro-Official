@@ -148,7 +148,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
   // Fetch students when class changes (strict Multi-Tenant & Campus)
   useEffect(() => {
     const fetchClassStudents = async () => {
-      if (!selectedClassId || !selectedYearId) {
+      if (!selectedClassId || selectedClassId.toLowerCase() === 'all' || !selectedYearId) {
         setClassStudents([]);
         return;
       }

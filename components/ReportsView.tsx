@@ -42,7 +42,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>(user.campus_id || currentCampusId || 'ALL');
 
   // Effective campus ID used for DB filtering
-  const effectiveCampusId = user.campus_id ? user.campus_id : (selectedCampusFilter === 'ALL' ? null : selectedCampusFilter);
+  const effectiveCampusId = user.campus_id ? user.campus_id : (!selectedCampusFilter || selectedCampusFilter.toUpperCase() === 'ALL' ? null : selectedCampusFilter);
 
   // Options mémoïsées pour les menus déroulants harmonisés (SelectPill)
   const campusOptions: SelectOption[] = useMemo(() => {
@@ -74,7 +74,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
   // Students State
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
+  const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [students, setStudents] = useState<any[]>([]);
 
   // Cancellation Modal & Supervisor Pass State
@@ -461,7 +461,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
         query = query.eq('campus_id', effectiveCampusId);
       }
 
-      if (selectedClassId !== 'ALL') {
+      const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
+      if (!isAllClasses) {
         query = query.eq('class_id', selectedClassId);
       }
 
@@ -620,7 +621,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
   const exportStudentsPDF = () => {
     const doc = new jsPDF();
-    const className = selectedClassId === 'ALL' ? 'Toutes les classes' : classes.find(c => c.id === selectedClassId)?.name || '';
+    const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
+    const className = isAllClasses ? 'Toutes les classes' : classes.find(c => c.id === selectedClassId)?.name || '';
     
     doc.setFontSize(18);
     doc.text(school?.name || 'EduNova Pro', 14, 18);
@@ -656,7 +658,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   };
 
   const exportStudentsExcel = () => {
-    const className = selectedClassId === 'ALL' ? 'Toutes_les_classes' : classes.find(c => c.id === selectedClassId)?.name || '';
+    const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
+    const className = isAllClasses ? 'Toutes_les_classes' : classes.find(c => c.id === selectedClassId)?.name || '';
     
     const wsData = students.map((s, index) => ({
       'N°': index + 1,
@@ -747,7 +750,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
               <p className="text-slate-300 text-xs font-medium mt-1">
                 {activeTab === 'FINANCE' 
                   ? `Recettes enregistrées du ${new Date(startDate).toLocaleDateString('fr-FR')} au ${new Date(endDate).toLocaleDateString('fr-FR')}` 
-                  : `Registre dynamique : ${selectedClassId === 'ALL' ? 'Toutes les classes' : classes.find(c => c.id === selectedClassId)?.name}`}
+                  : `Registre dynamique : ${(!selectedClassId || selectedClassId.toLowerCase() === 'all') ? 'Toutes les classes' : (classes.find(c => c.id === selectedClassId)?.name || 'Classe')}`}
               </p>
             </div>
           </div>
@@ -1352,7 +1355,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
               <div>
                 <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
                   Registre des {terminology.students}
-                  {selectedClassId !== 'ALL' && (
+                  {selectedClassId && selectedClassId.toLowerCase() !== 'all' && (
                     <span className="text-indigo-600 ml-1.5">
                       - {classes.find(c => c.id === selectedClassId)?.name}
                     </span>

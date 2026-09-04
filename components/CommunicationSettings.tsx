@@ -21,6 +21,7 @@ import {
 import { UserProfile } from '../types';
 import { supabase } from '../supabase';
 import { toast } from 'sonner';
+import { SelectPill } from './SelectPill';
 
 interface CommunicationSettingsProps {
   user: UserProfile;
@@ -319,16 +320,20 @@ const CommunicationSettings: React.FC<CommunicationSettingsProps> = ({ user }) =
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Mode Opérationnel WhatsApp</label>
-                <select
+                <SelectPill
+                  options={[
+                    { value: 'wa_me', label: 'Routage Direct wa.me (Recommandé • Gratuit)' },
+                    { value: 'whatsapp_cloud', label: 'Meta WhatsApp Cloud API (Serveur)' },
+                    { value: 'twilio', label: 'Twilio for WhatsApp Business' },
+                    { value: 'green_api', label: 'Passerelle Tierce (Green API / Ultramsg)' }
+                  ]}
                   value={settings.whatsapp_provider}
-                  onChange={e => setSettings({...settings, whatsapp_provider: e.target.value})}
-                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/70 text-slate-900 focus:bg-white focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all text-sm font-medium cursor-pointer"
-                >
-                  <option value="wa_me">Routage Direct wa.me (Recommandé • Gratuit • Sans passerelle tierce)</option>
-                  <option value="whatsapp_cloud">Meta WhatsApp Cloud API (Diffusion Serveur Automatique)</option>
-                  <option value="twilio">Twilio for WhatsApp Business</option>
-                  <option value="green_api">Passerelle Tierce (Green API / Ultramsg)</option>
-                </select>
+                  onChange={(val) => setSettings({...settings, whatsapp_provider: val})}
+                  variant="field"
+                  size="md"
+                  colorScheme="emerald"
+                  className="w-full"
+                />
               </div>
 
               {settings.whatsapp_provider !== 'wa_me' ? (
@@ -388,16 +393,20 @@ const CommunicationSettings: React.FC<CommunicationSettingsProps> = ({ user }) =
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Opérateur SMS</label>
-                <select
+                <SelectPill
+                  options={[
+                    { value: 'none', label: 'Désactivé (Recommandé si WhatsApp actif)' },
+                    { value: 'sent.dm', label: 'Sent.dm Gateway' },
+                    { value: 'twilio', label: 'Twilio SMS' },
+                    { value: 'bulksms', label: 'BulkSMS' }
+                  ]}
                   value={settings.sms_provider}
-                  onChange={e => setSettings({...settings, sms_provider: e.target.value})}
-                  className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-slate-50/70 text-slate-900 focus:bg-white focus:border-amber-600 focus:ring-4 focus:ring-amber-500/10 outline-none transition-all text-sm font-medium cursor-pointer"
-                >
-                  <option value="none">Désactivé (Recommandé si WhatsApp utilisé)</option>
-                  <option value="sent.dm">Sent.dm Gateway</option>
-                  <option value="twilio">Twilio SMS</option>
-                  <option value="bulksms">BulkSMS</option>
-                </select>
+                  onChange={(val) => setSettings({...settings, sms_provider: val})}
+                  variant="field"
+                  size="md"
+                  colorScheme="amber"
+                  className="w-full"
+                />
               </div>
 
               {settings.sms_provider !== 'none' && (

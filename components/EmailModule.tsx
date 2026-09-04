@@ -7,6 +7,9 @@ import CommunicationHistory from './CommunicationHistory';
 import CommunicationSettings from './CommunicationSettings';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
+import { SelectPill } from './SelectPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { CommunicationTabBar } from './CommunicationTabBar';
 
 interface EmailModuleProps {
   user: UserProfile;
@@ -350,44 +353,48 @@ const EmailModule: React.FC<EmailModuleProps> = ({ user }) => {
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-blue-600 text-white rounded-3xl flex items-center justify-center shadow-xl shadow-blue-600/20 rotate-3 hover:rotate-0 transition-transform duration-500">
-            <Mail size={32} />
+    <div className="space-y-3.5 sm:space-y-4 pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
+      <CommunicationTabBar activeChannel="email" />
+
+      {/* HEADER COMPACT */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-blue-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-blue-600/20 shrink-0">
+            <Mail size={22} />
           </div>
           <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Communication Email</h1>
-            <p className="text-slate-500 font-medium">Envoyez des messages importants aux parents et professeurs.</p>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Communication Email</h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">Envoyez des messages et convocations aux parents, professeurs et élèves.</p>
           </div>
         </div>
 
-        <div className="flex items-center bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200 self-start md:self-auto">
           <button
             onClick={() => setActiveTab('send')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'send' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-50'
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'send' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <Send size={18} />
+            <Send size={14} />
             Envoi
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-50'
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'history' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <History size={18} />
+            <History size={14} />
             Historique
           </button>
           <button
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              activeTab === 'settings' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'text-slate-500 hover:bg-slate-50'
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'settings' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
-            <Settings size={18} />
+            <Settings size={14} />
             Paramètres
           </button>
         </div>
@@ -397,106 +404,111 @@ const EmailModule: React.FC<EmailModuleProps> = ({ user }) => {
       {activeTab === 'settings' && <CommunicationSettings user={user} />}
 
       {activeTab === 'send' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4">
           {/* Form Section */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="lg:col-span-2 space-y-3.5 sm:space-y-4">
             {(!settings || !settings.smtp_host || !settings.smtp_pass) && (
-              <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl flex gap-3 animate-in fade-in slide-in-from-top-2">
-                <AlertCircle className="text-amber-600 shrink-0" size={20} />
+              <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex gap-3 animate-in fade-in slide-in-from-top-1">
+                <AlertCircle className="text-amber-600 shrink-0" size={18} />
                 <div>
-                  <p className="text-sm font-bold text-amber-900">Configuration SMTP manquante</p>
-                  <p className="text-xs text-amber-700 mt-0.5">
-                    Vos paramètres Google SMTP ne sont pas encore configurés. Les envois seront simulés. 
-                    <button onClick={() => setActiveTab('settings')} className="ml-1 underline font-bold hover:text-amber-900">Configurer maintenant</button>
+                  <p className="text-xs font-bold text-amber-900">Configuration SMTP recommandée</p>
+                  <p className="text-[11px] text-amber-700 mt-0.5">
+                    Vos identifiants Google SMTP ne sont pas encore configurés. 
+                    <button onClick={() => setActiveTab('settings')} className="ml-1 underline font-bold hover:text-amber-900">Configurer dans Paramètres</button>
                   </p>
                 </div>
               </div>
             )}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
-            <form onSubmit={handleSend} className="space-y-6">
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 sm:p-5">
+            <form onSubmit={handleSend} className="space-y-4">
               
               {/* Recipient Selection */}
               <div>
-                <label className="block text-sm font-semibold text-slate-700 mb-2">Destinataires</label>
-                <div className="grid grid-cols-3 gap-3">
+                <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Destinataires</label>
+                <div className="grid grid-cols-3 gap-2">
                   <button
                     type="button"
                     onClick={() => setRecipientType('parents')}
-                    className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-3 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
                       recipientType === 'parents' 
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-md ring-2 ring-blue-600/20' 
+                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs ring-2 ring-blue-600/20' 
                         : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl ${recipientType === 'parents' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={20} />
+                    <div className={`p-1.5 rounded-lg ${recipientType === 'parents' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Users size={16} />
                     </div>
-                    Parents
+                    <span>Parents</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecipientType('teachers')}
-                    className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-3 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
                       recipientType === 'teachers' 
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-md ring-2 ring-indigo-600/20' 
+                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs ring-2 ring-indigo-600/20' 
                         : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl ${recipientType === 'teachers' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={20} />
+                    <div className={`p-1.5 rounded-lg ${recipientType === 'teachers' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Users size={16} />
                     </div>
-                    Professeurs
+                    <span>Professeurs</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecipientType('students')}
-                    className={`p-4 rounded-2xl border-2 text-sm font-bold transition-all flex flex-col items-center justify-center gap-3 ${
+                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
                       recipientType === 'students' 
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-md ring-2 ring-emerald-600/20' 
+                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-xs ring-2 ring-emerald-600/20' 
                         : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
                     }`}
                   >
-                    <div className={`p-2 rounded-xl ${recipientType === 'students' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={20} />
+                    <div className={`p-1.5 rounded-lg ${recipientType === 'students' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                      <Users size={16} />
                     </div>
-                    Élèves
+                    <span>Élèves</span>
                   </button>
                 </div>
                 
-                {/* Scope Selection */}
-                <div className="mt-6 space-y-5 border-t border-slate-100 pt-6">
-                  <div>
-                    <label className="block text-sm font-bold text-slate-700 mb-2">Portée de l'envoi</label>
-                    <select
+                {/* Scope Selection (PILL STYLE) */}
+                <div className="mt-4 space-y-3.5 border-t border-slate-100 pt-3.5">
+                  <div className="space-y-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">Portée de l'envoi</label>
+                    <SelectPill
+                      options={[
+                        { value: 'all', label: `Tous les ${recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'professeurs' : studentsTerm}` },
+                        { value: 'class', label: 'Par classe spécifique' },
+                        { value: 'individual', label: 'Sélection individuelle' }
+                      ]}
                       value={recipientScope}
-                      onChange={(e) => setRecipientScope(e.target.value)}
-                      className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-medium"
-                    >
-                      <option value="all">Tous les {recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'professeurs' : studentsTerm}</option>
-                      <option value="class">Par classe</option>
-                      <option value="individual">Sélection individuelle</option>
-                    </select>
+                      onChange={(val) => setRecipientScope(val as any)}
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      className="w-full"
+                    />
                   </div>
 
-                  <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+                  <div className="animate-in fade-in slide-in-from-top-1 duration-150">
                     {recipientScope === 'class' && (
-                      <div className="mb-5">
-                        <label className="block text-sm font-bold text-slate-700 mb-2">Sélectionner une classe</label>
-                        <select
-                          value={selectedClass}
-                          onChange={(e) => setSelectedClass(e.target.value)}
-                          className="w-full px-4 py-3.5 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all font-medium"
-                        >
-                          <option value="">Choisir une classe...</option>
-                          {classes.map(c => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
+                      <div className="mb-3.5 space-y-1">
+                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700">Sélectionner une classe</label>
+                        <ClassSelectorPill
+                          classes={classes}
+                          selectedClassId={selectedClass}
+                          onSelectClass={(id) => setSelectedClass(id === 'all' ? '' : id)}
+                          allowAll={false}
+                          emptyLabel="Choisir une classe..."
+                          variant="field"
+                          size="sm"
+                          colorScheme="blue"
+                          className="w-full"
+                        />
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between mb-3">
-                      <label className="text-sm font-bold text-slate-700">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold text-slate-700">
                         {recipientScope === 'all' ? `Liste des ${recipientType === 'parents' ? 'parents' : recipientType === 'teachers' ? 'professeurs' : studentsTerm}` : 
                          recipientScope === 'class' ? 'Vérifier les destinataires de la classe' : 'Sélectionner les destinataires'}
                       </label>
@@ -519,29 +531,30 @@ const EmailModule: React.FC<EmailModuleProps> = ({ user }) => {
                       </div>
                     </div>
                     
-                    <div className="flex gap-2 mb-3">
+                    <div className="flex flex-col sm:flex-row gap-2 mb-2.5">
                       {recipientScope === 'individual' && recipientType !== 'teachers' && (
-                        <div className="flex-1">
-                          <select
-                            value={selectedClassFilter}
-                            onChange={(e) => setSelectedClassFilter(e.target.value)}
-                            className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 focus:ring-2 focus:ring-blue-600 outline-none transition-all text-sm"
-                          >
-                            <option value="">Toutes les classes</option>
-                            {classes.map(c => (
-                              <option key={c.id} value={c.id}>{c.name}</option>
-                            ))}
-                          </select>
+                        <div className="w-full sm:w-1/2">
+                          <ClassSelectorPill
+                            classes={classes}
+                            selectedClassId={selectedClassFilter}
+                            onSelectClass={(id) => setSelectedClassFilter(id === 'all' ? '' : id)}
+                            allowAll={true}
+                            allLabel="Toutes les classes"
+                            variant="field"
+                            size="sm"
+                            colorScheme="slate"
+                            className="w-full"
+                          />
                         </div>
                       )}
-                      <div className={`relative ${(recipientScope === 'individual' || recipientScope === 'all') && recipientType !== 'teachers' ? 'flex-[2]' : 'w-full'}`}>
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                         <input
                           type="text"
                           value={searchQuery}
                           onChange={(e) => setSearchQuery(e.target.value)}
                           placeholder={`Rechercher un ${recipientType === 'parents' ? 'parent' : recipientType === 'teachers' ? 'professeur' : studentTerm}...`}
-                          className="w-full pl-11 pr-10 py-3 rounded-xl border-2 border-slate-100 bg-slate-50/50 text-slate-900 placeholder:text-slate-500 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-600/10 outline-none transition-all text-sm font-medium"
+                          className="w-full pl-9 pr-8 py-2 rounded-xl border border-slate-200 bg-slate-50/60 focus:bg-white text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all text-xs font-medium"
                         />
                         {searchQuery && (
                           <button 
