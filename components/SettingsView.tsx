@@ -58,11 +58,17 @@ import {
   GitBranch,
   GitCommit,
   GitPullRequest,
-  Code2
+  Code2,
+  Edit2,
+  ArrowUp,
+  ArrowDown,
+  BookOpen,
+  GraduationCap,
+  Wrench
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabase';
-import { UserProfile, UserRole } from '../types';
+import { UserProfile, UserRole, SchoolType } from '../types';
 import Modal from './Modal';
 import { toast } from 'sonner';
 import { AuditLogger } from '../utils/auditLogger';
@@ -71,8 +77,13 @@ import { useSchool } from '../contexts/SchoolContext';
 import SessionManager from './SessionManager';
 import { 
   DocumentDefinition, 
-  getDocumentDefinitionsForSchoolType 
+  getDocumentDefinitionsForSchoolType,
+  DOCUMENT_SUGGESTIONS_BY_TYPE,
+  DOCUMENT_PRESETS,
+  DocumentPreset,
+  DocumentSuggestion
 } from '../utils/documentRequirements';
+import { getTerminology } from '../lib/terminology';
 import { BackupClientService, BackupMetadata } from '../services/backupClientService';
 import { 
   PaymentMethodConfig, 
@@ -913,18 +924,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     }
   };
 
-  // Gestion dynamique des pièces exigées à l'inscription
+  // Gestion dynamique des pièces exigées adaptées à la terminologie d'école connectée
   const [newDocName, setNewDocName] = useState('');
   const [newDocDescription, setNewDocDescription] = useState('');
   const [newDocRequired, setNewDocRequired] = useState(true);
   const [isSavingDocs, setIsSavingDocs] = useState(false);
+  const [editingDocId, setEditingDocId] = useState<string | null>(null);
+  const [editDocName, setEditDocName] = useState('');
+  const [editDocDescription, setEditDocDescription] = useState('');
+  const [editDocRequired, setEditDocRequired] = useState(true);
+  const [showPresetsMenu, setShowPresetsMenu] = useState(false);
+
+  const connectedSchoolType = (schoolData.school_type || school?.school_type || 'CLASSIC') as string;
+  const activeTerminology = useMemo(() => {
+    return getTerminology(
+      connectedSchoolType === 'UNIVERSITY' ? SchoolType.UNIVERSITY :
+      connectedSchoolType === 'PROFESSIONAL' ? SchoolType.PROFESSIONAL :
+      SchoolType.CLASSIC
+    );
+  }, [connectedSchoolType]);
+
+  const activeSchoolSuggestions: DocumentSuggestion[] = useMemo(() => {
+    return DOCUMENT_SUGGESTIONS_BY_TYPE[connectedSchoolType] || DOCUMENT_SUGGESTIONS_BY_TYPE.CLASSIC;
+  }, [connectedSchoolType]);
 
   const currentConfiguredDocs: DocumentDefinition[] = React.useMemo(() => {
     return getDocumentDefinitionsForSchoolType(
-      schoolData.school_type || school?.school_type, 
+      connectedSchoolType, 
       schoolData.global_settings
     );
-  }, [schoolData.school_type, school?.school_type, schoolData.global_settings]);
+  }, [connectedSchoolType, schoolData.global_settings]);
 
   const handleSaveDocumentList = async (updatedDocsList: DocumentDefinition[]) => {
     if (!canManageAllCampuses) {
@@ -1000,6 +1029,65 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     setNewDocRequired(true);
   };
 
+  const handleStartEditDoc = (doc: DocumentDefinition) => {
+    setEditingDocId(doc.id);
+    setEditDocName(doc.name);
+    setEditDocDescription(doc.description || '');
+    setEditDocRequired(!!doc.required);
+  };
+
+  const handleCancelEditDoc = () => {
+    setEditingDocId(null);
+    setEditDocName('');
+    setEditDocDescription('');
+  };
+
+  const handleSaveEditDoc = async () => {
+    if (!editDocName.trim()) {
+      toast.error("L'intitulé de la pièce justificative ne peut pas être vide.");
+      return;
+    }
+    const updatedList = currentConfiguredDocs.map(d => {
+      if (d.id === editingDocId) {
+        return {
+          ...d,
+          name: editDocName.trim(),
+          description: editDocDescription.trim() || undefined,
+          required: editDocRequired
+        };
+      }
+      return d;
+    });
+    await handleSaveDocumentList(updatedList);
+    setEditingDocId(null);
+    toast.success("Pièce justificative modifiée avec succès.");
+  };
+
+  const handleMoveDoc = async (index: number, direction: 'up' | 'down') => {
+    if (!canManageAllCampuses) return;
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= currentConfiguredDocs.length) return;
+    
+    const updatedList = [...currentConfiguredDocs];
+    const temp = updatedList[index];
+    updatedList[index] = updatedList[targetIndex];
+    updatedList[targetIndex] = temp;
+    await handleSaveDocumentList(updatedList);
+  };
+
+  const handleApplyPreset = async (preset: DocumentPreset) => {
+    if (!canManageAllCampuses) return;
+    await handleSaveDocumentList(preset.docs);
+    setShowPresetsMenu(false);
+    toast.success(`Standard "${preset.label}" appliqué avec succès.`);
+  };
+
+  const handleApplySuggestion = (suggestion: DocumentSuggestion) => {
+    setNewDocName(suggestion.name);
+    setNewDocDescription(suggestion.description);
+    setNewDocRequired(suggestion.required);
+  };
+
   const handleRemoveCustomDocument = async (docId: string) => {
     const updatedList = currentConfiguredDocs.filter(d => d.id !== docId);
     await handleSaveDocumentList(updatedList);
@@ -1017,9 +1105,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
   const handleResetDocsToDefault = async () => {
     if (!canManageAllCampuses) return;
-    const defaultDocs = getDocumentDefinitionsForSchoolType(schoolData.school_type || school?.school_type, null);
+    const defaultDocs = getDocumentDefinitionsForSchoolType(connectedSchoolType, null);
     await handleSaveDocumentList(defaultDocs);
-    toast.success("Pièces réinitialisées selon les standards de votre type d'établissement.");
+    toast.success(`Pièces réinitialisées selon le standard de votre établissement.`);
   };
 
   const handleCleanSchoolData = async () => {
@@ -2185,137 +2273,342 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                  </div>
                </div>
 
-               {/* Pièces Justificatives Exigées à l'Inscription */}
+               {/* Pièces Justificatives Exigées à l'Inscription / Admission adaptées à l'École Connectée */}
                <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                   <div className="flex items-center gap-2">
-                     <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><FileCheck size={13} /></div>
+                   <div className="flex items-start sm:items-center gap-2">
+                     <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg shrink-0 mt-0.5 sm:mt-0">
+                       <FileCheck size={14} />
+                     </div>
                      <div>
-                       <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-wider">Pièces Exigées à l'Inscription</h4>
+                       <div className="flex items-center gap-2 flex-wrap">
+                         <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-wider">
+                           Pièces Exigées à l'{activeTerminology.enrollment}
+                         </h4>
+                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 border ${
+                            connectedSchoolType === 'UNIVERSITY'
+                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                              : connectedSchoolType === 'PROFESSIONAL'
+                              ? 'bg-amber-50 text-amber-800 border-amber-200'
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                          }`}>
+                           {connectedSchoolType === 'UNIVERSITY' ? (
+                             <><GraduationCap size={10} /> Enseignement Supérieur • {activeTerminology.students} ({activeTerminology.enrollments})</>
+                           ) : connectedSchoolType === 'PROFESSIONAL' ? (
+                             <><Wrench size={10} /> Formation Pro • {activeTerminology.students} ({activeTerminology.enrollments})</>
+                           ) : (
+                             <><BookOpen size={10} /> Scolaire K-12 • {activeTerminology.students} ({activeTerminology.enrollments})</>
+                           )}
+                         </span>
+                       </div>
                        <p className="text-[11px] text-slate-600 font-medium mt-0.5">
-                         Personnalisez les documents requis lors de l'admission d'un {terminology.student.toLowerCase()} pour votre établissement.
+                         Personnalisez les pièces justificatives officielles requises pour la constitution du dossier d'{activeTerminology.enrollment.toLowerCase()} d'un {activeTerminology.student.toLowerCase()} dans votre établissement.
                        </p>
                      </div>
                    </div>
 
                    {canManageAllCampuses && (
-                     <button
-                       type="button"
-                       onClick={handleResetDocsToDefault}
-                       disabled={isSavingDocs}
-                       className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer shrink-0"
-                     >
-                       <RefreshCw size={11} className={isSavingDocs ? "animate-spin" : ""} />
-                       <span>Par défaut ({schoolData.school_type === 'UNIVERSITY' ? 'Université' : schoolData.school_type === 'PROFESSIONAL' ? 'Formation Pro' : 'École Fondamentale'})</span>
-                     </button>
+                     <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0 relative">
+                       {/* Menu Standards Prédéfinis */}
+                       <div className="relative">
+                         <button
+                           type="button"
+                           onClick={() => setShowPresetsMenu(!showPresetsMenu)}
+                           disabled={isSavingDocs}
+                           className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 hover:border-slate-300 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                           title="Choisir un standard officiel"
+                         >
+                           <Layers size={11} className="text-indigo-600" />
+                           <span>Standards Officiels</span>
+                            <ChevronDown size={11} className={`transition-transform duration-200 ${showPresetsMenu ? "rotate-180" : ""}`} />
+                         </button>
+
+                         {showPresetsMenu && (
+                           <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-30 space-y-1 animate-in fade-in zoom-in-95">
+                             <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                               Appliquer un standard complet
+                             </div>
+                             {DOCUMENT_PRESETS.map(preset => (
+                               <button
+                                 key={preset.id}
+                                 type="button"
+                                 onClick={() => handleApplyPreset(preset)}
+                                 className="w-full text-left p-2 rounded-lg hover:bg-slate-50 transition-all flex flex-col gap-0.5 cursor-pointer group"
+                               >
+                                 <div className="flex items-center justify-between">
+                                   <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
+                                     {preset.label}
+                                   </span>
+                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                                     {preset.badge}
+                                   </span>
+                                 </div>
+                                 <span className="text-[10px] text-slate-500 leading-tight">
+                                   {preset.description}
+                                 </span>
+                               </button>
+                             ))}
+                           </div>
+                         )}
+                       </div>
+
+                       {/* Bouton Réinitialiser au type connecté */}
+                       <button
+                         type="button"
+                         onClick={handleResetDocsToDefault}
+                         disabled={isSavingDocs}
+                         className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
+                         title="Restaurer la liste recommandée pour votre type d'établissement"
+                       >
+                         <RefreshCw size={11} className={isSavingDocs ? "animate-spin" : ""} />
+                         <span>Par défaut ({connectedSchoolType === 'UNIVERSITY' ? 'Université' : connectedSchoolType === 'PROFESSIONAL' ? 'Formation Pro' : 'École Fondamentale'})</span>
+                       </button>
+                     </div>
                    )}
                  </div>
 
-                 {/* Form to add a new document requirement */}
+                 {/* Form to add a new document requirement with contextual suggestions */}
                  {canManageAllCampuses && (
-                   <form onSubmit={handleAddCustomDocument} className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 mb-2 space-y-2">
-                     <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                       <Plus size={12} className="text-indigo-600" />
-                       <span>Ajouter une nouvelle pièce ou exigence</span>
-                     </div>
-
-                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                       <div className="sm:col-span-6 space-y-0.5">
-                         <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Nom de la pièce *</label>
-                         <input
-                           type="text"
-                           placeholder="Ex: Certificat Médical Récent, Billet d'Ordre..."
-                           value={newDocName}
-                           onChange={e => setNewDocName(e.target.value)}
-                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
-                         />
+                   <div className="bg-slate-50/90 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 mb-2 space-y-2">
+                     <div className="flex items-center justify-between gap-2">
+                       <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
+                         <Plus size={12} className="text-indigo-600" />
+                         <span>Ajouter une nouvelle pièce justificative exigée</span>
                        </div>
-                       <div className="sm:col-span-6 space-y-0.5">
-                         <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Description / Précisions (optionnel)</label>
-                         <input
-                           type="text"
-                           placeholder="Ex: Délivré depuis moins de 3 mois..."
-                           value={newDocDescription}
-                           onChange={e => setNewDocDescription(e.target.value)}
-                           className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
-                         />
+                       <span className="text-[10px] text-slate-500 font-medium">
+                         Constitution du dossier d'{activeTerminology.enrollment.toLowerCase()}
+                       </span>
+                     </div>
+
+                     {/* Suggestions contextuelles rapides en pills cliquables */}
+                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                       <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
+                         <Sparkles size={11} className="text-amber-500" />
+                         Suggestions rapides ({connectedSchoolType === 'UNIVERSITY' ? 'Universitaire' : connectedSchoolType === 'PROFESSIONAL' ? 'Technique' : 'Scolaire'}) :
+                       </span>
+                       {activeSchoolSuggestions.map((sug, i) => (
+                         <button
+                           key={i}
+                           type="button"
+                           onClick={() => handleApplySuggestion(sug)}
+                           className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer shadow-2xs"
+                            title={`Cliquer pour pré-remplir: ${sug.description}`}
+                         >
+                           + {sug.name}
+                         </button>
+                       ))}
+                     </div>
+
+                     <form onSubmit={handleAddCustomDocument} className="space-y-2 pt-1">
+                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                         <div className="sm:col-span-6 space-y-0.5">
+                           <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                             Intitulé officiel de la pièce *
+                           </label>
+                           <input
+                             type="text"
+                             placeholder={
+                               connectedSchoolType === 'UNIVERSITY'
+                                 ? "Ex: Relevé de Notes du Baccalauréat (S4 / Bac II), Pièce d'Identité..."
+                                 : connectedSchoolType === 'PROFESSIONAL'
+                                 ? "Ex: Pièce d'Identité (CIN/NIF), Dernier Diplôme Technique..."
+                                 : "Ex: Acte de Naissance / Extrait d'Archives, Bulletins Antérieurs..."
+                             }
+                             value={newDocName}
+                             onChange={e => setNewDocName(e.target.value)}
+                             className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
+                           />
+                         </div>
+                         <div className="sm:col-span-6 space-y-0.5">
+                           <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                             Description & Consignes officielles (optionnel)
+                           </label>
+                           <input
+                             type="text"
+                             placeholder={
+                               connectedSchoolType === 'UNIVERSITY'
+                                 ? "Ex: Diplôme original certifié par le MENFP, carnet d'admissibilité..."
+                                 : connectedSchoolType === 'PROFESSIONAL'
+                                 ? "Ex: Justificatif des prérequis techniques, convention d'apprentissage..."
+                                 : "Ex: Document officiel légalisé, carnet de vaccination pédiatrique à jour..."
+                             }
+                             value={newDocDescription}
+                             onChange={e => setNewDocDescription(e.target.value)}
+                             className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
+                           />
+                         </div>
                        </div>
-                     </div>
 
-                     <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-                       <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-                         <input
-                           type="checkbox"
-                           checked={newDocRequired}
-                           onChange={e => setNewDocRequired(e.target.checked)}
-                           className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                         />
-                         <span>Document obligatoire par défaut</span>
-                       </label>
+                       <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                         <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                           <input
+                             type="checkbox"
+                             checked={newDocRequired}
+                             onChange={e => setNewDocRequired(e.target.checked)}
+                             className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                           />
+                           <span>Pièce obligatoire lors de l'{activeTerminology.enrollment.toLowerCase()}</span>
+                         </label>
 
-                       <button
-                         type="submit"
-                         disabled={isSavingDocs || !newDocName.trim()}
-                         className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                       >
-                         <Plus size={12} />
-                         Ajouter au dossier
-                       </button>
-                     </div>
-                   </form>
+                         <button
+                           type="submit"
+                           disabled={isSavingDocs || !newDocName.trim()}
+                           className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                         >
+                           <Plus size={12} />
+                           <span>Ajouter au dossier d'{activeTerminology.enrollment.toLowerCase()}</span>
+                         </button>
+                       </div>
+                     </form>
+                   </div>
                  )}
 
-                 {/* List of configured documents */}
-                 <div className="space-y-1">
+                 {/* List of configured documents with inline editing and ordering */}
+                 <div className="space-y-1.5">
                    {currentConfiguredDocs.length === 0 ? (
-                     <div className="p-3 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs font-medium">
-                       Aucune pièce justificative configurée pour cet établissement.
+                     <div className="p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs font-medium">
+                       Aucune pièce justificative configurée pour les {activeTerminology.enrollments.toLowerCase()} de cet établissement.
                      </div>
                    ) : (
                      currentConfiguredDocs.map((doc, idx) => (
                        <div 
                          key={doc.id || idx}
-                         className="bg-white p-2 sm:p-2.5 rounded-lg border border-slate-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 shadow-2xs hover:border-slate-300 transition-all"
+                         className="bg-white p-2.5 rounded-xl border border-slate-200/90 flex flex-col gap-2 shadow-2xs hover:border-slate-300 transition-all"
                        >
-                         <div className="flex items-start gap-2">
-                           <div className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                             {idx + 1}
-                           </div>
-                           <div>
-                             <div className="flex items-center gap-2 flex-wrap">
-                               <h5 className="text-xs font-bold text-slate-900">{doc.name}</h5>
-                               <button
-                                 type="button"
-                                 onClick={() => canManageAllCampuses && handleToggleDocRequired(doc.id, !!doc.required)}
-                                 disabled={!canManageAllCampuses || isSavingDocs}
-                                 className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ${
-                                   doc.required 
-                                     ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100' 
-                                     : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                                 } ${!canManageAllCampuses ? 'cursor-default' : 'cursor-pointer'}`}
-                               >
-                                 {doc.required ? 'Obligatoire' : 'Facultatif'}
-                               </button>
+                         {editingDocId === doc.id ? (
+                           /* Mode Édition en ligne */
+                           <div className="space-y-2 p-1">
+                             <div className="flex items-center justify-between">
+                               <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
+                                 <Edit2 size={12} /> Modifier la pièce #{idx + 1}
+                               </span>
+                               <div className="flex items-center gap-1.5">
+                                 <button
+                                   type="button"
+                                   onClick={handleSaveEditDoc}
+                                   disabled={isSavingDocs || !editDocName.trim()}
+                                   className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                 >
+                                   <Check size={12} /> Enregistrer
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={handleCancelEditDoc}
+                                   className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                 >
+                                   <XCircle size={12} /> Annuler
+                                 </button>
+                               </div>
                              </div>
-                             {doc.description && (
-                               <p className="text-[10px] text-slate-500 font-medium mt-0.5">
-                                 {doc.description}
-                               </p>
-                             )}
-                           </div>
-                         </div>
 
-                         {canManageAllCampuses && (
-                           <div className="flex items-center gap-1.5 self-end sm:self-center">
-                             <button
-                               type="button"
-                               onClick={() => handleRemoveCustomDocument(doc.id)}
-                               disabled={isSavingDocs}
-                               className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                               title="Supprimer cette pièce"
-                             >
-                               <Trash2 size={12} />
-                             </button>
+                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                               <div className="sm:col-span-6 space-y-0.5">
+                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Intitulé *</label>
+                                 <input
+                                   type="text"
+                                   value={editDocName}
+                                   onChange={e => setEditDocName(e.target.value)}
+                                   className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:ring-1 focus:ring-indigo-600"
+                                 />
+                               </div>
+                               <div className="sm:col-span-6 space-y-0.5">
+                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Description</label>
+                                 <input
+                                   type="text"
+                                   value={editDocDescription}
+                                   onChange={e => setEditDocDescription(e.target.value)}
+                                   className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:ring-1 focus:ring-indigo-600"
+                                 />
+                               </div>
+                             </div>
+
+                             <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                               <input
+                                 type="checkbox"
+                                 checked={editDocRequired}
+                                 onChange={e => setEditDocRequired(e.target.checked)}
+                                 className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                               />
+                               <span>Pièce obligatoire lors de l'{activeTerminology.enrollment.toLowerCase()}</span>
+                             </label>
+                           </div>
+                         ) : (
+                           /* Mode Affichage standard */
+                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                             <div className="flex items-start gap-2.5">
+                               <div className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
+                                 {idx + 1}
+                               </div>
+                               <div>
+                                 <div className="flex items-center gap-2 flex-wrap">
+                                   <h5 className="text-xs font-bold text-slate-900">{doc.name}</h5>
+                                   <button
+                                     type="button"
+                                     onClick={() => canManageAllCampuses && handleToggleDocRequired(doc.id, !!doc.required)}
+                                     disabled={!canManageAllCampuses || isSavingDocs}
+                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ${
+                                        doc.required 
+                                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100' 
+                                          : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
+                                      } ${!canManageAllCampuses ? 'cursor-default' : 'cursor-pointer'}`}
+                                     title="Cliquer pour basculer entre obligatoire et facultatif"
+                                   >
+                                     {doc.required ? 'Obligatoire' : 'Facultatif'}
+                                   </button>
+                                 </div>
+                                 {doc.description && (
+                                   <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-relaxed">
+                                     {doc.description}
+                                   </p>
+                                 )}
+                               </div>
+                             </div>
+
+                             {canManageAllCampuses && (
+                               <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                                 {/* Réorganiser Ordre */}
+                                 <button
+                                   type="button"
+                                   onClick={() => handleMoveDoc(idx, 'up')}
+                                   disabled={idx === 0 || isSavingDocs}
+                                   className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent rounded-lg transition-all cursor-pointer"
+                                   title="Déplacer vers le haut"
+                                 >
+                                   <ArrowUp size={12} />
+                                 </button>
+                                 <button
+                                   type="button"
+                                   onClick={() => handleMoveDoc(idx, 'down')}
+                                   disabled={idx === currentConfiguredDocs.length - 1 || isSavingDocs}
+                                   className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent rounded-lg transition-all cursor-pointer"
+                                   title="Déplacer vers le bas"
+                                 >
+                                   <ArrowDown size={12} />
+                                 </button>
+
+                                 {/* Modifier */}
+                                 <button
+                                   type="button"
+                                   onClick={() => handleStartEditDoc(doc)}
+                                   disabled={isSavingDocs}
+                                   className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
+                                   title="Modifier cette pièce"
+                                 >
+                                   <Edit2 size={12} />
+                                 </button>
+
+                                 {/* Supprimer */}
+                                 <button
+                                   type="button"
+                                   onClick={() => handleRemoveCustomDocument(doc.id)}
+                                   disabled={isSavingDocs}
+                                   className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                   title="Supprimer cette pièce"
+                                 >
+                                   <Trash2 size={12} />
+                                 </button>
+                               </div>
+                             )}
                            </div>
                          )}
                        </div>

@@ -734,10 +734,10 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                     <div>
                       <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">
-                        Pièces Justificatives & Dossier d'Admission
+                        Pièces Justificatives & Dossier d'{terminology.enrollment || 'Admission'}
                       </h3>
                       <p className="text-[11px] text-slate-500 font-medium">
-                        Contrôle réglementaire ({school?.school_type === 'UNIVERSITY' ? 'Universitaire' : school?.school_type === 'PROFESSIONAL' ? 'Professionnel' : 'Classique'})
+                        Contrôle réglementaire ({school?.school_type === 'UNIVERSITY' ? 'Universitaire' : school?.school_type === 'PROFESSIONAL' ? 'Professionnel' : 'Scolaire Général'})
                       </p>
                     </div>
                   </div>

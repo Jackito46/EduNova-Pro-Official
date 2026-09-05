@@ -34,7 +34,7 @@ export const StudentDocumentStatusModal: React.FC<StudentDocumentStatusModalProp
   currentUser,
   onSuccess
 }) => {
-  const { school } = useSchool();
+  const { school, terminology } = useSchool();
   const [definitions, setDefinitions] = useState<DocumentDefinition[]>([]);
   const [docStates, setDocStates] = useState<Record<string, {
     status: DocumentStatus;
@@ -212,7 +212,7 @@ export const StudentDocumentStatusModal: React.FC<StudentDocumentStatusModalProp
                 Gestion des Pièces Justificatives
               </h2>
               <p className="text-xs text-slate-500 font-medium mt-0.5">
-                Élève : <span className="font-bold text-slate-800">{student?.first_name} {student?.last_name}</span> • Matricule : <span className="font-mono">{student?.id?.substring(0, 8)}</span>
+                {terminology.student} : <span className="font-bold text-slate-800">{student?.first_name} {student?.last_name}</span> • Matricule : <span className="font-mono">{student?.id?.substring(0, 8)}</span>
               </p>
             </div>
           </div>
@@ -398,7 +398,7 @@ export const StudentDocumentStatusModal: React.FC<StudentDocumentStatusModalProp
             {syncStudentStatus && targetStudentStatus === 'Actif' && !completeness.isComplete && (
               <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs font-medium flex items-center gap-2">
                 <AlertTriangle size={15} className="text-amber-600 shrink-0" />
-                <span>Attention : Vous activez l'élève alors que certaines pièces justificatives sont encore en attente ou incomplètes.</span>
+                <span>Attention : Vous activez l'{terminology.student?.toLowerCase() || 'élève'} alors que certaines pièces justificatives sont encore en attente ou incomplètes.</span>
               </div>
             )}
           </div>
