@@ -64,9 +64,9 @@ const getFeeRowDetails = (
   let isSettled = false;
   if (nativeUSD > 0 && nativeHTG === 0) {
     const effectiveUSD = Math.max(0, nativeUSD - (discountHTG > 0 ? discountHTG / rate : 0));
-    isSettled = paidUSD >= effectiveUSD - 0.05 || paidHTGEquiv >= (totalHTGEquiv - 1.0);
+    isSettled = paidUSD >= effectiveUSD - 0.10 || paidHTGEquiv >= (totalHTGEquiv - 15.0);
   } else {
-    isSettled = paidHTGEquiv >= (totalHTGEquiv - 1.0);
+    isSettled = paidHTGEquiv >= (totalHTGEquiv - 15.0);
   }
 
   let plannedNative = '';

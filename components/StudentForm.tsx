@@ -823,7 +823,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
           amount: amountToSave,
           amount_htg_equivalent: equivalentHtgToSave,
-          exchange_rate_applied: paymentCurrency === 'USD' ? actualExchangeRate : 1,
+          exchange_rate_applied: actualExchangeRate || 140,
           currency: paymentCurrency,
           nature: 'RECOUVREMENT',
           type: 'Revenu',

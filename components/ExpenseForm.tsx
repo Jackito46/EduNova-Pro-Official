@@ -181,7 +181,7 @@ const ExpenseForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         label: formData.label,
         amount: parseFloat(formData.amount),
         currency: formData.currency,
-        exchange_rate_applied: formData.currency === 'USD' ? currentExchangeRate : 1,
+        exchange_rate_applied: currentExchangeRate || 140,
         amount_htg_equivalent: formData.currency === 'USD' ? parseFloat(formData.amount) * currentExchangeRate : parseFloat(formData.amount),
         description: formData.description,
         expense_date: formData.expense_date || new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]

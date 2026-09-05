@@ -1767,7 +1767,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
         deposit_date: (paymentModalMethod === 'Dépôt Bancaire' || currentMethodConfig?.requires_deposit_date) ? paymentModalDepositDate : null,
         status: isPending ? 'EN_ATTENTE' : 'VALIDE',
         amount_htg_equivalent: paymentModalCurrency === 'USD' ? Math.round((amt * activeExchangeRate) * 100) / 100 : amt,
-        exchange_rate_applied: paymentModalCurrency === 'USD' ? activeExchangeRate : 1,
+        exchange_rate_applied: activeExchangeRate || 140,
         moncash_order_id: moncashOrderId,
         moncash_status: (paymentModalMethod === 'MonCash' || paymentModalMethod === 'Natcash') ? 'PENDING' : null,
         academic_year_id: campaign.academic_year_id

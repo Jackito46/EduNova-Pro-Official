@@ -36,7 +36,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
   const studentTerm = terminology.student.toLowerCase();
   const studentsTerm = terminology.students.toLowerCase();
 
-  const [activeTab, setActiveTab] = useState<'send' | 'history' | 'settings'>('send');
+  const [activeTab, setActiveTab] = useState<'send' | 'templates' | 'history' | 'settings'>('send');
   const [recipientType, setRecipientType] = useState<'parents' | 'teachers' | 'students'>('parents');
   const [recipientScope, setRecipientScope] = useState<'all' | 'class' | 'individual'>('all');
   const [selectedClass, setSelectedClass] = useState('');
@@ -54,7 +54,10 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
   const [settings, setSettings] = useState<any>(null);
   const [sentStatuses, setSentStatuses] = useState<Record<string, boolean>>({});
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [templateSearchQuery, setTemplateSearchQuery] = useState<string>('');
   const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [copiedTemplateId, setCopiedTemplateId] = useState<string | null>(null);
+  const [showGuideModal, setShowGuideModal] = useState(false);
 
   // Categories for official templates
   const templateCategories = [
@@ -135,9 +138,27 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
     }
   ];
 
-  const filteredTemplates = selectedCategory === 'all'
-    ? templates
-    : templates.filter(t => t.category === selectedCategory);
+  const filteredTemplates = templates.filter(t => {
+    const matchesCategory = selectedCategory === 'all' || t.category === selectedCategory;
+    const matchesSearch = !templateSearchQuery.trim() || 
+      t.title.toLowerCase().includes(templateSearchQuery.toLowerCase()) || 
+      t.content.toLowerCase().includes(templateSearchQuery.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const handleUseTemplate = (tmpl: typeof templates[0]) => {
+    setMessage(tmpl.content);
+    setSelectedTemplateId(tmpl.id);
+    setActiveTab('send');
+    toast.success(`Modèle "${tmpl.title}" inséré dans le composeur.`);
+  };
+
+  const handleCopyTemplate = (tmpl: typeof templates[0]) => {
+    navigator.clipboard.writeText(tmpl.content);
+    setCopiedTemplateId(tmpl.id);
+    toast.success(`Modèle "${tmpl.title}" copié dans le presse-papier.`);
+    setTimeout(() => setCopiedTemplateId(null), 2000);
+  };
 
   // Fetch classes
   useEffect(() => {
@@ -393,60 +414,233 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
       {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
       <CommunicationTabBar activeChannel="whatsapp" />
 
-      {/* HEADER SECTION COMPACT */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 p-4 sm:p-5 rounded-2xl text-white shadow-lg relative overflow-hidden">
-        <div className="absolute top-0 right-0 -mt-12 -mr-12 w-64 h-64 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
-        <div className="space-y-1 relative z-10">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-500/20 rounded-xl flex items-center justify-center border border-emerald-400/30 text-emerald-300 shadow-inner shrink-0">
-              <MessageCircle size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-black tracking-tight">Communication WhatsApp</h1>
-              <p className="text-emerald-100/90 text-xs sm:text-sm mt-0.5">
-                Diffusion ciblée et notifications officielles aux familles et au personnel.
-              </p>
-            </div>
+      {/* HEADER SECTION (STANDARDIZED WITH SMS, EMAIL & PUSH) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
+            <MessageCircle size={22} />
+          </div>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Communication WhatsApp</h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium">
+              Diffusion ciblée et notifications officielles aux familles et au personnel.
+            </p>
           </div>
         </div>
 
-        {/* TAB BUTTONS (INTERNATIONAL STANDARD) */}
-        <div className="flex items-center gap-1.5 bg-emerald-950/70 p-1 sm:p-1.5 rounded-xl border border-emerald-700/40 backdrop-blur-md self-start md:self-auto relative z-10">
+        {/* TAB BUTTONS (STANDARDIZED SIZES & STYLING) */}
+        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200 self-start md:self-auto gap-1">
           <button
+            type="button"
             onClick={() => setActiveTab('send')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
               activeTab === 'send'
-                ? 'bg-emerald-500 text-white shadow-xs'
-                : 'text-emerald-200 hover:text-white hover:bg-emerald-800/50'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
             <Send size={14} />
             Envoi
           </button>
           <button
+            type="button"
+            onClick={() => setActiveTab('templates')}
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
+              activeTab === 'templates'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-200/60'
+            }`}
+          >
+            <Sparkles size={14} />
+            Modèles Officiels
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
               activeTab === 'history'
-                ? 'bg-emerald-500 text-white shadow-xs'
-                : 'text-emerald-200 hover:text-white hover:bg-emerald-800/50'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
             <History size={14} />
             Historique
           </button>
           <button
+            type="button"
             onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg font-bold text-xs transition-all ${
+            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
               activeTab === 'settings'
-                ? 'bg-emerald-500 text-white shadow-xs'
-                : 'text-emerald-200 hover:text-white hover:bg-emerald-800/50'
+                ? 'bg-emerald-600 text-white shadow-xs'
+                : 'text-slate-600 hover:bg-slate-200/60'
             }`}
           >
             <Settings size={14} />
             Paramètres
           </button>
+          <button
+            type="button"
+            onClick={() => setShowGuideModal(true)}
+            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all text-slate-600 hover:bg-slate-200/60"
+            title="Guide WhatsApp"
+          >
+            <BookOpen size={14} />
+            Guide
+          </button>
         </div>
       </div>
+
+      {/* DEDICATED TAB: MODÈLES DE MESSAGES OFFICIELS */}
+      {activeTab === 'templates' && (
+        <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-sm space-y-5">
+          {/* HEADER & SEARCH */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
+                  <Sparkles size={18} />
+                </div>
+                <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+                  Modèles de Messages Officiels
+                </h2>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+                Modèles institutionnels prêts à l'emploi avec balises de fusion pour les alertes et avis officiels.
+              </p>
+            </div>
+
+            <div className="relative w-full sm:w-72">
+              <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={templateSearchQuery}
+                onChange={e => setTemplateSearchQuery(e.target.value)}
+                placeholder="Rechercher un modèle..."
+                className="w-full pl-9 pr-3 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 outline-none font-medium text-slate-800"
+              />
+            </div>
+          </div>
+
+          {/* CATEGORY FILTER PILLS */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {templateCategories.map(cat => (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => setSelectedCategory(cat.id)}
+                className={`h-8 px-3 sm:px-3.5 rounded-lg text-xs font-bold transition-all ${
+                  selectedCategory === cat.id
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                }`}
+              >
+                {cat.label}
+              </button>
+            ))}
+            <span className="text-xs text-slate-400 font-medium ml-auto">
+              {filteredTemplates.length} sur {templates.length} modèles
+            </span>
+          </div>
+
+          {/* TEMPLATES GRID */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {filteredTemplates.map(tmpl => {
+              const isCopied = copiedTemplateId === tmpl.id;
+              const isSelected = selectedTemplateId === tmpl.id;
+
+              const badgeColor = 
+                tmpl.category === 'Finances' ? 'bg-emerald-50 text-emerald-800 border-emerald-200' :
+                tmpl.category === 'Discipline' ? 'bg-amber-50 text-amber-800 border-amber-200' :
+                tmpl.category === 'Pédagogie' ? 'bg-blue-50 text-blue-800 border-blue-200' :
+                tmpl.category === 'Vie Scolaire' ? 'bg-purple-50 text-purple-800 border-purple-200' :
+                'bg-rose-50 text-rose-800 border-rose-200';
+
+              return (
+                <div
+                  key={tmpl.id}
+                  className={`bg-white rounded-2xl border p-4 sm:p-5 transition-all flex flex-col justify-between space-y-3.5 ${
+                    isSelected
+                      ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-xs'
+                      : 'border-slate-200 hover:border-emerald-300 hover:shadow-xs'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <span className="text-xl p-2 bg-slate-50 rounded-xl border border-slate-100 shrink-0">
+                          {tmpl.icon}
+                        </span>
+                        <div>
+                          <h3 className="text-sm font-bold text-slate-900">{tmpl.title}</h3>
+                          <span className={`inline-block mt-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeColor}`}>
+                            {tmpl.category}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* CONTENT PREVIEW */}
+                    <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 text-xs text-slate-700 whitespace-pre-wrap font-sans leading-relaxed">
+                      {tmpl.content}
+                    </div>
+                  </div>
+
+                  {/* ACTIONS */}
+                  <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => handleCopyTemplate(tmpl)}
+                      className="h-9 px-3 rounded-lg text-xs font-semibold bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center gap-1.5 transition-all"
+                    >
+                      {isCopied ? (
+                        <>
+                          <Check size={13} className="text-emerald-600" />
+                          <span>Copié !</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy size={13} />
+                          <span>Copier</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleUseTemplate(tmpl)}
+                      className="h-9 px-4 rounded-lg text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white flex items-center gap-1.5 transition-all shadow-xs"
+                    >
+                      <Send size={13} />
+                      <span>Utiliser ce modèle</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DYNAMIC VARIABLES REFERENCE GUIDE */}
+          <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-200/80 space-y-2">
+            <div className="flex items-center gap-2">
+              <Info size={16} className="text-emerald-600" />
+              <h4 className="text-xs font-bold uppercase tracking-wider text-emerald-950">
+                Champs dynamiques de personnalisation
+              </h4>
+            </div>
+            <p className="text-xs text-emerald-900/80 leading-relaxed">
+              Ces balises sont automatiquement remplacées par les données réelles du destinataire lors de la génération.
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-1">
+              {variableTags.map(v => (
+                <div key={v.tag} className="bg-white p-2.5 rounded-xl border border-emerald-200 text-center shadow-2xs">
+                  <span className="font-mono text-xs font-bold text-emerald-800">{v.tag}</span>
+                  <p className="text-[10px] text-slate-500 mt-0.5">{v.label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* TAB CONTENT: HISTORY & SETTINGS REUSE */}
       {activeTab === 'history' && (
@@ -463,89 +657,8 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
       {activeTab === 'send' && (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
           
-          {/* LEFT COLUMN: TEMPLATES & COMPOSER (7 cols) */}
+          {/* LEFT COLUMN: COMPOSER & PREVIEW (7 cols) */}
           <div className="lg:col-span-7 space-y-3.5 sm:space-y-4">
-            
-            {/* TEMPLATE PRESETS */}
-            <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Sparkles size={16} className="text-emerald-600" />
-                  Modèles de Messages Officiels
-                </h3>
-                <span className="text-xs text-slate-500 font-medium">
-                  {filteredTemplates.length} / {templates.length} modèles
-                </span>
-              </div>
-
-              {/* CATEGORY FILTER PILLS */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                {templateCategories.map(cat => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat.id)}
-                    className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all ${
-                      selectedCategory === cat.id
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                    }`}
-                  >
-                    {cat.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* TEMPLATES GRID */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-1 custom-scrollbar">
-                {filteredTemplates.map(tmpl => {
-                  const isApplied = selectedTemplateId === tmpl.id;
-                  return (
-                    <div
-                      key={tmpl.id}
-                      onClick={() => {
-                        setMessage(tmpl.content);
-                        setSelectedTemplateId(tmpl.id);
-                      }}
-                      className={`p-3 rounded-xl border text-left cursor-pointer transition-all flex flex-col justify-between gap-2 ${
-                        isApplied
-                          ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400'
-                          : 'bg-slate-50/70 border-slate-200/80 hover:bg-white hover:border-emerald-300 hover:shadow-xs'
-                      }`}
-                    >
-                      <div className="space-y-1">
-                        <div className="flex items-center justify-between gap-1.5">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <span className="text-base shrink-0">{tmpl.icon}</span>
-                            <h4 className="font-bold text-xs text-slate-900 truncate">{tmpl.title}</h4>
-                          </div>
-                          <span className="text-[10px] font-semibold text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full shrink-0">
-                            {tmpl.category}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-600 line-clamp-2 leading-relaxed font-normal">
-                          {tmpl.content}
-                        </p>
-                      </div>
-                      <div className="flex items-center justify-end pt-1">
-                        <span className={`text-[11px] font-bold flex items-center gap-1 ${
-                          isApplied ? 'text-emerald-700' : 'text-slate-500 group-hover:text-emerald-700'
-                        }`}>
-                          {isApplied ? (
-                            <>
-                              <CheckCircle2 size={12} className="text-emerald-600" />
-                              Appliqué
-                            </>
-                          ) : (
-                            'Insérer le modèle →'
-                          )}
-                        </span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
 
             {/* MESSAGE EDITOR */}
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
@@ -554,9 +667,45 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                   <MessageCircle size={16} className="text-emerald-600" />
                   Rédiger le Message
                 </label>
-                <span className="text-xs font-mono text-slate-400 font-bold">
-                  {message.length} caractères
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('templates')}
+                    className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 transition-all"
+                  >
+                    <Sparkles size={13} />
+                    <span>Modèles officiels ({templates.length})</span>
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <span className="text-xs font-mono text-slate-400 font-bold">
+                    {message.length} caractères
+                  </span>
+                </div>
+              </div>
+
+              {/* QUICK TEMPLATE SELECTION BAR */}
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
+                  Modèle rapide :
                 </span>
+                <select
+                  value={selectedTemplateId || ''}
+                  onChange={e => {
+                    const tmpl = templates.find(t => t.id === e.target.value);
+                    if (tmpl) {
+                      setMessage(tmpl.content);
+                      setSelectedTemplateId(tmpl.id);
+                    } else {
+                      setSelectedTemplateId(null);
+                    }
+                  }}
+                  className="flex-1 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                >
+                  <option value="">Sélectionner un modèle officiel...</option>
+                  {templates.map(t => (
+                    <option key={t.id} value={t.id}>{t.icon} {t.title} ({t.category})</option>
+                  ))}
+                </select>
               </div>
 
               {/* VARIABLE TAG INJECTORS */}
@@ -629,7 +778,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 </div>
               </div>
 
-              {/* DISPATCH MODE SELECTION (INTERNATIONAL STANDARD) */}
+              {/* DISPATCH MODE SELECTION (STANDARDIZED LABELS) */}
               <div className="pt-2 border-t border-slate-100 space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700">Mode de diffusion :</span>
@@ -638,7 +787,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setDispatchMode('direct_wame')}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    className={`h-10 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       dispatchMode === 'direct_wame'
                         ? 'bg-white text-emerald-900 shadow-xs border border-slate-200/80'
                         : 'text-slate-600 hover:text-slate-900'
@@ -650,14 +799,14 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setDispatchMode('api')}
-                    className={`py-2 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                    className={`h-10 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
                       dispatchMode === 'api'
                         ? 'bg-white text-emerald-900 shadow-xs border border-slate-200/80'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Send size={14} className="text-teal-600" />
-                    API WhatsApp
+                    <Send size={14} className="text-emerald-600" />
+                    Envoi Automatique (API)
                   </button>
                 </div>
               </div>
@@ -668,7 +817,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                   type="button"
                   onClick={handleSendViaApi}
                   disabled={isSending || activeRecipients.length === 0}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                  className="w-full h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm shadow-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isSending ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                   Envoyer via API ({activeRecipients.length} destinataire{activeRecipients.length > 1 ? 's' : ''})
@@ -697,7 +846,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setRecipientType('parents')}
-                  className={`py-1.5 sm:py-2 px-2.5 rounded-xl font-bold text-xs transition-all ${
+                  className={`h-9 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center ${
                     recipientType === 'parents'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -708,7 +857,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setRecipientType('teachers')}
-                  className={`py-1.5 sm:py-2 px-2.5 rounded-xl font-bold text-xs transition-all ${
+                  className={`h-9 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center ${
                     recipientType === 'teachers'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -719,7 +868,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setRecipientType('students')}
-                  className={`py-1.5 sm:py-2 px-2.5 rounded-xl font-bold text-xs transition-all ${
+                  className={`h-9 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center ${
                     recipientType === 'students'
                       ? 'bg-emerald-600 text-white shadow-xs'
                       : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -845,14 +994,14 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 )}
               </div>
 
-              {/* LOG BATCH ACTION FOR DIRECT LAUNCH MODE */}
+              {/* LOG BATCH ACTION FOR WEB/APP MODE */}
               {dispatchMode === 'direct_wame' && (
-                <div className="pt-3 border-t border-slate-100 space-y-2">
+                <div className="pt-3 border-t border-slate-100">
                   <button
                     type="button"
                     onClick={handleLogWhatsAppBatch}
                     disabled={isSending || activeRecipients.length === 0}
-                    className="w-full py-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold transition-all flex items-center justify-center gap-2"
+                    className="w-full h-10 px-4 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs sm:text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50"
                   >
                     <ShieldCheck size={15} className="text-emerald-400" />
                     Enregistrer la campagne dans l'historique
@@ -861,57 +1010,63 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
               )}
             </div>
 
-            {/* DIRECT WA LAUNCHER QUEUE */}
+            {/* DIRECT WA LAUNCHER QUEUE (STANDARDIZED CLEAN WHITE CARD) */}
             {dispatchMode === 'direct_wame' && activeRecipients.length > 0 && (
-              <div className="bg-emerald-950 text-white p-6 rounded-3xl space-y-4 shadow-xl border border-emerald-800/50">
-                <div className="flex items-center justify-between">
+              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                   <div className="flex items-center gap-2">
-                    <MessageCircle className="text-emerald-400" size={20} />
-                    <h4 className="font-bold text-sm">Lancement Direct WhatsApp</h4>
+                    <MessageCircle className="text-emerald-600" size={16} />
+                    <h4 className="font-bold text-xs sm:text-sm text-slate-900">File d'envoi WhatsApp</h4>
                   </div>
-                  <span className="text-[10px] bg-emerald-800 px-2.5 py-0.5 rounded-full font-bold text-emerald-200">
-                    {activeRecipients.length} liens prêts
+                  <span className="text-xs bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full font-bold text-emerald-800">
+                    {activeRecipients.filter(r => sentStatuses[r.id]).length} / {activeRecipients.length} traités
                   </span>
                 </div>
 
-                <p className="text-xs text-emerald-200/80 leading-relaxed">
-                  Cliquez sur <strong className="text-white">"Ouvrir WhatsApp"</strong> pour chaque destinataire. Le message personnalisé sera pré-rempli dans l'application WhatsApp.
-                </p>
-
                 <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
-                  {activeRecipients.map((rec, idx) => {
+                  {activeRecipients.map((rec) => {
                     const waUrl = generateWhatsAppLink(rec);
                     const isDone = sentStatuses[rec.id];
                     return (
                       <div
                         key={rec.id}
-                        className={`p-3 rounded-2xl border text-xs flex items-center justify-between gap-3 transition-all ${
+                        className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-3 transition-all ${
                           isDone 
-                            ? 'bg-emerald-900/40 border-emerald-700/50 text-emerald-300' 
-                            : 'bg-emerald-900/80 border-emerald-700/80 text-white'
+                            ? 'bg-emerald-50/50 border-emerald-200 text-emerald-950' 
+                            : 'bg-slate-50/70 border-slate-200/80 text-slate-900'
                         }`}
                       >
                         <div className="min-w-0 flex-1">
                           <p className="font-bold truncate">{rec.parent_name || rec.name}</p>
-                          <p className="text-[10px] font-mono text-emerald-300 opacity-80">
+                          <p className="text-[10px] font-mono text-emerald-700 flex items-center gap-1 mt-0.5">
+                            <Phone size={10} />
                             +{formatPhoneNumber(rec.phone)}
                           </p>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 shrink-0">
                           <a
                             href={waUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             onClick={() => setSentStatuses(prev => ({ ...prev, [rec.id]: true }))}
-                            className={`px-3 py-1.5 rounded-xl font-bold text-[11px] flex items-center gap-1.5 shadow-sm transition-all ${
+                            className={`h-8 px-3 rounded-lg font-bold text-xs flex items-center gap-1.5 transition-all ${
                               isDone
-                                ? 'bg-emerald-800 text-emerald-200'
-                                : 'bg-emerald-500 hover:bg-emerald-400 text-white active:scale-95'
+                                ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800 border border-emerald-300'
+                                : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
                             }`}
                           >
-                            <ExternalLink size={12} />
-                            {isDone ? 'Rouvrer' : 'Ouvrir WA'}
+                            {isDone ? (
+                              <>
+                                <Check size={13} className="text-emerald-700" />
+                                <span>Envoyé</span>
+                              </>
+                            ) : (
+                              <>
+                                <ExternalLink size={13} />
+                                <span>Ouvrir</span>
+                              </>
+                            )}
                           </a>
                         </div>
                       </div>

@@ -406,48 +406,42 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
               {/* Recipient Selection */}
               <div>
                 <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">Destinataires</label>
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                   <button
                     type="button"
                     onClick={() => setRecipientType('parents')}
-                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
+                    className={`h-9 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
                       recipientType === 'parents' 
-                        ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-xs ring-2 ring-blue-600/20' 
-                        : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
+                        ? 'bg-amber-600 text-white shadow-xs' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    <div className={`p-1.5 rounded-lg ${recipientType === 'parents' ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={16} />
-                    </div>
+                    <Users size={14} />
                     <span>Parents</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecipientType('teachers')}
-                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
+                    className={`h-9 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
                       recipientType === 'teachers' 
-                        ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-xs ring-2 ring-indigo-600/20' 
-                        : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
+                        ? 'bg-amber-600 text-white shadow-xs' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    <div className={`p-1.5 rounded-lg ${recipientType === 'teachers' ? 'bg-indigo-100 text-indigo-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={16} />
-                    </div>
+                    <Users size={14} />
                     <span>Professeurs</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setRecipientType('students')}
-                    className={`p-2.5 sm:p-3 rounded-xl border-2 text-xs font-bold transition-all flex flex-col sm:flex-row items-center justify-center gap-1.5 sm:gap-2 ${
+                    className={`h-9 px-2.5 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 ${
                       recipientType === 'students' 
-                        ? 'border-emerald-600 bg-emerald-50 text-emerald-700 shadow-xs ring-2 ring-emerald-600/20' 
-                        : 'border-slate-100 text-slate-500 hover:border-slate-200 hover:bg-slate-50'
+                        ? 'bg-amber-600 text-white shadow-xs' 
+                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
                     }`}
                   >
-                    <div className={`p-1.5 rounded-lg ${recipientType === 'students' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
-                      <Users size={16} />
-                    </div>
-                    <span>Élèves</span>
+                    <Users size={14} />
+                    <span>{terminology.students}</span>
                   </button>
                 </div>
                 
@@ -681,26 +675,22 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
                 <button
                   type="submit"
                   disabled={isSending || !message}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-white transition-all ${
-                    isSending || !message
-                      ? 'bg-slate-300 cursor-not-allowed'
-                      : 'bg-blue-600 hover:bg-blue-700 active:scale-95 shadow-lg shadow-blue-600/20'
-                  }`}
+                  className="h-10 px-5 rounded-xl bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs sm:text-sm transition-all shadow-sm flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {isSending ? (
                     <>
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Envoi en cours...
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Envoi en cours...</span>
                     </>
                   ) : sendSuccess ? (
                     <>
-                      <CheckCircle2 size={20} />
-                      Envoyé avec succès
+                      <CheckCircle2 size={16} className="text-white" />
+                      <span>Envoyé avec succès</span>
                     </>
                   ) : (
                     <>
-                      <Send size={20} />
-                      Envoyer le SMS
+                      <Send size={16} />
+                      <span>Envoyer le SMS</span>
                     </>
                   )}
                 </button>
@@ -710,24 +700,24 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
         </div>
 
         {/* Right Column: Templates & History */}
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl shadow-sm border border-slate-200 p-6">
-            <h2 className="text-lg font-bold text-slate-900 tracking-tight mb-4 flex items-center gap-2">
-              <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                <MessageSquare size={18} />
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200 p-4 sm:p-5 space-y-3">
+            <h2 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight flex items-center gap-2">
+              <div className="p-1.5 bg-amber-50 text-amber-600 rounded-lg">
+                <MessageSquare size={16} />
               </div>
               Modèles SMS
             </h2>
-            <div className="space-y-3">
+            <div className="space-y-2">
               {testTemplates.map((template) => (
                 <button
                   key={template.id}
                   type="button"
                   onClick={() => handleTemplateSelect(template)}
-                  className="w-full text-left p-4 rounded-2xl border-2 border-slate-100 hover:border-blue-200 hover:bg-blue-50/50 transition-all group"
+                  className="w-full text-left p-3 rounded-xl border border-slate-200 hover:border-amber-300 hover:bg-amber-50/40 transition-all group"
                 >
-                  <h3 className="font-bold text-slate-800 group-hover:text-blue-700">{template.title}</h3>
-                  <p className="text-xs font-medium text-slate-500 mt-1.5 line-clamp-2">{template.content}</p>
+                  <h3 className="font-bold text-xs text-slate-800 group-hover:text-amber-800">{template.title}</h3>
+                  <p className="text-[11px] font-medium text-slate-500 mt-1 line-clamp-2 leading-relaxed">{template.content}</p>
                 </button>
               ))}
             </div>

@@ -75,9 +75,9 @@ const getFeeRowDetails = (
 
   let isSettled = false;
   if (nativeUSD > 0 && nativeHTG === 0) {
-    isSettled = paidUSD >= nativeUSD - 0.05 || paidHTGEquiv >= (totalHTGEquiv - 1.0);
+    isSettled = paidUSD >= nativeUSD - 0.10 || paidHTGEquiv >= (totalHTGEquiv - 15.0);
   } else {
-    isSettled = paidHTGEquiv >= (totalHTGEquiv - 1.0);
+    isSettled = paidHTGEquiv >= (totalHTGEquiv - 15.0);
   }
 
   let plannedNative = '';

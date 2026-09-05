@@ -858,7 +858,17 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             .filter((p: any) => p.ad_hoc_campaign_id === c.id)
             .reduce((acc: number, p: any) => {
               const paymentCurrency = p.currency || 'HTG';
-              const rate = p.exchange_rate_applied || currentExchangeRate || 150;
+              let rate = (p.exchange_rate_applied && Number(p.exchange_rate_applied) > 1) 
+                ? Number(p.exchange_rate_applied) 
+                : (currentExchangeRate || 140);
+
+              if (c.currency === 'USD' && paymentCurrency !== 'USD' && expectedAmount > 0) {
+                const impliedRate = Number(p.amount || 0) / expectedAmount;
+                if (impliedRate >= 50 && impliedRate <= 300 && (!p.exchange_rate_applied || Number(p.exchange_rate_applied) <= 1)) {
+                  rate = impliedRate;
+                }
+              }
+
               if (c.currency === 'USD') {
                 if (paymentCurrency === 'USD') {
                   return acc + Number(p.amount || 0);
@@ -880,7 +890,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             custom_amount: customAmount,
             original_amount: Number(c.amount || 0),
             paid: paidForThis,
-            remaining: Math.max(0, expectedAmount - paidForThis)
+            remaining: (paidForThis >= expectedAmount - 0.10) ? 0 : Math.max(0, expectedAmount - paidForThis)
           };
         }).filter(c => c && c.id);
 
@@ -1433,7 +1443,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           deposit_date: paymentMethod === 'Dépôt Bancaire' ? depositDate : null,
           status: isPending ? 'EN_ATTENTE' : 'VALIDE',
           amount_htg_equivalent: currency === 'USD' ? Math.round((amount * currentExchangeRate) * 100) / 100 : amount,
-          exchange_rate_applied: currency === 'USD' ? currentExchangeRate : 1,
+          exchange_rate_applied: currentExchangeRate || 140,
           moncash_order_id: moncashOrderId,
           moncash_status: paymentMethod === 'MonCash' ? 'PENDING' : null
         };

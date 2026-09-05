@@ -185,7 +185,7 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
           <button
             onClick={handleSelfSubscribe}
             disabled={testLoading}
-            className="px-3.5 py-2 text-xs font-bold rounded-xl transition-all shadow-xs flex shrink-0 items-center gap-1.5 disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
+            className="h-9 px-3.5 text-xs font-bold rounded-xl transition-all shadow-xs flex shrink-0 items-center gap-1.5 disabled:opacity-50 bg-indigo-600 text-white hover:bg-indigo-700 active:scale-95"
           >
             {testLoading && <Loader2 size={14} className="animate-spin" />}
             Autoriser et S'abonner
@@ -207,9 +207,9 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
                     key={index}
                     type="button"
                     onClick={() => applyTemplate(t)}
-                    className="px-2.5 py-1 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200/80 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 shadow-xs"
+                    className="h-7 px-2.5 bg-white hover:bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded-lg text-xs font-bold whitespace-nowrap transition-colors flex items-center gap-1.5 shadow-xs"
                   >
-                    <Copy size={12} className="text-blue-500" />
+                    <Copy size={12} className="text-indigo-500" />
                     {t.label}
                   </button>
                 ))}
@@ -227,7 +227,7 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
                     key={r.id}
                     type="button"
                     onClick={() => handleToggleRole(r.id)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
+                    className={`h-9 px-3 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all ${
                       roleFilters.includes(r.id) 
                         ? 'bg-indigo-600 text-white shadow-xs' 
                         : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
@@ -322,7 +322,7 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
             <button
               type="submit"
               disabled={loading}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 transition-all shadow-xs active:scale-95 disabled:opacity-50"
+              className="h-10 px-5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
               Envoyer la notification

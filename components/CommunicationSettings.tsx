@@ -322,10 +322,10 @@ const CommunicationSettings: React.FC<CommunicationSettingsProps> = ({ user }) =
                 <label className="text-xs font-bold uppercase tracking-wider text-slate-700">Mode Opérationnel WhatsApp</label>
                 <SelectPill
                   options={[
-                    { value: 'wa_me', label: 'Routage Direct wa.me (Recommandé • Gratuit)' },
-                    { value: 'whatsapp_cloud', label: 'Meta WhatsApp Cloud API (Serveur)' },
+                    { value: 'wa_me', label: 'Envoi Standard (WhatsApp Web / Mobile)' },
+                    { value: 'whatsapp_cloud', label: 'Envoi Automatisé (Serveur API)' },
                     { value: 'twilio', label: 'Twilio for WhatsApp Business' },
-                    { value: 'green_api', label: 'Passerelle Tierce (Green API / Ultramsg)' }
+                    { value: 'green_api', label: 'Passerelle Tierce (Ultramsg)' }
                   ]}
                   value={settings.whatsapp_provider}
                   onChange={(val) => setSettings({...settings, whatsapp_provider: val})}
@@ -371,7 +371,7 @@ const CommunicationSettings: React.FC<CommunicationSettingsProps> = ({ user }) =
                 <div className="bg-emerald-50/60 border border-emerald-200/80 rounded-2xl p-4 flex items-center gap-3">
                   <CheckCircle2 size={20} className="text-emerald-600 shrink-0" />
                   <p className="text-xs text-emerald-950 leading-relaxed font-medium">
-                    Le mode <strong>wa.me</strong> est prêt à l'emploi : vos messages personnalisés s'ouvrent directement dans WhatsApp Web ou l'application mobile en 1 clic sans coûts d'API.
+                    Le mode <strong>WhatsApp Web / Mobile</strong> est prêt à l'emploi : vos messages personnalisés s'ouvrent directement dans WhatsApp Web ou l'application mobile en 1 clic sans frais d'API.
                   </p>
                 </div>
               )}
