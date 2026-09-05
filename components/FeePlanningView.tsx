@@ -14,6 +14,8 @@ import { AuditLogger } from '../utils/auditLogger';
 import FeeHistoryModal from './FeeHistoryModal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SelectPill } from './SelectPill';
 
 interface AcademicYear {
   id: string;
@@ -1252,34 +1254,27 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-100 relative">
-        <div className="w-full flex justify-start md:hidden mb-2">
+    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-500 pb-16">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-5 rounded-2xl shadow-xs border border-slate-200/90 relative">
+        <div className="flex items-center gap-3">
           <button 
             onClick={() => window.history.back()}
-            className="p-3 hover:bg-gray-100 transition-all text-gray-500 rounded-xl border border-gray-200 flex items-center gap-2"
+            className="p-2 sm:p-2.5 hover:bg-slate-100 transition-all text-slate-500 hover:text-slate-800 rounded-xl border border-slate-200 flex items-center gap-1.5 cursor-pointer shrink-0"
+            title="Retour"
           >
-            <ArrowLeft size={20} />
-            <span className="text-xs font-semibold  tracking-tight">Retour</span>
+            <ArrowLeft size={18} />
+            <span className="text-xs font-bold sm:inline-block hidden">Retour</span>
           </button>
-        </div>
-        <div className="hidden md:flex absolute left-6 top-1/2 -translate-y-1/2">
-          <button 
-            onClick={() => window.history.back()}
-            className="p-3 hover:bg-gray-100 transition-all text-gray-500 rounded-xl border border-gray-200 flex items-center gap-2"
-          >
-            <ArrowLeft size={20} />
-          </button>
-        </div>
-        <div className="md:ml-20">
-          <div className="flex items-center gap-2 text-blue-600 font-semibold text-sm mb-1">
-            <Settings2 size={16} /> Configuration Économat
+          <div>
+            <div className="flex items-center gap-1.5 text-blue-600 font-bold text-xs">
+              <Settings2 size={14} /> Configuration Économat
+            </div>
+            <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-serif">Plan Tarifaire</h2>
+            <p className="text-slate-500 text-xs mt-0.5">Grille officielle des tarifs d'admission et {terminology.tuition.toLowerCase()}</p>
           </div>
-          <h2 className="text-2xl font-bold text-gray-900">Plan Tarifaire</h2>
-          <p className="text-gray-500 mt-1 text-sm">Grille officielle des tarifs d'admission et {terminology.tuition.toLowerCase()}</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto flex-wrap">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full md:w-auto flex-wrap">
           {/* SÉLECTEUR D'ANNÉE ACADÉMIQUE */}
           <AcademicSessionPill
             academicYears={academicYears}
@@ -1476,27 +1471,44 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-      <div className="flex flex-col md:flex-row gap-4">
-        <div className="flex bg-white p-1 rounded-xl shadow-sm border border-gray-200 w-full overflow-x-auto flex-[2]">
+      <div className="bg-white p-2 sm:p-2.5 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
+        <div className="flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 overflow-x-auto custom-scrollbar gap-1 flex-1">
           {(school?.school_type === 'UNIVERSITY' 
             ? ['Tous', 'Diplôme', 'Licence'] 
             : school?.school_type === 'PROFESSIONAL' 
             ? ['Tous', 'Certificat', 'Diplôme'] 
             : ['Tous', 'Maternelle', 'Fondamentale', 'Secondaire']).map((cycle) => (
-            <button key={cycle} onClick={() => setActiveCycle(cycle)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors whitespace-nowrap flex-1 ${activeCycle === cycle ? 'bg-gray-900 text-white' : 'text-gray-600 hover:bg-gray-50'}`}>
+            <button
+              key={cycle}
+              onClick={() => setActiveCycle(cycle)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer flex-1 text-center ${
+                activeCycle === cycle
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/70'
+              }`}
+            >
               {cycle}
             </button>
           ))}
         </div>
-        <div className="flex items-center bg-white px-4 py-2 rounded-xl border border-gray-200 shadow-sm flex-1 relative">
-          <Search size={18} className="text-gray-400 absolute left-4" />
+        <div className="flex items-center bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 px-3 py-1.5 rounded-xl border border-slate-200 transition-all relative flex-1 md:max-w-xs">
+          <Search size={15} className="text-slate-400 shrink-0 mr-2" />
           <input 
             type="text" 
-            placeholder="Rechercher une discipline..." 
-            className="w-full pl-8 bg-transparent text-sm font-medium text-gray-900 outline-none"
+            placeholder="Rechercher une classe..." 
+            className="w-full bg-transparent text-xs font-bold text-slate-900 placeholder:text-slate-500 outline-none"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer ml-1"
+            >
+              <X size={13} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -1690,13 +1702,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-0 sm:p-3 md:p-4 animate-in fade-in duration-200">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[92vh] max-w-3xl lg:max-w-4xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col">
             {/* Header */}
-            <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800 shrink-0">
+            <div className="px-4 sm:px-6 py-3 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-2.5 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-blue-600 rounded-xl shadow-md shadow-blue-500/20 text-white">
                   <CreditCard size={18} />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-tight">Configuration du Plan Tarifaire</h3>
+                  <h3 className="text-sm sm:text-base font-black tracking-tight font-serif">Configuration du Plan Tarifaire</h3>
                   <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                     <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Grille des frais</p>
                     {currentYearObj && (
@@ -1720,10 +1732,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Form Content */}
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-              <div className="p-3.5 sm:p-5 lg:p-6 space-y-3 sm:space-y-4">
+              <div className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5">
                 {/* Session Target Clarity Banner */}
                 {currentYearObj && (
-                  <div className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2.5 text-xs ${
+                  <div className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2 text-xs ${
                     currentYearObj.status === 'FUTURE' 
                       ? 'bg-amber-50/90 border-amber-200 text-amber-950' 
                       : 'bg-blue-50/90 border-blue-200 text-blue-950'
@@ -1732,7 +1744,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <div className={`p-1.5 rounded-lg text-white shrink-0 ${
                         currentYearObj.status === 'FUTURE' ? 'bg-amber-500 shadow-2xs' : 'bg-blue-600 shadow-2xs'
                       }`}>
-                        <CalendarDays size={16} />
+                        <CalendarDays size={15} />
                       </div>
                       <div className="min-w-0">
                         <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500">Session académique cible</div>
@@ -1754,169 +1766,165 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 )}
 
-                {/* Classe Selection */}
-                <div className="space-y-1.5">
-                    <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider block flex items-center gap-1.5 ml-0.5">
-                      <Layers size={14} className="text-blue-500" /> {terminology.class} ou Programme d'affectation
-                    </label>
-                    <div className="relative">
-                      <select 
-                        required 
-                        className={`w-full px-3.5 py-2 sm:py-2.5 border rounded-xl text-xs sm:text-sm font-bold outline-none appearance-none cursor-pointer focus:ring-2 transition-all ${
-                          formData.class_id === 'ALL'
-                            ? 'bg-blue-50/80 border-blue-300 text-blue-900 focus:border-blue-500 focus:ring-blue-500/10'
-                            : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 focus:ring-blue-500/10'
-                        }`}
-                        value={formData.class_id} 
-                        onChange={(e) => setFormData({...formData, class_id: e.target.value})}
-                        disabled={!!formData.id}
-                      >
-                        <option value="">-- Choisir la classe concernée --</option>
-                        {!formData.id && (
-                          <option value="ALL" className="font-bold text-blue-700 bg-blue-50">
-                            ✨ TOUTES LES CLASSES ({validClasses.length}) — Appliquer cette grille à tout l'établissement
-                          </option>
-                        )}
-                        {validClasses.map(c => <option key={c.id} value={c.id}>{c.name} ({c.level})</option>)}
-                      </select>
-                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                    </div>
+                {/* Classe Selection using ClassSelectorPill */}
+                <div className="space-y-1">
+                  <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5 ml-0.5">
+                    <Layers size={13} className="text-blue-600" /> {terminology.class} ou Programme d'affectation
+                  </label>
+                  <ClassSelectorPill
+                    classes={validClasses}
+                    selectedClassId={formData.class_id}
+                    onSelectClass={(id) => setFormData(prev => ({ ...prev, class_id: id }))}
+                    allowAll={!formData.id}
+                    allLabel={`✨ TOUTES LES CLASSES (${validClasses.length}) — Grille globale`}
+                    emptyLabel="-- Choisir la classe concernée --"
+                    variant="field"
+                    size="sm"
+                    colorScheme="blue"
+                    disabled={!!formData.id}
+                    portal={true}
+                    className="w-full"
+                  />
 
-                    {formData.class_id === 'ALL' && (
-                      <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl flex items-center gap-2 text-xs text-blue-900 font-bold shadow-2xs">
-                        <div className="p-1 bg-blue-600 text-white rounded-md shrink-0">
-                          <Sparkles size={14} />
-                        </div>
-                        <span>Mode Global : Tarifs enregistrés pour l'ensemble des {validClasses.length} classes de la session <strong>{currentYearObj?.label}</strong>.</span>
+                  {formData.class_id === 'ALL' && (
+                    <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl flex items-center gap-2 text-xs text-blue-900 font-bold shadow-2xs mt-1.5">
+                      <div className="p-1 bg-blue-600 text-white rounded-md shrink-0">
+                        <Sparkles size={14} />
                       </div>
-                    )}
+                      <span>Mode Global : Tarifs enregistrés pour l'ensemble des {validClasses.length} classes de la session <strong>{currentYearObj?.label}</strong>.</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Primary Fees Box */}
-                <div className="bg-slate-50/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5 sm:space-y-3">
+                <div className="bg-slate-50/70 p-2.5 sm:p-3.5 rounded-xl border border-slate-200/80 space-y-2">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-white rounded-lg shadow-2xs border border-slate-200 text-blue-600">
-                      <CreditCard size={15} />
+                    <div className="p-1 bg-white rounded-lg shadow-2xs border border-slate-200 text-blue-600">
+                      <CreditCard size={14} />
                     </div>
                     <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Frais d'Admission & Réinscription</h4>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3.5">
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-1 ml-0.5">
-                          <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider truncate">
-                            {school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL' ? 'Admission / Inscription' : 'Inscription (Nouveau)'}
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => propagateFees('inscription')}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
-                            title="Propager ce montant à toutes les classes"
-                          >
-                            Appliquer partout
-                          </button>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                    {/* Inscription */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1 ml-0.5">
+                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider truncate">
+                          {school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL' ? 'Admission / Inscription' : 'Inscription (Nouveau)'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => propagateFees('inscription')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
+                          title="Propager ce montant à toutes les classes"
+                        >
+                          Appliquer partout
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative flex-1 min-w-0">
+                          <input 
+                            type="number" 
+                            min="0"
+                            className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all font-mono" 
+                            value={formData.inscription_currency === 'HTG' ? formData.inscription_fee : formData.inscription_fee_usd} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (formData.inscription_currency === 'HTG') {
+                                setFormData({...formData, inscription_fee: val, inscription_fee_usd: '0'});
+                              } else {
+                                setFormData({...formData, inscription_fee_usd: val, inscription_fee: '0'});
+                              }
+                            }} 
+                            placeholder="Montant"
+                          />
                         </div>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1 min-w-0">
-                            <input 
-                              type="number" 
-                              min="0"
-                              className="w-full pl-3 pr-2.5 py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all font-mono" 
-                              value={formData.inscription_currency === 'HTG' ? formData.inscription_fee : formData.inscription_fee_usd} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (formData.inscription_currency === 'HTG') {
-                                  setFormData({...formData, inscription_fee: val, inscription_fee_usd: '0'});
-                                } else {
-                                  setFormData({...formData, inscription_fee_usd: val, inscription_fee: '0'});
-                                }
-                              }} 
-                              placeholder="Montant"
-                            />
-                          </div>
-                          <div className="relative w-20 flex-shrink-0">
-                            <select 
-                              className="w-full pl-2.5 pr-6 py-2 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-xs sm:text-sm font-black outline-none focus:border-emerald-500 transition-all appearance-none cursor-pointer"
-                              value={formData.inscription_currency}
-                              onChange={(e) => {
-                                const newCurrency = e.target.value;
-                                const currentVal = formData.inscription_currency === 'HTG' ? formData.inscription_fee : formData.inscription_fee_usd;
-                                if (newCurrency === 'HTG') {
-                                  setFormData({...formData, inscription_currency: 'HTG', inscription_fee: currentVal, inscription_fee_usd: '0'});
-                                } else {
-                                  setFormData({...formData, inscription_currency: 'USD', inscription_fee_usd: currentVal, inscription_fee: '0'});
-                                }
-                              }}
-                            >
-                              <option value="HTG">HTG</option>
-                              <option value="USD">USD</option>
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none" size={14} />
-                          </div>
-                        </div>
+                        <SelectPill
+                          options={[
+                            { value: 'HTG', label: 'HTG' },
+                            { value: 'USD', label: 'USD' }
+                          ]}
+                          value={formData.inscription_currency}
+                          onChange={(newCurrency) => {
+                            const currentVal = formData.inscription_currency === 'HTG' ? formData.inscription_fee : formData.inscription_fee_usd;
+                            if (newCurrency === 'HTG') {
+                              setFormData({...formData, inscription_currency: 'HTG', inscription_fee: currentVal, inscription_fee_usd: '0'});
+                            } else {
+                              setFormData({...formData, inscription_currency: 'USD', inscription_fee_usd: currentVal, inscription_fee: '0'});
+                            }
+                          }}
+                          variant="field"
+                          size="sm"
+                          colorScheme="emerald"
+                          portal={true}
+                          className="w-24 shrink-0"
+                        />
+                      </div>
                     </div>
 
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between gap-1 ml-0.5">
-                          <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider truncate">
-                            {school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL' ? 'Réinscription' : 'Réinscription (Ancien)'}
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => propagateFees('reenrollment')}
-                            className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
-                            title="Propager ce montant à toutes les classes"
-                          >
-                            Appliquer partout
-                          </button>
+                    {/* Réinscription */}
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-1 ml-0.5">
+                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider truncate">
+                          {school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL' ? 'Réinscription' : 'Réinscription (Ancien)'}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => propagateFees('reenrollment')}
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
+                          title="Propager ce montant à toutes les classes"
+                        >
+                          Appliquer partout
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <div className="relative flex-1 min-w-0">
+                          <input 
+                            type="number" 
+                            min="0"
+                            className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono" 
+                            value={formData.reenrollment_currency === 'HTG' ? formData.reenrollment_fee : formData.reenrollment_fee_usd} 
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (formData.reenrollment_currency === 'HTG') {
+                                setFormData({...formData, reenrollment_fee: val, reenrollment_fee_usd: '0'});
+                              } else {
+                                setFormData({...formData, reenrollment_fee_usd: val, reenrollment_fee: '0'});
+                              }
+                            }} 
+                            placeholder="Montant"
+                          />
                         </div>
-                        <div className="flex gap-2">
-                          <div className="relative flex-1 min-w-0">
-                            <input 
-                              type="number" 
-                              min="0"
-                              className="w-full pl-3 pr-2.5 py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono" 
-                              value={formData.reenrollment_currency === 'HTG' ? formData.reenrollment_fee : formData.reenrollment_fee_usd} 
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                if (formData.reenrollment_currency === 'HTG') {
-                                  setFormData({...formData, reenrollment_fee: val, reenrollment_fee_usd: '0'});
-                                } else {
-                                  setFormData({...formData, reenrollment_fee_usd: val, reenrollment_fee: '0'});
-                                }
-                              }} 
-                              placeholder="Montant"
-                            />
-                          </div>
-                          <div className="relative w-20 flex-shrink-0">
-                            <select 
-                              className="w-full pl-2.5 pr-6 py-2 bg-indigo-50 text-indigo-900 border border-indigo-200 rounded-xl text-xs sm:text-sm font-black outline-none focus:border-indigo-500 transition-all appearance-none cursor-pointer"
-                              value={formData.reenrollment_currency}
-                              onChange={(e) => {
-                                const newCurrency = e.target.value;
-                                const currentVal = formData.reenrollment_currency === 'HTG' ? formData.reenrollment_fee : formData.reenrollment_fee_usd;
-                                if (newCurrency === 'HTG') {
-                                  setFormData({...formData, reenrollment_currency: 'HTG', reenrollment_fee: currentVal, reenrollment_fee_usd: '0'});
-                                } else {
-                                  setFormData({...formData, reenrollment_currency: 'USD', reenrollment_fee_usd: currentVal, reenrollment_fee: '0'});
-                                }
-                              }}
-                            >
-                              <option value="HTG">HTG</option>
-                              <option value="USD">USD</option>
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-indigo-600 pointer-events-none" size={14} />
-                          </div>
-                        </div>
+                        <SelectPill
+                          options={[
+                            { value: 'HTG', label: 'HTG' },
+                            { value: 'USD', label: 'USD' }
+                          ]}
+                          value={formData.reenrollment_currency}
+                          onChange={(newCurrency) => {
+                            const currentVal = formData.reenrollment_currency === 'HTG' ? formData.reenrollment_fee : formData.reenrollment_fee_usd;
+                            if (newCurrency === 'HTG') {
+                              setFormData({...formData, reenrollment_currency: 'HTG', reenrollment_fee: currentVal, reenrollment_fee_usd: '0'});
+                            } else {
+                              setFormData({...formData, reenrollment_currency: 'USD', reenrollment_fee_usd: currentVal, reenrollment_fee: '0'});
+                            }
+                          }}
+                          variant="field"
+                          size="sm"
+                          colorScheme="indigo"
+                          portal={true}
+                          className="w-24 shrink-0"
+                        />
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Tuition & Payment Structure */}
-                <div className="bg-blue-50/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-blue-200/80 space-y-2.5 sm:space-y-3">
+                <div className="bg-blue-50/50 p-2.5 sm:p-3.5 rounded-xl border border-blue-200/80 space-y-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="p-1.5 bg-blue-600 text-white rounded-lg shadow-2xs">
-                      <TrendingUp size={15} />
+                    <div className="p-1 bg-blue-600 text-white rounded-lg shadow-2xs">
+                      <TrendingUp size={14} />
                     </div>
                     <div>
                       <h4 className="text-xs font-black uppercase tracking-wider text-blue-950">{terminology.tuition}</h4>
@@ -1924,62 +1932,63 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
 
-                  <div className="space-y-1.5">
-                      <div className="flex items-center justify-between gap-1 ml-0.5">
-                        <label className="text-[10px] font-black text-blue-900 uppercase tracking-wider truncate">
-                          Montant Global {school?.school_type === 'CLASSIC' ? 'Annuel' : ''}
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => propagateFees('tuition')}
-                          className="text-[10px] text-blue-700 hover:text-blue-900 font-bold hover:underline bg-blue-100 hover:bg-blue-200/80 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
-                          title="Propager ce montant de scolarité à toutes les classes"
-                        >
-                          Appliquer partout
-                        </button>
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between gap-1 ml-0.5">
+                      <label className="text-[10px] font-black text-blue-900 uppercase tracking-wider truncate">
+                        Montant Global {school?.school_type === 'CLASSIC' ? 'Annuel' : ''}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => propagateFees('tuition')}
+                        className="text-[10px] text-blue-700 hover:text-blue-900 font-bold hover:underline bg-blue-100/70 hover:bg-blue-200/80 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
+                        title="Propager ce montant de scolarité à toutes les classes"
+                      >
+                        Appliquer partout
+                      </button>
+                    </div>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                      <div className="relative flex-1">
+                        <input 
+                          type="number" 
+                          min="0"
+                          className="w-full px-3.5 py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm sm:text-base font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-mono" 
+                          value={formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd} 
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            if (formData.tuition_currency === 'HTG') {
+                              setFormData({...formData, tuition_fee: val, tuition_fee_usd: '0'});
+                            } else {
+                              setFormData({...formData, tuition_fee_usd: val, tuition_fee: '0'});
+                            }
+                          }} 
+                          placeholder={`Total ${terminology.tuition}`}
+                        />
                       </div>
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <div className="relative flex-1">
-                          <input 
-                            type="number" 
-                            min="0"
-                            className="w-full pl-3.5 pr-4 py-2 sm:py-2.5 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm sm:text-base font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-mono" 
-                            value={formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd} 
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (formData.tuition_currency === 'HTG') {
-                                setFormData({...formData, tuition_fee: val, tuition_fee_usd: '0'});
-                              } else {
-                                setFormData({...formData, tuition_fee_usd: val, tuition_fee: '0'});
-                              }
-                            }} 
-                            placeholder={`Total ${terminology.tuition}`}
-                          />
-                        </div>
-                        <div className="relative w-full sm:w-36">
-                          <select 
-                            className="w-full pl-3 pr-7 py-2 sm:py-2.5 bg-blue-100 text-blue-950 border border-blue-200 rounded-xl text-xs sm:text-sm font-black outline-none appearance-none cursor-pointer focus:border-blue-500 focus:bg-blue-50 transition-all"
-                            value={formData.tuition_currency}
-                            onChange={(e) => {
-                              const newCurrency = e.target.value;
-                              const currentVal = formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd;
-                              if (newCurrency === 'HTG') {
-                                setFormData({...formData, tuition_currency: 'HTG', tuition_fee: currentVal, tuition_fee_usd: '0'});
-                              } else {
-                                setFormData({...formData, tuition_currency: 'USD', tuition_fee_usd: currentVal, tuition_fee: '0'});
-                              }
-                            }}
-                          >
-                            <option value="HTG">HTG (G)</option>
-                            <option value="USD">USD ($)</option>
-                          </select>
-                          <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" size={16} />
-                        </div>
-                      </div>
+                      <SelectPill
+                        options={[
+                          { value: 'HTG', label: 'HTG (G)' },
+                          { value: 'USD', label: 'USD ($)' }
+                        ]}
+                        value={formData.tuition_currency}
+                        onChange={(newCurrency) => {
+                          const currentVal = formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd;
+                          if (newCurrency === 'HTG') {
+                            setFormData({...formData, tuition_currency: 'HTG', tuition_fee: currentVal, tuition_fee_usd: '0'});
+                          } else {
+                            setFormData({...formData, tuition_currency: 'USD', tuition_fee_usd: currentVal, tuition_fee: '0'});
+                          }
+                        }}
+                        variant="field"
+                        size="md"
+                        colorScheme="blue"
+                        portal={true}
+                        className="w-full sm:w-36 shrink-0"
+                      />
+                    </div>
                   </div>
 
                   <div className="pt-2 border-t border-blue-200/60">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2.5">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
                       <h5 className="text-[10px] font-black uppercase tracking-wider text-blue-800">Modèles Prédéfinis</h5>
                       <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
                         {(school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL') ? (
@@ -2121,13 +2130,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
                   
-                  <div className="space-y-2">
+                  <div className="space-y-1.5">
                     {(formData.payment_structure || []).length === 0 ? (
-                      <p className="text-[10px] text-blue-600/70 font-bold italic text-center py-2">Structure par incréments libres (par défaut)</p>
+                      <p className="text-[10px] text-blue-600/70 font-bold italic text-center py-2 bg-white/60 rounded-xl border border-blue-100">Structure par incréments libres (par défaut)</p>
                     ) : (
-                      <div className="space-y-1.5 sm:space-y-2">
+                      <div className="space-y-1.5">
                         {formData.payment_structure?.map((step, idx) => (
-                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-2.5 p-2 sm:p-2.5 bg-white rounded-xl border border-blue-100/90 shadow-2xs">
+                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 p-2 bg-white rounded-xl border border-blue-100/90 shadow-2xs">
                             <div className="flex-1 min-w-0">
                               <label className="text-[9px] font-black text-blue-600 uppercase block mb-0.5 sm:hidden">Libellé</label>
                               <input 
@@ -2142,7 +2151,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 }}
                               />
                             </div>
-                            <div className="flex items-center gap-2 sm:w-auto">
+                            <div className="flex items-center gap-1.5 sm:w-auto">
                               <div className="w-28 sm:w-28 md:w-32">
                                 <label className="text-[9px] font-black text-blue-600 uppercase block mb-0.5 sm:hidden">Montant</label>
                                 <input 
@@ -2176,7 +2185,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   const newStructure = formData.payment_structure!.filter((_, i) => i !== idx);
                                   setFormData({...formData, payment_structure: newStructure});
                                 }}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 mt-auto sm:mt-0"
+                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
                                 title="Supprimer ce versement"
                               >
                                 <Trash2 size={15} />
@@ -2186,7 +2195,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         ))}
                         
                         {/* Summary Check */}
-                        <div className="flex items-center justify-between px-3 py-1.5 sm:py-2 bg-blue-100/70 rounded-xl text-xs">
+                        <div className="flex items-center justify-between px-3 py-1.5 bg-blue-100/70 rounded-xl text-xs">
                           <span className="text-[10px] font-black text-blue-900 uppercase">Total Échéancier :</span>
                           <span className={`text-xs sm:text-sm font-black ${(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0) !== (formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee) : parseFloat(formData.tuition_fee_usd)) ? 'text-rose-600' : 'text-emerald-700'}`}>
                             {(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0).toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}
@@ -2225,11 +2234,11 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* Misc Fees Section */}
-                <div className="bg-slate-50/80 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5 sm:space-y-3">
+                <div className="bg-slate-50/70 p-2.5 sm:p-3.5 rounded-xl border border-slate-200/80 space-y-2">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <div className="p-1.5 bg-white rounded-lg shadow-2xs border border-slate-200 text-indigo-600">
-                        <Plus size={15} />
+                      <div className="p-1 bg-white rounded-lg shadow-2xs border border-slate-200 text-indigo-600">
+                        <Plus size={14} />
                       </div>
                       <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Frais Divers (Optionnel)</h4>
                     </div>
@@ -2243,15 +2252,15 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </button>
                   </div>
                   
-                  <div className="space-y-1.5">
+                  <div className="space-y-1">
                     <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5">Montant et Devise</label>
-                    <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                       <div className="relative flex-1">
                         <input 
                           type="number" 
                           inputMode="decimal"
                           enterKeyHint="done"
-                          className="w-full px-3.5 py-2 sm:py-2.5 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 transition-all font-mono" 
+                          className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 transition-all font-mono" 
                           placeholder="0.00"
                           value={formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg} 
                           onChange={(e) => {
@@ -2264,35 +2273,36 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           }} 
                         />
                       </div>
-                      <div className="relative w-full sm:w-36">
-                        <select 
-                          className="w-full px-3 py-2 sm:py-2.5 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none appearance-none cursor-pointer focus:border-blue-500 transition-all"
-                          value={formData.misc_currency}
-                          onChange={(e) => {
-                            const newCurrency = e.target.value;
-                            const currentVal = formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg;
-                            if (newCurrency === 'USD') {
-                              setFormData({...formData, misc_currency: 'USD', misc_fee_usd: currentVal, misc_fee_htg: '0'});
-                            } else {
-                              setFormData({...formData, misc_currency: 'HTG', misc_fee_htg: currentVal, misc_fee_usd: '0'});
-                            }
-                          }}
-                        >
-                          <option value="USD">USD ($)</option>
-                          <option value="HTG">HTG (G)</option>
-                        </select>
-                        <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                      </div>
+                      <SelectPill
+                        options={[
+                          { value: 'USD', label: 'USD ($)' },
+                          { value: 'HTG', label: 'HTG (G)' }
+                        ]}
+                        value={formData.misc_currency}
+                        onChange={(newCurrency) => {
+                          const currentVal = formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg;
+                          if (newCurrency === 'USD') {
+                            setFormData({...formData, misc_currency: 'USD', misc_fee_usd: currentVal, misc_fee_htg: '0'});
+                          } else {
+                            setFormData({...formData, misc_currency: 'HTG', misc_fee_htg: currentVal, misc_fee_usd: '0'});
+                          }
+                        }}
+                        variant="field"
+                        size="sm"
+                        colorScheme="slate"
+                        portal={true}
+                        className="w-full sm:w-36 shrink-0"
+                      />
                     </div>
                   </div>
 
                   <button 
                     type="button"
-                    className="w-full flex items-center gap-3 cursor-pointer p-2.5 sm:p-3 bg-white border border-slate-200 rounded-xl hover:border-rose-300 transition-all text-left" 
+                    className="w-full flex items-center gap-3 cursor-pointer p-2.5 bg-white border border-slate-200 rounded-xl hover:border-rose-300 transition-all text-left" 
                     onClick={() => setFormData({...formData, is_misc_mandatory: !formData.is_misc_mandatory})}
                   >
-                    <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.is_misc_mandatory ? 'bg-rose-600 border-rose-600 shadow-2xs' : 'bg-white border-slate-300'}`}>
-                      {formData.is_misc_mandatory && <CheckCircle2 size={13} className="text-white" />}
+                    <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.is_misc_mandatory ? 'bg-rose-600 border-rose-600 shadow-2xs' : 'bg-white border-slate-300'}`}>
+                      {formData.is_misc_mandatory && <CheckCircle2 size={11} className="text-white" />}
                     </div>
                     <div className="min-w-0">
                       <span className="text-xs font-bold text-slate-800 block">Frais obligatoires</span>
@@ -2301,8 +2311,8 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </button>
                 </div>
 
-                <div className="bg-blue-50/80 p-2.5 border-l-4 border-blue-600 flex items-center gap-2.5 rounded-xl">
-                  <Info className="text-blue-600 shrink-0" size={16} />
+                <div className="bg-blue-50/80 p-2.5 border-l-4 border-blue-600 flex items-center gap-2 rounded-xl">
+                  <Info className="text-blue-600 shrink-0" size={15} />
                   <p className="text-[11px] font-bold text-blue-900 leading-snug">
                     Ces tarifs seront automatiquement appliqués lors des nouvelles {terminology.enrollments.toLowerCase()} pour la session sélectionnée.
                   </p>
@@ -2310,21 +2320,21 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {/* Sticky Footer */}
-              <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-white border-t border-slate-200 sticky bottom-0 z-10 flex items-center justify-end gap-2.5 mt-auto shrink-0">
+              <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-white border-t border-slate-200 sticky bottom-0 z-10 flex items-center justify-end gap-2 mt-auto shrink-0">
                 <button 
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-4 py-2 text-slate-600 font-bold text-xs sm:text-sm hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 text-slate-600 font-bold text-xs sm:text-sm hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button 
                   disabled={isSubmitting} 
                   type="submit" 
-                  className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm active:scale-95 cursor-pointer"
+                  className="px-4.5 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm active:scale-95 cursor-pointer"
                 >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />} 
-                  {formData.id ? 'Mettre à jour les tarifs' : 'Valider la tarification'}
+                  {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} 
+                  {formData.id ? 'Mettre à jour' : 'Valider la tarification'}
                 </button>
               </div>
             </form>
@@ -2351,25 +2361,25 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
 
           <div>
-            <label className="block text-xs font-bold text-gray-700 mb-1">
+            <label className="block text-xs font-bold text-slate-700 mb-1.5">
               Sélectionnez l'année académique source à dupliquer :
             </label>
-            <select 
-              className={`w-full p-2.5 border rounded-xl text-xs sm:text-sm outline-none transition-all font-bold ${
-                !migrateSourceId 
-                  ? 'border-amber-300 bg-amber-50/40 text-amber-950 focus:ring-2 focus:ring-amber-400/20 focus:border-amber-500' 
-                  : 'border-blue-300 bg-blue-50/30 text-blue-950 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500'
-              }`}
+            <SelectPill
+              options={[
+                { value: '', label: '-- Choisir une session source (ex: 2025-2026) --' },
+                ...academicYears.filter(y => y.id !== selectedYearId).map(y => ({
+                  value: y.id,
+                  label: `Session Source : ${y.label} ${y.is_active ? '⭐ (Session Active Actuelle)' : ''}`
+                }))
+              ]}
               value={migrateSourceId}
-              onChange={(e) => setMigrateSourceId(e.target.value)}
-            >
-              <option value="" disabled>-- Choisir une session source (ex: 2025-2026) --</option>
-              {academicYears.filter(y => y.id !== selectedYearId).map(y => (
-                <option key={y.id} value={y.id}>
-                  Session Source : {y.label} {y.is_active ? '⭐ (Session Active Actuelle)' : ''}
-                </option>
-              ))}
-            </select>
+              onChange={(val) => setMigrateSourceId(val)}
+              variant="field"
+              size="sm"
+              colorScheme={!migrateSourceId ? 'amber' : 'blue'}
+              portal={true}
+              className="w-full"
+            />
           </div>
 
           {migrateSourceId && (
@@ -2525,17 +2535,19 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         placeholder="Montant du frais"
                       />
                     </div>
-                    <div className="w-24 sm:w-28 relative">
-                      <select
-                        className="w-full pl-2.5 pr-6 py-2 bg-blue-50 text-blue-900 border border-blue-200 rounded-xl text-xs font-black outline-none cursor-pointer appearance-none"
-                        value={pendingPropagation.currency}
-                        onChange={(e) => setPendingPropagation({ ...pendingPropagation, currency: e.target.value as 'HTG' | 'USD' })}
-                      >
-                        <option value="HTG">HTG (G)</option>
-                        <option value="USD">USD ($)</option>
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-blue-600 pointer-events-none" size={13} />
-                    </div>
+                    <SelectPill
+                      options={[
+                        { value: 'HTG', label: 'HTG (G)' },
+                        { value: 'USD', label: 'USD ($)' }
+                      ]}
+                      value={pendingPropagation.currency}
+                      onChange={(val) => setPendingPropagation({ ...pendingPropagation, currency: val as 'HTG' | 'USD' })}
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      portal={true}
+                      className="w-24 sm:w-28 shrink-0"
+                    />
                   </div>
                 </div>
               )}
@@ -2752,17 +2764,19 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     )}
                   </div>
                   {bulkAdjustConfig.adjustType !== 'PERCENT' && (
-                    <div className="w-24 sm:w-28 relative">
-                      <select
-                        className="w-full pl-2.5 pr-6 py-2 bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-xl text-xs font-black outline-none cursor-pointer appearance-none"
-                        value={bulkAdjustConfig.currency}
-                        onChange={(e) => setBulkAdjustConfig({ ...bulkAdjustConfig, currency: e.target.value as 'HTG' | 'USD' })}
-                      >
-                        <option value="HTG">HTG (G)</option>
-                        <option value="USD">USD ($)</option>
-                      </select>
-                      <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 text-emerald-600 pointer-events-none" size={13} />
-                    </div>
+                    <SelectPill
+                      options={[
+                        { value: 'HTG', label: 'HTG (G)' },
+                        { value: 'USD', label: 'USD ($)' }
+                      ]}
+                      value={bulkAdjustConfig.currency}
+                      onChange={(val) => setBulkAdjustConfig({ ...bulkAdjustConfig, currency: val as 'HTG' | 'USD' })}
+                      variant="field"
+                      size="sm"
+                      colorScheme="emerald"
+                      portal={true}
+                      className="w-24 sm:w-28 shrink-0"
+                    />
                   )}
                 </div>
               </div>

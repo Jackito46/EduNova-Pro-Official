@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { GraduationCap, ChevronDown, Check, Search, X, Layers, BookOpen } from 'lucide-react';
 
 export interface ClassSelectorItem {
@@ -28,6 +29,7 @@ export interface ClassSelectorPillProps {
   disabled?: boolean;
   showIcon?: boolean;
   title?: string;
+  portal?: boolean;
 }
 
 export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
@@ -46,13 +48,69 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
   dropdownAlign,
   disabled = false,
   showIcon = true,
-  title = 'Filtrer par classe'
+  title = 'Filtrer par classe',
+  portal = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    const minWidth = variant === 'field' ? Math.max(rect.width, 280) : 280;
+    const popoverWidth = Math.min(minWidth, Math.max(viewportWidth - 24, 240));
+
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const preferUpward = spaceBelow < 250 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(160, Math.min(320, preferUpward ? spaceAbove - 12 : spaceBelow - 12));
+
+    let left = rect.left;
+    if (dropdownAlign === 'right' || effectiveAlign === 'right') {
+      left = rect.right - popoverWidth;
+    }
+
+    if (left + popoverWidth > viewportWidth - 12) {
+      left = viewportWidth - popoverWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    if (preferUpward) {
+      setPopoverCoords({
+        bottom: viewportHeight - rect.top + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: true
+      });
+    } else {
+      setPopoverCoords({
+        top: rect.bottom + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: false
+      });
+    }
+  }, [dropdownAlign, effectiveAlign, variant]);
 
   useEffect(() => {
     if (dropdownAlign) {
@@ -67,10 +125,26 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
     }
   }, [dropdownAlign, isOpen]);
 
+  useEffect(() => {
+    if (isOpen && portal) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen, portal, updatePosition]);
+
   // Close when clicked outside or pressed Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const inContainer = containerRef.current && containerRef.current.contains(target);
+      const inPopover = popoverRef.current && popoverRef.current.contains(target);
+      if (!inContainer && !inPopover) {
         setIsOpen(false);
       }
     };
@@ -278,144 +352,160 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
       </button>
 
       {/* Modern Floating Dropdown Menu */}
-      {isOpen && (
-        <div 
-          className={`absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 min-w-full max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-[100] animate-in fade-in zoom-in-95 duration-150`}
-        >
-          {/* Dropdown Header */}
-          <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-              <GraduationCap size={12} className={scheme.iconText} />
-              {labelPrefix ? labelPrefix.replace(':', '').trim() : 'Classes'}
-            </span>
-            <span className="text-[10px] font-bold text-slate-600">
-              {classes.length} disponible{classes.length > 1 ? 's' : ''}
-            </span>
-          </div>
-
-          {/* Search Input for fast filtering when there are multiple classes */}
-          {classes.length > 4 && (
-            <div className="relative mb-2 px-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={13} />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher une classe..."
-                className={`w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-500 rounded-xl border border-slate-200 ${scheme.focusBorder} focus:ring-2 outline-none transition-all`}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
-                >
-                  <X size={12} />
-                </button>
-              )}
+      {isOpen && (() => {
+        const popoverContent = (
+          <div 
+            ref={popoverRef}
+            style={portal && popoverCoords ? {
+              position: 'fixed',
+              top: popoverCoords.openUpward ? undefined : popoverCoords.top,
+              bottom: popoverCoords.openUpward ? popoverCoords.bottom : undefined,
+              left: popoverCoords.left,
+              width: popoverCoords.width,
+              zIndex: 9999
+            } : undefined}
+            className={`${portal ? '' : `absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 min-w-full max-w-[calc(100vw-2rem)] z-[100]`} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 animate-in fade-in zoom-in-95 duration-150`}
+          >
+            {/* Dropdown Header */}
+            <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
+                <GraduationCap size={12} className={scheme.iconText} />
+                {labelPrefix ? labelPrefix.replace(':', '').trim() : 'Classes'}
+              </span>
+              <span className="text-[10px] font-bold text-slate-600">
+                {classes.length} disponible{classes.length > 1 ? 's' : ''}
+              </span>
             </div>
-          )}
 
-          <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar p-0.5">
-            {/* Allow All Option */}
-            {allowAll && (
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectClass('all');
-                  setIsOpen(false);
-                }}
-                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                  isAllSelected 
-                    ? scheme.highlightBg + ' shadow-2xs font-bold' 
-                    : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAllSelected ? scheme.dotColor : 'bg-slate-300'}`} />
-                  <div className="min-w-0">
-                    <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
-                      {defaultAllLabel}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-500 block">
-                      Afficher tous les effectifs de cette sélection
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-                    Global
-                  </span>
-                  {isAllSelected && (
-                    <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                  )}
-                </div>
-              </button>
+            {/* Search Input for fast filtering when there are multiple classes */}
+            {classes.length > 4 && (
+              <div className="relative mb-2 px-1">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500" size={13} />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Rechercher une classe..."
+                  className={`w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-bold text-slate-900 placeholder:text-slate-500 rounded-xl border border-slate-200 ${scheme.focusBorder} focus:ring-2 outline-none transition-all`}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                  >
+                    <X size={12} />
+                  </button>
+                )}
+              </div>
             )}
 
-            {/* Class Items */}
-            {filteredClasses.length === 0 ? (
-              <div className="p-3 text-center text-slate-500 text-xs font-medium">
-                Aucune classe trouvée
-              </div>
-            ) : (
-              filteredClasses.map((c) => {
-                const isSelected = selectedClassId === c.id;
+            <div 
+              style={portal && popoverCoords ? { maxHeight: popoverCoords.maxHeight } : undefined}
+              className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar p-0.5"
+            >
+              {/* Allow All Option */}
+              {allowAll && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectClass('all');
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                    isAllSelected 
+                      ? scheme.highlightBg + ' shadow-2xs font-bold' 
+                      : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAllSelected ? scheme.dotColor : 'bg-slate-300'}`} />
+                    <div className="min-w-0">
+                      <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
+                        {defaultAllLabel}
+                      </span>
+                      <span className="text-[10px] font-medium text-slate-500 block">
+                        Appliquer à tous les effectifs de cette sélection
+                      </span>
+                    </div>
+                  </div>
 
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectClass(c.id);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                      isSelected 
-                        ? scheme.highlightBg + ' shadow-2xs font-bold' 
-                        : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-300'}`} />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-black text-slate-900 tracking-tight">
-                            {c.name}
-                          </span>
-                          {c.code && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
-                              {c.code}
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                      Global
+                    </span>
+                    {isAllSelected && (
+                      <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                    )}
+                  </div>
+                </button>
+              )}
+
+              {/* Class Items */}
+              {filteredClasses.length === 0 ? (
+                <div className="p-3 text-center text-slate-500 text-xs font-medium">
+                  Aucune classe trouvée
+                </div>
+              ) : (
+                filteredClasses.map((c) => {
+                  const isSelected = selectedClassId === c.id;
+
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectClass(c.id);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                        isSelected 
+                          ? scheme.highlightBg + ' shadow-2xs font-bold' 
+                          : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-300'}`} />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-black text-slate-900 tracking-tight">
+                              {c.name}
+                            </span>
+                            {c.code && (
+                              <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
+                                {c.code}
+                              </span>
+                            )}
+                          </div>
+                          {(c.cycle || c.level || c.section) && (
+                            <span className="text-[10px] font-semibold text-slate-500 block truncate">
+                              {[c.cycle, c.level, c.section].filter(Boolean).join(' • ')}
                             </span>
                           )}
                         </div>
-                        {(c.cycle || c.level || c.section) && (
-                          <span className="text-[10px] font-semibold text-slate-500 block truncate">
-                            {[c.cycle, c.level, c.section].filter(Boolean).join(' • ')}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {c.students_count !== undefined && (
+                          <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                            {c.students_count} él.
                           </span>
                         )}
+                        {isSelected && (
+                          <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                        )}
                       </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {c.students_count !== undefined && (
-                        <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-                          {c.students_count} él.
-                        </span>
-                      )}
-                      {isSelected && (
-                        <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+
+        return portal ? createPortal(popoverContent, document.body) : popoverContent;
+      })()}
     </div>
   );
 };
