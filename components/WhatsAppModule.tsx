@@ -1107,75 +1107,75 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
             {/* MODAL BODY */}
             <div className="p-6 overflow-y-auto space-y-6 text-sm text-slate-700 leading-relaxed custom-scrollbar">
               
-              {/* OPTION 1: LIENS DIRECTS (WA.ME) */}
-              <div className="p-5 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-3">
+              {/* OPTION 1: APPLICATION WHATSAPP */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-emerald-50/80 border border-emerald-200 space-y-2.5">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 bg-emerald-600 text-white font-black text-[10px] uppercase rounded-lg tracking-wider">
-                    Méthode 1 : Liens Directs (100% Gratuit)
+                    Option 1 : Application WhatsApp (100% Gratuit)
                   </span>
                   <span className="text-xs font-bold text-emerald-800">Recommandé pour démarrer</span>
                 </div>
-                <h4 className="font-bold text-slate-900 text-base">Utiliser WhatsApp Web / App sans API payante</h4>
+                <h4 className="font-bold text-slate-900 text-sm sm:text-base">Utiliser WhatsApp Web / App sans configuration externe</h4>
                 <p className="text-xs text-slate-600">
-                  Cette méthode ne nécessite aucune clé API. Le système génère automatiquement un bouton pré-rempli pour chaque parent.
+                  Cette méthode ne nécessite aucune clé externe. Le système génère automatiquement un bouton pré-rempli pour chaque destinataire.
                 </p>
-                <ol className="list-decimal pl-5 space-y-2 text-xs font-medium text-slate-800">
+                <ol className="list-decimal pl-5 space-y-1.5 text-xs font-medium text-slate-800">
                   <li>Inscrivez le numéro du parent/élève avec le code pays (ex: <strong>+509 37 00 0000</strong> pour Haïti).</li>
                   <li>Rédigez votre message avec les balises dynamiques (<code className="bg-emerald-100 text-emerald-900 px-1 py-0.5 rounded font-mono font-bold">{'{nom_parent}'}</code>, <code className="bg-emerald-100 text-emerald-900 px-1 py-0.5 rounded font-mono font-bold">{'{nom_eleve}'}</code>).</li>
                   <li>Cliquez sur <strong>"Ouvrir WA"</strong> : l'application WhatsApp s'ouvre directement avec le message prêt à être envoyé.</li>
                 </ol>
               </div>
 
-              {/* OPTION 2: META CLOUD API */}
-              <div className="p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-4">
+              {/* OPTION 2: SERVICES DE MESSAGERIE AUTOMATISÉS */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 border border-slate-200 space-y-3.5">
                 <div className="flex items-center justify-between">
                   <span className="px-2.5 py-1 bg-teal-800 text-white font-black text-[10px] uppercase rounded-lg tracking-wider">
-                    Méthode 2 : Meta WhatsApp Cloud API (Automatisé)
+                    Option 2 : Services de Messagerie (Automatisé)
                   </span>
-                  <span className="text-xs font-bold text-teal-800">Envoi en masse direct</span>
+                  <span className="text-xs font-bold text-teal-800">Diffusion automatisée pro</span>
                 </div>
 
-                <div className="space-y-3 text-xs">
+                <div className="space-y-2.5 text-xs">
                   <div className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5">1</span>
+                    <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5 text-[11px]">1</span>
                     <div>
-                      <p className="font-bold text-slate-900">Créer un Compte Meta for Developers</p>
-                      <p className="text-slate-500">Connectez-vous sur <a href="https://developers.facebook.com" target="_blank" rel="noopener noreferrer" className="text-emerald-600 underline font-bold">developers.facebook.com</a> avec votre compte d'entreprise.</p>
+                      <p className="font-bold text-slate-900">Activer les Services de Messagerie Professionnels</p>
+                      <p className="text-slate-500">Connectez-vous sur votre espace d'entreprise ou portail fournisseur agréé.</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5">2</span>
+                    <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5 text-[11px]">2</span>
                     <div>
-                      <p className="font-bold text-slate-900">Ajouter le produit "WhatsApp"</p>
-                      <p className="text-slate-500">Dans le tableau de bord de votre application Meta, ajoutez le produit WhatsApp Business API.</p>
+                      <p className="font-bold text-slate-900">Sélectionner le service "WhatsApp Business"</p>
+                      <p className="text-slate-500">Activez le service de messagerie officiel pour les envois institutionnels.</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5">3</span>
+                    <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5 text-[11px]">3</span>
                     <div>
-                      <p className="font-bold text-slate-900">Associer le Numéro de Téléphone Officiel de l'Établissement</p>
-                      <p className="text-slate-500">Ajoutez votre numéro fixe ou mobile professionnel (+509...). Un SMS/Appel de vérification vous sera envoyé par Meta.</p>
+                      <p className="font-bold text-slate-900">Associer le Numéro Officiel de l'Établissement</p>
+                      <p className="text-slate-500">Ajoutez le numéro fixe ou mobile professionnel de l'école (+509...).</p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5">4</span>
+                    <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5 text-[11px]">4</span>
                     <div>
-                      <p className="font-bold text-slate-900">Copier les 2 Identifiants Clés</p>
+                      <p className="font-bold text-slate-900">Copier les 2 Identifiants de Connexion</p>
                       <p className="text-slate-500">
-                        Récupérez l'<strong>ID de numéro de téléphone (Phone Number ID)</strong> et le <strong>Jeton d'accès système (Access Token)</strong>.
+                        Récupérez l'<strong>ID de ligne (Phone ID)</strong> et le <strong>Jeton de sécurité (Token)</strong>.
                       </p>
                     </div>
                   </div>
 
                   <div className="flex items-start gap-3">
-                    <span className="w-6 h-6 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5">5</span>
+                    <span className="w-5 h-5 rounded-full bg-teal-100 text-teal-800 font-black flex items-center justify-center shrink-0 mt-0.5 text-[11px]">5</span>
                     <div>
-                      <p className="font-bold text-slate-900">Enregistrer dans les Paramètres EduNova Pro</p>
+                      <p className="font-bold text-slate-900">Enregistrer dans les Paramètres EduNova</p>
                       <p className="text-slate-500">
-                        Allez sur l'onglet <strong>Paramètres</strong> dans cette page, sélectionnez <em>"Meta WhatsApp Cloud API"</em> et collez vos 2 identifiants.
+                        Allez dans l'onglet <strong>Paramètres</strong>, sélectionnez <em>"Services de Messagerie"</em> et collez vos 2 identifiants.
                       </p>
                     </div>
                   </div>

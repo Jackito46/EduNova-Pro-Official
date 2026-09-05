@@ -323,7 +323,7 @@ const CommunicationSettings: React.FC<CommunicationSettingsProps> = ({ user }) =
                 <SelectPill
                   options={[
                     { value: 'wa_me', label: 'Envoi Standard (WhatsApp Web / Mobile)' },
-                    { value: 'whatsapp_cloud', label: 'Envoi Automatisé (Serveur API)' },
+                    { value: 'whatsapp_cloud', label: 'Services de Messagerie Automatisés' },
                     { value: 'twilio', label: 'Twilio for WhatsApp Business' },
                     { value: 'green_api', label: 'Passerelle Tierce (Ultramsg)' }
                   ]}

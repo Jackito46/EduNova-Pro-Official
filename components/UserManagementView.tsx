@@ -15,6 +15,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { userSchema } from '../utils/validation';
 import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
 import { SkeletonTable, FluidLoadingState, SubmittingButtonContent } from './SkeletonLoader';
+import { SelectPill } from './SelectPill';
 
 const secondarySupabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -893,23 +894,23 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
   }, [formData.password]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-3 sm:space-y-3.5 max-w-7xl mx-auto pb-10 px-2 sm:px-4 animate-in fade-in duration-300">
       {/* Top Banner Header */}
-      <div className="bg-white p-6 md:p-8 rounded-3xl shadow-sm border border-slate-200 flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div className="flex items-center gap-5">
-          <div className="w-14 h-14 bg-blue-50 border border-blue-100 text-blue-600 rounded-2xl shadow-sm flex items-center justify-center shrink-0">
-            <UserCog size={28} />
+      <div className="bg-white p-3.5 sm:p-4 rounded-xl shadow-xs border border-slate-200/90 flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl shadow-xs flex items-center justify-center shrink-0">
+            <UserCog size={22} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight">Gestion des Accès</h2>
+              <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight font-serif">Gestion des Accès</h2>
               {(currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN) && (
-                <span className="px-2.5 py-1 bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-200 flex items-center gap-1">
+                <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-md border border-indigo-200 flex items-center gap-1">
                   <Sparkles size={11} /> Super Admin
                 </span>
               )}
             </div>
-            <div className="flex items-center gap-2 mt-1">
+            <div className="flex items-center gap-2 mt-0.5">
               <div className={`w-2 h-2 rounded-full ${isOffline ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
               <p className="text-slate-500 font-medium text-xs">
                 {isOffline ? 'Mode Cache (Hors-ligne)' : 'Habilitations, périmètres d\'annexe et sécurité des comptes'}
@@ -917,68 +918,68 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
             </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 w-full md:w-auto">
+        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
           <button 
             onClick={fetchUsersAndStaff} 
-            className="p-3 bg-slate-50 text-slate-500 rounded-xl hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95 shrink-0"
+            className="p-2 sm:p-2.5 bg-slate-50 text-slate-600 rounded-xl hover:text-slate-900 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95 shrink-0"
             title="Rafraîchir les utilisateurs"
           >
-            <RefreshCcw size={18} className={loading ? 'animate-spin' : ''} />
+            <RefreshCcw size={16} className={loading ? 'animate-spin' : ''} />
           </button>
           <button 
             onClick={() => setShowAddModal(true)}
-            className="flex-1 md:flex-none bg-blue-600 text-white font-bold px-6 py-3.5 rounded-xl shadow-md shadow-blue-200 hover:bg-blue-700 transition-all flex items-center justify-center gap-2 text-sm tracking-tight active:scale-95 cursor-pointer"
+            className="flex-1 md:flex-none bg-blue-600 text-white font-bold px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl shadow-xs hover:bg-blue-700 transition-all flex items-center justify-center gap-2 text-xs sm:text-sm tracking-tight active:scale-95 cursor-pointer"
           >
-            <UserPlus size={18} /> Nouveau Collaborateur
+            <UserPlus size={16} /> Nouveau Collaborateur
           </button>
         </div>
       </div>
 
       {/* Overview Statistics Cards */}
-      <div className={`grid grid-cols-2 ${campuses && campuses.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4`}>
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+      <div className={`grid grid-cols-2 ${campuses && campuses.length > 0 ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-2.5 sm:gap-3`}>
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Total Comptes</p>
-            <h3 className="text-2xl font-black text-slate-900 mt-0.5">{stats.total}</h3>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">{stats.active} actifs · {stats.inactive} inactifs</p>
+            <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.total}</h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">{stats.active} actifs · {stats.inactive} inactifs</p>
           </div>
-          <div className="w-11 h-11 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
-            <Users size={20} />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shrink-0">
+            <Users size={18} />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
           <div>
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Administrateurs</p>
-            <h3 className="text-2xl font-black text-amber-600 mt-0.5">{stats.adminCount} / 2</h3>
-            <p className="text-[10px] text-slate-500 font-medium mt-1">Limite officielle de sécurité</p>
+            <h3 className="text-xl sm:text-2xl font-black text-amber-600 mt-0.5">{stats.adminCount} / 2</h3>
+            <p className="text-[10px] text-slate-500 font-medium mt-0.5">Limite officielle de sécurité</p>
           </div>
-          <div className="w-11 h-11 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
-            <Crown size={20} />
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center shrink-0">
+            <Crown size={18} />
           </div>
         </div>
 
         {campuses && campuses.length > 0 && (
           <>
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Siège Social</p>
-                <h3 className="text-2xl font-black text-slate-900 mt-0.5">{stats.siegeCount}</h3>
-                <p className="text-[10px] text-slate-500 font-medium mt-1">Accès transversal école</p>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5">{stats.siegeCount}</h3>
+                <p className="text-[10px] text-slate-500 font-medium mt-0.5">Accès transversal école</p>
               </div>
-              <div className="w-11 h-11 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
-                <Building2 size={20} />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center shrink-0">
+                <Building2 size={18} />
               </div>
             </div>
 
-            <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+            <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-xs flex items-center justify-between">
               <div>
                 <p className="text-[10px] font-black text-slate-400 uppercase tracking-wider">Annexes & Campus</p>
-                <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{stats.annexesCount}</h3>
-                <p className="text-[10px] text-slate-500 font-medium mt-1">Affectations restreintes</p>
+                <h3 className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{stats.annexesCount}</h3>
+                <p className="text-[10px] text-slate-500 font-medium mt-0.5">Affectations restreintes</p>
               </div>
-              <div className="w-11 h-11 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
-                <MapPin size={20} />
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0">
+                <MapPin size={18} />
               </div>
             </div>
           </>
@@ -986,80 +987,81 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       </div>
 
       {/* Filter and Search Bar */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col md:flex-row gap-3 items-center justify-between">
+      <div className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/90 shadow-xs flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between">
         {/* Search */}
-        <div className="relative w-full md:w-80">
-          <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+        <div className="relative w-full md:w-72">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           <input
             type="text"
             placeholder="Rechercher nom ou email..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:bg-white focus:border-blue-600 transition-all placeholder:text-slate-400"
+            className="w-full pl-8.5 pr-7 py-1.5 sm:py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-lg sm:rounded-xl text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-slate-400"
           />
           {searchQuery && (
             <button 
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
 
-        {/* Dropdown Filters */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto">
+        {/* Dropdown Filters (Harmonized Pill Style) */}
+        <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
           {campuses && campuses.length > 0 && (
-            <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700">
-              <Building2 size={14} className="text-slate-400 shrink-0" />
-              <select
-                value={campusFilter}
-                onChange={(e) => setCampusFilter(e.target.value)}
-                className="bg-transparent border-none text-xs font-bold text-slate-800 outline-none cursor-pointer pr-2"
-              >
-                <option value="ALL">Tous les Campus</option>
-                <option value="SIEGE">🏛️ Siège Social (Global)</option>
-                {campuses.map(c => (
-                  <option key={c.id} value={c.id}>📍 {c.name}</option>
-                ))}
-              </select>
-            </div>
+            <SelectPill
+              options={[
+                { value: 'ALL', label: 'Tous les Campus' },
+                { value: 'SIEGE', label: '🏛️ Siège Social (Global)' },
+                ...campuses.map(c => ({ value: c.id, label: `📍 ${c.name}` }))
+              ]}
+              value={campusFilter}
+              onChange={setCampusFilter}
+              variant="pill"
+              size="xs"
+              colorScheme="purple"
+              portal={true}
+            />
           )}
 
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700">
-            <Shield size={14} className="text-slate-400 shrink-0" />
-            <select
-              value={roleFilter}
-              onChange={(e) => setRoleFilter(e.target.value)}
-              className="bg-transparent border-none text-xs font-bold text-slate-800 outline-none cursor-pointer pr-2"
-            >
-              <option value="ALL">Tous les Rôles</option>
-              <option value={UserRole.SCHOOL_ADMIN}>Administrateur</option>
-              <option value={UserRole.DIRECTOR}>{getRoleDisplayName(UserRole.DIRECTOR)}</option>
-              <option value={UserRole.SECRETARY}>{getRoleDisplayName(UserRole.SECRETARY)}</option>
-              <option value={UserRole.ACCOUNTANT}>{getRoleDisplayName(UserRole.ACCOUNTANT)}</option>
-              <option value={UserRole.TEACHER}>{getRoleDisplayName(UserRole.TEACHER)}</option>
-              <option value={UserRole.SUPERVISOR}>{getRoleDisplayName(UserRole.SUPERVISOR)}</option>
-            </select>
-          </div>
+          <SelectPill
+            options={[
+              { value: 'ALL', label: 'Tous les Rôles' },
+              { value: UserRole.SCHOOL_ADMIN, label: 'Administrateur' },
+              { value: UserRole.DIRECTOR, label: getRoleDisplayName(UserRole.DIRECTOR) },
+              { value: UserRole.SECRETARY, label: getRoleDisplayName(UserRole.SECRETARY) },
+              { value: UserRole.ACCOUNTANT, label: getRoleDisplayName(UserRole.ACCOUNTANT) },
+              { value: UserRole.TEACHER, label: getRoleDisplayName(UserRole.TEACHER) },
+              { value: UserRole.SUPERVISOR, label: getRoleDisplayName(UserRole.SUPERVISOR) },
+            ]}
+            value={roleFilter}
+            onChange={setRoleFilter}
+            variant="pill"
+            size="xs"
+            colorScheme="blue"
+            portal={true}
+          />
 
-          <div className="flex items-center gap-1.5 bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-700">
-            <Filter size={14} className="text-slate-400 shrink-0" />
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-transparent border-none text-xs font-bold text-slate-800 outline-none cursor-pointer pr-2"
-            >
-              <option value="ALL">Tous Statuts</option>
-              <option value="ACTIVE">Actifs</option>
-              <option value="INACTIVE">Inactifs / Suspendus</option>
-            </select>
-          </div>
+          <SelectPill
+            options={[
+              { value: 'ALL', label: 'Tous Statuts' },
+              { value: 'ACTIVE', label: 'Actifs' },
+              { value: 'INACTIVE', label: 'Inactifs / Suspendus' },
+            ]}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            variant="pill"
+            size="xs"
+            colorScheme="slate"
+            portal={true}
+          />
         </div>
       </div>
 
       {/* Main Users Table */}
-      <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[350px]">
+      <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 overflow-hidden min-h-[350px]">
         {loading && users.length === 0 ? (
           <div className="py-8">
             <FluidLoadingState message="Chargement de l'annuaire des utilisateurs..." subtext="Récupération sécurisée des profils et autorisations" />
@@ -1092,14 +1094,14 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full text-left min-w-[650px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200">
-                  <th scope="col" className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Collaborateur / Utilisateur</th>
-                  <th scope="col" className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rôle & Privilège</th>
+                <tr className="bg-slate-50/90 border-b border-slate-200">
+                  <th scope="col" className="px-4 py-2.5 sm:py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Collaborateur / Utilisateur</th>
+                  <th scope="col" className="px-4 py-2.5 sm:py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Rôle & Privilège</th>
                   {campuses && campuses.length > 0 && (
-                    <th scope="col" className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Périmètre / Campus</th>
+                    <th scope="col" className="px-4 py-2.5 sm:py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Périmètre / Campus</th>
                   )}
-                  <th scope="col" className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Statut</th>
-                  <th scope="col" className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
+                  <th scope="col" className="px-4 py-2.5 sm:py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Statut</th>
+                  <th scope="col" className="px-4 py-2.5 sm:py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -1110,62 +1112,62 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
                   return (
                     <tr key={u.id} className="group hover:bg-slate-50/70 transition-colors">
-                      <td className="px-6 py-4 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
-                        <div className="flex items-center gap-3.5">
-                          <div className="w-10 h-10 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center font-black text-slate-700 shrink-0 text-sm shadow-xs group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all">
+                      <td className="px-4 py-2.5 sm:py-3 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
+                        <div className="flex items-center gap-2.5 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-100 border border-slate-200 rounded-xl flex items-center justify-center font-black text-slate-700 shrink-0 text-xs sm:text-sm shadow-2xs group-hover:bg-blue-600 group-hover:text-white group-hover:border-blue-600 transition-all">
                             {u.full_name?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-sm truncate group-hover:text-blue-600 transition-colors">
+                            <p className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-blue-600 transition-colors">
                               {formatFullName(u.full_name || 'Sans Nom')}
                             </p>
-                            <p className="text-xs text-slate-500 font-medium truncate flex items-center gap-1.5 mt-0.5">
-                              <Mail size={12} className="text-slate-400 shrink-0" />
+                            <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1 mt-0.5">
+                              <Mail size={11} className="text-slate-400 shrink-0" />
                               {displayIdentifier(u.email)}
                             </p>
                           </div>
                         </div>
                       </td>
 
-                      <td className="px-6 py-4 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
-                        <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-extrabold ${roleStyle.bg}`}>
+                      <td className="px-4 py-2.5 sm:py-3 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-bold ${roleStyle.bg}`}>
                           {roleStyle.icon}
                           <span>{getRoleDisplayName(u.role)}</span>
                         </span>
                       </td>
 
                       {campuses && campuses.length > 0 && (
-                        <td className="px-6 py-4 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
+                        <td className="px-4 py-2.5 sm:py-3 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
                           {!u.campus_id ? (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-700 border border-purple-100 rounded-xl text-[10px] font-black uppercase tracking-wider">
-                              <Building2 size={12} />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 border border-purple-100 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                              <Building2 size={11} />
                               Siège Social
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-xl text-[10px] font-black uppercase tracking-wider">
-                              <MapPin size={12} />
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md text-[10px] font-bold uppercase tracking-wider">
+                              <MapPin size={11} />
                               {campuses?.find(c => c.id === u.campus_id)?.name || 'Campus spécifique'}
                             </span>
                           )}
                         </td>
                       )}
 
-                      <td className="px-6 py-4 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
+                      <td className="px-4 py-2.5 sm:py-3 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
                         {!isInactive ? (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-emerald-100 text-emerald-800 uppercase tracking-widest border border-emerald-200">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider border border-emerald-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                             Actif
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-[10px] font-black bg-rose-100 text-rose-800 uppercase tracking-widest border border-rose-200">
+                          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-100 text-rose-800 uppercase tracking-wider border border-rose-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
                             Inactif
                           </span>
                         )}
                       </td>
 
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="px-4 py-2.5 sm:py-3">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             onClick={() => setSelectedUserModal(u)}
                             className="p-2 text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
@@ -1271,52 +1273,59 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       {/* Modernized Add User Modal ("Nouveau Collaborateur") */}
       <AnimatePresence>
         {showAddModal && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-xl rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[90vh] sm:max-h-[86vh] overflow-hidden border border-slate-200"
             >
-              <div className="p-6 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-blue-600 border border-blue-500 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-md">
-                    <UserPlus size={22} />
+              <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-600 border border-blue-500 text-white rounded-xl flex items-center justify-center shrink-0 shadow-xs">
+                    <UserPlus size={18} />
                   </div>
                   <div>
-                    <h3 className="text-lg font-black text-white tracking-tight">Nouveau Collaborateur</h3>
-                    <p className="text-xs text-slate-300 font-medium">Créer un identifiant et attribuer des droits d'accès</p>
+                    <h3 className="text-base font-bold text-white tracking-tight">Nouveau Collaborateur</h3>
+                    <p className="text-[11px] text-slate-400 font-medium">Créer un identifiant et attribuer des droits d'accès</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setShowAddModal(false)} 
-                  className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="overflow-y-auto p-6 sm:p-8 custom-scrollbar space-y-6">
-                <form onSubmit={handleCreateUser} className="space-y-6">
+              <div className="overflow-y-auto p-3.5 sm:p-4.5 custom-scrollbar space-y-3 sm:space-y-3.5">
+                <form onSubmit={handleCreateUser} className="space-y-3 sm:space-y-3.5">
                   {errorMsg && (
-                    <div className="p-4 bg-rose-50 border border-rose-200 text-rose-800 rounded-2xl flex items-start gap-3 text-xs font-bold">
-                      <AlertCircle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+                    <div className="p-3 bg-rose-50 border border-rose-200 text-rose-800 rounded-xl flex items-start gap-2.5 text-xs font-bold">
+                      <AlertCircle size={16} className="mt-0.5 shrink-0 text-rose-600" />
                       <span>{errorMsg}</span>
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <label htmlFor="staff_id" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <User size={14} className="text-blue-600" />
-                      1. Liaison RH / Personnel
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <User size={13} className="text-blue-600" />
+                      <span>1. Liaison RH / Personnel</span>
                       <InfoTooltip content="Sélectionner un membre inscrit au registre du personnel auto-remplit son nom et son email." />
                     </label>
-                    <select 
-                      id="staff_id" 
-                      className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-blue-600 transition-all cursor-pointer" 
-                      value={formData.staff_id} 
-                      onChange={e => {
-                        const staff = staffList.find(s => s.id === e.target.value);
+                    <SelectPill
+                      options={[
+                        { value: '', label: 'Compte autonome (sans liaison RH)', badge: 'Autonome', description: 'Créer un compte sans associer de fiche du personnel' },
+                        ...getAvailableStaff().map(staff => ({
+                          value: staff.id,
+                          label: formatStudentName(staff.last_name, staff.first_name).fullName,
+                          badge: staff.role || 'Personnel',
+                          description: staff.email || staff.phone || undefined
+                        }))
+                      ]}
+                      value={formData.staff_id}
+                      onChange={(val) => {
+                        const staff = staffList.find(s => s.id === val);
                         let matchedRole = formData.role;
                         if (staff && staff.role) {
                           const r = staff.role.toLowerCase();
@@ -1330,25 +1339,25 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                         }
                         setFormData({
                           ...formData, 
-                          staff_id: e.target.value,
+                          staff_id: val,
                           full_name: staff ? formatStudentName(staff.last_name, staff.first_name).fullName : '',
                           email: staff?.email || formData.email,
                           role: matchedRole
                         });
                       }}
-                    >
-                      <option value="">-- Créer un compte autonome sans lien RH --</option>
-                      {getAvailableStaff().map(staff => (
-                        <option key={staff.id} value={staff.id}>
-                          {formatStudentName(staff.last_name, staff.first_name).fullName} ({staff.role})
-                        </option>
-                      ))}
-                    </select>
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      searchable={true}
+                      portal={true}
+                      placeholder="Sélectionner un collaborateur RH..."
+                      className="w-full"
+                    />
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                    <div className="space-y-2">
-                      <label htmlFor="full_name" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
+                    <div className="space-y-1">
+                      <label htmlFor="full_name" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                         Nom Complet
                       </label>
                       <input 
@@ -1356,7 +1365,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                         required 
                         type="text" 
                         readOnly={!!formData.staff_id} 
-                        className={`w-full px-4 py-3.5 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none transition-all ${
+                        className={`w-full px-3 py-2 border border-slate-200 rounded-xl text-xs font-bold outline-none transition-all ${
                           !!formData.staff_id ? 'bg-slate-100 text-slate-500 cursor-not-allowed' : 'bg-slate-50 text-slate-900 focus:bg-white focus:border-blue-600'
                         }`} 
                         value={formData.full_name} 
@@ -1365,86 +1374,97 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <label htmlFor="role" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                        Rôle & Habilitation
+                    <div className="space-y-1">
+                      <label htmlFor="role" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Shield size={13} className="text-blue-600" />
+                        <span>Rôle & Habilitation</span>
                         <InfoTooltip content="Définit les modules et les actions autorisés sur la plateforme." />
                       </label>
-                      <select 
-                        id="role" 
-                        className="w-full px-4 py-3.5 bg-slate-50 text-blue-700 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-blue-600 transition-all cursor-pointer" 
-                        value={formData.role} 
-                        onChange={e => setFormData({...formData, role: e.target.value as UserRole})}
-                      >
-                        {getAvailableRoles().map(role => (
-                          <option key={role.value} value={role.value}>{role.label}</option>
-                        ))}
-                      </select>
-                      <div className="mt-1.5 p-2.5 bg-blue-50/80 border border-blue-100 rounded-xl text-[11px] text-blue-900 flex items-start gap-2">
-                        <ShieldCheck size={14} className="text-blue-600 shrink-0 mt-0.5" />
-                        <div>
-                          <span className="font-extrabold block">Périmètre d'action :</span>
-                          <span className="text-slate-600 font-medium">
-                            {getAvailableRoles().find(r => r.value === formData.role)?.desc || 'Accès selon le rôle sélectionné'}
-                          </span>
-                        </div>
-                      </div>
+                      <SelectPill
+                        options={getAvailableRoles().map(role => ({
+                          value: role.value,
+                          label: role.label,
+                          description: role.desc,
+                          badge: role.value === UserRole.SCHOOL_ADMIN ? 'Admin' : undefined
+                        }))}
+                        value={formData.role}
+                        onChange={(val) => setFormData({...formData, role: val as UserRole})}
+                        variant="field"
+                        size="sm"
+                        colorScheme="blue"
+                        portal={true}
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-blue-50/70 border border-blue-100 rounded-xl text-[11px] text-blue-900 flex items-start gap-2">
+                    <ShieldCheck size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div>
+                      <span className="font-extrabold block">Périmètre d'action ({formData.role}) :</span>
+                      <span className="text-slate-600 font-medium">
+                        {getAvailableRoles().find(r => r.value === formData.role)?.desc || 'Accès selon le rôle sélectionné'}
+                      </span>
                     </div>
                   </div>
 
                   {!currentUser.campus_id && campuses && campuses.length > 0 && (
-                    <div className="space-y-2 p-4 bg-purple-50/60 border border-purple-100 rounded-2xl">
-                      <label htmlFor="campus_id" className="text-xs font-black text-purple-900 uppercase tracking-wider flex items-center gap-1.5">
-                        <Building2 size={15} className="text-purple-600" />
-                        Périmètre Annexe / Multi-Campus
+                    <div className="space-y-1 p-2.5 sm:p-3 bg-purple-50/50 border border-purple-100 rounded-xl">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-purple-900 flex items-center gap-1.5">
+                        <Building2 size={13} className="text-purple-600" />
+                        <span>Périmètre Annexe / Multi-Campus</span>
                         <InfoTooltip content="L'accès au Siège Social autorise la vue sur toutes les annexes. Un campus spécifique restreint l'utilisateur à son annexe." />
                       </label>
-                      <select 
-                        id="campus_id" 
-                        className="w-full px-4 py-3.5 bg-white text-slate-900 border-2 border-purple-200 rounded-xl text-xs font-bold outline-none focus:border-purple-600 transition-all cursor-pointer" 
-                        value={formData.campus_id} 
-                        onChange={e => setFormData({...formData, campus_id: e.target.value})}
-                      >
-                        <option value="">🏛️ Siège Social (Accès transversal à toutes les annexes)</option>
-                        {campuses.map(campus => (
-                          <option key={campus.id} value={campus.id}>
-                            📍 {campus.name}
-                          </option>
-                        ))}
-                      </select>
+                      <SelectPill
+                        options={[
+                          { value: '', label: '🏛️ Siège Social (Accès transversal)', description: 'Accès transversal à toutes les annexes de l\'établissement' },
+                          ...campuses.map(campus => ({
+                            value: campus.id,
+                            label: `📍 ${campus.name}`,
+                            description: campus.address || undefined
+                          }))
+                        ]}
+                        value={formData.campus_id}
+                        onChange={(val) => setFormData({...formData, campus_id: val})}
+                        variant="field"
+                        size="sm"
+                        colorScheme="purple"
+                        portal={true}
+                        className="w-full"
+                      />
                     </div>
                   )}
 
-                  <div className="space-y-2">
-                    <label htmlFor="email" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <User size={14} className="text-blue-600" />
-                      Identifiant ou Email de Connexion
+                  <div className="space-y-1">
+                    <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <User size={13} className="text-blue-600" />
+                      <span>Identifiant ou Email de Connexion</span>
                     </label>
                     <input 
                       id="email" 
                       required 
                       type="text" 
-                      className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-blue-600 transition-all placeholder:text-slate-400" 
+                      className="w-full px-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-blue-600 transition-all placeholder:text-slate-400" 
                       value={formData.email} 
                       onChange={e => setFormData({...formData, email: e.target.value})} 
                       placeholder="ex: eugene.roseline ou r.eugene@ecole.ht" 
                     />
                   </div>
 
-                  <div className="space-y-3 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                  <div className="space-y-2.5 p-3 bg-slate-50 border border-slate-200/90 rounded-xl">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                        <KeyRound size={14} className="text-blue-600" />
-                        Mot de passe d'Accès
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <KeyRound size={13} className="text-blue-600" />
+                        <span>Mot de passe d'Accès</span>
                       </label>
                       {passwordStrength.label && (
-                        <span className={`text-[10px] font-black px-2 py-0.5 text-white rounded-md ${passwordStrength.color}`}>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 text-white rounded-sm ${passwordStrength.color}`}>
                           {passwordStrength.label}
                         </span>
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       <div className="relative">
                         <input 
                           id="password" 
@@ -1452,16 +1472,16 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                           minLength={8} 
                           type={showPassword ? "text" : "password"} 
                           placeholder="Min. 8 caractères" 
-                          className="w-full pl-4 pr-10 py-3 bg-white text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-600 transition-all" 
+                          className="w-full pl-3 pr-8 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-600 transition-all" 
                           value={formData.password} 
                           onChange={e => setFormData({...formData, password: e.target.value})} 
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                         >
-                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                          {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                         </button>
                       </div>
 
@@ -1472,37 +1492,37 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                           minLength={8} 
                           type={showPassword ? "text" : "password"} 
                           placeholder="Confirmer mot de passe" 
-                          className="w-full px-4 py-3 bg-white text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-blue-600 transition-all" 
+                          className="w-full px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-blue-600 transition-all" 
                           value={formData.confirmPassword} 
                           onChange={e => setFormData({...formData, confirmPassword: e.target.value})} 
                         />
                       </div>
                     </div>
 
-                    <label className="flex items-center gap-2.5 pt-1 cursor-pointer">
+                    <label className="flex items-center gap-2 pt-0.5 cursor-pointer">
                       <input 
                         type="checkbox" 
                         checked={formData.forcePasswordChange}
                         onChange={(e) => setFormData({...formData, forcePasswordChange: e.target.checked})}
-                        className="w-4 h-4 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
+                        className="w-3.5 h-3.5 rounded text-blue-600 border-slate-300 focus:ring-blue-500"
                       />
-                      <span className="text-[11px] font-bold text-slate-700">
-                        Forcer le renouvellement du mot de passe à la première connexion
+                      <span className="text-[11px] font-semibold text-slate-600">
+                        Forcer le renouvellement à la première connexion
                       </span>
                     </label>
                   </div>
 
-                  <div className="pt-2">
+                  <div className="pt-1">
                     <button 
                       disabled={isSubmitting} 
                       type="submit" 
-                      className="w-full py-4 bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-700 text-white rounded-2xl font-bold text-sm tracking-tight shadow-lg shadow-blue-500/20 hover:shadow-xl hover:from-blue-700 hover:to-indigo-800 transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-75 cursor-pointer"
+                      className="w-full py-2.5 sm:py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs sm:text-sm tracking-tight shadow-xs transition-all flex items-center justify-center gap-2 active:scale-98 disabled:opacity-75 cursor-pointer"
                     >
                       {isSubmitting ? (
                         <SubmittingButtonContent label="Création du compte en cours..." />
                       ) : (
                         <>
-                          <ShieldCheck size={18} />
+                          <ShieldCheck size={16} />
                           <span>Valider et Créer le Compte</span>
                         </>
                       )}
@@ -1909,87 +1929,96 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       {/* Edit Role & Campus Modal */}
       <AnimatePresence>
         {editRoleModal.isOpen && editRoleModal.user && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 sm:p-6 animate-in fade-in">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white w-full max-w-lg rounded-3xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border border-slate-200"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              className="bg-white w-full max-w-md rounded-2xl shadow-xl flex flex-col max-h-[88vh] overflow-hidden border border-slate-200"
             >
-              <div className="p-6 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-11 h-11 bg-purple-600 text-white rounded-2xl flex items-center justify-center shrink-0 shadow-md">
-                    <UserCog size={22} />
+              <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 sm:w-10 sm:h-10 bg-purple-600 text-white rounded-xl flex items-center justify-center shrink-0 shadow-xs">
+                    <UserCog size={18} />
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-white tracking-tight">Modifier Rôle & Habilitations</h3>
-                    <p className="text-xs text-slate-300 font-medium">{formatFullName(editRoleModal.user.full_name || editRoleModal.user.email)}</p>
+                    <h3 className="text-base font-bold text-white tracking-tight">Modifier Rôle & Habilitations</h3>
+                    <p className="text-[11px] text-slate-400 font-medium truncate max-w-[220px] sm:max-w-xs">{formatFullName(editRoleModal.user.full_name || editRoleModal.user.email)}</p>
                   </div>
                 </div>
                 <button 
                   onClick={() => setEditRoleModal({ isOpen: false, user: null, newRole: UserRole.TEACHER, newCampusId: '' })} 
-                  className="w-10 h-10 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
                 >
-                  <X size={20} />
+                  <X size={18} />
                 </button>
               </div>
 
-              <div className="p-6 space-y-6 overflow-y-auto custom-scrollbar">
-                <div className="space-y-2">
-                  <label htmlFor="edit_role" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                    <Shield size={14} className="text-purple-600" />
-                    Rôle Système & Habilitation
+              <div className="p-3.5 sm:p-4 space-y-3 sm:space-y-3.5 overflow-y-auto custom-scrollbar">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Shield size={13} className="text-purple-600" />
+                    <span>Rôle Système & Habilitation</span>
                   </label>
-                  <select
-                    id="edit_role"
-                    className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-purple-600 transition-all cursor-pointer"
+                  <SelectPill
+                    options={getAvailableRoles().map(role => ({
+                      value: role.value,
+                      label: role.label,
+                      description: role.desc,
+                      badge: role.value === UserRole.SCHOOL_ADMIN ? 'Admin' : undefined
+                    }))}
                     value={editRoleModal.newRole}
-                    onChange={e => setEditRoleModal({ ...editRoleModal, newRole: e.target.value as UserRole })}
-                  >
-                    {getAvailableRoles().map(role => (
-                      <option key={role.value} value={role.value}>{role.label}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setEditRoleModal({ ...editRoleModal, newRole: val as UserRole })}
+                    variant="field"
+                    size="sm"
+                    colorScheme="purple"
+                    portal={true}
+                    className="w-full"
+                  />
                 </div>
 
-                <div className="p-4 bg-purple-50/70 border border-purple-100 rounded-2xl space-y-2">
-                  <div className="flex items-center gap-2 text-purple-900 text-xs font-black uppercase tracking-wider">
-                    <ShieldCheck size={16} className="text-purple-600 shrink-0" />
+                <div className="p-2.5 bg-purple-50/70 border border-purple-100 rounded-xl space-y-1">
+                  <div className="flex items-center gap-1.5 text-purple-900 text-[11px] font-black uppercase tracking-wider">
+                    <ShieldCheck size={14} className="text-purple-600 shrink-0" />
                     <span>Périmètre & Privilèges Accordés</span>
                   </div>
-                  <p className="text-xs font-bold text-slate-700 leading-relaxed">
+                  <p className="text-xs font-semibold text-slate-700 leading-snug">
                     {getAvailableRoles().find(r => r.value === editRoleModal.newRole)?.desc || 'Accès restreint selon le rôle'}
                   </p>
                 </div>
 
                 {!currentUser.campus_id && campuses && campuses.length > 0 && (
-                  <div className="space-y-2 p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                    <label htmlFor="edit_campus_id" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <Building2 size={15} className="text-purple-600" />
-                      Affectation Périmètre / Annexe
+                  <div className="space-y-1 p-2.5 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Building2 size={13} className="text-purple-600" />
+                      <span>Affectation Périmètre / Annexe</span>
                     </label>
-                    <select 
-                      id="edit_campus_id" 
-                      className="w-full px-4 py-3.5 bg-white text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-purple-600 transition-all cursor-pointer" 
-                      value={editRoleModal.newCampusId} 
-                      onChange={e => setEditRoleModal({ ...editRoleModal, newCampusId: e.target.value })}
-                    >
-                      <option value="">🏛️ Siège Social (Accès transversal à toutes les annexes)</option>
-                      {campuses.map(campus => (
-                        <option key={campus.id} value={campus.id}>
-                          📍 {campus.name}
-                        </option>
-                      ))}
-                    </select>
+                    <SelectPill
+                      options={[
+                        { value: '', label: '🏛️ Siège Social (Accès transversal)', description: 'Accès transversal à toutes les annexes' },
+                        ...campuses.map(campus => ({
+                          value: campus.id,
+                          label: `📍 ${campus.name}`,
+                          description: campus.address || undefined
+                        }))
+                      ]}
+                      value={editRoleModal.newCampusId}
+                      onChange={(val) => setEditRoleModal({ ...editRoleModal, newCampusId: val })}
+                      variant="field"
+                      size="sm"
+                      colorScheme="purple"
+                      portal={true}
+                      className="w-full"
+                    />
                   </div>
                 )}
               </div>
 
-              <div className="p-5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-3 shrink-0">
+              <div className="p-3 sm:p-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
                 <button
                   type="button"
                   onClick={() => setEditRoleModal({ isOpen: false, user: null, newRole: UserRole.TEACHER, newCampusId: '' })}
-                  className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                  className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
                 >
                   Annuler
                 </button>
@@ -1997,9 +2026,9 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                   type="button"
                   disabled={isSubmitting}
                   onClick={handleUpdateUserRoleAndCampus}
-                  className="px-5 py-2.5 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl shadow-md transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                  className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
-                  {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <ShieldCheck size={15} />}
+                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
                   <span>Enregistrer l'habilitation</span>
                 </button>
               </div>
