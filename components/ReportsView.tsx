@@ -4,7 +4,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile, SchoolClass } from '../types';
 import { 
   FileText, Download, FileSpreadsheet, Calendar, Users, DollarSign, Filter, Loader2, AlertCircle, RefreshCcw, Trash2,
-  Search, Building2, TrendingUp, Wallet, Tag, ShieldCheck, ChevronRight, Layers, CreditCard,
+  Search, Building2, TrendingUp, Wallet, Tag, ShieldCheck, ChevronRight, ChevronLeft, ChevronsLeft, ChevronsRight, X, Layers, CreditCard,
   Sparkles, MapPin, Landmark, Banknote, Smartphone, PieChart, ArrowDownRight, ArrowUpRight, Lock, Eye, EyeOff, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
@@ -76,6 +76,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [selectedClassId, setSelectedClassId] = useState<string>('all');
   const [students, setStudents] = useState<any[]>([]);
+  const [studentSearchTerm, setStudentSearchTerm] = useState<string>('');
+  const [studentCurrentPage, setStudentCurrentPage] = useState<number>(1);
+  const [studentItemsPerPage, setStudentItemsPerPage] = useState<number>(25);
+  const [studentGenderFilter, setStudentGenderFilter] = useState<'ALL' | 'M' | 'F'>('ALL');
 
   // Cancellation Modal & Supervisor Pass State
   const [cancellingPayment, setCancellingPayment] = useState<any | null>(null);
@@ -509,6 +513,60 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     });
   }, [payments, searchTerm]);
 
+  // Client-side search and filtering for Students
+  const filteredStudents = useMemo(() => {
+    let list = students;
+    if (studentGenderFilter !== 'ALL') {
+      list = list.filter(s => {
+        const g = (s.gender || '').toUpperCase();
+        return g.startsWith(studentGenderFilter);
+      });
+    }
+    if (!studentSearchTerm.trim()) return list;
+    const term = studentSearchTerm.toLowerCase().trim();
+    return list.filter(s => {
+      const fullName = `${s.first_name || ''} ${s.last_name || ''} ${s.first_name || ''}`.toLowerCase();
+      const matricule = (s.matricule || s.id || '').toLowerCase();
+      const className = (s.classes?.name || '').toLowerCase();
+      const campusName = (s.school_campuses?.name || '').toLowerCase();
+      const parentName = (s.parent_name || '').toLowerCase();
+      const parentPhone = (s.parent_phone || '').toLowerCase();
+      return fullName.includes(term) ||
+             matricule.includes(term) ||
+             className.includes(term) ||
+             campusName.includes(term) ||
+             parentName.includes(term) ||
+             parentPhone.includes(term);
+    });
+  }, [students, studentSearchTerm, studentGenderFilter]);
+
+  const studentTotalPages = Math.max(1, Math.ceil(filteredStudents.length / studentItemsPerPage));
+
+  // Reset page when out of bounds or on filter updates
+  useEffect(() => {
+    if (studentCurrentPage > studentTotalPages) {
+      setStudentCurrentPage(studentTotalPages);
+    }
+  }, [studentTotalPages, studentCurrentPage]);
+
+  const paginatedStudents = useMemo(() => {
+    const start = (studentCurrentPage - 1) * studentItemsPerPage;
+    return filteredStudents.slice(start, start + studentItemsPerPage);
+  }, [filteredStudents, studentCurrentPage, studentItemsPerPage]);
+
+  const studentStats = useMemo(() => {
+    const total = students.length;
+    const filteredTotal = filteredStudents.length;
+    let boys = 0;
+    let girls = 0;
+    filteredStudents.forEach(s => {
+      const g = (s.gender || '').toUpperCase();
+      if (g.startsWith('M')) boys++;
+      else if (g.startsWith('F')) girls++;
+    });
+    return { total, filteredTotal, boys, girls };
+  }, [students.length, filteredStudents]);
+
   // Helper for scope label in exports
   const getScopeLabel = () => {
     if (user.campus_id) {
@@ -623,6 +681,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     const doc = new jsPDF();
     const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
     const className = isAllClasses ? 'Toutes les classes' : classes.find(c => c.id === selectedClassId)?.name || '';
+    const listToExport = filteredStudents;
     
     doc.setFontSize(18);
     doc.text(school?.name || 'EduNova Pro', 14, 18);
@@ -632,9 +691,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     doc.setFontSize(10);
     doc.text(`Portée : ${getScopeLabel()}`, 14, 33);
     doc.text(`${terminology.option} : ${className}`, 14, 39);
-    doc.text(`Effectif total : ${students.length} ${terminology.student.toLowerCase()}s`, 14, 45);
+    doc.text(`Effectif total : ${listToExport.length} ${terminology.student.toLowerCase()}s`, 14, 45);
 
-    const tableData = students.map((s, index) => [
+    const tableData = listToExport.map((s, index) => [
       index + 1,
       s.last_name,
       s.first_name,
@@ -660,8 +719,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   const exportStudentsExcel = () => {
     const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
     const className = isAllClasses ? 'Toutes_les_classes' : classes.find(c => c.id === selectedClassId)?.name || '';
+    const listToExport = filteredStudents;
     
-    const wsData = students.map((s, index) => ({
+    const wsData = listToExport.map((s, index) => ({
       'N°': index + 1,
       [terminology.option]: s.classes?.name || '-',
       'Annexe / Campus': s.school_campuses?.name || 'Siège',
@@ -1308,63 +1368,156 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
       {activeTab === 'STUDENTS' && (
         <div className="space-y-6">
           
-          {/* FILTERS (Harmonisé ClassSelectorPill / SelectPill) */}
-          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-sm flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+          {/* FILTERS & SEARCH TOOLBAR */}
+          <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-100 shadow-sm flex flex-col gap-4">
             
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto flex-1 max-w-lg min-w-0">
-              <span className="text-xs font-black text-slate-600 uppercase tracking-wider shrink-0 hidden sm:inline">
-                Filtrer par {terminology.option || 'classe'} :
-              </span>
-              <div className="w-full flex-1 min-w-0">
-                <ClassSelectorPill
-                  classes={classes}
-                  selectedClassId={selectedClassId}
-                  onSelectClass={(id) => setSelectedClassId(id)}
-                  allowAll={true}
-                  allLabel="Toutes les classes"
-                  labelPrefix=""
-                  variant="field"
-                  size="sm"
-                  colorScheme="indigo"
-                  className="w-full"
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+              {/* Quick Search */}
+              <div className="relative flex-1 min-w-[240px] max-w-md">
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input 
+                  type="text"
+                  value={studentSearchTerm}
+                  onChange={(e) => {
+                    setStudentSearchTerm(e.target.value);
+                    setStudentCurrentPage(1);
+                  }}
+                  placeholder={`Rechercher un ${terminology.student.toLowerCase()} (nom, matricule, parent, tél)...`}
+                  className="w-full pl-10 pr-9 py-2.5 bg-slate-50 border border-slate-200/80 rounded-2xl text-xs font-bold text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 />
+                {studentSearchTerm && (
+                  <button
+                    onClick={() => {
+                      setStudentSearchTerm('');
+                      setStudentCurrentPage(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Effacer la recherche"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
+              </div>
+
+              {/* Selectors & Quick Filters */}
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Class selector */}
+                <div className="min-w-[190px] flex-1 sm:flex-initial">
+                  <ClassSelectorPill
+                    classes={classes}
+                    selectedClassId={selectedClassId}
+                    onSelectClass={(id) => {
+                      setSelectedClassId(id);
+                      setStudentCurrentPage(1);
+                    }}
+                    allowAll={true}
+                    allLabel="Toutes les classes"
+                    labelPrefix=""
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
+                </div>
+
+                {/* Multi-Campus selector for Students tab if global user */}
+                {hasMultiCampus && !user.campus_id && (
+                  <div className="min-w-[180px] flex-1 sm:flex-initial">
+                    <SelectPill
+                      options={campusOptions}
+                      value={selectedCampusFilter}
+                      onChange={(val) => {
+                        setSelectedCampusFilter(val);
+                        setStudentCurrentPage(1);
+                      }}
+                      variant="field"
+                      size="sm"
+                      colorScheme="indigo"
+                      icon={Building2}
+                      labelPrefix="Annexe :"
+                      className="w-full sm:min-w-[190px]"
+                    />
+                  </div>
+                )}
+
+                {/* Gender quick filter */}
+                <div className="flex items-center bg-slate-100 p-1 rounded-2xl border border-slate-200/60 text-xs font-bold shrink-0">
+                  <button
+                    onClick={() => {
+                      setStudentGenderFilter('ALL');
+                      setStudentCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                      studentGenderFilter === 'ALL'
+                        ? 'bg-white text-indigo-900 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Tous
+                  </button>
+                  <button
+                    onClick={() => {
+                      setStudentGenderFilter('M');
+                      setStudentCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                      studentGenderFilter === 'M'
+                        ? 'bg-blue-600 text-white shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Garçons
+                  </button>
+                  <button
+                    onClick={() => {
+                      setStudentGenderFilter('F');
+                      setStudentCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl transition-all cursor-pointer ${
+                      studentGenderFilter === 'F'
+                        ? 'bg-rose-600 text-white shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    Filles
+                  </button>
+                </div>
               </div>
             </div>
-
-            {/* Multi-Campus selector for Students tab if global user */}
-            {hasMultiCampus && !user.campus_id && (
-              <div className="shrink-0 w-full sm:w-auto">
-                <SelectPill
-                  options={campusOptions}
-                  value={selectedCampusFilter}
-                  onChange={(val) => setSelectedCampusFilter(val)}
-                  variant="field"
-                  size="sm"
-                  colorScheme="indigo"
-                  icon={Building2}
-                  labelPrefix="Annexe :"
-                  className="w-full sm:min-w-[200px]"
-                />
-              </div>
-            )}
           </div>
 
           {/* STUDENTS DATA TABLE */}
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-            <div className="p-6 bg-slate-50/60 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div>
-                <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
-                  Registre des {terminology.students}
-                  {selectedClassId && selectedClassId.toLowerCase() !== 'all' && (
-                    <span className="text-indigo-600 ml-1.5">
-                      - {classes.find(c => c.id === selectedClassId)?.name}
+            <div className="p-5 sm:p-6 bg-slate-50/60 border-b border-slate-100 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h2 className="text-sm font-black text-slate-900 uppercase tracking-wider">
+                    Registre des {terminology.students}
+                    {selectedClassId && selectedClassId.toLowerCase() !== 'all' && (
+                      <span className="text-indigo-600 ml-1.5">
+                        - {classes.find(c => c.id === selectedClassId)?.name}
+                      </span>
+                    )}
+                  </h2>
+                  <span className="px-2.5 py-0.5 bg-indigo-100/80 text-indigo-900 text-[11px] font-black rounded-lg border border-indigo-200/60">
+                    {filteredStudents.length} {terminology.student.toLowerCase()}{filteredStudents.length > 1 ? 's' : ''}
+                  </span>
+                  {studentTotalPages > 1 && (
+                    <span className="px-2.5 py-0.5 bg-slate-200/70 text-slate-700 text-[11px] font-extrabold rounded-lg">
+                      Page {studentCurrentPage} / {studentTotalPages}
                     </span>
                   )}
-                </h2>
-                <p className="text-xs font-bold text-slate-500 mt-0.5">{students.length} {terminology.student.toLowerCase()}s enregistrés</p>
+                </div>
+                <div className="flex items-center gap-3 text-xs text-slate-500 font-bold flex-wrap">
+                  <span>Total base : <strong className="text-slate-800">{students.length}</strong></span>
+                  <span>•</span>
+                  <span className="text-blue-700 font-bold">Garçons : {studentStats.boys}</span>
+                  <span>•</span>
+                  <span className="text-rose-700 font-bold">Filles : {studentStats.girls}</span>
+                </div>
               </div>
               
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button 
                   onClick={() => fetchStudentsData()}
                   className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
@@ -1375,14 +1528,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                 </button>
                 <button 
                   onClick={exportStudentsPDF}
-                  disabled={students.length === 0}
+                  disabled={filteredStudents.length === 0}
                   className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-rose-200/60"
                 >
                   <Download size={14} /> PDF
                 </button>
                 <button 
                   onClick={exportStudentsExcel}
-                  disabled={students.length === 0}
+                  disabled={filteredStudents.length === 0}
                   className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-emerald-200/60"
                 >
                   <FileSpreadsheet size={14} /> Excel
@@ -1408,7 +1561,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                     </th>
                     <th className="px-4 py-3.5 min-w-[220px]">
                       <span className="text-indigo-200 flex items-center gap-1.5">
-                        <Users size={13} className="text-indigo-400" /> Identité Eleve / Etudiant
+                        <Users size={13} className="text-indigo-400" /> Identité Élève / Étudiant
                       </span>
                     </th>
                     <th className="px-4 py-3.5 min-w-[120px]">
@@ -1437,56 +1590,252 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {students.length === 0 ? (
+                  {filteredStudents.length === 0 ? (
                     <tr>
                       <td colSpan={hasMultiCampus ? 7 : 6} className="py-16 text-center text-slate-500 font-bold text-xs italic">
-                        Aucun {terminology.student.toLowerCase()} trouvé.
+                        {students.length === 0 ? (
+                          `Aucun ${terminology.student.toLowerCase()} trouvé pour les critères sélectionnés.`
+                        ) : (
+                          <div className="space-y-3">
+                            <p>Aucun résultat ne correspond à votre recherche « {studentSearchTerm} ».</p>
+                            <button
+                              onClick={() => {
+                                setStudentSearchTerm('');
+                                setStudentGenderFilter('ALL');
+                                setStudentCurrentPage(1);
+                              }}
+                              className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-black transition-all cursor-pointer border border-indigo-200"
+                            >
+                              Réinitialiser la recherche
+                            </button>
+                          </div>
+                        )}
                       </td>
                     </tr>
                   ) : (
-                    students.map((s, index) => (
-                      <tr key={s.id} className="hover:bg-indigo-50/40 transition-colors">
-                        <td className="px-4 py-3.5 text-center text-xs font-bold text-slate-400">
-                          {index + 1}
-                        </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs font-extrabold text-slate-900">
-                          <div className="flex items-center gap-2.5">
-                            <div className="w-7 h-7 rounded-lg bg-indigo-100/80 text-indigo-800 font-black text-[10px] flex items-center justify-center shrink-0 border border-indigo-200/50">
-                              {s.first_name?.charAt(0)}{s.last_name?.charAt(0)}
+                    paginatedStudents.map((s, index) => {
+                      const globalIndex = (studentCurrentPage - 1) * studentItemsPerPage + index + 1;
+                      return (
+                        <tr key={s.id} className="hover:bg-indigo-50/40 transition-colors">
+                          <td className="px-4 py-3.5 text-center text-xs font-bold text-slate-400">
+                            {globalIndex}
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap text-xs font-extrabold text-slate-900">
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-indigo-100/80 text-indigo-800 font-black text-[10px] flex items-center justify-center shrink-0 border border-indigo-200/50">
+                                {s.first_name?.charAt(0)}{s.last_name?.charAt(0)}
+                              </div>
+                              <div>
+                                <span className="whitespace-nowrap font-black text-slate-900 text-xs block">
+                                  {formatStudentName(s.last_name, s.first_name).fullName}
+                                </span>
+                                {s.matricule && (
+                                  <span className="text-[10px] font-mono text-slate-400 font-normal">
+                                    Matr: {s.matricule}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span className="whitespace-nowrap font-black text-slate-900 text-xs">
-                              {formatStudentName(s.last_name, s.first_name).fullName}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-700">
-                          <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-extrabold border border-slate-200/50">
-                            {s.classes?.name || 'N/A'}
-                          </span>
-                        </td>
-                        {hasMultiCampus && (
+                          </td>
                           <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-700">
-                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase tracking-wider">
-                              📍 {s.school_campuses?.name || 'Siège'}
+                            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-extrabold border border-slate-200/50">
+                              {s.classes?.name || 'N/A'}
                             </span>
                           </td>
-                        )}
-                        <td className="px-4 py-3.5 text-center text-xs font-extrabold text-slate-600">
-                          {s.gender?.charAt(0) || '-'}
-                        </td>
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-600">
-                          {s.dob ? new Date(s.dob).toLocaleDateString('fr-FR') : '-'}
-                        </td>
-                        <td className="px-4 py-3.5 text-xs">
-                          <div className="font-extrabold text-slate-800 whitespace-nowrap">{s.parent_name || '-'}</div>
-                          <div className="text-[11px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">{s.parent_phone || '-'}</div>
-                        </td>
-                      </tr>
-                    ))
+                          {hasMultiCampus && (
+                            <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-700">
+                              <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 rounded-lg text-[10px] font-black uppercase tracking-wider">
+                                📍 {s.school_campuses?.name || 'Siège'}
+                              </span>
+                            </td>
+                          )}
+                          <td className="px-4 py-3.5 text-center text-xs font-extrabold text-slate-600">
+                            {s.gender ? (
+                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-black ${
+                                s.gender.toUpperCase().startsWith('M') 
+                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60' 
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200/60'
+                              }`}>
+                                {s.gender.charAt(0).toUpperCase()}
+                              </span>
+                            ) : '-'}
+                          </td>
+                          <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-600">
+                            {s.dob ? new Date(s.dob).toLocaleDateString('fr-FR') : '-'}
+                          </td>
+                          <td className="px-4 py-3.5 text-xs">
+                            <div className="font-extrabold text-slate-800 whitespace-nowrap">{s.parent_name || '-'}</div>
+                            <div className="text-[11px] text-slate-500 font-mono mt-0.5 whitespace-nowrap">{s.parent_phone || '-'}</div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
+            )}
+
+            {/* MODERN & FLUID PAGINATION CONTROLS */}
+            {!loading && filteredStudents.length > 0 && (
+              <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-100 flex flex-col md:flex-row items-center justify-between gap-4">
+                
+                {/* Left: Info & items per page */}
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-4 text-xs font-bold text-slate-600">
+                  <div>
+                    Affichage de <span className="font-extrabold text-slate-900">{(studentCurrentPage - 1) * studentItemsPerPage + 1}</span> à{' '}
+                    <span className="font-extrabold text-slate-900">
+                      {Math.min(studentCurrentPage * studentItemsPerPage, filteredStudents.length)}
+                    </span>{' '}
+                    sur <span className="font-extrabold text-slate-900">{filteredStudents.length}</span> {terminology.student.toLowerCase()}s
+                    {studentSearchTerm && filteredStudents.length !== students.length && (
+                      <span className="text-slate-400 font-medium ml-1">
+                        (filtrés sur {students.length})
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-2 pl-2 sm:border-l sm:border-slate-200">
+                    <span className="text-slate-500 font-semibold">Par page :</span>
+                    <select
+                      value={studentItemsPerPage}
+                      onChange={(e) => {
+                        setStudentItemsPerPage(Number(e.target.value));
+                        setStudentCurrentPage(1);
+                      }}
+                      className="bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-black text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors"
+                    >
+                      <option value={10}>10</option>
+                      <option value={25}>25</option>
+                      <option value={50}>50</option>
+                      <option value={100}>100</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Right: Page Navigation buttons */}
+                <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                  {/* First page */}
+                  <button
+                    onClick={() => setStudentCurrentPage(1)}
+                    disabled={studentCurrentPage === 1}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                    title="Première page"
+                    aria-label="Première page"
+                  >
+                    <ChevronsLeft size={15} />
+                  </button>
+
+                  {/* Previous page */}
+                  <button
+                    onClick={() => setStudentCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={studentCurrentPage === 1}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                    title="Page précédente"
+                    aria-label="Page précédente"
+                  >
+                    <ChevronLeft size={15} />
+                  </button>
+
+                  {/* Page numbers with smart ellipsis */}
+                  <div className="flex items-center gap-1">
+                    {(() => {
+                      const pages: (number | string)[] = [];
+                      const total = studentTotalPages;
+                      const current = studentCurrentPage;
+
+                      if (total <= 7) {
+                        for (let i = 1; i <= total; i++) pages.push(i);
+                      } else {
+                        pages.push(1);
+                        if (current > 3) {
+                          pages.push('ellipsis-start');
+                        }
+
+                        const start = Math.max(2, current - 1);
+                        const end = Math.min(total - 1, current + 1);
+
+                        for (let i = start; i <= end; i++) {
+                          pages.push(i);
+                        }
+
+                        if (current < total - 2) {
+                          pages.push('ellipsis-end');
+                        }
+                        pages.push(total);
+                      }
+
+                      return pages.map((page, idx) => {
+                        if (typeof page === 'string') {
+                          return (
+                            <span key={`ellipsis-${idx}`} className="px-1.5 py-1 text-slate-400 text-xs font-black">
+                              •••
+                            </span>
+                          );
+                        }
+
+                        const isActive = page === current;
+                        return (
+                          <button
+                            key={page}
+                            onClick={() => setStudentCurrentPage(page)}
+                            className={`min-w-[34px] h-[34px] px-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                              isActive
+                                ? 'bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white shadow-md shadow-indigo-500/20 scale-105'
+                                : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80 shadow-2xs'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+
+                  {/* Next page */}
+                  <button
+                    onClick={() => setStudentCurrentPage(prev => Math.min(studentTotalPages, prev + 1))}
+                    disabled={studentCurrentPage === studentTotalPages}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                    title="Page suivante"
+                    aria-label="Page suivante"
+                  >
+                    <ChevronRight size={15} />
+                  </button>
+
+                  {/* Last page */}
+                  <button
+                    onClick={() => setStudentCurrentPage(studentTotalPages)}
+                    disabled={studentCurrentPage === studentTotalPages}
+                    className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                    title="Dernière page"
+                    aria-label="Dernière page"
+                  >
+                    <ChevronsRight size={15} />
+                  </button>
+
+                  {/* Quick jump if more than 5 pages */}
+                  {studentTotalPages > 5 && (
+                    <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-slate-200 text-xs font-bold text-slate-500">
+                      <span>Aller à :</span>
+                      <input
+                        type="number"
+                        min={1}
+                        max={studentTotalPages}
+                        value={studentCurrentPage}
+                        onChange={(e) => {
+                          const val = Number(e.target.value);
+                          if (val >= 1 && val <= studentTotalPages) {
+                            setStudentCurrentPage(val);
+                          }
+                        }}
+                        className="w-12 py-1 px-1.5 bg-white border border-slate-200 rounded-lg text-center text-xs font-black text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+              </div>
             )}
           </div>
 
