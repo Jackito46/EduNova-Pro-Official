@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { School, SchoolType, SchoolCampus, UserProfile, AcademicYear } from '../types';
 import { supabase } from '../supabase';
 import { getTerminology, Terminology } from '../lib/terminology';
@@ -280,23 +280,32 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     };
   }, [schoolId, user?.id, user?.campus_id]);
 
-  const terminology = getTerminology((school?.school_type as SchoolType) || SchoolType.CLASSIC);
+  const terminology = useMemo(() => {
+    return getTerminology((school?.school_type as SchoolType) || SchoolType.CLASSIC);
+  }, [school?.school_type]);
+
+  const contextValue = useMemo(() => ({
+    school, 
+    terminology, 
+    loading, 
+    refreshSchool: fetchSchool,
+    campuses,
+    currentCampusId,
+    setCurrentCampusId: handleSetCampusId,
+    refreshCampuses: fetchCampuses,
+    activeAcademicYear,
+    refreshActiveYear: fetchActiveAcademicYear
+  }), [
+    school, 
+    terminology, 
+    loading, 
+    campuses, 
+    currentCampusId, 
+    activeAcademicYear
+  ]);
 
   return (
-    <SchoolContext.Provider 
-      value={{ 
-        school, 
-        terminology, 
-        loading, 
-        refreshSchool: fetchSchool,
-        campuses,
-        currentCampusId,
-        setCurrentCampusId: handleSetCampusId,
-        refreshCampuses: fetchCampuses,
-        activeAcademicYear,
-        refreshActiveYear: fetchActiveAcademicYear
-      }}
-    >
+    <SchoolContext.Provider value={contextValue}>
       {children}
     </SchoolContext.Provider>
   );

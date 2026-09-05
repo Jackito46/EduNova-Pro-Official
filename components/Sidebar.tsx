@@ -179,15 +179,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const academicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
   const restrictedAcademicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.SUPERVISOR];
 
-  const hasAccess = (allowedRoles: UserRole[]) => {
+  const hasAccess = React.useCallback((allowedRoles: UserRole[]) => {
     if (user.role === UserRole.SUPER_ADMIN || user.is_super_admin) return true;
     return allowedRoles.includes(user.role);
-  };
+  }, [user.role, user.is_super_admin]);
 
-  const schoolInfo = {
+  const schoolInfo = React.useMemo(() => ({
     name: school?.name || 'EduNova Pro',
     logo_url: school?.logo_url || null
-  };
+  }), [school?.name, school?.logo_url]);
 
   const handleToggleMenu = React.useCallback((menuId: string) => {
     if (isNarrow && sidebarMode === 'collapsed') {
@@ -202,7 +202,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
     setMobileOpen(false);
   }, []);
 
-  const renderNavLink = (item: { name: string; path: string; icon?: any }, isSubItem = false, icon?: any) => (
+  const renderNavLink = React.useCallback((item: { name: string; path: string; icon?: any }, isSubItem = false, icon?: any) => (
     <SidebarNavLink
       key={item.path}
       item={item}
@@ -212,9 +212,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       isNarrow={isNarrow}
       onNavigate={handleNavigate}
     />
-  );
+  ), [location.pathname, isNarrow, handleNavigate]);
 
-  const renderMenuHeader = (id: string, label: string, icon: any) => (
+  const renderMenuHeader = React.useCallback((id: string, label: string, icon: any) => (
     <SidebarMenuHeader
       key={id}
       id={id}
@@ -224,7 +224,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       isNarrow={isNarrow}
       onToggle={handleToggleMenu}
     />
-  );
+  ), [openMenus, isNarrow, handleToggleMenu]);
 
   return (
     <>
@@ -592,4 +592,4 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   );
 };
 
-export default Sidebar;
+export default React.memo(Sidebar);
