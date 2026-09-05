@@ -57,10 +57,13 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   }, [campuses]);
 
   // Finance State
+  const todayStr = useMemo(() => new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0], []);
   const [dateRange, setDateRange] = useState<DateRange>('TODAY');
   const [startDate, setStartDate] = useState(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
   const [endDate, setEndDate] = useState(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('ALL');
+  const [feeTypeFilter, setFeeTypeFilter] = useState<string>('ALL');
   const [payments, setPayments] = useState<any[]>([]);
   const [financeStats, setFinanceStats] = useState({ 
     totalHTG: 0, 
@@ -71,6 +74,34 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     byMethod: {} as Record<string, {htg: number, usd: number, count: number}>,
     byCampus: {} as Record<string, {htg: number, usd: number, count: number}>
   });
+
+  // Options pour les filtres harmonisés (SelectPill)
+  const paymentMethodOptions: SelectOption[] = useMemo(() => {
+    return [
+      { value: 'ALL', label: 'Tous les modes de règlement' },
+      { value: 'Cash', label: 'Cash / Espèces', badge: 'Espèces' },
+      { value: 'Dépôt', label: 'Dépôt Bancaire / Virement', badge: 'Banque' },
+      { value: 'Chèque', label: 'Chèque Bancaire', badge: 'Chèque' },
+      { value: 'MonCash', label: 'MonCash', badge: 'Mobile' },
+      { value: 'Natcash', label: 'Natcash', badge: 'Mobile' },
+      { value: 'Carte', label: 'Carte Bancaire / TPE', badge: 'Carte' },
+      { value: 'Portefeuille', label: 'Portefeuille Élève', badge: 'Avoir' },
+    ];
+  }, []);
+
+  const feeTypeFilterOptions: SelectOption[] = useMemo(() => {
+    const types = new Set<string>();
+    payments.forEach(p => {
+      if (p.type) types.add(p.type);
+    });
+    return [
+      { value: 'ALL', label: 'Tous les types de frais' },
+      ...Array.from(types).sort().map(t => ({
+        value: t,
+        label: t
+      }))
+    ];
+  }, [payments]);
 
   // Students State
   const [classes, setClasses] = useState<SchoolClass[]>([]);
@@ -488,13 +519,22 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     } else {
       fetchStudentsData();
     }
-  }, [activeTab, dateRange, selectedClassId, effectiveCampusId]);
+  }, [activeTab, dateRange, startDate, endDate, selectedClassId, effectiveCampusId]);
 
-  // Client-side search filtering
+  // Client-side search and filtering for Payments
   const filteredPayments = useMemo(() => {
-    if (!searchTerm.trim()) return payments;
+    let list = payments;
+    if (paymentMethodFilter !== 'ALL') {
+      const pTerm = paymentMethodFilter.toLowerCase();
+      list = list.filter(p => (p.method || '').toLowerCase().includes(pTerm));
+    }
+    if (feeTypeFilter !== 'ALL') {
+      const fTerm = feeTypeFilter.toLowerCase();
+      list = list.filter(p => (p.type || '').toLowerCase().includes(fTerm));
+    }
+    if (!searchTerm.trim()) return list;
     const term = searchTerm.toLowerCase().trim();
-    return payments.filter(p => {
+    return list.filter(p => {
       const studentName = p.students ? `${p.students.first_name} ${p.students.last_name}`.toLowerCase() : '';
       const className = p.students?.className ? p.students.className.toLowerCase() : '';
       const feeType = (p.type || '').toLowerCase();
@@ -511,7 +551,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
              origAmountStr.includes(term) ||
              campusName.includes(term);
     });
-  }, [payments, searchTerm]);
+  }, [payments, searchTerm, paymentMethodFilter, feeTypeFilter]);
 
   // Client-side search and filtering for Students
   const filteredStudents = useMemo(() => {
@@ -867,99 +907,181 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
       {activeTab === 'FINANCE' && (
         <div className="space-y-6">
           
-          {/* FLUID CONTROLS & FILTER BAR */}
-          <div className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm space-y-4">
-            
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          {/* TOOLBAR DE CONTRÔLE & FILTRES BILAN FINANCIER (HARMONISÉ STYLE PILLULE FEUILLE DE PRÉSENCE) */}
+          <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-3.5 sm:p-4 space-y-3 print:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
               
-              {/* Date Presets */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-2 lg:pb-0 scrollbar-none">
-                <span className="text-xs font-black text-slate-600 uppercase tracking-wider mr-2 shrink-0 flex items-center gap-1">
-                  <Calendar size={14} className="text-indigo-600" /> Période :
-                </span>
-                
-                {[
-                  { id: 'TODAY', label: "Aujourd'hui" },
-                  { id: 'WEEK', label: 'Cette Semaine' },
-                  { id: 'MONTH', label: 'Ce Mois' },
-                  { id: 'YEAR', label: 'Cette Année' },
-                  { id: 'CUSTOM', label: 'Personnalisée' },
-                ].map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => setDateRange(p.id as DateRange)}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-extrabold transition-all shrink-0 cursor-pointer ${
-                      dateRange === p.id 
-                        ? 'bg-indigo-600 text-white shadow-sm' 
-                        : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200/60'
-                    }`}
-                  >
-                    {p.label}
-                  </button>
-                ))}
+              {/* Sélecteur de Période Prédéfinie (Pill) */}
+              <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                  <Calendar size={13} className="text-blue-600" />
+                  <span>Période d'Analyse</span>
+                </label>
+                <SelectPill
+                  options={[
+                    { value: 'TODAY', label: "Aujourd'hui", badge: 'Jour' },
+                    { value: 'WEEK', label: 'Cette Semaine', badge: 'Hebdo' },
+                    { value: 'MONTH', label: 'Ce Mois-ci', badge: 'Mensuel' },
+                    { value: 'YEAR', label: 'Cette Année', badge: 'Annuel' },
+                    { value: 'CUSTOM', label: 'Plage Personnalisée...', badge: 'Libre' },
+                  ]}
+                  value={dateRange}
+                  onChange={(val) => setDateRange(val as DateRange)}
+                  variant="field"
+                  size="sm"
+                  colorScheme="blue"
+                  portal={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Sélecteur Date Début (Harmonisé DatePickerPill) */}
+              <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                    Date de Début
+                  </label>
+                  {startDate !== todayStr && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDateRange('CUSTOM');
+                        setStartDate(todayStr);
+                      }}
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer shrink-0"
+                    >
+                      Aujourd'hui
+                    </button>
+                  )}
+                </div>
+                <DatePickerPill
+                  selectedDate={startDate}
+                  onSelectDate={(newDate) => {
+                    setDateRange('CUSTOM');
+                    setStartDate(newDate);
+                  }}
+                  variant="field"
+                  size="sm"
+                  colorScheme="blue"
+                  showShortcuts={false}
+                  showQuickArrows={true}
+                  showTodayBadge={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Sélecteur Date Fin (Harmonisé DatePickerPill) */}
+              <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                    Date de Fin
+                  </label>
+                  {endDate !== todayStr && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDateRange('CUSTOM');
+                        setEndDate(todayStr);
+                      }}
+                      className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer shrink-0"
+                    >
+                      Aujourd'hui
+                    </button>
+                  )}
+                </div>
+                <DatePickerPill
+                  selectedDate={endDate}
+                  onSelectDate={(newDate) => {
+                    setDateRange('CUSTOM');
+                    setEndDate(newDate);
+                  }}
+                  variant="field"
+                  size="sm"
+                  colorScheme="blue"
+                  showShortcuts={false}
+                  showQuickArrows={true}
+                  showTodayBadge={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Bouton Actualiser */}
+              <div className="sm:col-span-1 lg:col-span-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => fetchFinanceData()}
+                  disabled={loading}
+                  className="w-full h-[36px] bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
+                >
+                  <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
+                  <span>{loading ? 'Calcul en cours...' : 'Actualiser le Bilan'}</span>
+                </button>
+              </div>
+
+            </div>
+
+            {/* LIGNE SECONDAIRE DE FILTRAGE PAR PILLS (Modes de règlement, Type de frais, Annexe) */}
+            <div className="pt-2.5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+              
+              {/* Filtre Mode de Règlement (Pill) */}
+              <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                  <CreditCard size={13} className="text-emerald-600" />
+                  <span>Mode de Règlement</span>
+                </label>
+                <SelectPill
+                  options={paymentMethodOptions}
+                  value={paymentMethodFilter}
+                  onChange={(val) => setPaymentMethodFilter(val)}
+                  variant="field"
+                  size="sm"
+                  colorScheme="emerald"
+                  portal={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Filtre Type de Frais (Pill) */}
+              <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                  <Tag size={13} className="text-purple-600" />
+                  <span>Type de Frais</span>
+                </label>
+                <SelectPill
+                  options={feeTypeFilterOptions}
+                  value={feeTypeFilter}
+                  onChange={(val) => setFeeTypeFilter(val)}
+                  variant="field"
+                  size="sm"
+                  colorScheme="purple"
+                  portal={true}
+                  className="w-full"
+                />
               </div>
 
               {/* Multi-Campus / Annexe Filter (If multi-campus school) */}
               {hasMultiCampus && !user.campus_id && (
-                <div className="shrink-0 w-full lg:w-auto">
+                <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                    <Building2 size={13} className="text-blue-600" />
+                    <span>Annexe / Campus</span>
+                  </label>
                   <SelectPill
                     options={campusOptions}
                     value={selectedCampusFilter}
                     onChange={(val) => setSelectedCampusFilter(val)}
                     variant="field"
                     size="sm"
-                    colorScheme="indigo"
+                    colorScheme="blue"
                     icon={Building2}
-                    labelPrefix="Annexe :"
-                    className="w-full sm:min-w-[220px]"
+                    labelPrefix=""
+                    portal={true}
+                    className="w-full"
                   />
                 </div>
               )}
-            </div>
 
-            {/* Custom Date Pickers if CUSTOM selected (Harmonisé DatePickerPill) */}
-            {dateRange === 'CUSTOM' && (
-              <div className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row items-end gap-3 sm:gap-4 animate-in fade-in duration-200">
-                <div className="space-y-1.5 flex-1 w-full sm:w-auto min-w-0">
-                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block">
-                    Date de Début
-                  </label>
-                  <DatePickerPill
-                    selectedDate={startDate}
-                    onSelectDate={(newDate) => setStartDate(newDate)}
-                    variant="field"
-                    size="sm"
-                    colorScheme="indigo"
-                    showShortcuts={false}
-                    showQuickArrows={true}
-                    showTodayBadge={true}
-                    className="w-full"
-                  />
-                </div>
-                <div className="space-y-1.5 flex-1 w-full sm:w-auto min-w-0">
-                  <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider block">
-                    Date de Fin
-                  </label>
-                  <DatePickerPill
-                    selectedDate={endDate}
-                    onSelectDate={(newDate) => setEndDate(newDate)}
-                    variant="field"
-                    size="sm"
-                    colorScheme="indigo"
-                    showShortcuts={false}
-                    showQuickArrows={true}
-                    showTodayBadge={true}
-                    className="w-full"
-                  />
-                </div>
-                <button 
-                  onClick={fetchFinanceData}
-                  className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-extrabold text-xs hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer h-[38px] sm:h-[40px] w-full sm:w-auto shrink-0"
-                >
-                  <Filter size={14} /> Actualiser
-                </button>
-              </div>
-            )}
+            </div>
           </div>
 
           {/* KEY METRICS CARDS GRID */}
@@ -1268,12 +1390,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                     filteredPayments.map((p) => (
                       <tr key={p.id} className="hover:bg-indigo-50/40 transition-colors group">
                         
-                        {/* Date */}
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-700">
-                          {new Date(p.created_at).toLocaleDateString('fr-FR')} 
-                          <span className="text-[10px] text-slate-400 font-medium ml-1.5">
-                            {new Date(p.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
-                          </span>
+                        {/* Date & Heure (Harmonisé Pillule DateTime) */}
+                        <td className="px-4 py-3.5 whitespace-nowrap text-xs">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-700 font-bold">
+                            <Calendar size={12} className="text-blue-600 shrink-0" />
+                            <span>{new Date(p.created_at).toLocaleDateString('fr-FR')}</span>
+                            <span className="text-[10.5px] text-slate-400 font-medium font-mono">
+                              {new Date(p.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                            </span>
+                          </div>
                         </td>
 
                         {/* Student - Full Name NEVER Truncated */}
@@ -1697,19 +1822,24 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
                   <div className="flex items-center gap-2 pl-2 sm:border-l sm:border-slate-200">
                     <span className="text-slate-500 font-semibold">Par page :</span>
-                    <select
-                      value={studentItemsPerPage}
-                      onChange={(e) => {
-                        setStudentItemsPerPage(Number(e.target.value));
+                    <SelectPill
+                      options={[
+                        { value: '10', label: '10 / page' },
+                        { value: '25', label: '25 / page' },
+                        { value: '50', label: '50 / page' },
+                        { value: '100', label: '100 / page' }
+                      ]}
+                      value={studentItemsPerPage.toString()}
+                      onChange={(val) => {
+                        setStudentItemsPerPage(Number(val));
                         setStudentCurrentPage(1);
                       }}
-                      className="bg-white border border-slate-200 rounded-xl px-2.5 py-1 text-xs font-black text-slate-700 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-colors"
-                    >
-                      <option value={10}>10</option>
-                      <option value={25}>25</option>
-                      <option value={50}>50</option>
-                      <option value={100}>100</option>
-                    </select>
+                      variant="field"
+                      size="xs"
+                      colorScheme="slate"
+                      portal={true}
+                      className="w-28 shrink-0"
+                    />
                   </div>
                 </div>
 

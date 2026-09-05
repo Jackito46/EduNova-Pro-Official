@@ -58,6 +58,74 @@ import { usePwaInstall } from '../hooks/usePwaInstall';
 
 import { toast } from 'sonner';
 
+interface SidebarNavLinkProps {
+  item: { name: string; path: string; icon?: any };
+  isSubItem?: boolean;
+  icon?: any;
+  isActive: boolean;
+  isNarrow: boolean;
+  onNavigate: () => void;
+}
+
+const SidebarNavLink = React.memo<SidebarNavLinkProps>(({ item, isSubItem = false, icon: Icon, isActive, isNarrow, onNavigate }) => {
+  const IconComponent = Icon || item.icon;
+
+  return (
+    <Link
+      to={item.path}
+      className={`relative flex items-center gap-3 py-2.5 min-h-[42px] rounded-xl transition-all duration-150 group select-none ${
+        isActive 
+          ? 'bg-blue-600 text-white font-semibold shadow-md shadow-blue-500/25' 
+          : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 text-[13.5px]'
+      } ${isNarrow ? 'justify-center px-0' : (isSubItem ? 'pl-9 pr-3.5' : 'px-3.5')}`}
+      onClick={onNavigate}
+      title={isNarrow ? item.name : undefined}
+    >
+      <span className="relative z-10 flex items-center gap-3 w-full">
+        {IconComponent && (
+          <IconComponent 
+            size={isActive ? 19 : isSubItem ? 17 : 19} 
+            className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'} shrink-0 transition-colors`} 
+          />
+        )}
+        {!isNarrow && (
+          <span className={`${isSubItem ? 'font-medium' : 'font-bold tracking-tight'} text-left break-words truncate`}>
+            {item.name}
+          </span>
+        )}
+      </span>
+    </Link>
+  );
+});
+SidebarNavLink.displayName = 'SidebarNavLink';
+
+interface SidebarMenuHeaderProps {
+  id: string;
+  label: string;
+  icon: any;
+  isOpen: boolean;
+  isNarrow: boolean;
+  onToggle: (id: string) => void;
+}
+
+const SidebarMenuHeader = React.memo<SidebarMenuHeaderProps>(({ id, label, icon: Icon, isOpen, isNarrow, onToggle }) => (
+  <button 
+    type="button"
+    onClick={() => onToggle(id)} 
+    className={`flex items-center justify-between w-full py-2.5 min-h-[42px] text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 rounded-xl transition-all select-none cursor-pointer ${
+      isOpen ? 'text-slate-900 bg-slate-200/50 font-semibold' : ''
+    } ${isNarrow ? 'justify-center px-0' : 'px-3.5'}`}
+    title={isNarrow ? label : undefined}
+  >
+    <div className={`flex items-center gap-3 ${isNarrow ? 'justify-center' : ''} flex-1 overflow-hidden`}>
+      <Icon size={19} className={`${isOpen ? 'text-blue-600' : 'text-slate-400'} shrink-0 transition-colors`} />
+      {!isNarrow && <span className="font-bold tracking-tight text-[13.5px] text-left break-words truncate">{label}</span>}
+    </div>
+    {!isNarrow && (isOpen ? <ChevronDown size={15} className="text-slate-400 shrink-0 ml-1.5" /> : <ChevronRight size={15} className="text-slate-400 opacity-60 shrink-0 ml-1.5" />)}
+  </button>
+));
+SidebarMenuHeader.displayName = 'SidebarMenuHeader';
+
 interface SidebarProps {
   user: UserProfile;
   onLogout: () => void;
@@ -65,6 +133,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const { school, terminology, campuses, currentCampusId, setCurrentCampusId } = useSchool();
+  const location = useLocation();
   const isPresencesEnabled = school?.global_settings?.modules?.presences ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isDisciplineEnabled = school?.global_settings?.modules?.discipline ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === UserRole.SUPER_ADMIN || (user?.role as any) === 'SUPER_ADMIN');
@@ -73,13 +142,18 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
-  const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>({
-    vieAcademique: false,
-    finance: false, 
-    rh: false,
-    communication: false,
-    config: false,
-    rapports: false
+  
+  const [openMenus, setOpenMenus] = useState<{ [key: string]: boolean }>(() => {
+    const p = (typeof window !== 'undefined' ? (window.location.hash || window.location.pathname) : '') || '';
+    return {
+      espaceEtudiant: p.includes('/profil') || p.includes('/mes-cours') || p.includes('/mon-horaire') || p.includes('/mes-notes') || p.includes('/mon-economat'),
+      vieAcademique: p.includes('/eleves') || p.includes('/notes') || p.includes('/presences') || p.includes('/bulletins') || p.includes('/discipline') || p.includes('/horaire') || p.includes('/syllabus'),
+      finance: p.includes('/economat'),
+      rh: p.includes('/personnel') || p.includes('/pointage'),
+      rapports: p.includes('/rapports') || p.includes('/supervision-annexes'),
+      communication: p.includes('/communication'),
+      config: p.includes('/settings') || p.includes('/classes')
+    };
   });
   
   const [sidebarMode, setSidebarMode] = useState<'expanded' | 'collapsed' | 'hover'>(() => {
@@ -96,14 +170,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   }, [sidebarMode]);
 
   const isNarrow = sidebarMode === 'collapsed' || (sidebarMode === 'hover' && !isHovered);
-  
-  const location = useLocation();
 
   // Role-based access control for sidebar
   const adminRoles = [UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR];
   const financeRoles = [...adminRoles, UserRole.ACCOUNTANT];
   const cashierRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY];
-  const hrRoles = [...adminRoles]; // Removed SECRETARY from hrRoles
+  const hrRoles = [...adminRoles];
   const academicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
   const restrictedAcademicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.SUPERVISOR];
 
@@ -117,60 +189,41 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
     logo_url: school?.logo_url || null
   };
 
-  const toggleMenu = (menu: string) => {
-    setOpenMenus(prev => ({ ...prev, [menu]: !prev[menu] }));
-  };
+  const handleToggleMenu = React.useCallback((menuId: string) => {
+    if (isNarrow && sidebarMode === 'collapsed') {
+      setSidebarMode('expanded');
+      setOpenMenus(prev => ({ ...prev, [menuId]: true }));
+    } else {
+      setOpenMenus(prev => ({ ...prev, [menuId]: !prev[menuId] }));
+    }
+  }, [isNarrow, sidebarMode]);
 
-  const NavLink: React.FC<{ item: any; isSubItem?: boolean; icon?: any }> = ({ item, isSubItem = false, icon: Icon }) => {
-    const isActive = location.pathname === item.path;
-    const IconComponent = Icon || item.icon;
+  const handleNavigate = React.useCallback(() => {
+    setMobileOpen(false);
+  }, []);
 
-    return (
-      <Link
-        to={item.path}
-        className={`relative flex items-center gap-3 py-3 min-h-[44px] rounded-xl transition-all group ${
-          isActive 
-            ? 'text-white font-semibold' 
-            : `text-slate-500 hover:bg-slate-200/50 hover:text-slate-900 text-[14px]`
-        } ${isNarrow ? 'justify-center px-0' : (isSubItem ? 'pl-10 pr-4' : 'px-4')}`}
-        onClick={() => setMobileOpen(false)}
-        title={isNarrow ? item.name : undefined}
-      >
-        {isActive && (
-          <motion.div
-            layoutId="active-sidebar-pill"
-            className="absolute inset-0 bg-blue-600 rounded-xl shadow-md shadow-blue-500/25"
-            transition={{ type: 'spring', stiffness: 380, damping: 30 }}
-            style={{ zIndex: 0 }}
-          />
-        )}
-        <span className="relative z-10 flex items-center gap-3 w-full">
-          {IconComponent && <IconComponent size={isActive ? 20 : isSubItem ? 18 : 20} className={`${isActive ? 'text-white' : 'text-slate-400'} shrink-0`} />}
-          {!isNarrow && <span className={`${isSubItem ? 'font-medium' : 'font-bold tracking-tight'} text-left break-words`}>{item.name}</span>}
-        </span>
-      </Link>
-    );
-  };
+  const renderNavLink = (item: { name: string; path: string; icon?: any }, isSubItem = false, icon?: any) => (
+    <SidebarNavLink
+      key={item.path}
+      item={item}
+      isSubItem={isSubItem}
+      icon={icon}
+      isActive={location.pathname === item.path}
+      isNarrow={isNarrow}
+      onNavigate={handleNavigate}
+    />
+  );
 
-  const MenuHeader: React.FC<{ id: string; label: string; icon: any }> = ({ id, label, icon: Icon }) => (
-    <button 
-      onClick={() => {
-        if (isNarrow && sidebarMode === 'collapsed') {
-           setSidebarMode('expanded'); // Auto expand on click if closed and clicked
-           setOpenMenus(prev => ({ ...prev, [id]: true }));
-        } else {
-           toggleMenu(id);
-        }
-      }} 
-      className={`flex items-center justify-between w-full py-3 min-h-[44px] text-slate-500 hover:bg-slate-200/50 hover:text-slate-900 rounded-xl transition-all hover-tremble ${openMenus[id] ? 'text-slate-900 bg-slate-200/50' : ''} ${isNarrow ? 'justify-center px-0' : 'px-4'}`}
-      title={isNarrow ? label : undefined}
-    >
-      <div className={`flex items-center gap-3 ${isNarrow ? 'justify-center' : ''} flex-1 overflow-hidden`}>
-        <Icon size={20} className={`${openMenus[id] ? 'text-blue-600' : 'text-slate-400'} shrink-0`} />
-        {!isNarrow && <span className="font-bold tracking-tight text-[14px] text-left break-words">{label}</span>}
-      </div>
-      {!isNarrow && (openMenus[id] ? <ChevronDown size={16} className="text-slate-400 shrink-0 ml-2" /> : <ChevronRight size={16} className="text-slate-400 opacity-60 shrink-0 ml-2" />)}
-    </button>
+  const renderMenuHeader = (id: string, label: string, icon: any) => (
+    <SidebarMenuHeader
+      key={id}
+      id={id}
+      label={label}
+      icon={icon}
+      isOpen={Boolean(openMenus[id])}
+      isNarrow={isNarrow}
+      onToggle={handleToggleMenu}
+    />
   );
 
   return (
@@ -210,8 +263,6 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                 if (!school?.has_multi_campus || (campuses && campuses.length <= 1)) {
                   return null;
                 }
-                // If the logged-in user is a global / Siège Social administrator with the dropdown selector,
-                // we do not need to display the badge here to avoid repeating "Siège Social" or "Vue Globale" twice.
                 if (!user.campus_id && campuses && campuses.length > 1) {
                   return null;
                 }
@@ -287,18 +338,18 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
         {/* NAVIGATION */}
         <nav className="flex-1 px-3 space-y-1 overflow-y-auto mt-6 sidebar-scrollbar pb-10">
-          <NavLink item={{ name: 'Tableau de Bord', path: '/', icon: LayoutDashboard }} />
+          {renderNavLink({ name: 'Tableau de Bord', path: '/', icon: LayoutDashboard })}
 
           {user.role === UserRole.STUDENT && (
             <div className="space-y-1 pt-2">
-               <MenuHeader id="espaceEtudiant" label="Mon Espace ÉduNova" icon={GraduationCap} />
+               {renderMenuHeader("espaceEtudiant", "Mon Espace ÉduNova", GraduationCap)}
                {openMenus.espaceEtudiant && (
                  <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                   <NavLink isSubItem icon={UserCircle} item={{ name: 'Mon Profil', path: '/profil' }} />
-                   <NavLink isSubItem icon={BookOpen} item={{ name: 'Mes Cours', path: '/mes-cours' }} />
-                   <NavLink isSubItem icon={Clock} item={{ name: 'Mon Horaire', path: '/mon-horaire' }} />
-                   <NavLink isSubItem icon={TrendingUp} item={{ name: 'Mes Notes', path: '/mes-notes' }} />
-                   <NavLink isSubItem icon={Receipt} item={{ name: 'Mon Économat', path: '/mon-economat' }} />
+                   {renderNavLink({ name: 'Mon Profil', path: '/profil' }, true, UserCircle)}
+                   {renderNavLink({ name: 'Mes Cours', path: '/mes-cours' }, true, BookOpen)}
+                   {renderNavLink({ name: 'Mon Horaire', path: '/mon-horaire' }, true, Clock)}
+                   {renderNavLink({ name: 'Mes Notes', path: '/mes-notes' }, true, TrendingUp)}
+                   {renderNavLink({ name: 'Mon Économat', path: '/mon-economat' }, true, Receipt)}
                  </div>
                )}
             </div>
@@ -306,20 +357,20 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {hasAccess(academicRoles) && (
             <div className="space-y-1 pt-2">
-              <MenuHeader id="vieAcademique" label="Gestion Académique" icon={GraduationCap} />
+              {renderMenuHeader("vieAcademique", "Gestion Académique", GraduationCap)}
               {openMenus.vieAcademique && (
                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                  {hasAccess(restrictedAcademicRoles) && <NavLink isSubItem icon={Users} item={{ name: `Registre ${terminology.students}`, path: '/eleves' }} />}
-                  {hasAccess([...adminRoles, UserRole.SECRETARY]) && <NavLink isSubItem icon={FileCheck} item={{ name: 'Validation de Dossiers', path: '/eleves/validation' }} />}
-                  {hasAccess([...adminRoles, UserRole.SECRETARY]) && <NavLink isSubItem icon={UserPlus} item={{ name: terminology.enrollment, path: '/eleves/ajouter' }} />}
+                  {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: `Registre ${terminology.students}`, path: '/eleves' }, true, Users)}
+                  {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: 'Validation de Dossiers', path: '/eleves/validation' }, true, FileCheck)}
+                  {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: terminology.enrollment, path: '/eleves/ajouter' }, true, UserPlus)}
                   {school?.school_type !== 'CLASSIC' && (
-                    <NavLink isSubItem icon={BookOpen} item={{ name: 'Syllabus d\'évaluations', path: '/enseignant/syllabus' }} />
+                    renderNavLink({ name: 'Syllabus d\'évaluations', path: '/enseignant/syllabus' }, true, BookOpen)
                   )}
-                  <NavLink isSubItem icon={ClipboardList} item={{ name: 'Saisie des Notes', path: '/notes' }} />
-                  {hasAccess(restrictedAcademicRoles) && isPresencesEnabled && <NavLink isSubItem icon={CalendarCheck} item={{ name: 'Présences', path: '/presences' }} />}
-                  {hasAccess(restrictedAcademicRoles) && <NavLink isSubItem icon={Files} item={{ name: 'Bulletins', path: '/bulletins' }} />}
-                  {hasAccess(academicRoles) && isDisciplineEnabled && <NavLink isSubItem icon={ShieldAlert} item={{ name: 'Discipline', path: '/discipline' }} />}
-                  {hasAccess(restrictedAcademicRoles) && <NavLink isSubItem icon={Clock} item={{ name: 'Emplois du Temps', path: '/horaire' }} />}
+                  {renderNavLink({ name: 'Saisie des Notes', path: '/notes' }, true, ClipboardList)}
+                  {hasAccess(restrictedAcademicRoles) && isPresencesEnabled && renderNavLink({ name: 'Présences', path: '/presences' }, true, CalendarCheck)}
+                  {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: 'Bulletins', path: '/bulletins' }, true, Files)}
+                  {hasAccess(academicRoles) && isDisciplineEnabled && renderNavLink({ name: 'Discipline', path: '/discipline' }, true, ShieldAlert)}
+                  {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: 'Emplois du Temps', path: '/horaire' }, true, Clock)}
                 </div>
               )}
             </div>
@@ -327,13 +378,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {hasAccess([...hrRoles, UserRole.SECRETARY]) && (
             <div className="space-y-1">
-              <MenuHeader id="rh" label="Ressources Humaines" icon={Briefcase} />
+              {renderMenuHeader("rh", "Ressources Humaines", Briefcase)}
               {openMenus.rh && (
                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                  {hasAccess(hrRoles) && <NavLink isSubItem icon={Users} item={{ name: 'Registre RH', path: '/personnel' }} />}
-                  {hasAccess(adminRoles) && <NavLink isSubItem icon={UserPlus} item={{ name: 'Recrutement', path: '/personnel/embaucher' }} />}
-                  {hasAccess(hrRoles) && <NavLink isSubItem icon={ClipboardList} item={{ name: 'Présences Employés', path: '/personnel/pointage' }} />}
-                  {hasAccess([...adminRoles, UserRole.SECRETARY]) && <NavLink isSubItem icon={PenTool} item={{ name: 'Signatures des Cours', path: '/enseignant/pointage' }} />}
+                  {hasAccess(hrRoles) && renderNavLink({ name: 'Registre RH', path: '/personnel' }, true, Users)}
+                  {hasAccess(adminRoles) && renderNavLink({ name: 'Recrutement', path: '/personnel/embaucher' }, true, UserPlus)}
+                  {hasAccess(hrRoles) && renderNavLink({ name: 'Présences Employés', path: '/personnel/pointage' }, true, ClipboardList)}
+                  {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: 'Signatures des Cours', path: '/enseignant/pointage' }, true, PenTool)}
                 </div>
               )}
             </div>
@@ -341,19 +392,19 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {hasAccess(cashierRoles) && (
             <div className="space-y-1">
-              <MenuHeader id="finance" label="Finance" icon={CircleDollarSign} />
+              {renderMenuHeader("finance", "Finance", CircleDollarSign)}
               {openMenus.finance && (
                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && <NavLink isSubItem icon={Target} item={{ name: 'Direction Économat', path: '/economat' }} />}
-                  <NavLink isSubItem icon={Receipt} item={{ name: 'Guichet d’Encaissement', path: '/economat/frais' }} />
-                  <NavLink isSubItem icon={Files} item={{ name: 'Factures (Réimpression)', path: '/economat/factures' }} />
-                  <NavLink isSubItem icon={FileText} item={{ name: 'Relevé de Compte', path: '/economat/releves' }} />
-                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && <NavLink isSubItem icon={History} item={{ name: 'Registre & Validations', path: '/economat/liste' }} />}
-                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && <NavLink isSubItem icon={ArrowRight} item={{ name: 'Registre Dépenses', path: '/economat/depenses' }} />}
-                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && <NavLink isSubItem icon={Wallet} item={{ name: 'Gestion Payroll', path: '/economat/paie' }} />}
-                  <NavLink isSubItem icon={Package} item={{ name: 'Fournitures', path: '/economat/fournitures' }} />
-                  {hasAccess(adminRoles) && <NavLink isSubItem icon={RefreshCcw} item={{ name: 'Réévaluations', path: '/economat/derogations' }} />}
-                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && <NavLink isSubItem icon={Rocket} item={{ name: 'Campagnes & Événements', path: '/economat/frais-occasionnels' }} />}
+                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Direction Économat', path: '/economat' }, true, Target)}
+                  {renderNavLink({ name: 'Guichet d’Encaissement', path: '/economat/frais' }, true, Receipt)}
+                  {renderNavLink({ name: 'Factures (Réimpression)', path: '/economat/factures' }, true, Files)}
+                  {renderNavLink({ name: 'Relevé de Compte', path: '/economat/releves' }, true, FileText)}
+                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Registre & Validations', path: '/economat/liste' }, true, History)}
+                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Registre Dépenses', path: '/economat/depenses' }, true, ArrowRight)}
+                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Gestion Payroll', path: '/economat/paie' }, true, Wallet)}
+                  {renderNavLink({ name: 'Fournitures', path: '/economat/fournitures' }, true, Package)}
+                  {hasAccess(adminRoles) && renderNavLink({ name: 'Réévaluations', path: '/economat/derogations' }, true, RefreshCcw)}
+                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Campagnes & Événements', path: '/economat/frais-occasionnels' }, true, Rocket)}
                 </div>
               )}
             </div>
@@ -361,12 +412,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && (
             <div className="space-y-1">
-              <MenuHeader id="rapports" label="Direction & Rapports" icon={Target} />
+              {renderMenuHeader("rapports", "Direction & Rapports", Target)}
               {openMenus.rapports && (
                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                  <NavLink isSubItem icon={Files} item={{ name: 'Rapports & Bilans', path: '/rapports' }} />
+                  {renderNavLink({ name: 'Rapports & Bilans', path: '/rapports' }, true, Files)}
                   {school?.has_multi_campus && !user.campus_id && (
-                    <NavLink isSubItem icon={Building2} item={{ name: 'Supervision Multi-Annexes', path: '/supervision-annexes' }} />
+                    renderNavLink({ name: 'Supervision Multi-Annexes', path: '/supervision-annexes' }, true, Building2)
                   )}
                 </div>
               )}
@@ -375,13 +426,13 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {hasAccess(adminRoles) && (
             <div className="space-y-1">
-              <MenuHeader id="communication" label="Communication" icon={MessageSquare} />
+              {renderMenuHeader("communication", "Communication", MessageSquare)}
               {openMenus.communication && (
                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                  <NavLink isSubItem icon={MessageCircle} item={{ name: 'WhatsApp', path: '/communication/whatsapp' }} />
-                  <NavLink isSubItem icon={Mail} item={{ name: 'Emailing', path: '/communication/email' }} />
-                  <NavLink isSubItem icon={MessageSquare} item={{ name: 'SMS', path: '/communication/sms' }} />
-                  <NavLink isSubItem icon={Target} item={{ name: 'Notifications Push', path: '/communication/push' }} />
+                  {renderNavLink({ name: 'WhatsApp', path: '/communication/whatsapp' }, true, MessageCircle)}
+                  {renderNavLink({ name: 'Emailing', path: '/communication/email' }, true, Mail)}
+                  {renderNavLink({ name: 'SMS', path: '/communication/sms' }, true, MessageSquare)}
+                  {renderNavLink({ name: 'Notifications Push', path: '/communication/push' }, true, Target)}
                 </div>
               )}
             </div>
@@ -389,14 +440,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {hasAccess(adminRoles) && (
             <div className="space-y-1">
-              <MenuHeader id="config" label="Configuration" icon={Settings} />
+              {renderMenuHeader("config", "Configuration", Settings)}
               {openMenus.config && (
                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200 ml-6">
-                  <NavLink isSubItem icon={School} item={{ name: 'Identité Établissement', path: '/settings/ecole' }} />
-                  <NavLink isSubItem icon={BookOpen} item={{ name: `${terminology.classes} & ${terminology.subjects}`, path: '/classes' }} />
-                  <NavLink isSubItem icon={CalendarCheck} item={{ name: `Planification ${terminology.academicYear}`, path: '/economat/planification' }} />
-                  <NavLink isSubItem icon={UserCog} item={{ name: 'Utilisateurs', path: '/settings/utilisateurs' }} />
-                  <NavLink isSubItem icon={History} item={{ name: 'Journal d\'Audit', path: '/settings/audit' }} />
+                  {renderNavLink({ name: 'Identité Établissement', path: '/settings/ecole' }, true, School)}
+                  {renderNavLink({ name: `${terminology.classes} & ${terminology.subjects}`, path: '/classes' }, true, BookOpen)}
+                  {renderNavLink({ name: `Planification ${terminology.academicYear}`, path: '/economat/planification' }, true, CalendarCheck)}
+                  {renderNavLink({ name: 'Utilisateurs', path: '/settings/utilisateurs' }, true, UserCog)}
+                  {renderNavLink({ name: 'Journal d\'Audit', path: '/settings/audit' }, true, History)}
                 </div>
               )}
             </div>
@@ -404,8 +455,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
           {isSuperAdmin && (
             <div className="mt-8 pt-4 border-t border-slate-200 space-y-1">
-              <NavLink item={{ name: 'Super Administrateur', path: '/super-admin', icon: ShieldAlert }} />
-              <NavLink item={{ name: 'Santé Système & Quotas', path: '/super-admin/system-health', icon: Activity }} />
+              {renderNavLink({ name: 'Super Administrateur', path: '/super-admin', icon: ShieldAlert })}
+              {renderNavLink({ name: 'Santé Système & Quotas', path: '/super-admin/system-health', icon: Activity })}
             </div>
           )}
         </nav>

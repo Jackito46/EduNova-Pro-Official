@@ -820,6 +820,10 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
         onNewSale={() => {
           setShowReceipt(false);
           setCart([]);
+          setPaymentMethod('Cash');
+          setBankName('');
+          setReferenceNumber('');
+          setDepositDate(getLocalTodayString());
           setPaymentCurrency('HTG');
           setMobileTab('catalog');
           setCheckoutStep('cart');

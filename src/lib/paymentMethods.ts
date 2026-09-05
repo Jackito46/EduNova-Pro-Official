@@ -148,6 +148,12 @@ export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[
   if (active.length === 0) {
     return DEFAULT_PAYMENT_METHODS.filter(m => m.code === 'Cash' || m.code === 'Dépôt Bancaire');
   }
+  // Priorité absolue : s'assurer que Cash / Espèces est toujours en première position par défaut s'il est actif
+  const cashIndex = active.findIndex(m => m.code === 'Cash' || m.id === 'CASH');
+  if (cashIndex > 0) {
+    const [cashItem] = active.splice(cashIndex, 1);
+    active.unshift(cashItem);
+  }
   return active;
 }
 

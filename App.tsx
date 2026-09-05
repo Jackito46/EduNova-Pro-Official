@@ -213,10 +213,10 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 10 }}
+                initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.12, ease: 'easeOut' }}
                 className="w-full"
               >
                 <Routes location={location}>
@@ -505,81 +505,62 @@ const App: React.FC = () => {
   }, []);
 
   const purgeSystemState = useCallback(async () => {
-    setIsExiting(true);
-    
-    // Purge Service Worker and local caches immediately
+    // 1. Déconnexion locale instantanée et réinitialisation de l'état (0ms de latence pour l'utilisateur)
     clearAuthStorage();
     try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}
+    setUser(null);
+    setLoading(false);
+    setIsExiting(false);
 
-    // Sécurité : Si signOut bloque (mode hors-ligne ou réseau lent), on force la déconnexion locale après 1.5s
-    const timeout = setTimeout(() => {
-      clearAuthStorage();
-      try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}
-      setUser(null);
-      setIsExiting(false);
-      window.location.reload();
-    }, 1500);
-
-    try {
-      // Direct call with timeout race for getUser and profile cleanup
-      const getUserPromise = supabase.auth.getUser();
-      const getUserTimeout = new Promise<{ data: { user: null } }>(res => setTimeout(() => res({ data: { user: null } }), 800));
-      const { data: { user: currentUser } } = await Promise.race([getUserPromise, getUserTimeout]) as any;
-
-      if (currentUser) {
-        try {
-          const { data } = await supabase
-            .from('profiles')
-            .select('school_id')
-            .eq('id', currentUser.id)
-            .single();
-            
-          if (currentUser.user_metadata?.school_id || data?.school_id) {
-            await AuditLogger.log({
-              school_id: data?.school_id || currentUser.user_metadata?.school_id,
-              user_id: currentUser.id,
-              action: 'LOGOUT',
-              entity_type: 'auth',
-              details: { }
-            });
-          }
-
-          // Clear session ID in DB & invalidate tokens with 800ms race timeout
-          await Promise.race([
-            supabase.from('profiles').update({ current_session_id: null }).eq('id', currentUser.id),
-            new Promise(res => setTimeout(res, 800))
-          ]);
-
-          await Promise.race([
-            supabase.rpc('invalidate_user_sessions', { p_user_id: currentUser.id }),
-            new Promise(res => setTimeout(res, 800))
-          ]);
-        } catch (dbErr) {
-          console.warn("DB session cleanup error during purge:", dbErr);
-        }
-      }
-
-      // Fast signOut attempt
+    // 2. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
+    (async () => {
       try {
+        const getUserPromise = supabase.auth.getUser();
+        const getUserTimeout = new Promise<{ data: { user: null } }>(res => setTimeout(() => res({ data: { user: null } }), 600));
+        const { data: { user: currentUser } } = await Promise.race([getUserPromise, getUserTimeout]) as any;
+
+        if (currentUser) {
+          try {
+            const { data } = await supabase
+              .from('profiles')
+              .select('school_id')
+              .eq('id', currentUser.id)
+              .single();
+              
+            if (currentUser.user_metadata?.school_id || data?.school_id) {
+              await AuditLogger.log({
+                school_id: data?.school_id || currentUser.user_metadata?.school_id,
+                user_id: currentUser.id,
+                action: 'LOGOUT',
+                entity_type: 'auth',
+                details: { }
+              });
+            }
+
+            // Clear session ID in DB & invalidate tokens with quick race timeout
+            await Promise.race([
+              supabase.from('profiles').update({ current_session_id: null }).eq('id', currentUser.id),
+              new Promise(res => setTimeout(res, 600))
+            ]);
+
+            await Promise.race([
+              supabase.rpc('invalidate_user_sessions', { p_user_id: currentUser.id }),
+              new Promise(res => setTimeout(res, 600))
+            ]);
+          } catch (dbErr) {
+            console.warn("DB session cleanup notice:", dbErr);
+          }
+        }
+
+        // Fast signOut attempt
         await Promise.race([
           supabase.auth.signOut(),
-          new Promise(res => setTimeout(res, 800))
+          new Promise(res => setTimeout(res, 600))
         ]);
-      } catch (e) {}
-
-      clearTimeout(timeout);
-      clearAuthStorage();
-      try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}
-      setUser(null);
-      setLoading(false);
-    } catch (e) {
-      clearAuthStorage();
-      try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (err) {}
-      setUser(null);
-      setLoading(false);
-    } finally {
-      setIsExiting(false);
-    }
+      } catch (e) {
+        console.warn("Background signout notice:", e);
+      }
+    })();
   }, []);
 
   useEffect(() => {

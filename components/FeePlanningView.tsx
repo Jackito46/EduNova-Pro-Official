@@ -1699,20 +1699,20 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {showForm && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-0 sm:p-3 md:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[100] bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-1 sm:p-3 md:p-4 animate-in fade-in duration-150">
           <div className="bg-white w-full h-full sm:h-auto sm:max-h-[92vh] max-w-3xl lg:max-w-4xl sm:rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 flex flex-col">
-            {/* Header */}
-            <div className="px-4 sm:px-6 py-3 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800 shrink-0">
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-blue-600 rounded-xl shadow-md shadow-blue-500/20 text-white">
-                  <CreditCard size={18} />
+            {/* Header compact */}
+            <div className="px-3.5 sm:px-5 py-2 sm:py-2.5 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800 shrink-0">
+              <div className="flex items-center gap-2 sm:gap-2.5">
+                <div className="p-1 sm:p-1.5 bg-blue-600 rounded-lg shadow-sm text-white">
+                  <CreditCard size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-tight font-serif">Configuration du Plan Tarifaire</h3>
-                  <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                    <p className="text-[10px] text-blue-300 font-bold uppercase tracking-wider">Grille des frais</p>
+                  <h3 className="text-xs sm:text-sm font-black tracking-tight font-serif">Configuration du Plan Tarifaire</h3>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <p className="text-[9.5px] text-blue-300 font-bold uppercase tracking-wider">Grille des frais</p>
                     {currentYearObj && (
-                      <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
+                      <span className={`text-[8.5px] sm:text-[9.5px] font-black uppercase px-1.5 py-0.2 rounded ${
                         currentYearObj.status === 'FUTURE' ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30' : 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
                       }`}>
                         Session : {currentYearObj.label} {currentYearObj.status === 'FUTURE' ? '(PRÉPARATION)' : '(ACTIVE)'}
@@ -1723,42 +1723,42 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
               <button 
                 onClick={() => setShowForm(false)} 
-                className="p-1.5 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
+                className="p-1 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
                 title="Fermer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
-            {/* Form Content */}
+            {/* Form Content - Compact Visual Rhythm */}
             <form onSubmit={handleSave} className="flex-1 overflow-y-auto custom-scrollbar flex flex-col">
-              <div className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5">
-                {/* Session Target Clarity Banner */}
+              <div className="p-2.5 sm:p-3.5 space-y-2 sm:space-y-2.5">
+                {/* Session Target Clarity Banner - Compact */}
                 {currentYearObj && (
-                  <div className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2 text-xs ${
+                  <div className={`p-2 rounded-xl border flex items-center justify-between gap-2 text-xs ${
                     currentYearObj.status === 'FUTURE' 
                       ? 'bg-amber-50/90 border-amber-200 text-amber-950' 
                       : 'bg-blue-50/90 border-blue-200 text-blue-950'
                   }`}>
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`p-1.5 rounded-lg text-white shrink-0 ${
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`p-1 rounded-md text-white shrink-0 ${
                         currentYearObj.status === 'FUTURE' ? 'bg-amber-500 shadow-2xs' : 'bg-blue-600 shadow-2xs'
                       }`}>
-                        <CalendarDays size={15} />
+                        <CalendarDays size={14} />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500">Session académique cible</div>
-                        <div className="text-xs sm:text-sm font-black flex items-center gap-1.5 mt-0.5 truncate">
+                        <div className="text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider text-slate-500 leading-tight">Session cible</div>
+                        <div className="text-xs font-black flex items-center gap-1.5 leading-tight truncate">
                           <span>{currentYearObj.label}</span>
-                          <span className={`text-[9px] sm:text-[10px] px-1.5 py-0.2 rounded font-black ${
+                          <span className={`text-[8.5px] sm:text-[9px] px-1 py-0.2 rounded font-black ${
                             currentYearObj.status === 'FUTURE' ? 'bg-amber-200 text-amber-900' : 'bg-blue-200 text-blue-900'
                           }`}>
-                            {currentYearObj.status === 'FUTURE' ? 'PRÉPARATION (FUTUR)' : 'ACTIVE'}
+                            {currentYearObj.status === 'FUTURE' ? 'PRÉPARATION' : 'ACTIVE'}
                           </span>
                         </div>
                       </div>
                     </div>
-                    <span className="text-[10px] sm:text-[11px] text-slate-500 font-medium hidden sm:inline-block shrink-0">
+                    <span className="text-[9.5px] sm:text-[10.5px] text-slate-500 font-medium hidden sm:inline-block shrink-0">
                       {currentYearObj.status === 'FUTURE' 
                         ? '🔒 N\'impacte pas la session active' 
                         : 'Application immédiate sur la session'}
@@ -1767,9 +1767,9 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
 
                 {/* Classe Selection using ClassSelectorPill */}
-                <div className="space-y-1">
-                  <label className="text-[11px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1.5 ml-0.5">
-                    <Layers size={13} className="text-blue-600" /> {terminology.class} ou Programme d'affectation
+                <div className="space-y-0.5">
+                  <label className="text-[10px] sm:text-[10.5px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1 ml-0.5">
+                    <Layers size={12} className="text-blue-600" /> {terminology.class} ou Programme d'affectation
                   </label>
                   <ClassSelectorPill
                     classes={validClasses}
@@ -1787,35 +1787,35 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   />
 
                   {formData.class_id === 'ALL' && (
-                    <div className="p-2.5 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl flex items-center gap-2 text-xs text-blue-900 font-bold shadow-2xs mt-1.5">
-                      <div className="p-1 bg-blue-600 text-white rounded-md shrink-0">
-                        <Sparkles size={14} />
+                    <div className="p-2 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200/80 rounded-xl flex items-center gap-2 text-xs text-blue-900 font-bold shadow-2xs mt-1">
+                      <div className="p-0.5 bg-blue-600 text-white rounded-md shrink-0">
+                        <Sparkles size={13} />
                       </div>
-                      <span>Mode Global : Tarifs enregistrés pour l'ensemble des {validClasses.length} classes de la session <strong>{currentYearObj?.label}</strong>.</span>
+                      <span className="text-[11px]">Mode Global : Tarifs appliqués aux {validClasses.length} classes de la session <strong>{currentYearObj?.label}</strong>.</span>
                     </div>
                   )}
                 </div>
 
-                {/* Primary Fees Box */}
-                <div className="bg-slate-50/70 p-2.5 sm:p-3.5 rounded-xl border border-slate-200/80 space-y-2">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1 bg-white rounded-lg shadow-2xs border border-slate-200 text-blue-600">
-                      <CreditCard size={14} />
+                {/* Primary Fees Box - Compact Grid */}
+                <div className="bg-slate-50/80 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="p-0.5 bg-white rounded-md shadow-2xs border border-slate-200 text-blue-600">
+                      <CreditCard size={13} />
                     </div>
-                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-800">Frais d'Admission & Réinscription</h4>
+                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-800">Frais d'Admission & Réinscription</h4>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {/* Inscription */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-1 ml-0.5">
-                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider truncate">
+                    <div className="space-y-0.5 bg-white p-2 rounded-lg border border-slate-200/70">
+                      <div className="flex items-center justify-between gap-1">
+                        <label className="text-[9.5px] font-black text-slate-700 uppercase tracking-wider truncate">
                           {school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL' ? 'Admission / Inscription' : 'Inscription (Nouveau)'}
                         </label>
                         <button
                           type="button"
                           onClick={() => propagateFees('inscription')}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
+                          className="text-[9px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-1.5 py-0.2 rounded transition-all shrink-0 cursor-pointer"
                           title="Propager ce montant à toutes les classes"
                         >
                           Appliquer partout
@@ -1826,7 +1826,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <input 
                             type="number" 
                             min="0"
-                            className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all font-mono" 
+                            className="w-full px-2.5 py-1.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white focus:ring-1 focus:ring-emerald-500/10 transition-all font-mono" 
                             value={formData.inscription_currency === 'HTG' ? formData.inscription_fee : formData.inscription_fee_usd} 
                             onChange={(e) => {
                               const val = e.target.value;
@@ -1836,7 +1836,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 setFormData({...formData, inscription_fee_usd: val, inscription_fee: '0'});
                               }
                             }} 
-                            placeholder="Montant"
+                            placeholder="0"
                           />
                         </div>
                         <SelectPill
@@ -1857,21 +1857,21 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           size="sm"
                           colorScheme="emerald"
                           portal={true}
-                          className="w-24 shrink-0"
+                          className="w-20 shrink-0"
                         />
                       </div>
                     </div>
 
                     {/* Réinscription */}
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between gap-1 ml-0.5">
-                        <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider truncate">
+                    <div className="space-y-0.5 bg-white p-2 rounded-lg border border-slate-200/70">
+                      <div className="flex items-center justify-between gap-1">
+                        <label className="text-[9.5px] font-black text-slate-700 uppercase tracking-wider truncate">
                           {school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL' ? 'Réinscription' : 'Réinscription (Ancien)'}
                         </label>
                         <button
                           type="button"
                           onClick={() => propagateFees('reenrollment')}
-                          className="text-[10px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
+                          className="text-[9px] text-blue-600 hover:text-blue-800 font-bold hover:underline bg-blue-50 hover:bg-blue-100/70 px-1.5 py-0.2 rounded transition-all shrink-0 cursor-pointer"
                           title="Propager ce montant à toutes les classes"
                         >
                           Appliquer partout
@@ -1882,7 +1882,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <input 
                             type="number" 
                             min="0"
-                            className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono" 
+                            className="w-full px-2.5 py-1.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white focus:ring-1 focus:ring-indigo-500/10 transition-all font-mono" 
                             value={formData.reenrollment_currency === 'HTG' ? formData.reenrollment_fee : formData.reenrollment_fee_usd} 
                             onChange={(e) => {
                               const val = e.target.value;
@@ -1892,7 +1892,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 setFormData({...formData, reenrollment_fee_usd: val, reenrollment_fee: '0'});
                               }
                             }} 
-                            placeholder="Montant"
+                            placeholder="0"
                           />
                         </div>
                         <SelectPill
@@ -1913,84 +1913,77 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           size="sm"
                           colorScheme="indigo"
                           portal={true}
-                          className="w-24 shrink-0"
+                          className="w-20 shrink-0"
                         />
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Tuition & Payment Structure */}
-                <div className="bg-blue-50/50 p-2.5 sm:p-3.5 rounded-xl border border-blue-200/80 space-y-2.5">
-                  <div className="flex items-center gap-2">
-                    <div className="p-1 bg-blue-600 text-white rounded-lg shadow-2xs">
-                      <TrendingUp size={14} />
+                {/* Tuition & Payment Structure - Compact Layout */}
+                <div className="bg-blue-50/40 p-2 sm:p-2.5 rounded-xl border border-blue-200/80 space-y-2">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <div className="p-0.5 bg-blue-600 text-white rounded-md shadow-2xs">
+                        <TrendingUp size={13} />
+                      </div>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-blue-950">{terminology.tuition}</h4>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-blue-950">{terminology.tuition}</h4>
-                      <p className="text-[10px] text-blue-700 font-medium">Versements échelonnés et échéancier</p>
-                    </div>
+                    <button
+                      type="button"
+                      onClick={() => propagateFees('tuition')}
+                      className="text-[9px] text-blue-700 hover:text-blue-900 font-bold hover:underline bg-blue-100/70 hover:bg-blue-200/80 px-1.5 py-0.2 rounded transition-all shrink-0 cursor-pointer"
+                      title="Propager ce montant de scolarité à toutes les classes"
+                    >
+                      Appliquer partout
+                    </button>
                   </div>
 
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between gap-1 ml-0.5">
-                      <label className="text-[10px] font-black text-blue-900 uppercase tracking-wider truncate">
-                        Montant Global {school?.school_type === 'CLASSIC' ? 'Annuel' : ''}
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => propagateFees('tuition')}
-                        className="text-[10px] text-blue-700 hover:text-blue-900 font-bold hover:underline bg-blue-100/70 hover:bg-blue-200/80 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer"
-                        title="Propager ce montant de scolarité à toutes les classes"
-                      >
-                        Appliquer partout
-                      </button>
-                    </div>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="relative flex-1">
-                        <input 
-                          type="number" 
-                          min="0"
-                          className="w-full px-3.5 py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-sm sm:text-base font-black outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all font-mono" 
-                          value={formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (formData.tuition_currency === 'HTG') {
-                              setFormData({...formData, tuition_fee: val, tuition_fee_usd: '0'});
-                            } else {
-                              setFormData({...formData, tuition_fee_usd: val, tuition_fee: '0'});
-                            }
-                          }} 
-                          placeholder={`Total ${terminology.tuition}`}
-                        />
-                      </div>
-                      <SelectPill
-                        options={[
-                          { value: 'HTG', label: 'HTG (G)' },
-                          { value: 'USD', label: 'USD ($)' }
-                        ]}
-                        value={formData.tuition_currency}
-                        onChange={(newCurrency) => {
-                          const currentVal = formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd;
-                          if (newCurrency === 'HTG') {
-                            setFormData({...formData, tuition_currency: 'HTG', tuition_fee: currentVal, tuition_fee_usd: '0'});
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <input 
+                        type="number" 
+                        min="0"
+                        className="w-full px-3 py-1.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-black outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/10 transition-all font-mono" 
+                        value={formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (formData.tuition_currency === 'HTG') {
+                            setFormData({...formData, tuition_fee: val, tuition_fee_usd: '0'});
                           } else {
-                            setFormData({...formData, tuition_currency: 'USD', tuition_fee_usd: currentVal, tuition_fee: '0'});
+                            setFormData({...formData, tuition_fee_usd: val, tuition_fee: '0'});
                           }
-                        }}
-                        variant="field"
-                        size="md"
-                        colorScheme="blue"
-                        portal={true}
-                        className="w-full sm:w-36 shrink-0"
+                        }} 
+                        placeholder={`Total ${terminology.tuition}`}
                       />
                     </div>
+                    <SelectPill
+                      options={[
+                        { value: 'HTG', label: 'HTG (G)' },
+                        { value: 'USD', label: 'USD ($)' }
+                      ]}
+                      value={formData.tuition_currency}
+                      onChange={(newCurrency) => {
+                        const currentVal = formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd;
+                        if (newCurrency === 'HTG') {
+                          setFormData({...formData, tuition_currency: 'HTG', tuition_fee: currentVal, tuition_fee_usd: '0'});
+                        } else {
+                          setFormData({...formData, tuition_currency: 'USD', tuition_fee_usd: currentVal, tuition_fee: '0'});
+                        }
+                      }}
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      portal={true}
+                      className="w-full sm:w-28 shrink-0"
+                    />
                   </div>
 
-                  <div className="pt-2 border-t border-blue-200/60">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2">
-                      <h5 className="text-[10px] font-black uppercase tracking-wider text-blue-800">Modèles Prédéfinis</h5>
-                      <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+                  {/* Modèles Prédéfinis & Pas d'échéance */}
+                  <div className="pt-1.5 border-t border-blue-200/50">
+                    <div className="flex items-center justify-between gap-1.5 mb-1.5 flex-wrap">
+                      <span className="text-[9.5px] font-black uppercase tracking-wider text-blue-800">Modèles d'Échéancier</span>
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
                         {(school?.school_type === 'UNIVERSITY' || school?.school_type === 'PROFESSIONAL') ? (
                           <>
                             <button 
@@ -1998,14 +1991,12 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               onClick={() => {
                                 const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
                                 const amount = Math.round((val / 2) * 100) / 100;
-                                const newStructure = [
+                                setFormData({...formData, payment_structure: [
                                   { label: '1er Semestre', amount: amount },
                                   { label: '2ème Semestre', amount: val - amount }
-                                ];
-                                setFormData({...formData, payment_structure: newStructure});
+                                ]});
                               }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 2 semestres"
+                              className="text-[9.5px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             >
                               2 Semestres
                             </button>
@@ -2014,15 +2005,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               onClick={() => {
                                 const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
                                 const amount = Math.round((val / 3) * 100) / 100;
-                                const newStructure = [
+                                setFormData({...formData, payment_structure: [
                                   { label: '1er Versement', amount: amount },
                                   { label: '2ème Versement', amount: amount },
                                   { label: 'Solde final', amount: val - (amount * 2) }
-                                ];
-                                setFormData({...formData, payment_structure: newStructure});
+                                ]});
                               }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 3 versements"
+                              className="text-[9.5px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             >
                               3 Versements
                             </button>
@@ -2031,52 +2020,16 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               onClick={() => {
                                 const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
                                 const amount = Math.round((val / 4) * 100) / 100;
-                                const newStructure = [
+                                setFormData({...formData, payment_structure: [
                                   { label: '1er Versement', amount: amount },
                                   { label: '2ème Versement', amount: amount },
                                   { label: '3ème Versement', amount: amount },
                                   { label: 'Solde final', amount: val - (amount * 3) }
-                                ];
-                                setFormData({...formData, payment_structure: newStructure});
+                                ]});
                               }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 4 versements"
+                              className="text-[9.5px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             >
                               4 Versements
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
-                                const amount = Math.round((val / 5) * 100) / 100;
-                                const newStructure = [
-                                  { label: '1er Versement', amount: amount },
-                                  { label: '2ème Versement', amount: amount },
-                                  { label: '3ème Versement', amount: amount },
-                                  { label: '4ème Versement', amount: amount },
-                                  { label: 'Solde final', amount: val - (amount * 4) }
-                                ];
-                                setFormData({...formData, payment_structure: newStructure});
-                              }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 5 versements"
-                            >
-                              5 Versements
-                            </button>
-                            <button 
-                              type="button"
-                              onClick={() => {
-                                const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
-                                const amount = Math.round((val / 10) * 100) / 100;
-                                const newStructure = Array.from({ length: 10 }).map((_, i) => ({
-                                  label: `Mensualité ${i + 1}`, amount: i === 9 ? val - (amount * 9) : amount
-                                }));
-                                setFormData({...formData, payment_structure: newStructure});
-                              }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 10 mensualités"
-                            >
-                              10 Mois
                             </button>
                           </>
                         ) : (
@@ -2086,15 +2039,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               onClick={() => {
                                 const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
                                 const amount = Math.round((val / 3) * 100) / 100;
-                                const newStructure = [
+                                setFormData({...formData, payment_structure: [
                                   { label: '1er Trimestre', amount: amount },
                                   { label: '2ème Trimestre', amount: amount },
                                   { label: '3ème Trimestre', amount: val - (amount * 2) }
-                                ];
-                                setFormData({...formData, payment_structure: newStructure});
+                                ]});
                               }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 3 trimestres"
+                              className="text-[9.5px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             >
                               3 Tranches
                             </button>
@@ -2103,13 +2054,11 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               onClick={() => {
                                 const val = formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee || '0') : parseFloat(formData.tuition_fee_usd || '0');
                                 const amount = Math.round((val / 10) * 100) / 100;
-                                const newStructure = Array.from({ length: 10 }).map((_, i) => ({
+                                setFormData({...formData, payment_structure: Array.from({ length: 10 }).map((_, i) => ({
                                   label: `Mois ${i + 1}`, amount: i === 9 ? val - (amount * 9) : amount
-                                }));
-                                setFormData({...formData, payment_structure: newStructure});
+                                }))});
                               }}
-                              className="text-[10px] font-bold text-blue-700 bg-white px-2.5 py-1 rounded-lg border border-blue-200/80 hover:bg-blue-100/70 active:scale-95 transition-all cursor-pointer shadow-2xs"
-                              title="Diviser en 10 mois"
+                              className="text-[9.5px] font-bold text-blue-700 bg-white px-2 py-0.5 rounded-md border border-blue-200 hover:bg-blue-50 transition-all cursor-pointer shadow-2xs whitespace-nowrap"
                             >
                               10 Mois
                             </button>
@@ -2122,218 +2071,217 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             newStructure.push({ label: `${newStructure.length + 1}${newStructure.length === 0 ? 'er' : 'ème'} Versement`, amount: 0 });
                             setFormData({...formData, payment_structure: newStructure});
                           }}
-                          className="text-[10px] font-black text-white bg-blue-600 hover:bg-blue-700 px-2.5 py-1 rounded-lg transition-all shadow-2xs flex items-center gap-1 cursor-pointer"
+                          className="text-[9.5px] font-black text-white bg-blue-600 hover:bg-blue-700 px-2 py-0.5 rounded-md transition-all shadow-2xs flex items-center gap-1 cursor-pointer whitespace-nowrap"
                         >
-                          <Plus size={12} /> Ajouter un pas
+                          <Plus size={11} /> Ajouter
                         </button>
                       </div>
                     </div>
-                  </div>
-                  
-                  <div className="space-y-1.5">
-                    {(formData.payment_structure || []).length === 0 ? (
-                      <p className="text-[10px] text-blue-600/70 font-bold italic text-center py-2 bg-white/60 rounded-xl border border-blue-100">Structure par incréments libres (par défaut)</p>
-                    ) : (
-                      <div className="space-y-1.5">
-                        {formData.payment_structure?.map((step, idx) => (
-                          <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2 p-2 bg-white rounded-xl border border-blue-100/90 shadow-2xs">
-                            <div className="flex-1 min-w-0">
-                              <label className="text-[9px] font-black text-blue-600 uppercase block mb-0.5 sm:hidden">Libellé</label>
-                              <input 
-                                type="text"
-                                placeholder={`Libellé ${idx + 1}`}
-                                className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all"
-                                value={step.label}
-                                onChange={(e) => {
-                                  const newStructure = [...formData.payment_structure!];
-                                  newStructure[idx].label = e.target.value;
-                                  setFormData({...formData, payment_structure: newStructure});
-                                }}
-                              />
-                            </div>
-                            <div className="flex items-center gap-1.5 sm:w-auto">
-                              <div className="w-28 sm:w-28 md:w-32">
-                                <label className="text-[9px] font-black text-blue-600 uppercase block mb-0.5 sm:hidden">Montant</label>
+
+                    {/* Liste des échéances - Compact, Responsive (mobile, tablet, desktop) */}
+                    <div className="space-y-1">
+                      {(formData.payment_structure || []).length === 0 ? (
+                        <p className="text-[9.5px] text-blue-600/70 font-bold italic text-center py-1.5 bg-white/70 rounded-lg border border-blue-100">Structure par incréments libres (par défaut)</p>
+                      ) : (
+                        <div className="space-y-1 max-h-48 overflow-y-auto custom-scrollbar pr-0.5">
+                          {formData.payment_structure?.map((step, idx) => (
+                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5 p-1.5 bg-white rounded-lg border border-blue-100/90 shadow-2xs hover:border-blue-200 transition-colors">
+                              {/* Libellé */}
+                              <div className="flex-1 min-w-0">
                                 <input 
-                                  type="number"
-                                  placeholder="Montant"
-                                  className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all font-mono"
-                                  value={step.amount || ''}
+                                  type="text"
+                                  placeholder={`Libellé ${idx + 1}`}
+                                  className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] sm:text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                                  value={step.label}
                                   onChange={(e) => {
                                     const newStructure = [...formData.payment_structure!];
-                                    newStructure[idx].amount = parseFloat(e.target.value) || 0;
+                                    newStructure[idx].label = e.target.value;
                                     setFormData({...formData, payment_structure: newStructure});
                                   }}
                                 />
                               </div>
-                              <div className="flex-1 sm:w-32 md:w-36">
-                                <label className="text-[9px] font-black text-blue-600 uppercase block mb-0.5 sm:hidden">Échéance</label>
-                                <input 
-                                  type="date"
-                                  className="w-full px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
-                                  value={step.due_date || ''}
-                                  onChange={(e) => {
-                                    const newStructure = [...formData.payment_structure!];
-                                    newStructure[idx].due_date = e.target.value;
+
+                              {/* Montant, Date & Supprimer */}
+                              <div className="flex items-center gap-1 shrink-0">
+                                <div className="w-24 sm:w-28">
+                                  <input 
+                                    type="number" 
+                                    placeholder="Montant"
+                                    className="w-full px-2 py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] sm:text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all font-mono"
+                                    value={step.amount || ''}
+                                    onChange={(e) => {
+                                      const newStructure = [...formData.payment_structure!];
+                                      newStructure[idx].amount = parseFloat(e.target.value) || 0;
+                                      setFormData({...formData, payment_structure: newStructure});
+                                    }}
+                                  />
+                                </div>
+                                <div className="w-28 sm:w-32">
+                                  <input 
+                                    type="date"
+                                    className="w-full px-1.5 py-1 bg-slate-50 border border-slate-200 rounded-md text-[10px] sm:text-[11px] font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                                    value={step.due_date || ''}
+                                    onChange={(e) => {
+                                      const newStructure = [...formData.payment_structure!];
+                                      newStructure[idx].due_date = e.target.value;
+                                      setFormData({...formData, payment_structure: newStructure});
+                                    }}
+                                  />
+                                </div>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    const newStructure = formData.payment_structure!.filter((_, i) => i !== idx);
                                     setFormData({...formData, payment_structure: newStructure});
                                   }}
-                                />
+                                  className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0"
+                                  title="Supprimer ce versement"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
                               </div>
-                              <button 
-                                type="button"
-                                onClick={() => {
-                                  const newStructure = formData.payment_structure!.filter((_, i) => i !== idx);
-                                  setFormData({...formData, payment_structure: newStructure});
-                                }}
-                                className="p-1.5 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0"
-                                title="Supprimer ce versement"
-                              >
-                                <Trash2 size={15} />
-                              </button>
                             </div>
+                          ))}
+
+                          {/* Summary Check - Compact */}
+                          <div className="flex items-center justify-between px-2.5 py-1 bg-blue-100/60 rounded-lg text-xs">
+                            <span className="text-[9.5px] font-black text-blue-900 uppercase">Total Échéancier :</span>
+                            <span className={`text-xs font-black ${(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0) !== (formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee) : parseFloat(formData.tuition_fee_usd)) ? 'text-rose-600' : 'text-emerald-700'}`}>
+                              {(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0).toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}
+                            </span>
                           </div>
-                        ))}
-                        
-                        {/* Summary Check */}
-                        <div className="flex items-center justify-between px-3 py-1.5 bg-blue-100/70 rounded-xl text-xs">
-                          <span className="text-[10px] font-black text-blue-900 uppercase">Total Échéancier :</span>
-                          <span className={`text-xs sm:text-sm font-black ${(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0) !== (formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee) : parseFloat(formData.tuition_fee_usd)) ? 'text-rose-600' : 'text-emerald-700'}`}>
-                            {(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0).toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}
-                          </span>
+
+                          {(() => {
+                             const sum = formData.payment_structure?.reduce((acc, s) => acc + (parseFloat(s.amount.toString()) || 0), 0) || 0;
+                             const currentFee = parseFloat(formData.tuition_currency === 'HTG' ? (formData.tuition_fee || '0') : (formData.tuition_fee_usd || '0')) || 0;
+                             if (sum > 0 && Math.abs(sum - currentFee) > 0.01) {
+                               return (
+                                 <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-1.5">
+                                   <p className="text-[9.5px] text-rose-700 font-bold leading-tight">
+                                     Écart : Total versements ({sum.toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}) ≠ Scolarité ({currentFee.toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'})
+                                   </p>
+                                   <button 
+                                     type="button"
+                                     onClick={() => {
+                                       if (formData.tuition_currency === 'HTG') {
+                                         setFormData({...formData, tuition_fee: sum.toString()});
+                                       } else {
+                                         setFormData({...formData, tuition_fee_usd: sum.toString()});
+                                       }
+                                     }}
+                                     className="text-[9px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2 py-0.5 rounded transition-all shadow-2xs whitespace-nowrap cursor-pointer"
+                                   >
+                                     Fixer à {sum.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} {formData.tuition_currency === 'HTG' ? 'G' : '$'}
+                                   </button>
+                                 </div>
+                               );
+                             }
+                             return null;
+                          })()}
                         </div>
-                        {(() => {
-                           const sum = formData.payment_structure?.reduce((acc, s) => acc + (parseFloat(s.amount.toString()) || 0), 0) || 0;
-                           const currentFee = parseFloat(formData.tuition_currency === 'HTG' ? (formData.tuition_fee || '0') : (formData.tuition_fee_usd || '0')) || 0;
-                           if (sum > 0 && Math.abs(sum - currentFee) > 0.01) {
-                             return (
-                               <div className="p-2 bg-rose-50 border border-rose-200 rounded-xl flex flex-col sm:flex-row items-center justify-between gap-2">
-                                 <p className="text-[10px] text-rose-700 font-bold">
-                                   Écart constaté : Total versements ({sum.toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}) ≠ {terminology.tuition} ({currentFee.toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'})
-                                 </p>
-                                 <button 
-                                   type="button"
-                                   onClick={() => {
-                                     if (formData.tuition_currency === 'HTG') {
-                                       setFormData({...formData, tuition_fee: sum.toString()});
-                                     } else {
-                                       setFormData({...formData, tuition_fee_usd: sum.toString()});
-                                     }
-                                   }}
-                                   className="text-[10px] font-bold text-white bg-rose-600 hover:bg-rose-700 px-2.5 py-1 rounded-lg transition-all shadow-2xs whitespace-nowrap cursor-pointer"
-                                 >
-                                   Fixer à {sum.toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 2})} {formData.tuition_currency === 'HTG' ? 'G' : '$'}
-                                 </button>
-                               </div>
-                             );
-                           }
-                           return null;
-                        })()}
-                      </div>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {/* Misc Fees Section */}
-                <div className="bg-slate-50/70 p-2.5 sm:p-3.5 rounded-xl border border-slate-200/80 space-y-2">
+                {/* Misc Fees Section - Compact */}
+                <div className="bg-slate-50/80 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1 bg-white rounded-lg shadow-2xs border border-slate-200 text-indigo-600">
-                        <Plus size={14} />
+                    <div className="flex items-center gap-1.5">
+                      <div className="p-0.5 bg-white rounded-md shadow-2xs border border-slate-200 text-indigo-600">
+                        <Plus size={13} />
                       </div>
-                      <h4 className="text-xs font-black uppercase tracking-wider text-slate-900">Frais Divers (Optionnel)</h4>
+                      <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-900">Frais Divers (Optionnel)</h4>
                     </div>
                     <button
                       type="button"
                       onClick={() => propagateFees('misc')}
-                      className="text-[10px] text-indigo-700 hover:text-indigo-900 font-bold hover:underline bg-indigo-50 hover:bg-indigo-100/80 px-2 py-0.5 rounded-md transition-all shrink-0 cursor-pointer border border-indigo-200/60"
+                      className="text-[9px] text-indigo-700 hover:text-indigo-900 font-bold hover:underline bg-indigo-50 hover:bg-indigo-100/80 px-1.5 py-0.2 rounded transition-all shrink-0 cursor-pointer border border-indigo-200/60"
                       title="Propager ces frais divers à toutes les classes"
                     >
                       Appliquer partout
                     </button>
                   </div>
                   
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5">Montant et Devise</label>
-                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                      <div className="relative flex-1">
-                        <input 
-                          type="number" 
-                          inputMode="decimal"
-                          enterKeyHint="done"
-                          className="w-full px-3 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 transition-all font-mono" 
-                          placeholder="0.00"
-                          value={formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg} 
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (formData.misc_currency === 'USD') {
-                              setFormData({...formData, misc_fee_usd: val, misc_fee_htg: '0'});
-                            } else {
-                              setFormData({...formData, misc_fee_htg: val, misc_fee_usd: '0'});
-                            }
-                          }} 
-                        />
-                      </div>
-                      <SelectPill
-                        options={[
-                          { value: 'USD', label: 'USD ($)' },
-                          { value: 'HTG', label: 'HTG (G)' }
-                        ]}
-                        value={formData.misc_currency}
-                        onChange={(newCurrency) => {
-                          const currentVal = formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg;
-                          if (newCurrency === 'USD') {
-                            setFormData({...formData, misc_currency: 'USD', misc_fee_usd: currentVal, misc_fee_htg: '0'});
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-1.5">
+                    <div className="relative flex-1">
+                      <input 
+                        type="number" 
+                        inputMode="decimal"
+                        enterKeyHint="done"
+                        className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 transition-all font-mono" 
+                        placeholder="0.00"
+                        value={formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg} 
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          if (formData.misc_currency === 'USD') {
+                            setFormData({...formData, misc_fee_usd: val, misc_fee_htg: '0'});
                           } else {
-                            setFormData({...formData, misc_currency: 'HTG', misc_fee_htg: currentVal, misc_fee_usd: '0'});
+                            setFormData({...formData, misc_fee_htg: val, misc_fee_usd: '0'});
                           }
-                        }}
-                        variant="field"
-                        size="sm"
-                        colorScheme="slate"
-                        portal={true}
-                        className="w-full sm:w-36 shrink-0"
+                        }} 
                       />
                     </div>
+                    <SelectPill
+                      options={[
+                        { value: 'USD', label: 'USD ($)' },
+                        { value: 'HTG', label: 'HTG (G)' }
+                      ]}
+                      value={formData.misc_currency}
+                      onChange={(newCurrency) => {
+                        const currentVal = formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg;
+                        if (newCurrency === 'USD') {
+                          setFormData({...formData, misc_currency: 'USD', misc_fee_usd: currentVal, misc_fee_htg: '0'});
+                        } else {
+                          setFormData({...formData, misc_currency: 'HTG', misc_fee_htg: currentVal, misc_fee_usd: '0'});
+                        }
+                      }}
+                      variant="field"
+                      size="sm"
+                      colorScheme="slate"
+                      portal={true}
+                      className="w-full sm:w-28 shrink-0"
+                    />
                   </div>
 
                   <button 
                     type="button"
-                    className="w-full flex items-center gap-3 cursor-pointer p-2.5 bg-white border border-slate-200 rounded-xl hover:border-rose-300 transition-all text-left" 
+                    className="w-full flex items-center gap-2 cursor-pointer p-1.5 bg-white border border-slate-200 rounded-lg hover:border-rose-300 transition-all text-left" 
                     onClick={() => setFormData({...formData, is_misc_mandatory: !formData.is_misc_mandatory})}
                   >
-                    <div className={`w-4 h-4 rounded-md border-2 flex items-center justify-center transition-all flex-shrink-0 ${formData.is_misc_mandatory ? 'bg-rose-600 border-rose-600 shadow-2xs' : 'bg-white border-slate-300'}`}>
-                      {formData.is_misc_mandatory && <CheckCircle2 size={11} className="text-white" />}
+                    <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all flex-shrink-0 ${formData.is_misc_mandatory ? 'bg-rose-600 border-rose-600 shadow-2xs' : 'bg-white border-slate-300'}`}>
+                      {formData.is_misc_mandatory && <CheckCircle2 size={10} className="text-white" />}
                     </div>
                     <div className="min-w-0">
-                      <span className="text-xs font-bold text-slate-800 block">Frais obligatoires</span>
-                      <span className="text-[10px] text-slate-500 font-medium block">Doivent être acquittés prioritairement lors des encaissements</span>
+                      <span className="text-[11px] font-bold text-slate-800 leading-none">Frais obligatoires</span>
+                      <span className="text-[9.5px] text-slate-500 font-medium block leading-tight">À acquitter en priorité lors des encaissements</span>
                     </div>
                   </button>
                 </div>
 
-                <div className="bg-blue-50/80 p-2.5 border-l-4 border-blue-600 flex items-center gap-2 rounded-xl">
-                  <Info className="text-blue-600 shrink-0" size={15} />
-                  <p className="text-[11px] font-bold text-blue-900 leading-snug">
+                <div className="bg-blue-50/70 p-2 border-l-3 border-blue-600 flex items-center gap-1.5 rounded-lg">
+                  <Info className="text-blue-600 shrink-0" size={13} />
+                  <p className="text-[10px] sm:text-[10.5px] font-bold text-blue-900 leading-snug">
                     Ces tarifs seront automatiquement appliqués lors des nouvelles {terminology.enrollments.toLowerCase()} pour la session sélectionnée.
                   </p>
                 </div>
               </div>
 
-              {/* Sticky Footer */}
-              <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-white border-t border-slate-200 sticky bottom-0 z-10 flex items-center justify-end gap-2 mt-auto shrink-0">
+              {/* Sticky Footer compact */}
+              <div className="px-3.5 sm:px-5 py-2 sm:py-2.5 bg-white border-t border-slate-200 sticky bottom-0 z-10 flex items-center justify-end gap-2 mt-auto shrink-0">
                 <button 
                   type="button"
                   onClick={() => setShowForm(false)}
-                  className="px-3.5 py-1.5 text-slate-600 font-bold text-xs sm:text-sm hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+                  className="px-3 py-1.5 text-slate-600 font-bold text-xs hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button 
                   disabled={isSubmitting} 
                   type="submit" 
-                  className="px-4.5 py-1.5 sm:py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm active:scale-95 cursor-pointer"
+                  className="px-3.5 sm:px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 shadow-sm active:scale-95 cursor-pointer"
                 >
-                  {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} 
+                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} 
                   {formData.id ? 'Mettre à jour' : 'Valider la tarification'}
                 </button>
               </div>

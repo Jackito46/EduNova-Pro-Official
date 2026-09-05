@@ -58,9 +58,7 @@ export const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
 
   const handleLogoutClick = () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      onConfirm();
-    }, 300);
+    onConfirm();
   };
 
   return (
