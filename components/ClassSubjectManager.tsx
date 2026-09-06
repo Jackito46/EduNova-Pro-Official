@@ -197,47 +197,82 @@ const ClassSubjectManager: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const availableSubjectsToAdd = allSubjects.filter(s => !associations.some(a => a.subject_id === s.id));
 
+  const totalCoefficient = associations.reduce((sum, a) => sum + (Number(a.coefficient) || 0), 0);
+
   return (
-    <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in pb-20">
-      <div className="flex items-center gap-4 mb-6">
-        <button onClick={() => navigate('/classes')} className="p-2 bg-white rounded-lg shadow-sm border border-gray-200 hover:bg-gray-50 transition-colors">
-          <ArrowLeft size={20} className="text-gray-600" />
-        </button>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Programme Académique</h2>
-          <p className="text-gray-500 font-medium text-sm mt-1">{terminology.class} : <span className="text-blue-600">{schoolClass.name}</span> ({schoolClass.level})</p>
-        </div>
-      </div>
-
-      {notification && (
-        <div className={`p-4 rounded-xl flex items-center gap-3 mb-6 ${notification.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
-          {notification.type === 'success' ? <CheckCircle2 size={20} /> : <AlertCircle size={20} />}
-          <p className="font-medium text-sm">{notification.message}</p>
-        </div>
-      )}
-
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-6 bg-gray-50 border-b border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-600 text-white rounded-lg shadow-sm">
+    <div className="max-w-5xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-300 pb-12">
+      {/* Compact Modern Header */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+        <div className="flex items-center gap-3">
+          <button 
+            type="button"
+            onClick={() => navigate('/classes')} 
+            className="p-2 bg-slate-50 text-slate-600 rounded-xl border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900 transition-all shadow-2xs group shrink-0 cursor-pointer"
+            title={`Retour aux ${terminology.classes.toLowerCase()}`}
+          >
+            <ArrowLeft size={17} className="group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50/80 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs border border-blue-100/80 shrink-0">
               <Layers size={20} />
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{terminology.subjects} & Coefficients</h3>
-              <p className="text-sm font-medium text-gray-500 mt-0.5">Définissez le poids de chaque {terminology.subject.toLowerCase()} pour le calcul des moyennes</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                  Programme Académique
+                </h2>
+                <span className="text-[11px] font-extrabold bg-blue-50 text-blue-700 px-2.5 py-0.5 rounded-full border border-blue-200/60">
+                  {schoolClass.name}
+                </span>
+                <span className="text-[10px] uppercase font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full border border-slate-200">
+                  {schoolClass.level}
+                </span>
+              </div>
+              <p className="text-slate-500 text-xs font-medium">
+                Pondération et barèmes des {terminology.subjects.toLowerCase()} pour le calcul des moyennes
+              </p>
             </div>
           </div>
+        </div>
+
+        {associations.length > 0 && (
+          <div className="self-start sm:self-auto flex items-center gap-2">
+            <div className="px-3 py-1 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-medium text-slate-600 flex items-center gap-2">
+              <span>Matières : <strong className="text-slate-900">{associations.length}</strong></span>
+              <span className="text-slate-300">•</span>
+              <span>Total Coef : <strong className="text-blue-700">{totalCoefficient}</strong></span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {notification && (
+        <div className={`p-3.5 rounded-xl flex items-center gap-2.5 ${notification.type === 'success' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/80' : 'bg-rose-50 text-rose-800 border border-rose-200/80'} shadow-2xs animate-in fade-in`}>
+          {notification.type === 'success' ? <CheckCircle2 size={18} className="shrink-0 text-emerald-600" /> : <AlertCircle size={18} className="shrink-0 text-rose-600" />}
+          <p className="font-medium text-xs sm:text-sm">{notification.message}</p>
+        </div>
+      )}
+
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden space-y-0">
+        {/* Card Header Toolbar */}
+        <div className="p-3.5 sm:p-4 bg-slate-50/70 border-b border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+              {terminology.subjects} & Coefficients Associés
+            </h3>
+          </div>
           
-          <div className="flex-1 max-w-xs">
+          <div className="w-full sm:w-72">
             <select 
-              className="w-full px-4 py-2.5 rounded-lg text-sm font-medium text-gray-900 outline-none shadow-sm border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all cursor-pointer bg-white"
+              className="w-full px-3 py-2 rounded-xl text-xs font-medium text-slate-900 outline-none shadow-2xs border border-slate-200/90 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all cursor-pointer bg-white"
               onChange={(e) => {
                 handleAddSubject(e.target.value);
                 e.target.value = "";
               }}
               defaultValue=""
             >
-              <option value="" disabled>+ Ajouter un(e) {terminology.subject.toLowerCase()}...</option>
+              <option value="" disabled>+ Assigner une {terminology.subject.toLowerCase()}...</option>
               {availableSubjectsToAdd.map(s => (
                 <option key={s.id} value={s.id}>{s.name} ({s.code})</option>
               ))}
@@ -245,68 +280,86 @@ const ClassSubjectManager: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        <div className="p-6">
+        {/* Card Content Table / Cards */}
+        <div className="p-3.5 sm:p-4">
           {associations.length === 0 ? (
-            <div className="py-16 text-center border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center">
-              <BookOpen size={40} className="text-gray-300 mb-3" />
-              <p className="text-gray-500 font-semibold text-sm">Aucun(e) {terminology.subject.toLowerCase()} assigné(e) à {terminology.class.toLowerCase()}</p>
-              <p className="text-gray-400 text-xs mt-1">Utilisez le menu déroulant ci-dessus pour ajouter des {terminology.subjects.toLowerCase()}.</p>
+            <div className="py-10 text-center border-2 border-dashed border-slate-200 rounded-xl flex flex-col items-center justify-center">
+              <BookOpen size={32} className="text-slate-300 mb-2" />
+              <p className="text-slate-600 font-bold text-xs sm:text-sm">Aucune {terminology.subject.toLowerCase()} assignée à cette {terminology.class.toLowerCase()}</p>
+              <p className="text-slate-400 text-xs mt-0.5">Utilisez le menu déroulant ci-dessus pour ajouter des {terminology.subjects.toLowerCase()}.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              <div className="grid grid-cols-12 gap-4 px-4 py-3 bg-gray-100 text-gray-600 rounded-lg text-xs font-semibold uppercase tracking-wider">
-                <div className="col-span-6 md:col-span-5">{terminology.subject}</div>
-                <div className="col-span-3 md:col-span-3 text-center">Code</div>
-                <div className="col-span-3 md:col-span-3 text-center">Coefficient</div>
-                <div className="col-span-12 md:col-span-1 text-right hidden md:block">Action</div>
+            <div className="space-y-2">
+              {/* Header row on desktop */}
+              <div className="hidden sm:grid grid-cols-12 gap-3 px-3 py-2 bg-slate-100/70 text-slate-600 rounded-xl text-[11px] font-bold uppercase tracking-wider">
+                <div className="col-span-5">{terminology.subject}</div>
+                <div className="col-span-2 text-center">Code</div>
+                <div className="col-span-4 text-center">Coefficient Pondéré</div>
+                <div className="col-span-1 text-right">Action</div>
               </div>
               
               {associations.map((assoc) => (
-                <div key={assoc.id} className="grid grid-cols-12 gap-4 items-center px-4 py-3 bg-white rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50/50 transition-colors group">
-                  <div className="col-span-12 md:col-span-5 flex items-center gap-3">
-                    <div className="w-8 h-8 bg-gray-50 rounded-md flex items-center justify-center border border-gray-200 text-blue-600 font-bold text-xs">
-                      {assoc.subject?.name.charAt(0)}
+                <div 
+                  key={assoc.id} 
+                  className="flex flex-col sm:grid sm:grid-cols-12 gap-2.5 sm:gap-3 sm:items-center p-3 sm:px-3 sm:py-2.5 bg-white rounded-xl border border-slate-200/80 hover:border-blue-300 hover:bg-blue-50/30 transition-all shadow-2xs group"
+                >
+                  <div className="sm:col-span-5 flex items-center gap-2.5">
+                    <div className="w-7 h-7 bg-blue-50 rounded-lg flex items-center justify-center border border-blue-100 text-blue-700 font-bold text-xs shrink-0">
+                      {assoc.subject?.name?.charAt(0) || 'M'}
                     </div>
-                    <span className="font-medium text-gray-900 text-sm">{assoc.subject?.name}</span>
+                    <span className="font-bold text-slate-900 text-xs sm:text-sm truncate">{assoc.subject?.name}</span>
                   </div>
                   
-                  <div className="col-span-4 md:col-span-3 text-center">
-                    <span className="px-2.5 py-1 bg-gray-100 text-gray-600 rounded-md text-xs font-medium">
+                  <div className="sm:col-span-2 flex sm:justify-center items-center">
+                    <span className="px-2 py-0.5 bg-slate-100 text-slate-700 font-mono font-bold rounded-md text-[11px] border border-slate-200">
                       {assoc.subject?.code}
                     </span>
                   </div>
                   
-                  <div className="col-span-6 md:col-span-3 flex items-center justify-center gap-1.5">
-                    <div className="hidden sm:flex items-center gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                      {[100, 200, 300].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => handleCoefChange(assoc.id, preset)}
-                          className={`px-1.5 py-0.5 text-[10px] font-black rounded transition-all cursor-pointer ${assoc.coefficient === preset ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-slate-200'}`}
-                        >
-                          {preset}
-                        </button>
-                      ))}
+                  <div className="sm:col-span-4 flex items-center justify-between sm:justify-center gap-2">
+                    <span className="text-xs text-slate-500 font-medium sm:hidden">Coefficient :</span>
+                    <div className="flex items-center gap-1.5">
+                      <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+                        {[100, 200, 300].map((preset) => (
+                          <button
+                            key={preset}
+                            type="button"
+                            onClick={() => handleCoefChange(assoc.id, preset)}
+                            className={`px-1.5 py-0.5 text-[9px] font-black rounded transition-all cursor-pointer ${
+                              assoc.coefficient === preset ? 'bg-blue-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {preset}
+                          </button>
+                        ))}
+                      </div>
+                      <input 
+                        type="number" 
+                        min="0.5" 
+                        max="500"
+                        step="0.5"
+                        className="w-16 sm:w-20 px-2 py-1 text-center font-bold text-blue-700 bg-white border border-slate-200 rounded-lg focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 outline-none transition-all shadow-2xs text-xs"
+                        value={assoc.coefficient}
+                        onChange={(e) => handleCoefChange(assoc.id, parseFloat(e.target.value) || 1)}
+                      />
                     </div>
-                    <input 
-                      type="number" 
-                      min="0.5" 
-                      max="500"
-                      step="0.5"
-                      className="w-24 px-3 py-1.5 text-center font-bold text-blue-700 bg-white border border-gray-200 rounded-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all shadow-sm"
-                      value={assoc.coefficient}
-                      onChange={(e) => handleCoefChange(assoc.id, parseFloat(e.target.value) || 1)}
-                    />
-                  </div>
-                  
-                  <div className="col-span-2 md:col-span-1 flex justify-end">
+
                     <button 
                       onClick={() => handleRemoveSubject(assoc.id)}
-                      className="p-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer sm:hidden"
                       title={formatActionWithTerminology('REMOVE', terminology.subject)}
                     >
-                      <Trash2 size={18} />
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
+                  
+                  <div className="hidden sm:flex col-span-1 justify-end">
+                    <button 
+                      onClick={() => handleRemoveSubject(assoc.id)}
+                      className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                      title={formatActionWithTerminology('REMOVE', terminology.subject)}
+                    >
+                      <Trash2 size={15} />
                     </button>
                   </div>
                 </div>
@@ -315,14 +368,23 @@ const ClassSubjectManager: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
         </div>
         
-        <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-end">
+        {/* Card Footer Actions */}
+        <div className="p-3 sm:p-4 bg-slate-50/70 border-t border-slate-200/80 flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => navigate('/classes')}
+            className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-2xs cursor-pointer"
+          >
+            Retour aux {terminology.classes.toLowerCase()}
+          </button>
+
           <button 
             onClick={handleSave}
             disabled={isSubmitting}
-            className="bg-blue-600 text-white px-6 py-2.5 rounded-lg font-medium text-sm shadow-sm hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+            className="bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-xs uppercase tracking-wider shadow-xs hover:bg-blue-600 transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
           >
-            {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
-            Enregistrer les modifications
+            {isSubmitting ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            <span>Enregistrer les coefficients</span>
           </button>
         </div>
       </div>

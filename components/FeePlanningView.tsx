@@ -55,6 +55,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const siegeCampusId = siegeCampus ? siegeCampus.id : null;
   const currentCampusObj = campuses?.find(c => c.id === currentCampusId);
   const isSiegeActive = !user.campus_id && (!currentCampusId || currentCampusId === siegeCampusId);
+  const canManageAllCampuses = Boolean(
+    school?.has_multi_campus &&
+    (!user.campus_id || isSiegeActive || user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN)
+  );
 
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -247,7 +251,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           finalPlans = data.filter(p => {
             if (p.class?.campus_id) return p.class.campus_id === currentCampusId;
             if (classes && classes.length > 0) return classes.some(c => c.id === p.class_id);
-            return true;
+            return !p.class?.campus_id && currentCampusId === siegeCampusId;
           });
         }
         setPlans(finalPlans);
@@ -367,12 +371,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const executePropagation = async () => {
     if (!pendingPropagation || !selectedYearId || !user.school_id) return;
     const { type, val, currency, label, scope = 'current_campus' } = pendingPropagation;
+    const effectiveScope = canManageAllCampuses ? scope : 'current_campus';
 
     setIsSubmitting(true);
     try {
       let targetClassesList = validClasses && validClasses.length > 0 ? validClasses : classes;
 
-      if (scope === 'all_campuses' && school?.has_multi_campus) {
+      if (effectiveScope === 'all_campuses' && school?.has_multi_campus) {
         const { data: allCompClasses, error: classErr } = await supabase
           .from('classes')
           .select('*')
@@ -380,6 +385,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (!classErr && allCompClasses && allCompClasses.length > 0) {
           targetClassesList = filterClassesBySchoolType(allCompClasses);
         }
+      } else if (school?.has_multi_campus && currentCampusId) {
+        targetClassesList = targetClassesList.filter(c => 
+          c.campus_id === currentCampusId || (!c.campus_id && currentCampusId === siegeCampusId)
+        );
       }
 
       if (!targetClassesList || targetClassesList.length === 0) {
@@ -485,12 +494,12 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           amount: val, 
           currency, 
           classes_count: finalUpdates.length,
-          scope,
+          scope: effectiveScope,
           campus_id: currentCampusId 
         }
       });
 
-      const scopeLabel = scope === 'all_campuses' 
+      const scopeLabel = effectiveScope === 'all_campuses' 
         ? 'sur toutes les annexes du réseau' 
         : (currentCampusObj ? `sur l'annexe "${currentCampusObj.name}"` : 'sur le campus actuel');
 
@@ -707,9 +716,12 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
 
       // Filtrer selon le périmètre multi-campus / annexe
+      const effectiveScope = canManageAllCampuses ? migrateScope : 'current_campus';
       let plansToMigrate = sourcePlans;
-      if (school?.has_multi_campus && migrateScope === 'current_campus' && currentCampusId) {
-        plansToMigrate = sourcePlans.filter(p => p.class?.campus_id === currentCampusId);
+      if (school?.has_multi_campus && effectiveScope === 'current_campus' && currentCampusId) {
+        plansToMigrate = sourcePlans.filter(p => 
+          p.class?.campus_id === currentCampusId || (!p.class?.campus_id && currentCampusId === siegeCampusId)
+        );
       }
 
       if (plansToMigrate.length === 0) {
@@ -746,7 +758,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       }
 
-      const scopeLabel = migrateScope === 'all_campuses' 
+      const scopeLabel = effectiveScope === 'all_campuses' 
         ? 'sur toutes les annexes du réseau' 
         : (currentCampusObj ? `sur l'annexe "${currentCampusObj.name}"` : 'sur le campus actuel');
 
@@ -760,7 +772,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           count: newPlans.length, 
           source_year: sourceId, 
           target_year: selectedYearId,
-          scope: migrateScope,
+          scope: effectiveScope,
           campus_id: currentCampusId 
         }
       });
@@ -1176,11 +1188,12 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       toast.error("Veuillez sélectionner une session académique valide.");
       return;
     }
+    const effectiveScope = canManageAllCampuses ? (bulkAdjustConfig.scope || 'current_campus') : 'current_campus';
     setIsSubmitting(true);
     try {
       let targetPlans = plans;
 
-      if (bulkAdjustConfig.scope === 'all_campuses' && school?.has_multi_campus) {
+      if (effectiveScope === 'all_campuses' && school?.has_multi_campus) {
         // Multi-campus: Fetch all fee plans for this school and year across ALL campuses
         const { data: allCampusesPlans, error: acErr } = await supabase
           .from('fee_plans')
@@ -1192,6 +1205,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (allCampusesPlans && allCampusesPlans.length > 0) {
           targetPlans = allCampusesPlans;
         }
+      } else if (school?.has_multi_campus && currentCampusId) {
+        targetPlans = targetPlans.filter(p => 
+          p.class?.campus_id === currentCampusId || (!p.class?.campus_id && currentCampusId === siegeCampusId)
+        );
       }
 
       if (!targetPlans || targetPlans.length === 0) {
@@ -1294,12 +1311,12 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           value,
           currency,
           classes_count: updatedPayloads.length,
-          scope: bulkAdjustConfig.scope || 'current_campus',
+          scope: effectiveScope,
           campus_id: currentCampusId
         }
       });
 
-      const scopeLabel = bulkAdjustConfig.scope === 'all_campuses' 
+      const scopeLabel = effectiveScope === 'all_campuses' 
         ? 'sur toutes les annexes du réseau' 
         : (currentCampusObj ? `sur l'annexe "${currentCampusObj.name}"` : 'sur le campus actuel');
       const targetLabel = currentYearObj ? `${currentYearObj.label} ${currentYearObj.status === 'FUTURE' ? '(PRÉPARATION)' : '(ACTIVE)'}` : '';

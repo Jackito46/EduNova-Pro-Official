@@ -3598,60 +3598,68 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20">
-      <header className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">
-            Structure Académique
-          </h2>
-          <p className="text-gray-500 mt-1 text-sm">
-            Gestion des {terminology.classes} & {terminology.subjects}
-          </p>
+    <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-300 max-w-7xl mx-auto pb-16">
+      {/* Compact Modern Header */}
+      <header className="bg-white p-3.5 sm:p-4 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50/80 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs border border-blue-100/80 shrink-0">
+            <GraduationCap size={20} />
+          </div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+              Structure Académique
+            </h2>
+            <p className="text-slate-500 text-xs font-medium">
+              Gestion centralisée des {terminology.classes.toLowerCase()} & {terminology.subjects.toLowerCase()}
+            </p>
+          </div>
         </div>
-        <div className="flex w-full md:w-auto gap-3">
-          <div className="relative group flex-1 md:flex-none">
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="relative flex-1 sm:w-64">
             <Search
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-              size={18}
+              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              size={15}
             />
             <input
               type="text"
-              placeholder="Rechercher..."
-              className="pl-10 pr-4 py-2 bg-white text-gray-900 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full md:w-64 shadow-sm text-sm transition-shadow"
+              placeholder={`Filtrer les ${terminology.classes.toLowerCase()}...`}
+              className="w-full pl-9 pr-3 py-1.5 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 outline-none transition-all shadow-2xs placeholder:text-slate-400"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
           <button
             onClick={fetchData}
-            className="p-2 bg-white text-gray-500 rounded-lg hover:text-blue-600 hover:bg-blue-50 border border-gray-300 transition-colors"
+            className="p-2 bg-slate-50 text-slate-600 rounded-xl hover:text-blue-600 hover:bg-slate-100 border border-slate-200/80 transition-all shadow-2xs cursor-pointer shrink-0"
             title="Rafraîchir"
           >
-            <RefreshCw size={18} />
+            <RefreshCw size={15} />
           </button>
         </div>
       </header>
 
       {notification && (
         <div
-          className={`p-4 rounded-xl flex items-center gap-3 animate-in slide-in-from-top duration-300 ${notification.type === "success" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-rose-50 text-rose-700 border border-rose-100"}`}
+          className={`p-3.5 rounded-xl flex items-center gap-2.5 animate-in slide-in-from-top duration-200 shadow-2xs ${notification.type === "success" ? "bg-emerald-50 text-emerald-800 border border-emerald-200/80" : "bg-rose-50 text-rose-800 border border-rose-200/80"}`}
         >
           {notification.type === "success" ? (
-            <CheckCircle2 size={20} />
+            <CheckCircle2 size={18} className="shrink-0 text-emerald-600" />
           ) : (
-            <AlertCircle size={20} />
+            <AlertCircle size={18} className="shrink-0 text-rose-600" />
           )}
-          <p className="font-medium text-sm">{notification.message}</p>
+          <p className="font-medium text-xs sm:text-sm">{notification.message}</p>
           <button
             onClick={() => setNotification(null)}
-            className="ml-auto p-1.5 hover:bg-black/5 rounded-lg"
+            className="ml-auto p-1 hover:bg-black/5 rounded-lg text-slate-500 cursor-pointer"
           >
-            <X size={16} />
+            <X size={15} />
           </button>
         </div>
       )}
 
-      <div className="flex bg-white rounded-xl shadow-sm border border-gray-200 w-full overflow-x-auto custom-scrollbar">
+      {/* Main Module Tabs (Classes, Subjects, Matrix, Dashboard) */}
+      <div className="bg-white p-1 rounded-2xl shadow-xs border border-slate-200/80 flex gap-1 overflow-x-auto custom-scrollbar">
         {[
           { id: "classes", label: terminology.classes, icon: GraduationCap },
           {
@@ -3673,36 +3681,36 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as any)}
-            className={`flex-1 px-6 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 border-b-2 whitespace-nowrap ${
+            className={`flex-1 min-w-[120px] px-3.5 py-2 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeTab === tab.id
-                ? "border-blue-600 text-blue-700 bg-blue-50/40 shadow-inner hover:bg-blue-50/50"
-                : "border-transparent text-gray-500 hover:text-gray-900 hover:bg-gray-50/70"
+                ? "bg-blue-50 text-blue-700 shadow-2xs border border-blue-200/60"
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-50"
             }`}
           >
-            <tab.icon size={18} />
-            {tab.label}
+            <tab.icon size={15} />
+            <span>{tab.label}</span>
           </button>
         ))}
       </div>
 
-      <div className="mt-6">
+      <div className="mt-3.5 sm:mt-4">
         {activeTab === "classes" && (
-          <div className="space-y-8">
-            <div className="flex bg-gray-100 p-1 rounded-lg w-full max-w-3xl mx-auto mb-6 overflow-x-auto custom-scrollbar animate-in fade-in duration-350">
+          <div className="space-y-4 sm:space-y-5">
+            <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 w-full max-w-2xl mx-auto mb-3.5 overflow-x-auto custom-scrollbar animate-in fade-in duration-200">
               {availableTabs.map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setAcademicTab(tab)}
-                  className={`flex-1 min-w-[120px] flex items-center justify-center gap-2 py-2.5 px-3 text-sm font-semibold rounded-md transition-all ${
+                  className={`flex-1 min-w-[100px] flex items-center justify-center gap-1.5 py-1.5 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
                     academicTab === tab
-                      ? "bg-white text-blue-600 shadow-sm border border-gray-100"
-                      : "text-gray-500 hover:text-gray-700"
+                      ? "bg-white text-blue-700 shadow-2xs border border-slate-200/60"
+                      : "text-slate-500 hover:text-slate-800"
                   }`}
                 >
                   {tab === "Tous les cycles" ? (
-                    <Layers size={16} />
+                    <Layers size={14} />
                   ) : (
-                    <GraduationCap size={16} />
+                    <GraduationCap size={14} />
                   )}
                   <span className="whitespace-nowrap">{tab}</span>
                 </button>
@@ -4962,17 +4970,21 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* MODALE AJOUT DISCIPLINE / CURSUS PERSONNALISÉ */}
       {customDisciplineModal.isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Sparkles size={20} className="text-blue-600" />
-                {school?.school_type === "UNIVERSITY"
-                  ? "Discipline / Cursus Personnalisé"
-                  : school?.school_type === "PROFESSIONAL"
-                  ? "Filière / Spécialité Personnalisée"
-                  : `Structure / ${terminology.class} Sur-Mesure`}
-              </h3>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100/80 shrink-0">
+                  <Sparkles size={16} />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  {school?.school_type === "UNIVERSITY"
+                    ? "Discipline / Cursus Personnalisé"
+                    : school?.school_type === "PROFESSIONAL"
+                    ? "Filière / Spécialité Personnalisée"
+                    : `Structure / ${terminology.class} Sur-Mesure`}
+                </h3>
+              </div>
               <button
                 onClick={() =>
                   setCustomDisciplineModal((prev) => ({
@@ -4980,18 +4992,18 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                     isOpen: false,
                   }))
                 }
-                className="text-gray-400 hover:bg-gray-100 rounded-lg p-1.5 transition-colors"
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5 transition-colors cursor-pointer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
 
             <form
               onSubmit={handleAddCustomDiscipline}
-              className="p-6 space-y-5"
+              className="p-3.5 sm:p-4 space-y-3.5"
             >
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   {school?.school_type === "UNIVERSITY"
                     ? "Nom de la Discipline / Filière"
                     : school?.school_type === "PROFESSIONAL"
@@ -5015,12 +5027,12 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                       ? "Ex: COUPE-COUTURE"
                       : "Ex: 9ÈME AF, NS1, SECTION BILINGUE..."
                   }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none text-sm"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 transition-all outline-none text-xs sm:text-sm bg-slate-50/50 font-medium"
                 />
               </div>
               
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                   Division Académique
                 </label>
                 <select
@@ -5040,7 +5052,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                       level: newLevel,
                     }));
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none text-sm bg-white"
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 transition-all outline-none text-xs sm:text-sm bg-white font-medium"
                 >
                   {school?.school_type === "UNIVERSITY" ? (
                     <>
@@ -5063,9 +5075,9 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     Niveau Cible
                   </label>
                   <select
@@ -5076,7 +5088,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                         level: e.target.value,
                       }))
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 transition-all outline-none text-xs sm:text-sm bg-white font-medium"
                   >
                     {customDisciplineModal.division === "Universitaire" ? (
                       <>
@@ -5124,7 +5136,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                     {customDisciplineModal.duration === 1 ? "Structure" : "Nombre d'années"}
                   </label>
                   <select
@@ -5135,7 +5147,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                         duration: Number(e.target.value),
                       }))
                     }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-shadow outline-none text-sm bg-white"
+                    className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 transition-all outline-none text-xs sm:text-sm bg-white font-medium"
                   >
                     {[1, 2, 3, 4, 5, 6, 7].map((num) => (
                       <option key={num} value={num}>
@@ -5151,14 +5163,14 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
 
-              <div className="bg-blue-50 p-4 rounded-lg flex items-start gap-3 border border-blue-100 mt-2">
+              <div className="bg-blue-50/70 p-3 rounded-xl flex items-start gap-2.5 border border-blue-150">
                 <GraduationCap
-                  size={18}
+                  size={16}
                   className="text-blue-600 mt-0.5 shrink-0"
                 />
-                <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">Action automatique</p>
-                  <p className="text-blue-600 leading-relaxed">
+                <div className="text-xs text-blue-900 leading-relaxed">
+                  <p className="font-bold text-blue-950 mb-0.5">Génération automatique</p>
+                  <p className="text-blue-700">
                     {customDisciplineModal.duration === 1
                       ? `Cette action créera 1 ${terminology.class.toLowerCase()} unique : "${
                           customDisciplineModal.name ? customDisciplineModal.name.toUpperCase() : "EXEMPLAR"
@@ -5172,7 +5184,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
 
-              <div className="flex gap-3 pt-2">
+              <div className="flex gap-2.5 pt-1">
                 <button
                   type="button"
                   onClick={() =>
@@ -5181,7 +5193,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                       isOpen: false,
                     }))
                   }
-                  className="flex-1 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
+                  className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
@@ -5191,12 +5203,12 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                     customDisciplineModal.isSubmitting ||
                     !customDisciplineModal.name.trim()
                   }
-                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium text-sm shadow-sm hover:bg-blue-700 flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                  className="flex-1 py-2 bg-blue-600 text-white rounded-xl font-bold text-xs shadow-xs hover:bg-blue-700 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {customDisciplineModal.isSubmitting ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin" />
                   ) : (
-                    <Plus size={16} />
+                    <Plus size={14} />
                   )}
                   Générer
                 </button>
@@ -5206,29 +5218,35 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-    {/* MODALE D'ACTION DISCIPLINE (RENAME / DELETE) */}
+      {/* MODALE D'ACTION DISCIPLINE (RENAME / DELETE / MOVE) */}
       {disciplineActionModal.isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                {disciplineActionModal.type === "rename" ? (
-                  <>
-                    <Edit2 size={18} className="text-blue-600" />
-                    Modifier la filière
-                  </>
-                ) : disciplineActionModal.type === "move" ? (
-                  <>
-                    <Sparkles size={18} className="text-amber-600" />
-                    Déplacer la discipline
-                  </>
-                ) : (
-                  <>
-                    <Trash2 size={18} className="text-red-700" />
-                    Supprimer la filière
-                  </>
-                )}
-              </h3>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border ${
+                  disciplineActionModal.type === "rename"
+                    ? "bg-blue-50 text-blue-600 border-blue-100"
+                    : disciplineActionModal.type === "move"
+                    ? "bg-amber-50 text-amber-600 border-amber-100"
+                    : "bg-rose-50 text-rose-600 border-rose-100"
+                }`}>
+                  {disciplineActionModal.type === "rename" ? (
+                    <Edit2 size={15} />
+                  ) : disciplineActionModal.type === "move" ? (
+                    <Sparkles size={15} />
+                  ) : (
+                    <Trash2 size={15} />
+                  )}
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  {disciplineActionModal.type === "rename"
+                    ? "Modifier la filière"
+                    : disciplineActionModal.type === "move"
+                    ? "Déplacer la discipline"
+                    : "Supprimer la filière"}
+                </h3>
+              </div>
               <button
                 onClick={() =>
                   setDisciplineActionModal((prev) => ({
@@ -5236,31 +5254,31 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                     isOpen: false,
                   }))
                 }
-                className="text-gray-400 hover:bg-gray-100 rounded-lg p-1.5 transition-colors"
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg p-1.5 transition-colors cursor-pointer"
               >
-                <X size={20} />
+                <X size={18} />
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-3.5 sm:p-4 space-y-3.5">
               {disciplineActionModal.error && (
-                <div className="p-3 bg-red-50 border border-red-150 text-red-700 rounded-lg text-xs leading-relaxed">
+                <div className="p-2.5 bg-rose-50 border border-rose-200/80 text-rose-800 rounded-xl text-xs leading-relaxed font-medium">
                   {disciplineActionModal.error}
                 </div>
               )}
               
               {disciplineActionModal.type === "rename" ? (
                 <div className="space-y-3">
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    Cette action va renommer tous les niveaux et promotions associés à la filière <strong className="text-gray-950 font-bold">"{disciplineActionModal.disciplineName}"</strong>.
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Cette action va renommer tous les niveaux et promotions associés à la filière <strong className="text-slate-900 font-bold">"{disciplineActionModal.disciplineName}"</strong>.
                   </p>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                       Nouveau nom de la discipline
                     </label>
                     <input
                       type="text"
-                      className="w-full px-3 py-2 border border-gray-200 focus:border-blue-550 focus:ring focus:ring-blue-100/50 rounded-lg text-sm bg-gray-50/50"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:border-blue-600 focus:ring-2 focus:ring-blue-600/10 text-xs sm:text-sm bg-slate-50/50 font-medium outline-none transition-all"
                       placeholder="Ex: Administration & Gestion Financière"
                       value={disciplineActionModal.newName}
                       onChange={(e) =>
@@ -5273,16 +5291,16 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
               ) : disciplineActionModal.type === "move" ? (
-                <div className="space-y-4">
-                  <p className="text-xs text-gray-500 leading-relaxed">
-                    Déplacez la discipline <strong className="text-gray-950 font-bold">"{disciplineActionModal.disciplineName}"</strong> vers une autre division académique. Les matières et configurations associées seront préservées.
+                <div className="space-y-3">
+                  <p className="text-xs text-slate-500 leading-relaxed">
+                    Déplacez la discipline <strong className="text-slate-900 font-bold">"{disciplineActionModal.disciplineName}"</strong> vers une autre division académique. Les matières et configurations associées seront préservées.
                   </p>
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1">
                       Division cible
                     </label>
                     <select
-                      className="w-full px-3 py-2 border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-550 rounded-lg text-sm bg-white outline-none"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 text-xs sm:text-sm bg-white outline-none font-medium transition-all"
                       value={disciplineActionModal.targetDivision}
                       onChange={(e) =>
                         setDisciplineActionModal((prev) => ({
@@ -5311,32 +5329,32 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                       )}
                     </select>
                   </div>
-                  <p className="text-[11px] text-amber-700 bg-amber-50 rounded-lg p-2.5 leading-relaxed">
+                  <p className="text-[11px] text-amber-800 bg-amber-50 rounded-xl p-2.5 border border-amber-100 leading-relaxed font-medium">
                     Note : Les niveaux Licence/Master ne s'affichant pas en Professionnelle, ils seront automatiquement convertis en niveau "DIPLÔME" s'ils sont déplacés. De même, un niveau Certificat déplacé vers Universitaire sera converti en niveau "DIPLÔME".
                   </p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  <div className="p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-xl flex items-start gap-2.5">
-                    <ShieldAlert size={20} className="text-red-650 shrink-0 mt-0.5" />
-                    <div className="text-xs space-y-1.5 leading-relaxed">
-                      <p className="font-extrabold uppercase tracking-wide text-red-950">Avertissement de suppression en cascade</p>
+                <div className="space-y-3">
+                  <div className="p-3 bg-rose-50 border border-rose-200/80 text-rose-800 rounded-xl flex items-start gap-2.5">
+                    <ShieldAlert size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                    <div className="text-xs space-y-1 leading-relaxed">
+                      <p className="font-bold uppercase tracking-wide text-rose-950">Avertissement de suppression en cascade</p>
                       <p>
-                        Vous êtes sur le point de supprimer entièrement la filière <strong className="font-extrabold text-gray-955">"{disciplineActionModal.disciplineName}"</strong>.
+                        Vous êtes sur le point de supprimer entièrement la filière <strong className="font-bold text-slate-900">"{disciplineActionModal.disciplineName}"</strong>.
                       </p>
-                      <p className="font-bold">
+                      <p className="font-semibold text-rose-900">
                         Tous les niveaux académiques (ex: I, II, III), leurs frais d'admission, les attributions de matières, et les inscriptions des étudiants associés seront effacés de manière irréversible !
                       </p>
                     </div>
                   </div>
-                  <p className="text-xs text-gray-500 text-center">
+                  <p className="text-xs text-slate-500 text-center font-medium">
                     Cette action est définitive. Confirmez-vous la suppression ?
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 bg-gray-50 flex items-center gap-3">
+            <div className="p-3 sm:p-3.5 bg-slate-50/80 border-t border-slate-100 flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() =>
@@ -5345,7 +5363,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                     isOpen: false,
                   }))
                 }
-                className="flex-1 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
+                className="flex-1 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
                 disabled={disciplineActionModal.isSubmitting}
               >
                 Annuler
@@ -5354,16 +5372,16 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                 type="button"
                 onClick={handleExecuteDisciplineAction}
                 disabled={disciplineActionModal.isSubmitting || (disciplineActionModal.type === "rename" && !disciplineActionModal.newName.trim())}
-                className={`flex-1 py-2 text-white rounded-lg font-medium text-sm shadow-sm flex items-center justify-center gap-2 disabled:opacity-50 transition-colors ${
+                className={`flex-1 py-2 text-white rounded-xl font-bold text-xs shadow-xs flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors cursor-pointer ${
                   disciplineActionModal.type === "rename"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : disciplineActionModal.type === "move"
                       ? "bg-amber-600 hover:bg-amber-700"
-                      : "bg-red-600 hover:bg-red-700"
+                      : "bg-rose-600 hover:bg-rose-700"
                 }`}
               >
                 {disciplineActionModal.isSubmitting ? (
-                  <Loader2 size={16} className="animate-spin" />
+                  <Loader2 size={14} className="animate-spin" />
                 ) : (
                   disciplineActionModal.type === "rename" ? "Renommer" : disciplineActionModal.type === "move" ? "Déplacer" : "Supprimer"
                 )}
@@ -5375,51 +5393,53 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* MODALE DE CONFIRMATION PERSONNALISÉE */}
       {confirmModal.isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 text-center space-y-6">
-              <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto">
-                <ShieldAlert size={32} />
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-sm rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-4 sm:p-5 text-center space-y-4">
+              <div className="w-12 h-12 bg-rose-50 text-rose-600 rounded-2xl border border-rose-100 flex items-center justify-center mx-auto shadow-2xs">
+                <ShieldAlert size={24} />
               </div>
               <div>
-                <h3 className="text-xl font-bold text-gray-900">
+                <h3 className="text-base sm:text-lg font-bold text-slate-900">
                   {confirmModal.title}
                 </h3>
-                <div className="mt-2 space-y-2">
-                  <p className="text-gray-500 text-sm">
+                <div className="mt-1.5 space-y-1">
+                  <p className="text-slate-500 text-xs font-medium leading-relaxed">
                     {confirmModal.message}
                   </p>
-                  <span className="text-gray-900 font-semibold text-base block">
-                    {confirmModal.name}
-                  </span>
+                  {confirmModal.name && (
+                    <span className="text-slate-900 font-bold text-sm block">
+                      {confirmModal.name}
+                    </span>
+                  )}
                 </div>
 
                 {confirmModal.error && (
-                  <div className="mt-4 p-3 bg-rose-50 border border-rose-200 rounded-lg flex items-center gap-2 text-rose-700 text-sm text-left">
-                    <AlertCircle size={16} className="shrink-0" />
+                  <div className="mt-3 p-2.5 bg-rose-50 border border-rose-200 rounded-xl flex items-center gap-2 text-rose-700 text-xs text-left font-medium">
+                    <AlertCircle size={14} className="shrink-0" />
                     <span>{confirmModal.error}</span>
                   </div>
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3 pt-2">
+              <div className="grid grid-cols-2 gap-2.5 pt-1">
                 <button
                   onClick={() =>
                     setConfirmModal((prev) => ({ ...prev, isOpen: false }))
                   }
-                  className="py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-medium text-sm hover:bg-gray-50 transition-colors"
+                  className="py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   onClick={handlePerformDelete}
                   disabled={isDeleting !== null || isSeeding || isMigrating}
-                  className="py-2.5 bg-rose-600 text-white rounded-lg font-medium text-sm shadow-sm hover:bg-rose-700 flex items-center justify-center gap-2 disabled:opacity-50 transition-colors"
+                  className="py-2 bg-rose-600 text-white rounded-xl font-bold text-xs shadow-xs hover:bg-rose-700 flex items-center justify-center gap-1.5 disabled:opacity-50 transition-colors cursor-pointer"
                 >
                   {isDeleting !== null || isSeeding || isMigrating ? (
-                    <Loader2 size={16} className="animate-spin" />
+                    <Loader2 size={14} className="animate-spin" />
                   ) : (
-                    <Trash2 size={16} />
+                    <Trash2 size={14} />
                   )}
                   Confirmer
                 </button>
@@ -5431,53 +5451,57 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* MODALE D'INJECTION DE DISCIPLINE AUX AUTRES ANNEXES */}
       {injectModal.isOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-lg rounded-xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                <Send size={18} className="text-emerald-600" />
-                Diffuser la Discipline vers les Annexes
-              </h3>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/50 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-lg rounded-2xl shadow-xl border border-slate-200/80 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-3.5 sm:p-4 border-b border-slate-100 flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shrink-0">
+                  <Send size={15} />
+                </div>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
+                  Diffuser la Filière vers les Annexes
+                </h3>
+              </div>
               <button
                 type="button"
                 onClick={() => setInjectModal(prev => ({ ...prev, isOpen: false }))}
-                className="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-1.5 rounded-lg transition-colors"
+                className="text-slate-400 hover:text-slate-700 hover:bg-slate-100 p-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div>
-                <p className="text-xs text-gray-500 uppercase font-extrabold tracking-wider">Discipline de Référence du Siège</p>
-                <h4 className="text-base font-extrabold text-gray-950 mt-1">{injectModal.disciplineName}</h4>
-                <p className="text-xs text-slate-600 leading-relaxed mt-1.5">
-                  Cette action va créer tous les niveaux d'enseignement de la filière <strong className="text-gray-900 font-bold">"{injectModal.disciplineName}"</strong> déjà définis au Siège Social, et les injecter avec leurs grilles de cours (matières et coefficients) dans les annexes choisies.
+            <div className="p-3.5 sm:p-4 space-y-3.5">
+              <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200/60">
+                <p className="text-[10px] text-slate-400 uppercase font-extrabold tracking-wider">Discipline de Référence du Siège</p>
+                <h4 className="text-sm font-bold text-slate-900 mt-0.5">{injectModal.disciplineName}</h4>
+                <p className="text-xs text-slate-600 leading-relaxed mt-1">
+                  Cette action va créer tous les niveaux d'enseignement de la filière <strong className="text-slate-900 font-bold">"{injectModal.disciplineName}"</strong> définis au Siège Social, et les injecter avec leurs cours et coefficients dans les annexes choisies.
                 </p>
               </div>
 
               {injectModal.success && (
-                <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-850 text-xs font-semibold space-y-1">
-                  <div className="flex gap-2 items-start font-extrabold">
-                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0 mt-0.5" />
+                <div className="p-3 bg-emerald-50 border border-emerald-200/80 rounded-xl text-emerald-900 text-xs font-medium space-y-1">
+                  <div className="flex gap-2 items-center font-bold">
+                    <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
                     <span>Diffusion réussie !</span>
                   </div>
-                  <p className="pl-6 text-emerald-750 leading-snug">{injectModal.success}</p>
+                  <p className="pl-5 text-emerald-700 leading-snug">{injectModal.success}</p>
                 </div>
               )}
 
               {injectModal.error && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold flex items-start gap-2">
-                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 text-xs font-medium flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5" />
                   <span>{injectModal.error}</span>
                 </div>
               )}
 
               {/* Annexes list */}
               {!injectModal.success && (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-extrabold text-slate-700">Sélectionner les annexes destinataires :</span>
+                    <span className="text-xs font-bold text-slate-700">Sélectionner les annexes destinataires :</span>
                     {(() => {
                       const targetAnnexes = (campuses || []).filter(
                         (c) => c.id !== siegeCampusId && c.id !== currentCampusId
@@ -5493,7 +5517,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                               setInjectModal(prev => ({ ...prev, selectedCampusIds: targetAnnexes.map(c => c.id) }));
                             }
                           }}
-                          className="text-[10px] uppercase font-extrabold text-blue-600 hover:underline cursor-pointer"
+                          className="text-[10px] uppercase font-bold text-blue-600 hover:underline cursor-pointer"
                         >
                           {allSelected ? "Tout désélectionner" : "Tout sélectionner"}
                         </button>
@@ -5501,7 +5525,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                     })()}
                   </div>
 
-                  <div className="border border-gray-150 rounded-xl p-3 bg-slate-50/50 max-h-48 overflow-y-auto space-y-2">
+                  <div className="border border-slate-200/80 rounded-xl p-2.5 bg-slate-50/50 max-h-44 overflow-y-auto space-y-1.5 custom-scrollbar">
                     {(() => {
                       const targetAnnexes = (campuses || []).filter(
                         (c) => c.id !== siegeCampusId && c.id !== currentCampusId
@@ -5509,7 +5533,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       if (targetAnnexes.length === 0) {
                         return (
-                          <p className="text-xs font-bold text-gray-500 text-center py-4">
+                          <p className="text-xs font-medium text-slate-500 text-center py-4">
                             Aucune autre annexe n'a été répertoriée pour cet établissement.
                           </p>
                         );
@@ -5520,10 +5544,10 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                         return (
                           <label
                             key={campusItem.id}
-                            className={`flex items-center gap-3 p-2.5 rounded-lg border transition-all cursor-pointer bg-white ${
+                            className={`flex items-center gap-2.5 p-2 rounded-lg border transition-all cursor-pointer bg-white ${
                               isChecked
-                                ? "border-blue-200 bg-blue-50/20 text-blue-900 font-semibold"
-                                : "border-gray-200 text-slate-700 hover:bg-slate-50"
+                                ? "border-blue-200 bg-blue-50/20 text-blue-900 font-bold"
+                                : "border-slate-200/80 text-slate-700 hover:bg-slate-50 font-medium"
                             }`}
                           >
                             <input
@@ -5540,12 +5564,12 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   };
                                 });
                               }}
-                              className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                              className="rounded border-slate-300 text-blue-600 focus:ring-blue-500 h-3.5 w-3.5"
                             />
-                            <div className="flex-1">
-                              <span className="text-xs font-bold">{campusItem.name}</span>
+                            <div className="flex-1 min-w-0">
+                              <span className="text-xs block truncate">{campusItem.name}</span>
                               {campusItem.address && (
-                                <span className="text-[10px] text-gray-400 block -mt-0.5 font-normal">
+                                <span className="text-[10px] text-slate-400 block font-normal truncate">
                                   {campusItem.address}
                                 </span>
                               )}
@@ -5559,11 +5583,11 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-100 bg-slate-50 flex items-center justify-between">
+            <div className="p-3 sm:p-3.5 border-t border-slate-100 bg-slate-50/80 flex items-center justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setInjectModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg font-bold text-xs hover:bg-gray-50 transition-colors"
+                className="px-3.5 py-2 bg-white border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-50 transition-colors cursor-pointer"
               >
                 Fermer
               </button>
@@ -5573,11 +5597,11 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                   type="button"
                   disabled={injectModal.isSubmitting || injectModal.selectedCampusIds.length === 0}
                   onClick={handleExecuteInjection}
-                  className="px-4 py-2 bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed hover:bg-emerald-700 text-white rounded-lg font-bold text-xs shadow-sm flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-2 bg-emerald-600 disabled:bg-slate-300 disabled:cursor-not-allowed hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-xs flex items-center gap-1.5 transition-colors cursor-pointer"
                 >
                   {injectModal.isSubmitting ? (
                     <>
-                      <Loader2 size={14} className="animate-spin" />
+                      <Loader2 size={13} className="animate-spin" />
                       Diffusion en cours...
                     </>
                   ) : (
@@ -5595,37 +5619,37 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Quick Edit Coefficient Modal */}
       {editCoefModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-5 animate-in zoom-in-95 border border-slate-100">
+        <div className="fixed inset-0 bg-slate-950/50 backdrop-blur-xs z-[1000] flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-4 sm:p-5 space-y-4 animate-in zoom-in-95 border border-slate-200/80">
             <div className="flex items-center justify-between border-b pb-3 border-slate-100">
-              <div className="flex items-center gap-2">
-                <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
-                  <Bookmark size={18} />
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-100 shrink-0">
+                  <Bookmark size={15} />
                 </div>
-                <h3 className="text-base font-extrabold text-slate-900">
+                <h3 className="text-sm sm:text-base font-bold text-slate-900">
                   Modifier le Coefficient
                 </h3>
               </div>
               <button
                 onClick={() => setEditCoefModal((prev) => ({ ...prev, isOpen: false }))}
-                className="text-slate-400 hover:text-slate-600 p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-lg hover:bg-slate-100 transition-colors cursor-pointer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200/80 space-y-1">
-              <p className="text-xs text-slate-500 font-semibold uppercase tracking-wider">
+            <div className="bg-slate-50/70 p-3 rounded-xl border border-slate-200/60 space-y-0.5">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                 Matière & Classe concernées
               </p>
-              <p className="text-sm font-bold text-slate-900">
+              <p className="text-xs sm:text-sm font-bold text-slate-900">
                 {editCoefModal.subjectName}{" "}
                 <span className="text-blue-600 font-normal">({editCoefModal.className})</span>
               </p>
             </div>
 
-            <div className="space-y-3">
-              <label className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">
+            <div className="space-y-2.5">
+              <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                 Nouveau Coefficient / Barème (ex: 100, 200, 300)
               </label>
               <input
@@ -5633,7 +5657,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                 min="0.5"
                 max="500"
                 step="0.5"
-                className="w-full px-4 py-3 rounded-xl border border-slate-200 text-slate-900 font-extrabold text-xl outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-center bg-white"
+                className="w-full px-3 py-2 rounded-xl border border-slate-200 text-slate-900 font-bold text-lg outline-none focus:ring-2 focus:ring-blue-600/10 focus:border-blue-600 transition-all text-center bg-white shadow-2xs"
                 value={editCoefModal.coefficient}
                 onChange={(e) =>
                   setEditCoefModal((prev) => ({
@@ -5644,7 +5668,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
               />
               <div className="space-y-1">
                 <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Raccourcis rapides :</p>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1">
                   {[100, 200, 300, 10, 20, 1, 2, 3, 4, 5].map((preset) => (
                     <button
                       key={preset}
@@ -5655,9 +5679,9 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                           coefficient: preset,
                         }))
                       }
-                      className={`px-2.5 py-1 text-xs font-black rounded-lg border transition-all cursor-pointer ${
+                      className={`px-2 py-0.5 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
                         editCoefModal.coefficient === preset
-                          ? "bg-blue-600 text-white border-blue-600 shadow-sm"
+                          ? "bg-blue-600 text-white border-blue-600 shadow-2xs"
                           : "bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200"
                       }`}
                     >
@@ -5666,16 +5690,16 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                   ))}
                 </div>
               </div>
-              <p className="text-[11px] text-slate-500 font-medium pt-1">
-                Note : Modifiable à volonté par l'administrateur. Reste strictly propre à votre établissement.
+              <p className="text-[10px] text-slate-500 font-medium">
+                Note : Modifiable à volonté par l'administrateur. Spécifique à votre établissement.
               </p>
             </div>
 
-            <div className="flex justify-end gap-3 pt-2">
+            <div className="flex justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setEditCoefModal((prev) => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2.5 text-slate-600 hover:bg-slate-100 font-bold text-xs rounded-xl transition-colors cursor-pointer"
+                className="px-3.5 py-2 text-slate-600 hover:bg-slate-100 font-bold text-xs rounded-xl transition-colors cursor-pointer"
               >
                 Annuler
               </button>
@@ -5683,14 +5707,14 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                 type="button"
                 onClick={handleSaveInlineCoef}
                 disabled={editCoefModal.isSaving}
-                className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-colors shadow-xs flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {editCoefModal.isSaving ? (
-                  <Loader2 size={15} className="animate-spin" />
+                  <Loader2 size={13} className="animate-spin" />
                 ) : (
-                  <CheckCircle2 size={15} />
+                  <CheckCircle2 size={13} />
                 )}
-                Enregistrer Coefficient
+                Enregistrer
               </button>
             </div>
           </div>

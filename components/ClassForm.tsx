@@ -402,33 +402,35 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in slide-in-from-bottom duration-300 pb-16">
-      {/* Header */}
-      <div className="bg-white rounded-2xl p-6 shadow-xs border border-gray-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-300 pb-12">
+      {/* Compact Modern Header */}
+      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
+        <div className="flex items-center gap-3">
           <button 
             type="button"
             onClick={() => navigate('/classes')} 
-            className="p-2.5 bg-gray-50 text-gray-600 rounded-xl border border-gray-200 hover:bg-gray-100 hover:text-gray-900 transition-all shadow-2xs group"
-            title="Retourner aux classes"
+            className="p-2 bg-slate-50 text-slate-600 rounded-xl border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900 transition-all shadow-2xs group shrink-0 cursor-pointer"
+            title={`Retour aux ${terminology.classes.toLowerCase()}`}
           >
-            <ArrowLeft size={18} className="group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft size={17} className="group-hover:-translate-x-0.5 transition-transform" />
           </button>
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs border border-blue-100">
-              <School size={22} />
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-blue-50/80 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs border border-blue-100/80 shrink-0">
+              <School size={20} />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                <span>{isEdit ? `Modifier ${terminology.class}` : `Nouvelle ${terminology.class}`}</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                  {isEdit ? `Modifier la ${terminology.class}` : `Nouvelle ${terminology.class}`}
+                </h2>
                 {!isEdit && (
                   <span className="text-[10px] uppercase font-extrabold tracking-wider bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full border border-blue-200/60">
-                    {activeCategory === SchoolType.UNIVERSITY ? 'Universitaire' : activeCategory === SchoolType.PROFESSIONAL ? 'Pro' : 'Classique'}
+                    {activeCategory === SchoolType.UNIVERSITY ? 'Universitaire' : activeCategory === SchoolType.PROFESSIONAL ? 'Professionnelle' : 'Général'}
                   </span>
                 )}
-              </h2>
-              <p className="text-gray-500 text-xs font-medium mt-0.5">
-                {isEdit ? `Ajustez les détails de la structure de classe` : `Définissez les paramètres de la classe pour votre établissement`}
+              </div>
+              <p className="text-slate-500 text-xs font-medium">
+                {isEdit ? `Configuration et paramètres pédagogiques de la structure` : `Paramétrage de la ${terminology.class.toLowerCase()} pour votre établissement`}
               </p>
             </div>
           </div>
@@ -436,18 +438,18 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         {/* Category Selector Tabs if creating */}
         {!isEdit && (
-          <div className="flex bg-gray-100/80 p-1 rounded-xl border border-gray-200/60 text-xs font-semibold self-start sm:self-auto">
+          <div className="flex bg-slate-100/80 p-0.5 rounded-xl border border-slate-200/70 text-xs font-semibold self-start sm:self-auto shrink-0">
             {(!school || school.school_type === 'CLASSIC') && (
               <button
                 type="button"
                 onClick={() => setActiveCategory(SchoolType.CLASSIC)}
-                className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                   activeCategory === SchoolType.CLASSIC 
                     ? 'bg-white text-blue-700 shadow-2xs font-bold' 
-                    : 'text-gray-600 hover:text-gray-900'
+                    : 'text-slate-600 hover:text-slate-900'
                 }`}
               >
-                Scolaire
+                Général
               </button>
             )}
             {(!school || school.school_type === 'UNIVERSITY' || school.school_type === 'PROFESSIONAL') && (
@@ -456,10 +458,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setActiveCategory(SchoolType.UNIVERSITY)}
-                    className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                    className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                       activeCategory === SchoolType.UNIVERSITY 
                         ? 'bg-white text-blue-700 shadow-2xs font-bold' 
-                        : 'text-gray-600 hover:text-gray-900'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
                     Universitaire
@@ -468,10 +470,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => setActiveCategory(SchoolType.PROFESSIONAL)}
-                  className={`px-3.5 py-1.5 rounded-lg transition-all ${
+                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
                     activeCategory === SchoolType.PROFESSIONAL 
                       ? 'bg-white text-blue-700 shadow-2xs font-bold' 
-                      : 'text-gray-600 hover:text-gray-900'
+                      : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
                   Professionnelle
@@ -483,37 +485,37 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {apiError && (
-        <div className="bg-rose-50 border border-rose-200/80 p-4 rounded-xl flex items-start gap-3 text-rose-800 shadow-2xs animate-in fade-in">
-          <AlertCircle size={20} className="mt-0.5 flex-shrink-0 text-rose-600" />
+        <div className="bg-rose-50 border border-rose-200/80 p-3.5 rounded-xl flex items-start gap-2.5 text-rose-800 shadow-2xs animate-in fade-in">
+          <AlertCircle size={18} className="mt-0.5 shrink-0 text-rose-600" />
           <div className="space-y-0.5">
-             <p className="text-xs font-bold uppercase tracking-wider text-rose-900">Attention</p>
+             <p className="text-xs font-bold uppercase tracking-wider text-rose-900">Avertissement de validation</p>
              <p className="text-xs font-medium">{apiError}</p>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
         {/* Section 1: Information principale & Cycle */}
-        <div className="bg-white rounded-2xl p-6 shadow-xs border border-gray-200/80 space-y-5">
-          <div className="flex items-center justify-between pb-3 border-b border-gray-100">
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3.5">
+          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Identité de la Classe</h3>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Identité & Cycle Académique</h3>
             </div>
-            <span className="text-xs text-gray-400 font-normal">* Champs obligatoires</span>
+            <span className="text-[11px] text-slate-400 font-normal">* Obligatoire</span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
             {/* Disciplines Standard for Uni/Pro */}
             {formSchoolType !== SchoolType.CLASSIC && useStandardSelector ? (
-              <div className="md:col-span-2 p-4 bg-gradient-to-r from-blue-50/60 to-indigo-50/40 rounded-xl border border-blue-100 space-y-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-blue-950 uppercase tracking-wide">Discipline Standard</label>
+              <div className="md:col-span-2 p-3.5 bg-gradient-to-r from-blue-50/60 to-indigo-50/40 rounded-xl border border-blue-100 space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-blue-950 uppercase tracking-wide">Filière / Discipline Standard</label>
                     <select 
                       value={selectedStandardDiscipline}
                       onChange={(e) => setSelectedStandardDiscipline(e.target.value)}
-                      className="w-full px-3.5 py-2 bg-white text-gray-900 border border-blue-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none shadow-2xs cursor-pointer"
+                      className="w-full px-3 py-2 bg-white text-slate-900 border border-blue-200 rounded-lg text-xs font-medium focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none shadow-2xs cursor-pointer"
                     >
                       {(formSchoolType === SchoolType.UNIVERSITY ? standardUniversityDisciplines : standardProfessionalDisciplines).map(d => (
                         <option key={d.name} value={d.name}>{d.name}</option>
@@ -521,9 +523,9 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </select>
                   </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-blue-950 uppercase tracking-wide">Niveau / Promotion</label>
-                    <div className="flex flex-wrap gap-1.5">
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-blue-950 uppercase tracking-wide">Niveau / Promotion</label>
+                    <div className="flex flex-wrap gap-1">
                       {['I', 'II', 'III', 'IV', 'V', 'VI'].slice(0, 
                         (formSchoolType === SchoolType.UNIVERSITY ? standardUniversityDisciplines : standardProfessionalDisciplines)
                           .find(d => d.name === selectedStandardDiscipline)?.duration || 4
@@ -532,10 +534,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           key={year}
                           type="button"
                           onClick={() => setSelectedStandardYear(year)}
-                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
                             selectedStandardYear === year
                               ? 'bg-blue-600 text-white shadow-2xs'
-                              : 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-100'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
                           }`}
                         >
                           Année {year}
@@ -546,8 +548,8 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div className="flex flex-wrap justify-between items-center pt-2 border-t border-blue-100/80 gap-2">
-                  <span className="text-xs font-extrabold text-blue-800 bg-blue-100/70 px-3 py-1 rounded-lg">
-                    Format généré : {formData.name} ({formData.duration})
+                  <span className="text-[11px] font-extrabold text-blue-900 bg-blue-100/70 px-2.5 py-0.5 rounded-md">
+                    Format généré : <strong>{formData.name}</strong> ({formData.duration})
                   </span>
                   <button 
                     type="button"
@@ -555,23 +557,23 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       setUseStandardSelector(false);
                       setFormData(prev => ({ ...prev, name: '' }));
                     }}
-                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors flex items-center gap-1"
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors flex items-center gap-1 cursor-pointer"
                   >
-                    <span>Saisir un nom personnalisé</span>
+                    <span>Saisir un intitulé personnalisé</span>
                   </button>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2 md:col-span-1">
+              <div className="space-y-1.5 md:col-span-1">
                 <div className="flex justify-between items-center">
-                  <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-                    Nom de la classe <span className="text-rose-500">*</span>
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                    Intitulé de la {terminology.class.toLowerCase()} <span className="text-rose-500">*</span>
                   </label>
                   {formSchoolType !== SchoolType.CLASSIC && (
                     <button 
                       type="button"
                       onClick={() => setUseStandardSelector(true)}
-                      className="text-xs font-medium text-blue-600 hover:text-blue-800 hover:underline transition-colors"
+                      className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:underline transition-colors cursor-pointer"
                     >
                       Catalogue standard
                     </button>
@@ -579,37 +581,37 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div className="relative">
-                  <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                    <GraduationCap size={16} />
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                    <GraduationCap size={15} />
                   </div>
                   <input 
                     required 
                     type="text" 
-                    className={`w-full pl-10 pr-4 py-2.5 bg-gray-50/50 text-gray-900 border ${
+                    className={`w-full pl-9 pr-3 py-2 bg-slate-50/60 text-slate-900 border ${
                       isNameDuplicate 
                         ? 'border-amber-500 focus:border-amber-500 focus:ring-amber-500/20' 
-                        : 'border-gray-200 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10'
-                    } rounded-xl text-sm font-medium transition-all shadow-2xs placeholder:text-gray-400`} 
+                        : 'border-slate-200 focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10'
+                    } rounded-xl text-xs sm:text-sm font-medium transition-all shadow-2xs placeholder:text-slate-400 outline-none`} 
                     value={formData.name} 
                     onChange={(e) => setFormData({...formData, name: e.target.value})} 
-                    placeholder={formSchoolType !== SchoolType.CLASSIC ? "Ex: Génie Civil I" : "Ex: 1ère Année AF"} 
+                    placeholder={formSchoolType !== SchoolType.CLASSIC ? "Ex: Génie Logiciel I" : "Ex: 1ère Année AF, NS1"} 
                   />
                 </div>
 
                 {isNameDuplicate && (
-                  <p className="text-xs text-amber-700 font-medium ml-1 flex items-center gap-1 mt-1">
-                    <AlertCircle size={14} /> Cette classe existe déjà dans ce niveau/cycle.
+                  <p className="text-[11px] text-amber-700 font-medium ml-1 flex items-center gap-1">
+                    <AlertCircle size={13} /> Cette {terminology.class.toLowerCase()} existe déjà dans ce cycle.
                   </p>
                 )}
 
                 {/* Quick Presets for Classic Schools */}
                 {formSchoolType === SchoolType.CLASSIC && !isEdit && (
-                  <div className="pt-2">
-                    <span className="text-[11px] font-semibold text-gray-500 block mb-1.5 flex items-center gap-1">
-                      <Sparkles size={12} className="text-amber-500" />
-                      Raccourcis rapides :
+                  <div className="pt-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-1 flex items-center gap-1">
+                      <Sparkles size={11} className="text-amber-500" />
+                      Raccourcis prédéfinis :
                     </span>
-                    <div className="flex flex-wrap gap-1.5">
+                    <div className="flex flex-wrap gap-1">
                       {classicPresets.map((preset) => (
                         <button
                           key={preset.label}
@@ -621,10 +623,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                               level: preset.level
                             }));
                           }}
-                          className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-all ${
+                          className={`px-2 py-0.5 rounded-md text-[11px] font-medium border transition-all cursor-pointer ${
                             formData.name === preset.full
                               ? 'bg-blue-50 text-blue-700 border-blue-300 font-bold shadow-2xs'
-                              : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100 hover:text-gray-900'
+                              : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-slate-900'
                           }`}
                         >
                           {preset.label}
@@ -637,9 +639,9 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             )}
 
             {/* Cycle / Niveau Selector */}
-            <div className="space-y-2 md:col-span-1">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Cycle / Niveau Scolaire</label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            <div className="space-y-1.5 md:col-span-1">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">Cycle & Degré Académique</label>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                 {formSchoolType === SchoolType.UNIVERSITY ? (
                   [
                     { value: SchoolLevel.DIPLOME, label: 'Diplôme' },
@@ -649,10 +651,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       key={lvl.value}
                       type="button"
                       onClick={() => setFormData({...formData, level: lvl.value})}
-                      className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border text-center ${
+                      className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
                         formData.level === lvl.value
                           ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          : 'bg-slate-50/70 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       {lvl.label}
@@ -667,10 +669,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       key={lvl.value}
                       type="button"
                       onClick={() => setFormData({...formData, level: lvl.value})}
-                      className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border text-center ${
+                      className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all border text-center cursor-pointer ${
                         formData.level === lvl.value
                           ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          : 'bg-slate-50/70 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       {lvl.label}
@@ -686,10 +688,10 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       key={lvl.value}
                       type="button"
                       onClick={() => setFormData({...formData, level: lvl.value})}
-                      className={`px-3 py-2.5 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1.5 ${
+                      className={`px-2.5 py-2 rounded-xl text-xs font-bold transition-all border text-center flex items-center justify-center gap-1 cursor-pointer ${
                         formData.level === lvl.value
                           ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
-                          : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                          : 'bg-slate-50/70 text-slate-700 border-slate-200 hover:bg-slate-100'
                       }`}
                     >
                       <span>{lvl.icon}</span>
@@ -702,60 +704,60 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Section 2: Attribution & Localisation */}
-        <div className="bg-white rounded-2xl p-6 shadow-xs border border-gray-200/80 space-y-5">
-          <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+        {/* Section 2: Attribution, Salle & Campus */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3.5">
+          <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
             <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Attribution & Localisation</h3>
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Attribution, Salle & Localisation</h3>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">
-                {formSchoolType === SchoolType.UNIVERSITY ? "Responsable de Promotion / Niveau" : "Professeur Titulaire / Responsable"}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
+                {formSchoolType === SchoolType.UNIVERSITY ? "Responsable de Promotion" : "Titulaire / Responsable"}
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <UserCheck size={16} />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <UserCheck size={15} />
                 </div>
                 <input 
                   type="text" 
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs placeholder:text-gray-400" 
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs placeholder:text-slate-400 outline-none" 
                   value={formData.teacher} 
                   onChange={(e) => setFormData({...formData, teacher: e.target.value})} 
-                  placeholder="Ex: Jean-Baptiste Marie" 
+                  placeholder="Ex: Prof. Marie Jean" 
                 />
               </div>
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Local / Salle de Classe</label>
+            <div className="space-y-1">
+              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Local / Salle de Classe</label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-gray-400">
-                  <Building2 size={16} />
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <Building2 size={15} />
                 </div>
                 <input 
                   type="text" 
-                  className="w-full pl-10 pr-4 py-2.5 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs placeholder:text-gray-400" 
+                  className="w-full pl-9 pr-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs placeholder:text-slate-400 outline-none" 
                   value={formData.room} 
                   onChange={(e) => setFormData({...formData, room: e.target.value})} 
-                  placeholder="Ex: Bâtiment B, Salle 104" 
+                  placeholder="Ex: Bâtiment A, Salle 203" 
                 />
               </div>
             </div>
 
             {campuses && campuses.length > 1 && !user.campus_id && (
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide flex items-center gap-1.5">
-                  <MapPin size={15} className="text-blue-600" />
+              <div className="space-y-1 sm:col-span-2 lg:col-span-1">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                  <MapPin size={13} className="text-blue-600" />
                   Campus / Annexe d'Attache
                 </label>
                 <select
                   value={formData.campus_id}
                   onChange={(e) => setFormData({...formData, campus_id: e.target.value})}
-                  className="w-full px-4 py-2.5 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all outline-none cursor-pointer shadow-2xs"
+                  className="w-full px-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all outline-none cursor-pointer shadow-2xs"
                 >
-                  <option value="" className="text-slate-500">🌍 Accès Global (Disponible sur tous les campus)</option>
+                  <option value="" className="text-slate-500">🌍 Réseau complet (Tous les campus)</option>
                   {campuses.map(c => (
                     <option key={c.id} value={c.id}>📍 {c.name}</option>
                   ))}
@@ -767,28 +769,28 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         {/* Extra options for University/Pro */}
         {formSchoolType !== SchoolType.CLASSIC && (
-          <div className="bg-white rounded-2xl p-6 shadow-xs border border-gray-200/80 space-y-5">
-            <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+          <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3.5">
+            <div className="flex items-center gap-2 pb-2.5 border-b border-slate-100">
               <span className="w-2 h-2 rounded-full bg-indigo-500"></span>
-              <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Paramètres Pédagogiques</h3>
+              <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Paramètres Pédagogiques du Cursus</h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Durée Globale</label>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Durée Globale</label>
                 <input 
                   type="text" 
-                  className="w-full px-4 py-2.5 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs" 
+                  className="w-full px-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs outline-none" 
                   value={formData.duration} 
                   onChange={(e) => setFormData({...formData, duration: e.target.value})} 
                   placeholder="ex: 4 ans / 8 semestres" 
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Format d'Évaluation</label>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Format d'Évaluation</label>
                 <select 
-                  className="w-full px-4 py-2.5 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all outline-none cursor-pointer shadow-2xs" 
+                  className="w-full px-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all outline-none cursor-pointer shadow-2xs" 
                   value={formData.periodFormat} 
                   onChange={(e) => setFormData({...formData, periodFormat: e.target.value})}
                 >
@@ -799,13 +801,13 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </select>
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-700 uppercase tracking-wide">Nb. d'Examens / An</label>
+              <div className="space-y-1">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">Nb. d'Examens / An</label>
                 <input 
                   type="number" 
                   min={1} 
                   max={10} 
-                  className="w-full px-4 py-2.5 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs" 
+                  className="w-full px-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all shadow-2xs outline-none" 
                   value={formData.examsCount} 
                   onChange={(e) => setFormData({...formData, examsCount: parseInt(e.target.value) || 4})} 
                 />
@@ -814,30 +816,30 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         )}
 
-        {/* Section 3: Notes / Remarques */}
-        <div className="bg-white rounded-2xl p-6 shadow-xs border border-gray-200/80 space-y-4">
-          <div className="flex items-center gap-2 pb-3 border-b border-gray-100">
+        {/* Section 3: Notes & Consignes */}
+        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
             <span className="w-2 h-2 rounded-full bg-slate-400"></span>
-            <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider">Notes Complementaires</h3>
+            <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Consignes & Notes Administratives</h3>
           </div>
 
           <div className="relative">
             <textarea 
-              rows={3} 
-              className="w-full p-4 bg-gray-50/50 text-gray-900 border border-gray-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all resize-none shadow-2xs placeholder:text-gray-400" 
+              rows={2} 
+              className="w-full p-3 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-blue-600 focus:bg-white focus:ring-2 focus:ring-blue-600/10 transition-all resize-none shadow-2xs placeholder:text-slate-400 outline-none" 
               value={formData.description} 
               onChange={(e) => setFormData({...formData, description: e.target.value})} 
-              placeholder="Inscrivez d'éventuelles consignes ou remarques administratives concernant cette classe..." 
+              placeholder="Inscrivez d'éventuelles directives administratives ou pédagogiques pour cette classe..." 
             />
           </div>
         </div>
 
-        {/* Submit Actions */}
-        <div className="flex items-center justify-between pt-2">
+        {/* Submit Actions Bar */}
+        <div className="flex items-center justify-between gap-3 pt-1">
           <button 
             type="button" 
             onClick={() => navigate('/classes')} 
-            className="px-5 py-2.5 text-xs font-bold text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-100 hover:text-gray-900 transition-all shadow-2xs"
+            className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200/80 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-2xs cursor-pointer"
           >
             Annuler
           </button>
@@ -845,14 +847,14 @@ const ClassForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           <button 
             disabled={isSubmitting || isNameDuplicate} 
             type="submit" 
-            className="px-6 py-3 bg-gray-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-sm hover:bg-blue-600 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group/btn"
+            className="px-5 py-2.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs hover:bg-blue-600 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed group/btn cursor-pointer"
           >
             {isSubmitting ? (
-              <Loader2 className="animate-spin" size={16} />
+              <Loader2 className="animate-spin" size={15} />
             ) : (
-              <Save size={16} className="group-hover/btn:scale-110 transition-transform" />
+              <Save size={15} className="group-hover/btn:scale-110 transition-transform" />
             )}
-            <span>{isEdit ? 'Mettre à jour la classe' : `Créer la classe`}</span>
+            <span>{isEdit ? `Enregistrer les modifications` : `Créer la ${terminology.class.toLowerCase()}`}</span>
           </button>
         </div>
       </form>
