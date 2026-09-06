@@ -3723,23 +3723,23 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
               const disciplines = Object.keys(groupedAll);
 
               const renderGrids = () => (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                <div className="space-y-4 sm:space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-300">
                   {Object.entries(groupedFiltered)
                     .filter(
                       ([groupName]) => cycleTab === "Tous" || cycleTab === groupName,
                     )
                     .filter(([_, groupClasses]) => groupClasses.length > 0)
                     .map(([groupName, groupClasses]) => (
-                      <div key={groupName} className="space-y-4">
-                        <div className="flex items-center gap-3 border-b border-gray-200 pb-2">
-                          <h3 className="text-lg font-extrabold text-gray-800">
+                      <div key={groupName} className="space-y-3">
+                        <div className="flex items-center gap-2.5 border-b border-gray-200/80 pb-1.5">
+                          <h3 className="text-base font-extrabold text-gray-800">
                             {groupName}
                           </h3>
-                          <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold shadow-sm">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
                             {groupClasses.length} {terminology.classes}
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
                           {groupClasses.map((cls) => {
                             const classAssocs = associations.filter((a) => a.class_id === cls.id);
                             const totalCoef = classAssocs.reduce(
@@ -3751,21 +3751,21 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                             return (
                               <div
                                 key={cls.id}
-                                className="bg-white rounded-xl p-5 shadow-sm border border-gray-200 hover:shadow-md hover:border-blue-300 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[250px]"
+                                className="bg-white rounded-xl p-3.5 sm:p-4 shadow-xs border border-gray-200/80 hover:shadow-md hover:border-blue-300 transition-all group relative overflow-hidden flex flex-col justify-between min-h-[220px]"
                               >
-                                <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-br from-blue-500/5 to-indigo-500/10 rounded-full -mr-14 -mt-14 pointer-events-none group-hover:scale-125 transition-transform duration-300"></div>
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-blue-500/5 to-indigo-500/10 rounded-full -mr-12 -mt-12 pointer-events-none group-hover:scale-125 transition-transform duration-300"></div>
 
                                 <div className="relative z-10 flex flex-col h-full justify-between flex-1">
                                   <div>
-                                    <div className="flex justify-between items-start mb-3">
-                                      <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shadow-xs group-hover:bg-blue-600 group-hover:text-white transition-colors">
-                                        <GraduationCap size={20} />
+                                    <div className="flex justify-between items-start mb-2">
+                                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shadow-2xs group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                        <GraduationCap size={18} />
                                       </div>
 
                                       <div className="flex items-center gap-1.5">
                                         {studentCount > 0 ? (
-                                          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                                            <Users size={12} />
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                                            <Users size={11} />
                                             {studentCount} {academicTab === "Universitaire" ? "étudiant(s)" : academicTab === "Professionnelle" ? "apprenant(s)" : "élève(s)"}
                                           </span>
                                         ) : (
@@ -3782,26 +3782,26 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                               onClick={() =>
                                                 navigate(`/classes/modifier/${cls.id}`)
                                               }
-                                              className="p-1.5 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-md transition-colors"
+                                              className="p-1 text-gray-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors cursor-pointer"
                                               title="Modifier la structure"
                                             >
-                                              <Edit2 size={15} />
+                                              <Edit2 size={14} />
                                             </button>
                                             <button
                                               onClick={() =>
                                                 triggerDeleteClass(cls.id, cls.name)
                                               }
-                                              className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                              className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                               title={`Supprimer ce/cette ${terminology.class.toLowerCase()}`}
                                             >
-                                              <Trash2 size={15} />
+                                              <Trash2 size={14} />
                                             </button>
                                           </div>
                                         )}
                                       </div>
                                     </div>
 
-                                    <h4 className="text-base font-bold text-gray-900 leading-tight flex flex-wrap items-center gap-1.5 mb-4">
+                                    <h4 className="text-sm sm:text-base font-bold text-gray-900 leading-tight flex flex-wrap items-center gap-1.5 mb-2.5">
                                       <span>{formatDisciplineName(cls.name)}</span>
                                       {getRomanSuffix(cls.name) && (
                                         <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-extrabold bg-blue-100/85 text-blue-800 border border-blue-200">
@@ -3810,17 +3810,17 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       )}
                                     </h4>
 
-                                    <div className="space-y-2 text-xs">
+                                    <div className="space-y-1.5 text-xs">
                                       {/* Programme & Coefs */}
-                                      <div className="flex items-center justify-between p-2.5 bg-indigo-50/40 rounded-lg border border-indigo-100">
-                                        <div className="flex items-center gap-2">
-                                          <BookOpen size={15} className="text-indigo-600" />
-                                          <span className="font-semibold text-indigo-900">
+                                      <div className="flex items-center justify-between p-2 bg-indigo-50/40 rounded-lg border border-indigo-100/80">
+                                        <div className="flex items-center gap-1.5">
+                                          <BookOpen size={14} className="text-indigo-600" />
+                                          <span className="font-semibold text-indigo-900 text-xs">
                                             {terminology.subjects}
                                           </span>
                                         </div>
                                         <div className="flex items-center gap-1.5">
-                                          <span className="font-extrabold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-100 shadow-2xs">
+                                          <span className="font-extrabold text-indigo-700 bg-white px-1.5 py-0.5 rounded border border-indigo-100 text-[11px] shadow-2xs">
                                             {cls.subjects_count || 0} matière(s)
                                           </span>
                                           {totalCoef > 0 && (
@@ -3832,10 +3832,10 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       </div>
 
                                       {/* Professeur Titulaire */}
-                                      <div className="flex items-center justify-between p-2.5 bg-gray-50/80 rounded-lg border border-gray-100">
-                                        <div className="flex items-center gap-2">
-                                          <UserCheck size={15} className="text-gray-500" />
-                                          <span className="font-semibold text-gray-600">
+                                      <div className="flex items-center justify-between p-2 bg-gray-50/80 rounded-lg border border-gray-100">
+                                        <div className="flex items-center gap-1.5">
+                                          <UserCheck size={14} className="text-gray-500" />
+                                          <span className="font-semibold text-gray-600 text-xs">
                                             {academicTab === "Universitaire" ? "Resp. Niveau" : "Titulaire"}
                                           </span>
                                         </div>
@@ -3846,10 +3846,10 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                                       {/* Salle / Local */}
                                       {cls.room && (
-                                        <div className="flex items-center justify-between p-2.5 bg-gray-50/80 rounded-lg border border-gray-100">
-                                          <div className="flex items-center gap-2">
-                                            <Building2 size={15} className="text-gray-500" />
-                                            <span className="font-semibold text-gray-600">Salle / Local</span>
+                                        <div className="flex items-center justify-between p-2 bg-gray-50/80 rounded-lg border border-gray-100">
+                                          <div className="flex items-center gap-1.5">
+                                            <Building2 size={14} className="text-gray-500" />
+                                            <span className="font-semibold text-gray-600 text-xs">Salle / Local</span>
                                           </div>
                                           <span className="font-bold text-[11px] text-gray-900 bg-white px-2 py-0.5 rounded border border-gray-200">
                                             {cls.room}
@@ -3864,9 +3864,9 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       setActiveTab("matrix");
                                       window.scrollTo({ top: 300, behavior: "smooth" });
                                     }}
-                                    className="w-full py-2.5 mt-4 bg-gray-900 text-white rounded-lg text-xs font-bold hover:bg-blue-600 transition-colors shadow-xs flex items-center justify-center gap-2 group/btn"
+                                    className="w-full py-2 mt-3 bg-gray-900 text-white rounded-xl text-xs font-bold hover:bg-blue-600 transition-colors shadow-2xs flex items-center justify-center gap-1.5 group/btn cursor-pointer"
                                   >
-                                    <BookOpen size={14} className="group-hover/btn:scale-110 transition-transform" />
+                                    <BookOpen size={13} className="group-hover/btn:scale-110 transition-transform" />
                                     <span>Gérer le Programme & Cours</span>
                                   </button>
                                 </div>
@@ -3880,11 +3880,11 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                               onClick={() =>
                                 navigate(`/classes/ajouter?type=${academicTab}`)
                               }
-                              className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-8 flex flex-col items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/40 transition-all min-h-[240px] group"
+                              className="bg-gray-50 border-2 border-dashed border-gray-300 rounded-xl p-5 flex flex-col items-center justify-center text-gray-400 hover:border-blue-400 hover:text-blue-600 hover:bg-blue-50/40 transition-all min-h-[200px] group cursor-pointer"
                             >
                               <Plus
-                                size={32}
-                                className="mb-2 group-hover:scale-110 transition-transform text-gray-400 group-hover:text-blue-600"
+                                size={26}
+                                className="mb-1.5 group-hover:scale-110 transition-transform text-gray-400 group-hover:text-blue-600"
                               />
                               <span className="font-bold text-xs text-center leading-normal">
                                 Nouvelle Niveau / Promotion
@@ -4149,16 +4149,16 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
               <table className="w-full text-left min-w-[600px]">
                 <thead>
                   <tr className="bg-gray-50/80 text-gray-700 text-xs font-bold uppercase tracking-wider border-b border-gray-200/80">
-                    <th scope="col" className="px-6 py-4">
+                    <th scope="col" className="px-4 py-2.5">
                       Intitulé de la {terminology.subject}
                     </th>
-                    <th scope="col" className="px-6 py-4">
+                    <th scope="col" className="px-4 py-2.5">
                       Description / Objectifs
                     </th>
                     {(user.role === UserRole.SUPER_ADMIN ||
                       user.role === UserRole.SCHOOL_ADMIN ||
                       user.role === UserRole.DIRECTOR) && (
-                      <th scope="col" className="px-6 py-4 text-center w-36">
+                      <th scope="col" className="px-4 py-2.5 text-center w-28">
                         Actions
                       </th>
                     )}
@@ -4170,22 +4170,22 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                       key={s.id}
                       className="group hover:bg-indigo-50/40 transition-colors duration-150"
                     >
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs group-hover:bg-indigo-100 group-hover:text-indigo-700 transition-colors">
-                            <BookOpen size={16} />
+                      <td className="px-4 py-2.5">
+                        <div className="flex items-center gap-2.5">
+                          <div className="p-1.5 rounded-lg bg-slate-100 text-slate-700 font-bold text-xs group-hover:bg-indigo-100 group-hover:text-indigo-700 transition-colors">
+                            <BookOpen size={15} />
                           </div>
                           <div>
-                            <span className="text-sm font-bold text-gray-900 block group-hover:text-indigo-900 transition-colors">
+                            <span className="text-xs sm:text-sm font-bold text-gray-900 block group-hover:text-indigo-900 transition-colors">
                               {s.name}
                             </span>
-                            <span className="text-[11px] font-mono text-gray-400 group-hover:text-indigo-600 transition-colors">
+                            <span className="text-[10px] font-mono text-gray-400 group-hover:text-indigo-600 transition-colors">
                               Code : {s.code}
                             </span>
                           </div>
                         </div>
                       </td>
-                      <td className="px-6 py-4 text-xs text-gray-600 max-w-[320px]">
+                      <td className="px-4 py-2.5 text-xs text-gray-600 max-w-[320px]">
                         {s.description ? (
                           <span className="line-clamp-2">{s.description}</span>
                         ) : (
@@ -4195,25 +4195,25 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                       {(user.role === UserRole.SUPER_ADMIN ||
                         user.role === UserRole.SCHOOL_ADMIN ||
                         user.role === UserRole.DIRECTOR) && (
-                        <td className="px-6 py-4">
-                          <div className="flex items-center justify-center gap-2">
+                        <td className="px-4 py-2.5">
+                          <div className="flex items-center justify-center gap-1.5">
                             <button
                               onClick={() =>
                                 navigate(`/matieres/ajouter?id=${s.id}`)
                               }
-                              className="p-2 text-amber-600 bg-amber-50 hover:bg-amber-500 hover:text-white rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
+                              className="p-1.5 text-amber-600 bg-amber-50 hover:bg-amber-500 hover:text-white rounded-lg transition-all shadow-2xs cursor-pointer active:scale-95"
                               title="Modifier la matière"
                               aria-label={`Modifier ${s.name}`}
                             >
-                              <Edit2 size={16} />
+                              <Edit2 size={14} />
                             </button>
                             <button
                               onClick={() => triggerDeleteSubject(s.id, s.name)}
-                              className="p-2 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-xl transition-all shadow-2xs cursor-pointer active:scale-95"
+                              className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-lg transition-all shadow-2xs cursor-pointer active:scale-95"
                               title="Supprimer la matière"
                               aria-label={`Supprimer ${s.name}`}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </div>
                         </td>
@@ -4290,36 +4290,36 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
               const disciplines = Object.keys(groupedAll);
 
               const renderGrids = () => (
-                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-3 duration-300">
+                <div className="space-y-4 sm:space-y-5 animate-in fade-in slide-in-from-bottom-3 duration-300">
                   {Object.entries(groupedFiltered)
                     .filter(
                       ([groupName]) => cycleTab === "Tous" || cycleTab === groupName,
                     )
                     .filter(([_, groupClasses]) => groupClasses.length > 0)
                     .map(([groupName, groupClasses]) => (
-                      <div key={groupName} className="space-y-4">
-                        <div className="flex items-center gap-3 border-b border-gray-200 pb-2">
-                          <h3 className="text-lg font-extrabold text-gray-800">
+                      <div key={groupName} className="space-y-3">
+                        <div className="flex items-center gap-2.5 border-b border-gray-200/80 pb-1.5">
+                          <h3 className="text-base font-extrabold text-gray-800">
                             {groupName}
                           </h3>
-                          <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 text-xs font-bold shadow-sm">
+                          <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-100">
                             {groupClasses.length} {terminology.classes}
                           </span>
                         </div>
-                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4">
                           {groupClasses.map((cls) => (
                             <div
                               key={cls.id}
-                              className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden group hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between"
+                              className="bg-white rounded-xl shadow-xs border border-gray-200/80 overflow-hidden group hover:border-blue-300 hover:shadow-md transition-all flex flex-col justify-between"
                             >
                               <div>
-                                <div className="px-6 py-5 bg-gray-50 border-b border-gray-200 flex items-center justify-between group-hover:bg-blue-50/50 transition-colors">
-                                  <div className="flex items-center gap-4">
-                                    <div className="w-10 h-10 bg-white border border-gray-200 rounded-lg flex items-center justify-center font-bold text-lg text-gray-700 shadow-sm group-hover:text-blue-600 group-hover:border-blue-200">
+                                <div className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-gray-50/80 border-b border-gray-200/80 flex items-center justify-between group-hover:bg-blue-50/50 transition-colors">
+                                  <div className="flex items-center gap-2.5 sm:gap-3">
+                                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white border border-gray-200 rounded-lg flex items-center justify-center font-bold text-sm sm:text-base text-gray-700 shadow-2xs group-hover:text-blue-600 group-hover:border-blue-200">
                                       {formatDisciplineName(cls.name).charAt(0)}
                                     </div>
-                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
-                                      <h4 className="text-base font-bold text-gray-900 leading-tight">
+                                    <div className="flex flex-col sm:flex-row sm:items-center gap-1">
+                                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 leading-tight">
                                         {formatDisciplineName(cls.name)}
                                       </h4>
                                       {getRomanSuffix(cls.name) && (
@@ -4329,15 +4329,15 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       )}
                                     </div>
                                   </div>
-                                  <div className="bg-white px-3 py-1.5 rounded-md text-xs font-semibold text-gray-600 border border-gray-200 shadow-sm">
+                                  <div className="bg-white px-2.5 py-1 rounded-md text-xs font-semibold text-gray-600 border border-gray-200 shadow-2xs">
                                     {cls.subjects_count}{" "}
                                     {terminology.subjects.toLowerCase()}
                                   </div>
                                 </div>
 
-                                <div className="p-6 space-y-4">
-                                  <div className="flex items-center gap-2 text-gray-800 font-bold text-xs uppercase tracking-wider mb-2">
-                                    <BookOpen size={15} className="text-blue-600" />
+                                <div className="p-3 sm:p-4 space-y-2.5">
+                                  <div className="flex items-center gap-2 text-gray-800 font-bold text-[11px] sm:text-xs uppercase tracking-wider mb-1.5">
+                                    <BookOpen size={14} className="text-blue-600" />
                                     <span>
                                       {academicTab === "Universitaire"
                                         ? "Maquette Pédagogique & Unités d'Enseignement (UE)"
@@ -4346,12 +4346,12 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                           : "Matières & Programme d'Études"}
                                     </span>
                                   </div>
-                                  <div className="space-y-2 max-h-[290px] overflow-y-auto custom-scrollbar pr-1">
+                                  <div className="space-y-1.5 max-h-[260px] overflow-y-auto custom-scrollbar pr-1">
                                     {associations.filter((a) => a.class_id === cls.id)
                                       .length === 0 ? (
-                                      <div className="py-10 text-center border-2 border-dashed border-gray-150 rounded-xl text-gray-400 font-medium text-xs flex flex-col items-center justify-center gap-3 bg-gray-50/50">
+                                      <div className="py-6 text-center border-2 border-dashed border-gray-150 rounded-xl text-gray-400 font-medium text-xs flex flex-col items-center justify-center gap-2 bg-gray-50/50">
                                         <AlertCircle
-                                          size={20}
+                                          size={18}
                                           className="opacity-40"
                                         />
                                         Configuration Manquante
@@ -4362,19 +4362,19 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                         .map((a) => (
                                           <div
                                             key={a.id}
-                                            className={`flex flex-col sm:flex-row sm:items-center justify-between p-3 bg-white border border-gray-200/80 rounded-xl hover:bg-gray-50 hover:border-blue-200 transition-all group/item gap-3 sm:gap-2 ${isDeleting === a.id ? "opacity-50" : ""}`}
+                                            className={`flex items-center justify-between p-2 sm:p-2.5 bg-white border border-gray-200/80 rounded-xl hover:bg-gray-50 hover:border-blue-200 transition-all group/item gap-2 ${isDeleting === a.id ? "opacity-50" : ""}`}
                                           >
-                                            <div className="flex items-center gap-3">
-                                              <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center font-bold text-xs ">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                              <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-md flex items-center justify-center font-bold text-[11px] shrink-0">
                                                 {a.subject?.code?.substring(0, 3)}
                                               </div>
-                                              <div>
-                                                <p className="text-xs font-bold text-gray-900 leading-tight">
+                                              <div className="min-w-0">
+                                                <p className="text-xs font-bold text-gray-900 leading-tight truncate">
                                                   {a.subject?.name}
                                                 </p>
-                                                <div className="flex items-center gap-2 mt-0.5">
+                                                <div className="flex items-center gap-1.5 mt-0.5">
                                                   <p className="text-[10px] text-gray-500 font-mono">
-                                                    Code: {a.subject?.code}
+                                                    {a.subject?.code}
                                                   </p>
                                                   <span className="w-1 h-1 rounded-full bg-gray-300"></span>
                                                   <p className="text-[10px] font-bold text-emerald-600">
@@ -4386,7 +4386,7 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                             {(user.role === UserRole.SUPER_ADMIN ||
                                               user.role === UserRole.SCHOOL_ADMIN ||
                                               user.role === UserRole.DIRECTOR) && (
-                                              <div className="flex items-center gap-1 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity">
+                                              <div className="flex items-center gap-1 shrink-0 md:opacity-0 md:group-hover/item:opacity-100 transition-opacity">
                                                 <button
                                                   onClick={() =>
                                                     setEditCoefModal({
@@ -4398,10 +4398,10 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                                       isSaving: false,
                                                     })
                                                   }
-                                                  className="p-1.5 text-amber-600 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
+                                                  className="p-1 text-amber-600 hover:bg-amber-50 rounded-md transition-colors cursor-pointer"
                                                   title="Modifier le coefficient"
                                                 >
-                                                  <Edit2 size={14} />
+                                                  <Edit2 size={13} />
                                                 </button>
                                                 <button
                                                   onClick={() =>
@@ -4411,10 +4411,10 @@ const ClassManagement: React.FC<{ user: UserProfile }> = ({ user }) => {
                                                       formatDisciplineName(cls.name),
                                                     )
                                                   }
-                                                  className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-md transition-colors"
+                                                  className="p-1 text-rose-600 hover:bg-rose-50 rounded-md transition-colors cursor-pointer"
                                                   title={`Retirer de/du ${terminology.class.toLowerCase()}`}
                                                 >
-                                                  <Trash2 size={14} />
+                                                  <Trash2 size={13} />
                                                 </button>
                                               </div>
                                             )}

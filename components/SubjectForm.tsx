@@ -279,35 +279,54 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
   }
 
+  const handleSelectAllInCycle = (classesInGroup: SchoolClass[]) => {
+    const newAssocs = [...associations];
+    classesInGroup.forEach(c => {
+      if (!newAssocs.some(a => a.classId === c.id)) {
+        const defaultCoef = getCollegeInnovationsDefaultCoefficient(
+          c.level || '',
+          formData.code || generateCode(formData.name)
+        );
+        newAssocs.push({ classId: c.id, className: c.name, coefficient: defaultCoef });
+      }
+    });
+    setAssociations(newAssocs);
+  };
+
+  const handleDeselectAllInCycle = (classesInGroup: SchoolClass[]) => {
+    const idsToRemove = new Set(classesInGroup.map(c => c.id));
+    setAssociations(associations.filter(a => !idsToRemove.has(a.classId)));
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-300 pb-12">
+    <div className="max-w-4xl mx-auto space-y-3 sm:space-y-3.5 animate-in fade-in duration-300 pb-10">
       {/* Compact Modern Header */}
-      <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-3.5">
-        <div className="flex items-center gap-3">
+      <div className="bg-white rounded-xl p-3 sm:p-4 shadow-xs border border-slate-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2.5">
           <button 
             type="button"
             onClick={() => navigate('/classes')} 
-            className="p-2 bg-slate-50 text-slate-600 rounded-xl border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900 transition-all shadow-2xs group shrink-0 cursor-pointer"
+            className="p-1.5 sm:p-2 bg-slate-50 text-slate-600 rounded-lg sm:rounded-xl border border-slate-200/80 hover:bg-slate-100 hover:text-slate-900 transition-all shadow-2xs group shrink-0 cursor-pointer"
             title={`Retour aux ${terminology.classes.toLowerCase()}`}
           >
-            <ArrowLeft size={17} className="group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
           </button>
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 bg-indigo-50/80 text-indigo-600 rounded-xl flex items-center justify-center shadow-2xs border border-indigo-100/80 shrink-0">
-              <BookOpen size={20} />
+            <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50/80 text-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center shadow-2xs border border-indigo-100/80 shrink-0">
+              <BookOpen size={18} />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg sm:text-xl font-bold text-slate-900 tracking-tight">
+                <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
                   {isEdit ? `Modifier la ${terminology.subject}` : `Nouvelle ${terminology.subject}`}
                 </h2>
                 {formData.code && (
-                  <span className="text-[10px] uppercase font-extrabold tracking-wider bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full border border-indigo-200/60 font-mono">
+                  <span className="text-[10px] uppercase font-extrabold tracking-wider bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md border border-indigo-200/60 font-mono">
                     {formData.code}
                   </span>
                 )}
               </div>
-              <p className="text-slate-500 text-xs font-medium">
+              <p className="text-slate-500 text-[11px] sm:text-xs font-medium">
                 {isEdit ? `Ajustement du cours et des coefficients d'évaluation` : `Ajout au catalogue académique et assignation aux ${terminology.classes.toLowerCase()}`}
               </p>
             </div>
@@ -315,7 +334,7 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {associations.length > 0 && (
-          <div className="self-start sm:self-auto px-3 py-1.5 bg-indigo-50/70 border border-indigo-200/60 rounded-xl text-xs font-semibold text-indigo-800 flex items-center gap-1.5">
+          <div className="self-start sm:self-auto px-2.5 py-1 bg-indigo-50/70 border border-indigo-200/60 rounded-lg text-xs font-semibold text-indigo-800 flex items-center gap-1.5 shrink-0">
             <Layers size={13} className="text-indigo-600" />
             <span>{associations.length} {associations.length > 1 ? terminology.classes.toLowerCase() : terminology.class.toLowerCase()} assignée(s)</span>
           </div>
@@ -323,40 +342,40 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {apiError && (
-        <div className="bg-rose-50 border border-rose-200/80 p-3.5 rounded-xl flex items-start gap-2.5 text-rose-800 shadow-2xs animate-in fade-in">
-          <AlertCircle size={18} className="mt-0.5 shrink-0 text-rose-600" />
+        <div className="bg-rose-50 border border-rose-200/80 p-3 rounded-xl flex items-start gap-2 text-rose-800 shadow-2xs animate-in fade-in">
+          <AlertCircle size={16} className="mt-0.5 shrink-0 text-rose-600" />
           <div className="space-y-0.5">
-             <p className="text-xs font-bold uppercase tracking-wider text-rose-900">Avertissement</p>
+             <p className="text-[11px] font-bold uppercase tracking-wider text-rose-900">Avertissement</p>
              <p className="text-xs font-medium">{apiError}</p>
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-3.5 sm:space-y-4">
+      <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-3.5">
         {/* Section 1: Informations Générales */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3.5">
-          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+        <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-xs border border-slate-200/80 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Informations Globales</h3>
             </div>
-            <span className="text-[11px] text-slate-400 font-normal">* Obligatoire</span>
+            <span className="text-[10px] text-slate-400 font-normal">* Champ obligatoire</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
             <div className="space-y-1 sm:col-span-1">
               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                 Intitulé de la {terminology.subject.toLowerCase()} <span className="text-rose-500">*</span>
               </label>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none text-slate-400">
                   <BookOpen size={15} />
                 </div>
                 <input 
                   required 
                   type="text" 
                   placeholder="Ex: Mathématiques, Communication Française, Chimie..."
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/10 transition-all shadow-2xs outline-none placeholder:text-slate-400" 
+                  className="w-full pl-8 sm:pl-9 pr-3 py-1.5 sm:py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/10 transition-all shadow-2xs outline-none placeholder:text-slate-400" 
                   value={formData.name} 
                   onChange={(e) => {
                     const newName = e.target.value;
@@ -391,14 +410,14 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
               </div>
               <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                <div className="absolute inset-y-0 left-0 pl-2.5 sm:pl-3 flex items-center pointer-events-none text-slate-400">
                   <Hash size={15} />
                 </div>
                 <input 
                   required
                   type="text"
                   placeholder="Ex: MATH, FRANC, CHIM"
-                  className="w-full pl-9 pr-3 py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold font-mono tracking-wider focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/10 transition-all shadow-2xs outline-none placeholder:text-slate-400 uppercase"
+                  className="w-full pl-8 sm:pl-9 pr-3 py-1.5 sm:py-2 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold font-mono tracking-wider focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/10 transition-all shadow-2xs outline-none placeholder:text-slate-400 uppercase"
                   value={formData.code}
                   onChange={(e) => {
                     setIsCodeManuallyEdited(true);
@@ -413,7 +432,7 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <textarea 
                 rows={2}
                 placeholder="Détails optionnels, objectifs d'apprentissage ou spécificités du cours..."
-                className="w-full p-3 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/10 transition-all shadow-2xs resize-none outline-none placeholder:text-slate-400" 
+                className="w-full p-2.5 sm:p-3 bg-slate-50/60 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium focus:border-indigo-600 focus:bg-white focus:ring-2 focus:ring-indigo-600/10 transition-all shadow-2xs resize-none outline-none placeholder:text-slate-400" 
                 value={formData.description} 
                 onChange={(e) => setFormData({...formData, description: e.target.value})} 
               />
@@ -422,26 +441,26 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* Section 2: Assignations & Coefficients */}
-        <div className="bg-white rounded-2xl p-4 sm:p-5 shadow-xs border border-slate-200/80 space-y-3.5">
-          <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+        <div className="bg-white rounded-xl p-3.5 sm:p-4 shadow-xs border border-slate-200/80 space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-blue-500"></span>
               <h3 className="text-xs font-bold text-slate-800 uppercase tracking-wider">Assignation aux {terminology.classes} & Coefficients</h3>
             </div>
-            <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">
+            <span className="text-xs font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
               {associations.length} sélectionnée(s)
             </span>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2.5">
             {/* Cycle Selector Bar */}
-            <div className="flex flex-wrap gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 text-xs font-semibold">
+            <div className="flex flex-wrap gap-1 bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 text-xs font-semibold">
               {availableTabs.map((tab) => (
                 <button
                   key={tab}
                   type="button"
                   onClick={() => setAcademicTab(tab)}
-                  className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
                     academicTab === tab 
                       ? 'bg-white text-indigo-700 shadow-2xs font-bold' 
                       : 'text-slate-600 hover:text-slate-900'
@@ -454,13 +473,13 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Sub-cycles if applicable */}
             {['Universitaire', 'Professionnelle'].includes(academicTab) && (
-              <div className="flex gap-1.5 overflow-x-auto pb-1 custom-scrollbar">
+              <div className="flex gap-1 overflow-x-auto pb-1 custom-scrollbar">
                 {['Tous', ...Object.keys(getGroupedClasses(availableClasses, academicTab) || {})].map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setCycleTab(tab)}
-                    className={`px-2.5 py-1 text-xs rounded-lg transition-all cursor-pointer whitespace-nowrap font-medium ${
+                    className={`px-2 py-0.5 text-xs rounded-md transition-all cursor-pointer whitespace-nowrap font-medium ${
                       cycleTab === tab 
                         ? 'bg-slate-800 text-white font-bold shadow-2xs' 
                         : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
@@ -473,15 +492,27 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             )}
 
             {/* Classes Grid */}
-            <div className="p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-3">
+            <div className="p-2.5 sm:p-3 bg-slate-50/70 rounded-xl border border-slate-200/70 space-y-2.5">
               {Object.entries(getGroupedClasses(availableClasses, academicTab))
                 .filter(([groupName]) => cycleTab === 'Tous' || cycleTab === groupName)
                 .map(([groupName, groupClasses]) => {
                   if (groupClasses.length === 0) return null;
+                  const allSelected = groupClasses.every(c => associations.some(a => a.classId === c.id));
                   return (
                     <div key={groupName} className="space-y-1.5">
-                      <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{groupName}</h4>
-                      <div className="flex flex-wrap gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">{groupName}</h4>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => allSelected ? handleDeselectAllInCycle(groupClasses) : handleSelectAllInCycle(groupClasses)}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline transition-colors cursor-pointer"
+                          >
+                            {allSelected ? "Tout décocher" : "Tout cocher"}
+                          </button>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-1 sm:gap-1.5">
                         {groupClasses.map(c => {
                           const isSelected = associations.some(a => a.classId === c.id);
                           return (
@@ -492,13 +523,13 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 if (isSelected) handleRemoveAssociation(c.id);
                                 else handleAddAssociation(c.id);
                               }}
-                              className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 ${
+                              className={`px-2 py-1 text-xs font-semibold rounded-md border transition-all cursor-pointer flex items-center gap-1 ${
                                 isSelected 
                                   ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs' 
                                   : 'bg-white border-slate-200 text-slate-700 hover:border-indigo-300 hover:bg-indigo-50/50'
                               }`}
                             >
-                              {isSelected && <CheckCircle2 size={13} className="shrink-0" />}
+                              {isSelected && <CheckCircle2 size={12} className="shrink-0" />}
                               <span>{c.name}</span>
                             </button>
                           );
@@ -511,7 +542,7 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               {Object.entries(getGroupedClasses(availableClasses, academicTab))
                 .filter(([groupName]) => cycleTab === 'Tous' || cycleTab === groupName)
                 .every(([_, g]) => g.length === 0) && (
-                  <div className="py-6 text-center text-slate-400 text-xs font-medium">
+                  <div className="py-4 text-center text-slate-400 text-xs font-medium">
                     Aucune {terminology.class.toLowerCase()} trouvée pour ce filtre.
                   </div>
               )}
@@ -519,23 +550,23 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Coefficients editor */}
             {associations.length > 0 ? (
-              <div className="space-y-2 pt-1">
+              <div className="space-y-1.5 pt-1">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
                   Configuration des Coefficients ({associations.length}) :
                 </span>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   {associations.map((assoc) => (
                     <div 
                       key={assoc.classId} 
-                      className="flex items-center justify-between p-2.5 bg-slate-50/80 rounded-xl border border-slate-200/80 hover:border-indigo-300 transition-all shadow-2xs gap-2"
+                      className="flex items-center justify-between p-2 bg-slate-50/80 rounded-xl border border-slate-200/80 hover:border-indigo-300 transition-all shadow-2xs gap-2"
                     >
                       <div className="min-w-0 flex-1">
                         <span className="text-xs font-bold text-slate-900 truncate block">{assoc.className}</span>
                         <span className="text-[10px] text-slate-400 font-medium">Coefficient</span>
                       </div>
                       
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="hidden sm:flex items-center gap-0.5 bg-white p-0.5 rounded-lg border border-slate-200">
+                      <div className="flex items-center gap-1 shrink-0">
+                        <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-lg border border-slate-200">
                           {[100, 200, 300].map((preset) => (
                             <button
                               key={preset}
@@ -557,7 +588,7 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           min="0.5" 
                           max="500"
                           step="0.5"
-                          className="w-16 sm:w-20 px-2 py-1 rounded-lg text-center font-bold text-slate-900 bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/10 outline-none transition-all shadow-2xs text-xs" 
+                          className="w-14 sm:w-16 px-1.5 py-1 rounded-lg text-center font-bold text-slate-900 bg-white border border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/10 outline-none transition-all shadow-2xs text-xs" 
                           value={Number.isNaN(assoc.coefficient) ? '' : assoc.coefficient} 
                           onChange={(e) => {
                             const val = e.target.value;
@@ -568,10 +599,10 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <button 
                           type="button" 
                           onClick={() => handleRemoveAssociation(assoc.classId)} 
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                           title="Retirer"
                         >
-                          <Trash2 size={15} />
+                          <Trash2 size={14} />
                         </button>
                       </div>
                     </div>
@@ -579,7 +610,7 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
             ) : (
-              <div className="py-6 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-medium">
+              <div className="py-4 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs font-medium">
                 Aucune {terminology.class.toLowerCase()} sélectionnée. Cliquez sur les étiquettes ci-dessus pour assigner cette {terminology.subject.toLowerCase()}.
               </div>
             )}
@@ -587,11 +618,11 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* Submit Actions Bar */}
-        <div className="flex items-center justify-between gap-3 pt-1">
+        <div className="flex items-center justify-between gap-2.5 pt-1">
           <button 
             type="button" 
             onClick={() => navigate('/classes')} 
-            className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200/80 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-2xs cursor-pointer"
+            className="px-3.5 sm:px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200/80 rounded-xl hover:bg-slate-50 hover:text-slate-900 transition-all shadow-2xs cursor-pointer"
           >
             Annuler
           </button>
@@ -599,12 +630,12 @@ const SubjectForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           <button 
             disabled={isSubmitting} 
             type="submit" 
-            className="px-5 py-2.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs hover:bg-indigo-600 transition-all flex items-center gap-2 disabled:opacity-50 group/btn cursor-pointer"
+            className="px-4 sm:px-5 py-2 sm:py-2.5 bg-slate-900 text-white text-xs font-bold uppercase tracking-wider rounded-xl shadow-xs hover:bg-indigo-600 transition-all flex items-center gap-2 disabled:opacity-50 group/btn cursor-pointer"
           >
             {isSubmitting ? (
-              <Loader2 className="animate-spin" size={15} />
+              <Loader2 className="animate-spin" size={14} />
             ) : (
-              <Save size={15} className="group-hover/btn:scale-110 transition-transform" />
+              <Save size={14} className="group-hover/btn:scale-110 transition-transform" />
             )}
             <span>{formatActionWithTerminology(isEdit ? 'UPDATE' : 'CREATE', terminology.subject)}</span>
           </button>

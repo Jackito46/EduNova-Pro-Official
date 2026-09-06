@@ -73,7 +73,7 @@ const SidebarNavLink = React.memo<SidebarNavLinkProps>(({ item, isSubItem = fals
   return (
     <Link
       to={item.path}
-      className={`relative flex items-center py-2 rounded-xl transition-all duration-150 group select-none ${
+      className={`relative flex items-center py-1.5 rounded-xl transition-all duration-150 group select-none ${
         isActive 
           ? 'bg-blue-600 text-white font-semibold shadow-sm shadow-blue-500/20' 
           : 'text-slate-600 hover:bg-slate-200/60 hover:text-slate-900'
@@ -81,22 +81,22 @@ const SidebarNavLink = React.memo<SidebarNavLinkProps>(({ item, isSubItem = fals
         isNarrow 
           ? 'justify-center px-0 min-h-[42px]' 
           : isSubItem 
-            ? 'pl-2.5 pr-2 min-h-[38px] text-[13px]' 
-            : 'px-3 min-h-[42px] text-[13.5px]'
+            ? 'pl-2 pr-1.5 min-h-[36px] text-[12.5px] sm:text-[13px]' 
+            : 'px-2.5 min-h-[40px] text-[13.5px]'
       }`}
       onClick={onNavigate}
       title={item.name}
     >
-      <div className={`relative z-10 flex items-center gap-2.5 w-full min-w-0 ${isNarrow ? 'justify-center' : ''}`}>
+      <div className={`relative z-10 flex items-center gap-2 w-full min-w-0 ${isNarrow ? 'justify-center' : ''}`}>
         {IconComponent && (
           <IconComponent 
-            size={isActive ? 18 : isSubItem ? 16 : 18} 
+            size={isActive ? 17 : isSubItem ? 15 : 18} 
             className={`${isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600'} shrink-0 transition-colors`} 
           />
         )}
         {!isNarrow && (
           <span 
-            className={`${isSubItem ? 'font-medium' : 'font-bold tracking-tight'} text-left truncate flex-1 min-w-0`} 
+            className={`${isSubItem ? 'font-medium' : 'font-bold tracking-tight'} text-left truncate flex-1 min-w-0 whitespace-nowrap`} 
             title={item.name}
           >
             {item.name}
@@ -121,15 +121,15 @@ const SidebarMenuHeader = React.memo<SidebarMenuHeaderProps>(({ id, label, icon:
   <button 
     type="button"
     onClick={() => onToggle(id)} 
-    className={`flex items-center justify-between w-full py-2.5 min-h-[42px] text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 rounded-xl transition-all select-none cursor-pointer ${
+    className={`flex items-center justify-between w-full py-2 min-h-[40px] text-slate-600 hover:bg-slate-200/60 hover:text-slate-900 rounded-xl transition-all select-none cursor-pointer ${
       isOpen ? 'text-slate-900 bg-slate-200/50 font-semibold' : ''
-    } ${isNarrow ? 'justify-center px-0' : 'px-3'}`}
+    } ${isNarrow ? 'justify-center px-0' : 'px-2.5'}`}
     title={label}
   >
     <div className={`flex items-center gap-2.5 ${isNarrow ? 'justify-center' : ''} flex-1 min-w-0 overflow-hidden`}>
       <Icon size={18} className={`${isOpen ? 'text-blue-600' : 'text-slate-400'} shrink-0 transition-colors`} />
       {!isNarrow && (
-        <span className="font-bold tracking-tight text-[13.5px] text-left truncate flex-1 min-w-0" title={label}>
+        <span className="font-bold tracking-tight text-[13.5px] text-left truncate flex-1 min-w-0 whitespace-nowrap" title={label}>
           {label}
         </span>
       )}
@@ -260,7 +260,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       </button>
 
       <aside 
-        className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} fixed lg:static inset-y-0 left-0 z-50 ${isNarrow ? 'w-[280px] lg:w-20' : 'w-[280px] sm:w-[285px] lg:w-[285px] xl:w-[295px] 2xl:w-[305px]'} bg-slate-100 text-slate-800 transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200 shadow-xl lg:shadow-sm print:hidden group`}
+        className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} fixed lg:static inset-y-0 left-0 z-50 ${isNarrow ? 'w-[290px] lg:w-20' : 'w-[295px] sm:w-[305px] lg:w-[310px] xl:w-[320px] 2xl:w-[330px]'} bg-slate-100 text-slate-800 transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200 shadow-xl lg:shadow-sm print:hidden group`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -350,14 +350,14 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         )}
 
         {/* NAVIGATION */}
-        <nav className="flex-1 px-2.5 sm:px-3 space-y-1 overflow-y-auto mt-4 sidebar-scrollbar pb-10">
+        <nav className="flex-1 px-2 sm:px-2.5 space-y-1 overflow-y-auto mt-4 sidebar-scrollbar pb-10">
           {renderNavLink({ name: 'Tableau de Bord', path: '/', icon: LayoutDashboard })}
 
           {user.role === UserRole.STUDENT && (
             <div className="space-y-1 pt-2">
                {renderMenuHeader("espaceEtudiant", "Mon Espace ÉduNova", GraduationCap)}
                {openMenus.espaceEtudiant && (
-                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                    {renderNavLink({ name: 'Mon Profil', path: '/profil' }, true, UserCircle)}
                    {renderNavLink({ name: 'Mes Cours', path: '/mes-cours' }, true, BookOpen)}
                    {renderNavLink({ name: 'Mon Horaire', path: '/mon-horaire' }, true, Clock)}
@@ -372,7 +372,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <div className="space-y-1 pt-2">
               {renderMenuHeader("vieAcademique", "Gestion Académique", GraduationCap)}
               {openMenus.vieAcademique && (
-                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                   {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: `Registre ${terminology.students}`, path: '/eleves' }, true, Users)}
                   {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: 'Validation de Dossiers', path: '/eleves/validation' }, true, FileCheck)}
                   {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: terminology.enrollment, path: '/eleves/ajouter' }, true, UserPlus)}
@@ -393,7 +393,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <div className="space-y-1">
               {renderMenuHeader("rh", "Ressources Humaines", Briefcase)}
               {openMenus.rh && (
-                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                   {hasAccess(hrRoles) && renderNavLink({ name: 'Registre RH', path: '/personnel' }, true, Users)}
                   {hasAccess(adminRoles) && renderNavLink({ name: 'Recrutement', path: '/personnel/embaucher' }, true, UserPlus)}
                   {hasAccess(hrRoles) && renderNavLink({ name: 'Présences Employés', path: '/personnel/pointage' }, true, ClipboardList)}
@@ -407,7 +407,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <div className="space-y-1">
               {renderMenuHeader("finance", "Finance", CircleDollarSign)}
               {openMenus.finance && (
-                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Direction Économat', path: '/economat' }, true, Target)}
                   {renderNavLink({ name: 'Guichet d’Encaissement', path: '/economat/frais' }, true, Receipt)}
                   {renderNavLink({ name: 'Factures (Réimpression)', path: '/economat/factures' }, true, Files)}
@@ -427,7 +427,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <div className="space-y-1">
               {renderMenuHeader("rapports", "Direction & Rapports", Target)}
               {openMenus.rapports && (
-                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                   {renderNavLink({ name: 'Rapports & Bilans', path: '/rapports' }, true, Files)}
                   {school?.has_multi_campus && !user.campus_id && (
                     renderNavLink({ name: 'Supervision Multi-Annexes', path: '/supervision-annexes' }, true, Building2)
@@ -441,7 +441,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <div className="space-y-1">
               {renderMenuHeader("communication", "Communication", MessageSquare)}
               {openMenus.communication && (
-                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                   {renderNavLink({ name: 'WhatsApp', path: '/communication/whatsapp' }, true, MessageCircle)}
                   {renderNavLink({ name: 'Emailing', path: '/communication/email' }, true, Mail)}
                   {renderNavLink({ name: 'SMS', path: '/communication/sms' }, true, MessageSquare)}
@@ -455,7 +455,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             <div className="space-y-1">
               {renderMenuHeader("config", "Configuration", Settings)}
               {openMenus.config && (
-                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l border-slate-200/90 ml-3.5 pl-1">
+                <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                   {renderNavLink({ name: 'Identité Établissement', path: '/settings/ecole' }, true, School)}
                   {renderNavLink({ name: `${terminology.classes} & ${terminology.subjects}`, path: '/classes' }, true, BookOpen)}
                   {renderNavLink({ name: `Planification ${terminology.academicYear}`, path: '/economat/planification' }, true, CalendarCheck)}

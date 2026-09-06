@@ -57,7 +57,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const isSiegeActive = !user.campus_id && (!currentCampusId || currentCampusId === siegeCampusId);
   const canManageAllCampuses = Boolean(
     school?.has_multi_campus &&
-    (!user.campus_id || isSiegeActive || user.role === UserRole.SUPER_ADMIN || user.role === UserRole.ADMIN)
+    (!user.campus_id || isSiegeActive || user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR)
   );
 
   const [loading, setLoading] = useState(true);
