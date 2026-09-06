@@ -77,6 +77,7 @@ import { RoleGuard } from './components/RoleGuard';
 import { useSecurity } from './components/SecurityGuard';
 import { SchoolProvider } from './contexts/SchoolContext';
 import Logo from './components/Logo';
+import AppFooter from './components/AppFooter';
 
 import { NotificationBanner } from './components/NotificationBanner';
 import { AiQuotaAlertBanner } from './components/AiQuotaAlertBanner';
@@ -326,14 +327,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
         </AnimatePresence>
       </ErrorBoundary>
 
-          {/* Application Footer - Masqué automatiquement sur mobile (< md) et en mode PWA autonome */}
-          {!isPwaStandalone && (
-            <footer className="hidden md:block mt-8 py-4 border-t border-slate-200/60 text-center select-none">
-              <p className="text-slate-400 text-[10px] font-medium tracking-wider">
-                &copy; {new Date().getFullYear()} EduNova Technologies <span className="mx-1 text-slate-300">•</span> Gestion Académique Intégrée
-              </p>
-            </footer>
-          )}
+          {/* Application Footer - Version Internationale & Moderne */}
+          {!isPwaStandalone && <AppFooter />}
         </main>
       </div>
     </SessionGuard>

@@ -21,6 +21,9 @@ import {
 } from '../utils/subjectMatching';
 import { toast } from 'sonner';
 import Modal from './Modal';
+import { ClassSelectorPill, ClassSelectorItem } from './ClassSelectorPill';
+import { SelectPill, SelectOption } from './SelectPill';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 const DAYS_SHORT: Record<string, string> = {
@@ -641,6 +644,50 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
   // Backward compatibility alias
   const filteredSubjects = affiliatedSubjects.length > 0 ? affiliatedSubjects : availableSubjects;
 
+  // Options formatées pour ClassSelectorPill
+  const classSelectorItems: ClassSelectorItem[] = useMemo(() => {
+    return availableClasses.map(c => ({
+      id: c.id,
+      name: c.name,
+      cycle: c.cycle,
+      level: c.level,
+      section: c.section,
+      code: c.code,
+      students_count: c.enrollment_count
+    }));
+  }, [availableClasses]);
+
+  // Options structurées pour SelectPill (Matière / Cours)
+  const subjectOptions: SelectOption[] = useMemo(() => {
+    if (!newAssignment.class_id) return [];
+    if (affiliatedSubjects.length > 0) {
+      const list: SelectOption[] = [];
+      affiliatedSubjects.forEach(s => {
+        list.push({
+          value: s.id,
+          label: s.code ? `${s.name} (${s.code})` : s.name,
+          badge: 'Au programme',
+          description: 'Associée à cette classe',
+          color: 'emerald'
+        });
+      });
+      otherSubjects.forEach(s => {
+        list.push({
+          value: s.id,
+          label: s.code ? `${s.name} (${s.code})` : s.name,
+          badge: 'Autre matière',
+          description: 'Matière générale',
+          color: 'slate'
+        });
+      });
+      return list;
+    }
+    return availableSubjects.map(s => ({
+      value: s.id,
+      label: s.code ? `${s.name} (${s.code})` : s.name
+    }));
+  }, [newAssignment.class_id, affiliatedSubjects, otherSubjects, availableSubjects]);
+
   const removeAssignment = useCallback((aid: string) => {
     setAssignments(prev => prev.filter(a => String(a.id) !== String(aid)));
     setHasUnsavedChanges(true);
@@ -1105,27 +1152,27 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-24">
+    <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 animate-in fade-in duration-300 pb-16 px-1 sm:px-2">
       
       {/* En-tête Compact & Standard International */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-4 sm:p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs p-3 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
         {/* Profil Enseignant & Navigation */}
-        <div className="flex items-center gap-3.5 sm:gap-4 min-w-0">
+        <div className="flex items-center gap-3 sm:gap-3.5 min-w-0">
           <button 
             onClick={() => navigate('/personnel')} 
-            className="p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-xl border border-slate-200 shadow-2xs active:scale-95 transition-all shrink-0"
+            className="p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 rounded-xl border border-slate-200 shadow-2xs active:scale-95 transition-all shrink-0 cursor-pointer"
             title="Retour à la liste du personnel"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={16} />
           </button>
           
-          <div className="w-11 h-11 sm:w-12 sm:h-12 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-lg shadow-sm shrink-0">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-bold text-base shadow-2xs shrink-0">
             {staff?.last_name?.charAt(0) || 'E'}
           </div>
           
           <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight truncate">
                 {staff ? formatStudentName(staff.last_name, staff.first_name).fullName : 'Chargement...'}
               </h2>
               <span className="bg-indigo-50 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-indigo-100 shrink-0">
@@ -1138,9 +1185,9 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 mt-1 text-[11px] text-slate-500 flex-wrap">
+            <div className="flex items-center gap-2 mt-0.5 text-[11px] text-slate-500 flex-wrap">
               {staff?.id && (
-                <div className="flex items-center gap-1 bg-slate-100 border border-slate-200 rounded px-1.5 py-0.5">
+                <div className="flex items-center gap-1 bg-slate-100/80 border border-slate-200 rounded px-1.5 py-0.5">
                   <span className="text-[9px] font-bold uppercase text-slate-400">ID :</span>
                   <span className="font-mono text-slate-700 font-semibold text-[10px]" title={staff.id}>
                     {staff.id.length > 14 ? `${staff.id.substring(0, 8)}...${staff.id.substring(staff.id.length - 4)}` : staff.id}
@@ -1168,49 +1215,37 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
           </div>
         </div>
 
-        {/* Contrôles Côté Droit : KPI Rémunération + Sélecteur d'Année */}
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap lg:flex-nowrap shrink-0">
+        {/* Contrôles Côté Droit : KPI Rémunération + Sélecteur d'Année Harmonieuse en Pilule */}
+        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap shrink-0">
           {/* KPI Compact : Salaire & Volume */}
-          <div className="bg-slate-900 text-white px-3.5 py-2 rounded-xl flex items-center gap-3.5 border border-slate-800 shadow-xs">
+          <div className="bg-slate-900 text-white px-3 py-1.5 rounded-xl flex items-center gap-3 border border-slate-800 shadow-2xs">
             <div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Salaire Est. / Mois</p>
-              <p className="text-sm font-black font-mono text-emerald-400 leading-tight">
-                {projectedMonthlyIncome.toLocaleString()} <span className="text-[10px] text-slate-400 font-normal uppercase">HTG</span>
+              <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Salaire Est. / Mois</p>
+              <p className="text-xs sm:text-sm font-black font-mono text-emerald-400 leading-tight">
+                {projectedMonthlyIncome.toLocaleString()} <span className="text-[9px] text-slate-400 font-normal uppercase">HTG</span>
               </p>
             </div>
-            <div className="h-6 w-px bg-slate-700/80" />
+            <div className="h-5 w-px bg-slate-700/80" />
             <div>
-              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Volume</p>
+              <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Volume</p>
               <p className="text-xs font-bold text-slate-200 flex items-center gap-1 leading-tight">
                 <Clock size={11} className="text-indigo-400" /> {weeklyHours}h/sem
               </p>
             </div>
           </div>
 
-          {/* Sélecteur d'Année Académique */}
-          <div className="relative min-w-[200px] sm:min-w-[220px]">
-            <label htmlFor="target_year_select" className="sr-only">Année Cible</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-              <select
-                id="target_year_select"
-                value={selectedYearId || ''}
-                onChange={(e) => handleYearSwitch(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold pl-8 pr-8 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer appearance-none transition-colors"
-              >
-                {allAcademicYears.map(y => {
-                  const isAct = y.status === 'ACTIVE' || y.is_active === true;
-                  const isPrep = y.status === 'FUTURE' || y.status === 'PREPARATION';
-                  const statusBadge = isAct ? '🟢 En cours' : isPrep ? '🟡 Préparation' : '⚪ Clôturée';
-                  return (
-                    <option key={y.id} value={y.id}>
-                      {y.label} ({statusBadge})
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-            </div>
+          {/* Sélecteur d'Année Académique Harmonisé (Style Pilule) */}
+          <div className="shrink-0">
+            <AcademicSessionPill
+              academicYears={allAcademicYears}
+              selectedYearId={selectedYearId || ''}
+              onSelectYear={(newYearId) => handleYearSwitch(newYearId)}
+              variant="pill"
+              size="sm"
+              colorScheme="indigo"
+              dropdownAlign="right"
+              className="shadow-2xs"
+            />
           </div>
         </div>
       </div>
@@ -1234,21 +1269,21 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         return null;
       })()}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
         
-        {/* Formulaire d'assignation moderne et fluide */}
-        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8 self-start">
-           <div className={`p-6 rounded-3xl shadow-xl border-2 transition-all space-y-5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${editingId ? 'bg-indigo-50/70 border-indigo-300 ring-4 ring-indigo-500/10' : 'bg-white border-slate-100 shadow-slate-200/50'}`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-2xl shadow-sm ${editingId ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
-                    {editingId ? <RefreshCw size={20} className="animate-spin-slow" /> : <Plus size={20} />}
+        {/* Formulaire d'assignation moderne, compact et ergonomique */}
+        <div className="lg:col-span-5 lg:sticky lg:top-4 self-start">
+           <div className={`p-3.5 sm:p-4 rounded-2xl shadow-2xs border transition-all space-y-3 max-h-[calc(100vh-90px)] overflow-y-auto custom-scrollbar ${editingId ? 'bg-indigo-50/70 border-indigo-300 ring-2 ring-indigo-500/10' : 'bg-white border-slate-200/80'}`}>
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className={`p-2 rounded-xl shadow-2xs ${editingId ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
+                    {editingId ? <RefreshCw size={17} className="animate-spin-slow" /> : <Plus size={17} />}
                   </div>
                   <div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight">
+                    <h3 className="text-sm font-black text-slate-900 tracking-tight">
                       {editingId ? 'Modifier l\'assignation' : 'Assigner un nouveau cours'}
                     </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">
+                    <p className="text-[10.5px] text-slate-500 font-medium">
                       {editingId ? 'Ajustez les paramètres et validez la mise à jour' : 'Remplissez les détails du cours et créneau'}
                     </p>
                   </div>
@@ -1256,47 +1291,46 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 {editingId && (
                   <button 
                     onClick={cancelEdit} 
-                    className="px-2.5 py-1 text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1 border border-slate-200"
+                    className="px-2 py-1 text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all flex items-center gap-1 border border-slate-200 cursor-pointer"
                     title="Annuler la modification"
                   >
-                    <X size={14} /> Annuler
+                    <X size={13} /> Annuler
                   </button>
                 )}
               </div>
 
-              <div className="space-y-4">
-                {/* 1. Sélection de la Classe / Promotion */}
-                <div className="space-y-1.5">
+              <div className="space-y-3">
+                {/* 1. Sélection de la Classe / Promotion (Style Pilule) */}
+                <div className="space-y-1">
                    <div className="flex items-center justify-between">
-                     <label htmlFor="class_id" className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
-                       <Layers size={14} className="text-indigo-600" />
+                     <label className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
+                       <Layers size={13} className="text-indigo-600" />
                        {terminology.class} <span className="text-rose-500 font-bold">*</span>
                      </label>
                      {availableClasses.length > 0 && (
-                       <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">
+                       <span className="text-[9.5px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">
                          {availableClasses.length} éligible{availableClasses.length > 1 ? 's' : ''}
                        </span>
                      )}
                    </div>
-                   <div className="relative">
-                     <select 
-                      id="class_id"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-semibold outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none transition-all cursor-pointer" 
-                      value={newAssignment.class_id} 
-                      onChange={e => {setNewAssignment({...newAssignment, class_id: e.target.value}); setFormError(null);}}
-                     >
-                       <option value="">-- Choisir un(e) {terminology.class.toLowerCase()} --</option>
-                       {availableClasses.map(c => (
-                         <option key={c.id} value={c.id}>
-                           {c.name} ({c.enrollment_count} inscrit{c.enrollment_count > 1 ? 's' : ''})
-                         </option>
-                       ))}
-                     </select>
-                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                   </div>
+                   <ClassSelectorPill
+                     classes={classSelectorItems}
+                     selectedClassId={newAssignment.class_id}
+                     onSelectClass={(id) => {
+                       setNewAssignment(prev => ({ ...prev, class_id: id, subject_id: '' }));
+                       setFormError(null);
+                     }}
+                     emptyLabel={availableClasses.length === 0 ? "Aucune classe éligible" : `-- Choisir un(e) ${terminology.class.toLowerCase()} --`}
+                     variant="field"
+                     size="sm"
+                     colorScheme="indigo"
+                     portal={true}
+                     disabled={availableClasses.length === 0}
+                     className="w-full"
+                   />
                    {availableClasses.length === 0 && (
-                     <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2 animate-in fade-in">
-                       <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600" />
+                     <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-[11px] flex items-start gap-2 animate-in fade-in mt-1">
+                       <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-600" />
                        <div>
                          <span className="font-bold">Aucune classe éligible :</span> Aucun élève n'est encore inscrit pour cette session.
                        </div>
@@ -1304,63 +1338,51 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                    )}
                 </div>
 
-                {/* 2. Sélection de la Matière */}
-                <div className="space-y-1.5">
+                {/* 2. Sélection de la Matière / Cours (Style Pilule) */}
+                <div className="space-y-1">
                    <div className="flex items-center justify-between">
-                     <label htmlFor="subject_id" className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
-                       <BookOpen size={14} className="text-indigo-600" />
+                     <label className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
+                       <BookOpen size={13} className="text-indigo-600" />
                        Matière / Cours <span className="text-rose-500 font-bold">*</span>
                      </label>
                      {newAssignment.class_id && affiliatedSubjects.length > 0 && (
-                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
+                       <span className="text-[9.5px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">
                          {affiliatedSubjects.length} au programme
                        </span>
                      )}
                    </div>
-                   <div className="relative">
-                     <select 
-                      id="subject_id"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-semibold outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none transition-all disabled:opacity-50 disabled:bg-slate-100 cursor-pointer" 
-                      value={newAssignment.subject_id} 
-                      onChange={e => {setNewAssignment({...newAssignment, subject_id: e.target.value}); setFormError(null);}}
-                      disabled={!newAssignment.class_id}
-                     >
-                       <option value="">
-                         {!newAssignment.class_id 
-                           ? `-- Sélectionnez d'abord un(e) ${terminology.class.toLowerCase()} --` 
-                           : "-- Choisir une matière --"}
-                       </option>
-                       {affiliatedSubjects.length > 0 ? (
-                         <>
-                           <optgroup label={`✨ Matières associées à la classe (${affiliatedSubjects.length})`}>
-                             {affiliatedSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)}
-                           </optgroup>
-                           {otherSubjects.length > 0 && (
-                             <optgroup label={`📚 Autres matières de l'école (${otherSubjects.length})`}>
-                               {otherSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)}
-                             </optgroup>
-                           )}
-                         </>
-                       ) : (
-                         availableSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)
-                       )}
-                     </select>
-                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                   </div>
+                   <SelectPill
+                     options={subjectOptions}
+                     value={newAssignment.subject_id}
+                     onChange={(val) => {
+                       setNewAssignment(prev => ({ ...prev, subject_id: val }));
+                       setFormError(null);
+                     }}
+                     placeholder={!newAssignment.class_id 
+                       ? `-- Sélectionnez d'abord un(e) ${terminology.class.toLowerCase()} --` 
+                       : "-- Choisir une matière --"}
+                     disabled={!newAssignment.class_id}
+                     searchable={true}
+                     portal={true}
+                     variant="field"
+                     size="sm"
+                     colorScheme="indigo"
+                     className="w-full"
+                   />
                 </div>
 
                 {/* 3. Sélecteur de Jour avec Boutons Pills Tactiles */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                    <div className="flex items-center justify-between">
                      <label className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
-                       <Calendar size={14} className="text-indigo-600" />
+                       <Calendar size={13} className="text-indigo-600" />
                        Jour de cours <span className="text-rose-500 font-bold">*</span>
                      </label>
-                     <span className="text-[11px] font-bold text-indigo-700">{newAssignment.day}</span>
+                     <span className="text-[10.5px] font-bold text-indigo-700">{newAssignment.day}</span>
                    </div>
                    
                    {/* Boutons de sélection rapide du jour */}
-                   <div className="grid grid-cols-6 gap-1.5">
+                   <div className="grid grid-cols-6 gap-1">
                      {DAYS.map(d => {
                        const isSelected = newAssignment.day === d;
                        return (
@@ -1371,9 +1393,9 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                              setNewAssignment({ ...newAssignment, day: d });
                              setFormError(null);
                            }}
-                           className={`py-2 text-center text-xs font-bold rounded-xl transition-all border ${
+                           className={`py-1.5 text-center text-xs font-bold rounded-lg transition-all border cursor-pointer ${
                              isSelected 
-                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20 scale-[1.02]' 
+                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs scale-[1.02]' 
                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                            }`}
                            title={d}
@@ -1386,14 +1408,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 </div>
 
                 {/* 4. Horaires & Durée Dynamique */}
-                <div className="space-y-2 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80">
+                <div className="space-y-1.5 bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/80">
                    <div className="flex items-center justify-between">
                      <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                       <Clock size={14} className="text-indigo-600" />
+                       <Clock size={13} className="text-indigo-600" />
                        Horaires du cours
                      </span>
                      {currentSlotDuration && (
-                       <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg border flex items-center gap-1 ${
+                       <span className={`text-[10.5px] font-extrabold px-2 py-0.5 rounded-md border flex items-center gap-1 ${
                          currentSlotDuration.valid 
                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                            : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
@@ -1404,7 +1426,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                    </div>
 
                    {/* Créneaux rapides populaires */}
-                   <div className="flex flex-wrap gap-1.5 pb-1">
+                   <div className="flex flex-wrap gap-1 pb-0.5">
                      {QUICK_TIME_SLOTS.map(slot => (
                        <button
                          key={slot.label}
@@ -1417,9 +1439,9 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                            });
                            setFormError(null);
                          }}
-                         className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all ${
+                         className={`px-1.5 py-0.5 text-[9.5px] font-bold rounded-md border transition-all cursor-pointer ${
                            newAssignment.start === slot.start && newAssignment.end === slot.end
-                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
                              : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-indigo-600'
                          }`}
                        >
@@ -1428,23 +1450,23 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                      ))}
                    </div>
 
-                   <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                         <label htmlFor="start" className="text-[11px] font-bold text-slate-600">Début</label>
+                   <div className="grid grid-cols-2 gap-2">
+                      <div className="space-y-0.5">
+                         <label htmlFor="start" className="text-[10.5px] font-bold text-slate-600">Début</label>
                          <input 
                            id="start" 
                            type="time" 
-                           className="w-full px-3 py-2 bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono" 
+                           className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 focus:border-indigo-600 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono" 
                            value={newAssignment.start} 
                            onChange={e => {setNewAssignment({...newAssignment, start: e.target.value}); setFormError(null);}} 
                          />
                       </div>
-                      <div className="space-y-1">
-                         <label htmlFor="end" className="text-[11px] font-bold text-slate-600">Fin</label>
+                      <div className="space-y-0.5">
+                         <label htmlFor="end" className="text-[10.5px] font-bold text-slate-600">Fin</label>
                          <input 
                            id="end" 
                            type="time" 
-                           className="w-full px-3 py-2 bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono" 
+                           className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 focus:border-indigo-600 rounded-lg text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono" 
                            value={newAssignment.end} 
                            onChange={e => {setNewAssignment({...newAssignment, end: e.target.value}); setFormError(null);}} 
                          />
@@ -1453,10 +1475,10 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 </div>
 
                 {/* 5. Taux horaire & Rémunération */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
                     <label htmlFor="hourly_rate" className="text-xs font-bold text-emerald-800 tracking-tight flex items-center gap-1.5">
-                      <TrendingUp size={14} className="text-emerald-600" />
+                      <TrendingUp size={13} className="text-emerald-600" />
                       Taux Horaire Spécifique (HTG/h)
                     </label>
                     {staff?.pay_type === 'Horaire' && staff?.amount && Number(staff.amount) > 0 && (
@@ -1466,9 +1488,9 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                           setNewAssignment({ ...newAssignment, hourly_rate: String(staff.amount) });
                           setFormError(null);
                         }}
-                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline"
+                        className="text-[9.5px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
                       >
-                        Utiliser taux base ({staff.amount} HTG)
+                        Taux base ({staff.amount} HTG)
                       </button>
                     )}
                   </div>
@@ -1477,16 +1499,16 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                       id="hourly_rate" 
                       type="number" 
                       step="0.01" 
-                      className="w-full px-3.5 py-2.5 bg-emerald-50/60 border-2 border-emerald-200 rounded-xl text-xs font-black text-emerald-950 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono" 
+                      className="w-full px-3 py-1.5 bg-emerald-50/60 border border-emerald-200 rounded-lg text-xs font-black text-emerald-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 transition-all font-mono" 
                       value={newAssignment.hourly_rate} 
                       onChange={e => {setNewAssignment({...newAssignment, hourly_rate: e.target.value}); setFormError(null);}} 
                       placeholder={staff?.pay_type === 'Horaire' ? (staff?.amount?.toString() || "0.00") : "0.00"}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700/60 pointer-events-none">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700/60 pointer-events-none">
                       HTG/h
                     </span>
                   </div>
-                  <p className="text-[10px] text-emerald-700/80 font-medium px-1">
+                  <p className="text-[9.5px] text-emerald-700/80 font-medium px-0.5">
                     {staff?.pay_type === 'Horaire' 
                       ? `💡 Laissez vide ou à 0 pour utiliser le taux par défaut du contrat (${staff?.amount || 0} HTG/h).`
                       : `💡 Laissez à 0 si inclus dans le salaire fixe (${staff?.amount || 0} HTG). Sinon, indiquez le taux additionnel.`}
@@ -1495,11 +1517,11 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
 
                 {/* Erreurs de validation visuelles */}
                 {formError && (
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2">
-                    <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={16} />
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
+                    <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={14} />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-bold text-rose-900 mb-0.5">{formError.title}</h4>
-                      <p className="text-[11px] text-rose-700 whitespace-pre-line leading-relaxed">
+                      <p className="text-[10.5px] text-rose-700 whitespace-pre-line leading-relaxed">
                         {formError.message}
                       </p>
                     </div>
@@ -1510,13 +1532,13 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 <button 
                   onClick={handleProcessAssignment} 
                   type="button"
-                  className={`w-full py-3 rounded-2xl font-black text-xs tracking-tight transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md ${
+                  className={`w-full py-2.5 rounded-xl font-bold text-xs tracking-tight transition-all flex items-center justify-center gap-2 active:scale-95 shadow-2xs cursor-pointer ${
                     editingId 
                       ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20' 
                       : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
                   }`}
                 >
-                   {editingId ? <RefreshCw size={16} /> : <Plus size={16} />}
+                   {editingId ? <RefreshCw size={14} /> : <Plus size={14} />}
                    {editingId ? 'Valider la modification du créneau' : 'Ajouter au planning de cours'}
                 </button>
               </div>
@@ -1524,45 +1546,45 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         </div>
 
         {/* Tableau du Registre de Programme */}
-        <div className="lg:col-span-7 space-y-6">
-           <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden min-h-[500px] flex flex-col">
-              <div className="px-6 py-5 bg-slate-50/80 border-b border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-                 <div className="flex items-center gap-3">
-                   <div className="p-2 bg-indigo-100 text-indigo-600 rounded-xl">
-                    <Calendar size={18} />
+        <div className="lg:col-span-7">
+           <div className="bg-white rounded-2xl shadow-2xs border border-slate-200/80 overflow-hidden min-h-[440px] flex flex-col">
+              <div className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-slate-50/80 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                 <div className="flex items-center gap-2.5">
+                   <div className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg">
+                    <Calendar size={16} />
                    </div>
                    <div>
-                     <h3 className="font-bold text-slate-900 tracking-tight text-sm">Registre des Cours Attribués</h3>
-                     <p className="text-[11px] text-slate-500">{assignments.length} affectation{assignments.length > 1 ? 's' : ''} active{assignments.length > 1 ? 's' : ''}</p>
+                     <h3 className="font-bold text-slate-900 tracking-tight text-xs sm:text-sm">Registre des Cours Attribués</h3>
+                     <p className="text-[10.5px] text-slate-500">{assignments.length} affectation{assignments.length > 1 ? 's' : ''} active{assignments.length > 1 ? 's' : ''}</p>
                    </div>
                  </div>
-                 <div className="flex items-center gap-3">
+                 <div className="flex items-center gap-2">
                    {canShowImportButton && (
                      <button
                        onClick={openImportModal}
                        disabled={isSaving}
-                       className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-xl hover:bg-indigo-100 transition-colors flex items-center gap-1.5 shadow-xs active:scale-95 transition-all"
+                       className="px-2.5 py-1 bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold text-xs rounded-lg hover:bg-indigo-100 transition-colors flex items-center gap-1.5 shadow-2xs active:scale-95 cursor-pointer"
                      >
-                       <RefreshCw size={13} className={isSaving ? "animate-spin" : ""} />
+                       <RefreshCw size={12} className={isSaving ? "animate-spin" : ""} />
                        Importer année préc.
                      </button>
                    )}
-                   <div className="bg-slate-900 px-3.5 py-1.5 rounded-xl text-white font-black text-[10px] tracking-wider uppercase shadow-md shadow-slate-900/10 flex items-center gap-1.5">
-                      <Clock size={12} className="text-indigo-400" />
+                   <div className="bg-slate-900 px-2.5 py-1 rounded-lg text-white font-black text-[9.5px] tracking-wider uppercase shadow-2xs flex items-center gap-1.5">
+                      <Clock size={11} className="text-indigo-400" />
                       {weeklyHours} H / SEMAINE
                    </div>
                  </div>
               </div>
 
               <div className="flex-1 overflow-x-auto custom-scrollbar">
-                 <table className="w-full text-left min-w-[580px]">
+                 <table className="w-full text-left min-w-[540px]">
                    <thead>
-                     <tr className="bg-slate-900 text-white text-[10px] font-bold uppercase tracking-wider border-b border-slate-800">
-                       <th scope="col" className="px-5 py-3">Planning</th>
-                       <th scope="col" className="px-5 py-3">Cours & Classe</th>
-                       <th scope="col" className="px-4 py-3 text-center">Volume</th>
-                       <th scope="col" className="px-4 py-3 text-center">Taux/h</th>
-                       <th scope="col" className="px-5 py-3 text-center">Actions</th>
+                     <tr className="bg-slate-900 text-white text-[9.5px] font-bold uppercase tracking-wider border-b border-slate-800">
+                       <th scope="col" className="px-3.5 sm:px-4 py-2.5">Planning</th>
+                       <th scope="col" className="px-3.5 sm:px-4 py-2.5">Cours & Classe</th>
+                       <th scope="col" className="px-3 py-2.5 text-center">Volume</th>
+                       <th scope="col" className="px-3 py-2.5 text-center">Taux/h</th>
+                       <th scope="col" className="px-3.5 sm:px-4 py-2.5 text-center">Actions</th>
                      </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
@@ -1573,66 +1595,66 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                            key={String(a.id)} 
                            className={`group transition-colors duration-200 ${isBeingEdited ? 'bg-indigo-50/70 font-semibold' : 'hover:bg-slate-50/70'}`}
                          >
-                           <td className="px-5 py-3.5">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mb-0.5">
+                           <td className="px-3.5 sm:px-4 py-2.5">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10.5px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 mb-0.5">
                                 {a.day_of_week}
                               </span>
-                              <div className="flex items-center gap-1 text-xs text-slate-500 font-medium font-mono mt-0.5">
-                                <Clock size={12} className="text-slate-400" /> {a.start_time} - {a.end_time}
+                              <div className="flex items-center gap-1 text-[11px] text-slate-500 font-medium font-mono mt-0.5">
+                                <Clock size={11} className="text-slate-400" /> {a.start_time} - {a.end_time}
                               </div>
                            </td>
-                           <td className="px-5 py-3.5">
+                           <td className="px-3.5 sm:px-4 py-2.5">
                               <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
                                 {a.subject_name}
                               </p>
-                              <span className="text-[11px] text-slate-500 flex items-center gap-1 mt-0.5">
-                                <Layers size={12} className="text-slate-400"/> {a.class_name}
+                              <span className="text-[10.5px] text-slate-500 flex items-center gap-1 mt-0.5">
+                                <Layers size={11} className="text-slate-400"/> {a.class_name}
                               </span>
                            </td>
-                           <td className="px-4 py-3.5 text-center">
-                             <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-black bg-slate-100 text-slate-700 font-mono">
+                           <td className="px-3 py-2.5 text-center">
+                             <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-black bg-slate-100 text-slate-700 font-mono">
                                {a.duration_hours}h
                              </span>
                            </td>
-                           <td className="px-4 py-3.5 text-center">
-                             <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-black border font-mono ${
+                           <td className="px-3 py-2.5 text-center">
+                             <span className={`inline-flex items-center px-1.5 py-0.5 rounded-md text-xs font-black border font-mono ${
                                a.hourly_rate > 0 || staff?.pay_type === 'Horaire' 
                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                  : 'bg-slate-50 text-slate-400 border-slate-200'
                              }`}>
-                               {a.hourly_rate || (staff?.pay_type === 'Horaire' ? staff?.amount : 0) || 0} <span className="ml-1 text-[9px] opacity-70">HTG</span>
+                               {a.hourly_rate || (staff?.pay_type === 'Horaire' ? staff?.amount : 0) || 0} <span className="ml-1 text-[8.5px] opacity-70">HTG</span>
                              </span>
                            </td>
-                           <td className="px-5 py-3.5">
-                              <div className="flex items-center justify-center gap-1.5">
+                           <td className="px-3.5 sm:px-4 py-2.5">
+                              <div className="flex items-center justify-center gap-1">
                                  <button 
                                   onClick={() => startEdit(a)} 
-                                  className={`p-1.5 rounded-lg transition-colors active:scale-95 ${
+                                  className={`p-1.5 rounded-lg transition-colors active:scale-95 cursor-pointer ${
                                     isBeingEdited 
-                                      ? 'bg-indigo-600 text-white shadow-xs' 
+                                      ? 'bg-indigo-600 text-white shadow-2xs' 
                                       : 'text-amber-700 bg-amber-50 hover:bg-amber-500 hover:text-white border border-amber-200/60'
                                   }`}
                                   title="Modifier cette ligne"
                                   aria-label={`Modifier l'assignation pour ${a.subject_name}`}
                                  >
-                                    <Edit2 size={15} />
+                                    <Edit2 size={13} />
                                  </button>
                                  <button 
                                   onClick={() => cloneAssignment(a)} 
-                                  className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white rounded-lg transition-colors active:scale-95 border border-indigo-200/60"
+                                  className="p-1.5 text-indigo-600 bg-indigo-50 hover:bg-indigo-600 hover:text-white rounded-lg transition-colors active:scale-95 border border-indigo-200/60 cursor-pointer"
                                   title="Dupliquer dans le formulaire"
                                   aria-label={`Dupliquer l'assignation pour ${a.subject_name}`}
                                  >
-                                    <Copy size={15} />
+                                    <Copy size={13} />
                                  </button>
                                  <button 
                                   onClick={() => removeAssignment(String(a.id))} 
                                   type="button"
-                                  className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-lg transition-colors active:scale-95 border border-rose-200/60"
+                                  className="p-1.5 text-rose-600 bg-rose-50 hover:bg-rose-600 hover:text-white rounded-lg transition-colors active:scale-95 border border-rose-200/60 cursor-pointer"
                                   title="Supprimer cette ligne"
                                   aria-label={`Supprimer l'assignation pour ${a.subject_name}`}
                                  >
-                                    <Trash2 size={15} />
+                                    <Trash2 size={13} />
                                  </button>
                               </div>
                            </td>
@@ -1641,10 +1663,10 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                      })}
                      {assignments.length === 0 && (
                        <tr>
-                         <td colSpan={5} className="px-10 py-24 text-center text-slate-400 font-semibold text-xs leading-relaxed">
-                           <BookOpen size={40} className="mx-auto mb-3 text-slate-300" />
-                           <p className="font-bold text-slate-600 mb-1">Aucune affectation enregistrée</p>
-                           <p className="text-[11px] text-slate-400">Utilisez le formulaire ci-contre pour ajouter les cours de cet enseignant.</p>
+                         <td colSpan={5} className="px-8 py-16 text-center text-slate-400 font-semibold text-xs leading-relaxed">
+                           <BookOpen size={36} className="mx-auto mb-2.5 text-slate-300" />
+                           <p className="font-bold text-slate-600 mb-0.5">Aucune affectation enregistrée</p>
+                           <p className="text-[10.5px] text-slate-400">Utilisez le formulaire ci-contre pour ajouter les cours de cet enseignant.</p>
                          </td>
                        </tr>
                      )}
@@ -1652,16 +1674,16 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                  </table>
               </div>
 
-              <div className="px-6 py-5 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="px-3.5 sm:px-4 py-2.5 sm:py-3 bg-slate-50 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                  <div className="flex items-center gap-2">
                    {saveStatus === 'success' && (
-                     <div className="text-emerald-700 font-black text-xs uppercase tracking-wider bg-emerald-50 px-3.5 py-1.5 rounded-xl border border-emerald-200 flex items-center gap-1.5">
-                       <CheckCircle2 size={14} /> Synchronisé avec succès
+                     <div className="text-emerald-700 font-black text-[11px] uppercase tracking-wider bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200 flex items-center gap-1.5">
+                       <CheckCircle2 size={13} /> Synchronisé avec succès
                      </div>
                    )}
                    {saveStatus === 'error' && (
-                     <div className="text-rose-600 font-black text-xs uppercase tracking-wider bg-rose-50 px-3.5 py-1.5 rounded-xl border border-rose-200 flex items-center gap-1.5">
-                       <AlertTriangle size={14} /> Échec de synchronisation
+                     <div className="text-rose-600 font-black text-[11px] uppercase tracking-wider bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200 flex items-center gap-1.5">
+                       <AlertTriangle size={13} /> Échec de synchronisation
                      </div>
                    )}
                  </div>
@@ -1670,13 +1692,13 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                   disabled={isSaving || (!hasUnsavedChanges && assignments.length > 0 && saveStatus !== 'error')} 
                   onClick={handleSaveAll} 
                   type="button"
-                  className={`w-full sm:w-auto px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md ${
+                  className={`w-full sm:w-auto px-5 py-2.5 rounded-xl font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 active:scale-95 shadow-2xs cursor-pointer ${
                     hasUnsavedChanges 
                       ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-emerald-600/20 animate-pulse' 
                       : 'bg-slate-900 text-white hover:bg-slate-800 disabled:opacity-50 disabled:pointer-events-none'
                   }`}
                  >
-                    {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                    {isSaving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
                     {isSaving ? 'Enregistrement en cours...' : hasUnsavedChanges ? 'Finaliser les Affectations (*)' : 'Affectations Enregistrées'}
                  </button>
               </div>
@@ -1702,22 +1724,21 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
           </div>
         }
         hideDefaultActions
-        containerClassName="rounded-[2.5rem] max-w-2xl"
-        contentClassName="p-8"
+        containerClassName="rounded-2xl max-w-xl"
+        contentClassName="p-4 sm:p-5"
       >
-        <div className="space-y-6 text-left">
+        <div className="space-y-4 text-left">
           {/* Cartes d'Information Cible & Source */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Année Cible (Destination) */}
-            <div className="p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100">
-              <label htmlFor="modal_target_year" className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider block mb-1">
+            <div className="p-3 bg-indigo-50/60 rounded-xl border border-indigo-100 space-y-1.5">
+              <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider block">
                 🎯 Année Cible (Destination)
-              </label>
-              <select
-                id="modal_target_year"
-                value={selectedYearId}
-                onChange={(e) => {
-                  const newTargetId = e.target.value;
+              </span>
+              <AcademicSessionPill
+                academicYears={allAcademicYears}
+                selectedYearId={selectedYearId}
+                onSelectYear={(newTargetId) => {
                   setSelectedYearId(newTargetId);
                   setActiveYearId(newTargetId);
                   const otherOpts = allAcademicYears.filter(y => y.id !== newTargetId);
@@ -1727,53 +1748,35 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                     analyzeSourceAssignments(newSrcId, newTargetId);
                   }
                 }}
-                className="w-full bg-white text-slate-900 text-xs font-bold px-3 py-2 rounded-xl border border-indigo-200 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                {allAcademicYears.map(y => {
-                  const isAct = y.is_active || y.status === 'ACTIVE';
-                  const isPrep = y.status === 'FUTURE' || y.status === 'PREPARATION';
-                  const statusLabel = isAct ? 'Active' : isPrep ? 'En préparation' : 'Passée';
-                  return (
-                    <option key={y.id} value={y.id}>
-                      {y.label} ({statusLabel})
-                    </option>
-                  );
-                })}
-              </select>
-              <div className="flex items-center gap-2 mt-2">
-                <span className="text-[10px] bg-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-md flex items-center gap-1">
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                className="w-full"
+              />
+              <div className="flex items-center gap-2 pt-0.5">
+                <span className="text-[9.5px] bg-indigo-100 text-indigo-700 font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
                   <ShieldCheck size={10} /> Multi-Tenant Sécurisé
                 </span>
               </div>
             </div>
 
             {/* Sélecteur d'Année Source */}
-            <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200">
-              <label htmlFor="modal_source_year" className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">
+            <div className="p-3 bg-slate-50 rounded-xl border border-slate-200 space-y-1.5">
+              <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
                 📚 Année Source (Origine)
-              </label>
-              <select
-                id="modal_source_year"
-                value={sourceYearId}
-                onChange={(e) => {
-                  setSourceYearId(e.target.value);
-                  analyzeSourceAssignments(e.target.value, selectedYearId);
+              </span>
+              <AcademicSessionPill
+                academicYears={allAcademicYears.filter(y => y.id !== selectedYearId)}
+                selectedYearId={sourceYearId}
+                onSelectYear={(newSrcId) => {
+                  setSourceYearId(newSrcId);
+                  analyzeSourceAssignments(newSrcId, selectedYearId);
                 }}
-                className="w-full bg-white text-slate-900 text-xs font-bold px-3 py-2 rounded-xl border border-slate-300 outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-              >
-                {allAcademicYears
-                  .filter(y => y.id !== selectedYearId)
-                  .map(y => {
-                    const isAct = y.is_active || y.status === 'ACTIVE';
-                    const isPrep = y.status === 'FUTURE' || y.status === 'PREPARATION';
-                    const statusLabel = isAct ? 'Active' : isPrep ? 'En préparation' : 'Passée';
-                    return (
-                      <option key={y.id} value={y.id}>
-                        {y.label} ({statusLabel})
-                      </option>
-                    );
-                  })}
-              </select>
+                variant="field"
+                size="sm"
+                colorScheme="slate"
+                className="w-full"
+              />
             </div>
           </div>
 

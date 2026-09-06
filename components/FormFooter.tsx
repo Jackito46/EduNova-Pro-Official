@@ -21,8 +21,8 @@ export const FormFooter: React.FC<FormFooterProps> = ({
   showSecurityBadge = false,
   securityText = 'Système Sécurisé',
   year = '2026',
-  brandName = 'EDUNOVA TECHNOLOGIES',
-  tagline = 'GESTION ACADÉMIQUE INTÉGRÉE'
+  brandName = 'EduNova Technologies Inc.',
+  tagline = 'Gestion Académique & Économat'
 }) => {
   if (variant === 'dark') {
     return (
