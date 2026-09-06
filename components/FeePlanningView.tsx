@@ -53,6 +53,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       c.name.toLowerCase().includes("siege")
   );
   const siegeCampusId = siegeCampus ? siegeCampus.id : null;
+  const currentCampusObj = campuses?.find(c => c.id === currentCampusId);
   const isSiegeActive = !user.campus_id && (!currentCampusId || currentCampusId === siegeCampusId);
 
   const [loading, setLoading] = useState(true);
@@ -70,6 +71,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [isMigrating, setIsMigrating] = useState(false);
   const [showMigrateModal, setShowMigrateModal] = useState(false);
   const [migrateSourceId, setMigrateSourceId] = useState<string>('');
+  const [migrateScope, setMigrateScope] = useState<'current_campus' | 'all_campuses'>('current_campus');
   
   const [showHistoryForPlan, setShowHistoryForPlan] = useState<{id: string, className: string} | null>(null);
   const [pendingPropagation, setPendingPropagation] = useState<{
@@ -114,12 +116,14 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
     value: number;
     currency: 'HTG' | 'USD';
     cycleTarget: string;
+    scope?: 'current_campus' | 'all_campuses';
   }>({
     feeTarget: 'tuition',
     adjustType: 'PERCENT',
     value: 10,
     currency: 'HTG',
-    cycleTarget: 'ALL'
+    cycleTarget: 'ALL',
+    scope: 'current_campus'
   });
 
   const fetchData = useCallback(async () => {
@@ -259,6 +263,42 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   useEffect(() => { fetchData(); }, [fetchData]);
   useEffect(() => { if (selectedYearId) fetchPlans(); }, [selectedYearId, fetchPlans]);
 
+  const normalizeLevel = (level?: string) => {
+    if (!level) return '';
+    return level.toUpperCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace('È', 'E')
+      .replace('É', 'E')
+      .replace('Ê', 'E')
+      .replace('Ô', 'O')
+      .replace('Î', 'I')
+      .replace('Û', 'U');
+  };
+
+  const filterClassesBySchoolType = useCallback((classesList: SchoolClass[]) => {
+    if (!school) return classesList;
+    const type = school.school_type;
+    
+    const classicLevels = ['MATERNELLE', 'FONDAMENTALE', 'SECONDAIRE'];
+    const uniLevels = ['DIPLÔME', 'DIPLOME', 'LICENCE', 'MASTER'];
+    const proLevels = ['CERTIFICAT', 'DIPLOME', 'DIPLÔME'];
+
+    const allStandardLevels = [...classicLevels, ...uniLevels, ...proLevels];
+
+    return classesList.filter(c => {
+      const level = c.level?.toUpperCase() || '';
+      if (!allStandardLevels.includes(level)) return true;
+      if (type === 'UNIVERSITY') return uniLevels.includes(level);
+      if (type === 'PROFESSIONAL') return proLevels.includes(level);
+      return classicLevels.includes(level);
+    });
+  }, [school]);
+
+  const validClasses = useMemo(() => {
+    return filterClassesBySchoolType(classes);
+  }, [classes, filterClassesBySchoolType]);
+
   const [formData, setFormData] = useState({
     id: '',
     class_id: '',
@@ -320,7 +360,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       currency,
       label,
       targetCount: targetClasses ? targetClasses.length : 0,
-      scope: 'current_campus'
+      scope: currentCampusId ? 'current_campus' : 'all_campuses'
     });
   };
 
@@ -338,7 +378,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           .select('*')
           .eq('school_id', user.school_id);
         if (!classErr && allCompClasses && allCompClasses.length > 0) {
-          targetClassesList = allCompClasses;
+          targetClassesList = filterClassesBySchoolType(allCompClasses);
         }
       }
 
@@ -450,7 +490,11 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       });
 
-      toast.success(`✨ ${label} (${val.toLocaleString()} ${currency}) propagé(s) avec succès à ${finalUpdates.length} classe(s) !`);
+      const scopeLabel = scope === 'all_campuses' 
+        ? 'sur toutes les annexes du réseau' 
+        : (currentCampusObj ? `sur l'annexe "${currentCampusObj.name}"` : 'sur le campus actuel');
+
+      toast.success(`✨ ${label} (${val.toLocaleString()} ${currency}) propagé(s) avec succès à ${finalUpdates.length} classe(s) (${scopeLabel}) !`);
       setPendingPropagation(null);
       await fetchPlans();
     } catch (error: any) {
@@ -631,6 +675,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const defaultSource = academicYears.find(y => y.id !== selectedYearId && y.is_active)?.id || academicYears.find(y => y.id !== selectedYearId)?.id || '';
       setMigrateSourceId(defaultSource);
     }
+    setMigrateScope(currentCampusId ? 'current_campus' : 'all_campuses');
     setShowMigrateModal(true);
   };
 
@@ -647,10 +692,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
     setIsMigrating(true);
     const sourceId = migrateSourceId;
     try {
-      // 1. Récupérer les plans de la source
+      // 1. Récupérer les plans de la source avec isolation school_id et jointure de classe
       const { data: sourcePlans, error: srcErr } = await supabase
         .from('fee_plans')
-        .select('*')
+        .select('*, class:classes(id, name, level, campus_id, school_id)')
         .eq('academic_year_id', sourceId)
         .eq('school_id', user.school_id);
 
@@ -661,8 +706,20 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         return;
       }
 
+      // Filtrer selon le périmètre multi-campus / annexe
+      let plansToMigrate = sourcePlans;
+      if (school?.has_multi_campus && migrateScope === 'current_campus' && currentCampusId) {
+        plansToMigrate = sourcePlans.filter(p => p.class?.campus_id === currentCampusId);
+      }
+
+      if (plansToMigrate.length === 0) {
+        const cName = campuses?.find(c => c.id === currentCampusId)?.name || 'ce campus';
+        toast.warning(`Aucun plan tarifaire trouvé dans la session source pour ${cName}.`);
+        return;
+      }
+
       // 2. Préparer les nouveaux plans pour la cible
-      const newPlans = sourcePlans.map(p => ({
+      const newPlans = plansToMigrate.map(p => ({
         school_id: user.school_id,
         class_id: p.class_id,
         academic_year_id: selectedYearId,
@@ -689,18 +746,29 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       }
 
+      const scopeLabel = migrateScope === 'all_campuses' 
+        ? 'sur toutes les annexes du réseau' 
+        : (currentCampusObj ? `sur l'annexe "${currentCampusObj.name}"` : 'sur le campus actuel');
+
       AuditLogger.log({
         school_id: user.school_id,
         user_id: user.id,
         action: 'CREATE',
         entity_type: 'fee_plan',
-        details: { mode: 'fee_plan_migration', count: newPlans.length, source_year: sourceId, target_year: selectedYearId }
+        details: { 
+          mode: 'fee_plan_migration', 
+          count: newPlans.length, 
+          source_year: sourceId, 
+          target_year: selectedYearId,
+          scope: migrateScope,
+          campus_id: currentCampusId 
+        }
       });
 
       const sourceYearObj = academicYears.find(y => y.id === sourceId);
       const targetYearLabel = currentYearObj ? `${currentYearObj.label} ${currentYearObj.status === 'FUTURE' ? '(PRÉPARATION)' : '(ACTIVE)'}` : '';
 
-      toast.success(`✨ ${newPlans.length} grille(s) tarifaire(s) copiée(s) avec succès depuis "${sourceYearObj?.label || 'Source'}" vers "${targetYearLabel}" !`);
+      toast.success(`✨ ${newPlans.length} grille(s) tarifaire(s) copiée(s) avec succès (${scopeLabel}) depuis "${sourceYearObj?.label || 'Source'}" vers "${targetYearLabel}" !`);
 
       setShowMigrateModal(false);
       setMigrateSourceId('');
@@ -1007,38 +1075,6 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
     setDeleteId(null);
   };
 
-  const normalizeLevel = (level?: string) => {
-    if (!level) return '';
-    return level.toUpperCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace('È', 'E')
-      .replace('É', 'E')
-      .replace('Ê', 'E')
-      .replace('Ô', 'O')
-      .replace('Î', 'I')
-      .replace('Û', 'U');
-  };
-
-  const validClasses = useMemo(() => {
-    if (!school) return classes;
-    const type = school.school_type;
-    
-    const classicLevels = ['MATERNELLE', 'FONDAMENTALE', 'SECONDAIRE'];
-    const uniLevels = ['DIPLÔME', 'DIPLOME', 'LICENCE', 'MASTER'];
-    const proLevels = ['CERTIFICAT', 'DIPLOME', 'DIPLÔME'];
-
-    const allStandardLevels = [...classicLevels, ...uniLevels, ...proLevels];
-
-    return classes.filter(c => {
-      const level = c.level?.toUpperCase() || '';
-      if (!allStandardLevels.includes(level)) return true;
-      if (type === 'UNIVERSITY') return uniLevels.includes(level);
-      if (type === 'PROFESSIONAL') return proLevels.includes(level);
-      return classicLevels.includes(level);
-    });
-  }, [classes, school]);
-
   const filteredPlans = useMemo(() => {
     return plans.filter(p => {
       // Only show plans for classes in the current campus 
@@ -1136,15 +1172,35 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [school?.school_type]);
 
   const executeBulkAdjustment = async () => {
-    if (!selectedYearId || !user.school_id || plans.length === 0) {
-      toast.error("Aucun plan tarifaire à ajuster pour cette session.");
+    if (!selectedYearId || !user.school_id) {
+      toast.error("Veuillez sélectionner une session académique valide.");
       return;
     }
     setIsSubmitting(true);
     try {
       let targetPlans = plans;
+
+      if (bulkAdjustConfig.scope === 'all_campuses' && school?.has_multi_campus) {
+        // Multi-campus: Fetch all fee plans for this school and year across ALL campuses
+        const { data: allCampusesPlans, error: acErr } = await supabase
+          .from('fee_plans')
+          .select('*, class:classes(name, level, campus_id, school_id)')
+          .eq('academic_year_id', selectedYearId)
+          .eq('school_id', user.school_id);
+
+        if (acErr) throw acErr;
+        if (allCampusesPlans && allCampusesPlans.length > 0) {
+          targetPlans = allCampusesPlans;
+        }
+      }
+
+      if (!targetPlans || targetPlans.length === 0) {
+        toast.error("Aucun plan tarifaire à ajuster pour cette sélection.");
+        return;
+      }
+
       if (bulkAdjustConfig.cycleTarget !== 'ALL') {
-        targetPlans = plans.filter(p => normalizeLevel(p.class?.level) === normalizeLevel(bulkAdjustConfig.cycleTarget));
+        targetPlans = targetPlans.filter(p => normalizeLevel(p.class?.level) === normalizeLevel(bulkAdjustConfig.cycleTarget));
       }
 
       if (targetPlans.length === 0) {
@@ -1237,12 +1293,17 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           adjustType,
           value,
           currency,
-          classes_count: updatedPayloads.length
+          classes_count: updatedPayloads.length,
+          scope: bulkAdjustConfig.scope || 'current_campus',
+          campus_id: currentCampusId
         }
       });
 
+      const scopeLabel = bulkAdjustConfig.scope === 'all_campuses' 
+        ? 'sur toutes les annexes du réseau' 
+        : (currentCampusObj ? `sur l'annexe "${currentCampusObj.name}"` : 'sur le campus actuel');
       const targetLabel = currentYearObj ? `${currentYearObj.label} ${currentYearObj.status === 'FUTURE' ? '(PRÉPARATION)' : '(ACTIVE)'}` : '';
-      toast.success(`✨ Ajustement appliqué avec succès à ${updatedPayloads.length} classe(s) pour la session ${targetLabel} !`);
+      toast.success(`✨ Ajustement appliqué avec succès (${scopeLabel}) à ${updatedPayloads.length} classe(s) pour la session ${targetLabel} !`);
       setShowBulkAdjustModal(false);
       await fetchPlans();
     } catch (err: any) {
@@ -1412,65 +1473,6 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-      {/* VUE GLOBALE CONSOLIDÉE - STATISTIQUES GLOBALES */}
-      {!currentCampusId && globalStats && (
-        <div className={`grid grid-cols-1 sm:grid-cols-2 ${school?.has_multi_campus ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4 animate-in fade-in duration-300`}>
-          {/* Card 1: Plans Count */}
-          <div className="bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 rounded-2xl shadow-sm border border-slate-700/50 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-300">Tarifs Consolidés</span>
-              <div className="p-1.5 bg-slate-800 rounded-lg text-blue-400"><Layers size={16} /></div>
-            </div>
-            <div className="mt-4">
-              <h4 className="text-3xl font-bold tracking-tight">{globalStats.totalPlans}</h4>
-              <p className="text-slate-400 text-[10px] mt-1 font-medium">
-                {school?.has_multi_campus 
-                  ? `Grilles réparties sur ${globalStats.campusesConfiguredCount} annexes actives.` 
-                  : "Grilles actives pour l'ensemble des classes."}
-              </p>
-            </div>
-          </div>
-
-          {/* Card 2: Campus Coverage */}
-          {school?.has_multi_campus && (
-            <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Couverture Annexes</span>
-                <div className="p-1.5 bg-indigo-50 rounded-lg text-indigo-600"><School size={16} /></div>
-              </div>
-              <div className="mt-4">
-                <h4 className="text-3xl font-bold text-gray-900">{globalStats.campusesConfiguredCount} <span className="text-sm font-medium text-gray-400">/ {campuses?.length || 0}</span></h4>
-                <p className="text-gray-500 text-[10px] mt-1 font-medium">Établissements avec règles tarifaires actives.</p>
-              </div>
-            </div>
-          )}
-
-          {/* Card 3: HTG Average */}
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Scolarité Moyenne (HTG)</span>
-              <div className="p-1.5 bg-emerald-50 rounded-lg text-emerald-600"><TrendingUp size={16} /></div>
-            </div>
-            <div className="mt-4">
-              <h4 className="text-2xl font-bold text-gray-950">{Math.round(globalStats.avgTuitionHtg).toLocaleString()} G</h4>
-              <p className="text-gray-500 text-[10px] mt-1 font-medium">Moyenne calculée sur les tarifs en gourdes.</p>
-            </div>
-          </div>
-
-          {/* Card 4: USD Average */}
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-200 flex flex-col justify-between">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-black uppercase tracking-wider text-gray-400">Scolarité Moyenne (USD)</span>
-              <div className="p-1.5 bg-blue-50 rounded-lg text-blue-600 font-bold">$</div>
-            </div>
-            <div className="mt-4">
-              <h4 className="text-2xl font-bold text-gray-950">${Math.round(globalStats.avgTuitionUsd).toLocaleString()}</h4>
-              <p className="text-gray-500 text-[10px] mt-1 font-medium">Moyenne calculée sur les tarifs en dollars.</p>
-            </div>
-          </div>
-        </div>
-      )}
-
       <div className="bg-white p-2 sm:p-2.5 rounded-2xl shadow-xs border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-2.5">
         <div className="flex bg-slate-100/90 p-1 rounded-xl border border-slate-200/60 overflow-x-auto custom-scrollbar gap-1 flex-1">
           {(school?.school_type === 'UNIVERSITY' 
@@ -1491,24 +1493,33 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </button>
           ))}
         </div>
-        <div className="flex items-center bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 px-3 py-1.5 rounded-xl border border-slate-200 transition-all relative flex-1 md:max-w-xs">
-          <Search size={15} className="text-slate-400 shrink-0 mr-2" />
-          <input 
-            type="text" 
-            placeholder="Rechercher une classe..." 
-            className="w-full bg-transparent text-xs font-bold text-slate-900 placeholder:text-slate-500 outline-none"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-          {searchQuery && (
-            <button
-              type="button"
-              onClick={() => setSearchQuery('')}
-              className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer ml-1"
-            >
-              <X size={13} />
-            </button>
-          )}
+
+        <div className="flex items-center gap-2">
+          {/* Badge sobre et compact du nombre de grilles tarifaires actives */}
+          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 bg-slate-100/90 px-3 py-1.5 rounded-xl border border-slate-200 shrink-0">
+            <Layers size={13} className="text-blue-600" />
+            <span>{plans.length} grille{plans.length > 1 ? 's' : ''} configurée{plans.length > 1 ? 's' : ''}</span>
+          </div>
+
+          <div className="flex items-center bg-slate-50 hover:bg-slate-100/70 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500 px-3 py-1.5 rounded-xl border border-slate-200 transition-all relative flex-1 md:w-64">
+            <Search size={15} className="text-slate-400 shrink-0 mr-2" />
+            <input 
+              type="text" 
+              placeholder="Rechercher une classe..." 
+              className="w-full bg-transparent text-xs font-bold text-slate-900 placeholder:text-slate-500 outline-none"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery('')}
+                className="text-slate-400 hover:text-slate-600 p-0.5 rounded-full cursor-pointer ml-1"
+              >
+                <X size={13} />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1818,8 +1829,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <div className="flex items-center gap-1.5">
                         <input 
                           type="number" 
+                          inputMode="decimal"
                           min="0"
-                          className="flex-1 min-w-0 px-2.5 py-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all font-mono" 
+                          step="any"
+                          className="flex-1 min-w-0 h-10 sm:h-9 px-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-sm sm:text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all font-mono shadow-2xs" 
                           value={formData.inscription_currency === 'HTG' ? formData.inscription_fee : formData.inscription_fee_usd} 
                           onChange={(e) => {
                             const val = e.target.value;
@@ -1849,7 +1862,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           size="sm"
                           colorScheme="emerald"
                           portal={true}
-                          className="w-18 sm:w-20 shrink-0"
+                          className="w-20 sm:w-22 shrink-0"
                         />
                       </div>
                     </div>
@@ -1872,8 +1885,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <div className="flex items-center gap-1.5">
                         <input 
                           type="number" 
+                          inputMode="decimal"
                           min="0"
-                          className="flex-1 min-w-0 px-2.5 py-1 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-all font-mono" 
+                          step="any"
+                          className="flex-1 min-w-0 h-10 sm:h-9 px-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-sm sm:text-sm font-bold outline-none focus:border-indigo-500 focus:bg-white transition-all font-mono shadow-2xs" 
                           value={formData.reenrollment_currency === 'HTG' ? formData.reenrollment_fee : formData.reenrollment_fee_usd} 
                           onChange={(e) => {
                             const val = e.target.value;
@@ -1903,7 +1918,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           size="sm"
                           colorScheme="indigo"
                           portal={true}
-                          className="w-18 sm:w-20 shrink-0"
+                          className="w-20 sm:w-22 shrink-0"
                         />
                       </div>
                     </div>
@@ -1934,8 +1949,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <div className="relative flex-1">
                       <input 
                         type="number" 
+                        inputMode="decimal"
                         min="0"
-                        className="w-full px-2.5 py-1 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-black outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/10 transition-all font-mono" 
+                        step="any"
+                        className="w-full h-10 sm:h-9.5 px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm sm:text-base font-black outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/10 transition-all font-mono shadow-2xs" 
                         value={formData.tuition_currency === 'HTG' ? formData.tuition_fee : formData.tuition_fee_usd} 
                         onChange={(e) => {
                           const val = e.target.value;
@@ -2071,24 +2088,24 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
                     </div>
 
-                    {/* Responsive Installments List - Compact for Mobile, Tablet & Desktop */}
+                    {/* Responsive Installments List - Dynamic on Mobile, Tablet & Desktop */}
                     <div className="space-y-1">
                       {(formData.payment_structure || []).length === 0 ? (
-                        <p className="text-[9px] text-blue-600/70 font-bold italic text-center py-1 bg-white/70 rounded-lg border border-blue-100">
+                        <p className="text-[9px] text-blue-600/70 font-bold italic text-center py-1.5 bg-white/70 rounded-lg border border-blue-100">
                           Structure par incréments libres (par défaut)
                         </p>
                       ) : (
-                        <div className="space-y-1 max-h-44 sm:max-h-48 overflow-y-auto custom-scrollbar pr-0.5">
+                        <div className="space-y-1.5 max-h-48 sm:max-h-52 overflow-y-auto custom-scrollbar pr-0.5">
                           {formData.payment_structure?.map((step, idx) => (
-                            <div key={idx} className="p-1 sm:p-1.5 bg-white rounded-lg border border-blue-100/90 shadow-2xs hover:border-blue-200 transition-colors">
-                              {/* Desktop / Tablet: One single dense line. Mobile: Dense 2-level layout */}
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-1.5">
+                            <div key={idx} className="p-2 sm:p-1.5 bg-white rounded-xl border border-blue-100/90 shadow-2xs hover:border-blue-200 transition-colors">
+                              {/* Responsive Adaptive Grid: stacked & spacious on mobile, compact single-line on tablet/desktop */}
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5">
                                 {/* Libellé */}
                                 <div className="flex-1 min-w-0">
                                   <input 
                                     type="text"
                                     placeholder={`Libellé ${idx + 1}`}
-                                    className="w-full px-2 py-0.5 sm:py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                                    className="w-full h-9 sm:h-8 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all"
                                     value={step.label}
                                     onChange={(e) => {
                                       const newStructure = [...formData.payment_structure!];
@@ -2099,12 +2116,15 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 </div>
 
                                 {/* Montant, Date & Supprimer */}
-                                <div className="flex items-center gap-1 shrink-0">
-                                  <div className="w-24 sm:w-28">
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  <div className="flex-1 sm:w-28 sm:flex-none">
                                     <input 
                                       type="number" 
+                                      inputMode="decimal"
+                                      min="0"
+                                      step="any"
                                       placeholder="Montant"
-                                      className="w-full px-2 py-0.5 sm:py-1 bg-slate-50 border border-slate-200 rounded-md text-[11px] font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all font-mono text-right"
+                                      className="w-full h-9 sm:h-8 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs sm:text-xs font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white transition-all font-mono text-right"
                                       value={step.amount || ''}
                                       onChange={(e) => {
                                         const newStructure = [...formData.payment_structure!];
@@ -2113,10 +2133,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       }}
                                     />
                                   </div>
-                                  <div className="w-28 sm:w-32">
+                                  <div className="flex-1 sm:w-32 sm:flex-none">
                                     <input 
-                                      type="date"
-                                      className="w-full px-1.5 py-0.5 sm:py-1 bg-slate-50 border border-slate-200 rounded-md text-[10px] font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
+                                      type="date" 
+                                      className="w-full h-9 sm:h-8 px-2 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-800 outline-none focus:border-blue-500 focus:bg-white transition-all"
                                       value={step.due_date || ''}
                                       onChange={(e) => {
                                         const newStructure = [...formData.payment_structure!];
@@ -2131,10 +2151,10 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       const newStructure = formData.payment_structure!.filter((_, i) => i !== idx);
                                       setFormData({...formData, payment_structure: newStructure});
                                     }}
-                                    className="p-1 text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded transition-colors cursor-pointer shrink-0"
+                                    className="h-9 w-9 sm:h-8 sm:w-8 flex items-center justify-center text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer shrink-0 border border-rose-100"
                                     title="Supprimer ce versement"
                                   >
-                                    <Trash2 size={13} />
+                                    <Trash2 size={14} />
                                   </button>
                                 </div>
                               </div>
@@ -2142,7 +2162,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           ))}
 
                           {/* Summary Check - Ultra Compact */}
-                          <div className="flex items-center justify-between px-2 py-0.5 bg-blue-100/60 rounded-lg text-xs">
+                          <div className="flex items-center justify-between px-2 py-1 bg-blue-100/60 rounded-lg text-xs">
                             <span className="text-[9px] font-black text-blue-900 uppercase">Total Échéancier :</span>
                             <span className={`text-[11px] font-black ${(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0) !== (formData.tuition_currency === 'HTG' ? parseFloat(formData.tuition_fee) : parseFloat(formData.tuition_fee_usd)) ? 'text-rose-600' : 'text-emerald-700'}`}>
                               {(formData.payment_structure?.reduce((acc, s) => acc + s.amount, 0) || 0).toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}
@@ -2154,7 +2174,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                              const currentFee = parseFloat(formData.tuition_currency === 'HTG' ? (formData.tuition_fee || '0') : (formData.tuition_fee_usd || '0')) || 0;
                              if (sum > 0 && Math.abs(sum - currentFee) > 0.01) {
                                return (
-                                 <div className="p-1 bg-rose-50 border border-rose-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-1">
+                                 <div className="p-1.5 bg-rose-50 border border-rose-200 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-1">
                                    <p className="text-[9px] text-rose-700 font-bold leading-tight">
                                      Écart : Total versements ({sum.toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'}) ≠ Scolarité ({currentFee.toLocaleString()} {formData.tuition_currency === 'HTG' ? 'G' : '$'})
                                    </p>
@@ -2183,7 +2203,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* Misc Fees Section - Compact & Unified */}
-                <div className="bg-slate-50/80 p-2 rounded-xl border border-slate-200/80 space-y-1.5">
+                <div className="bg-slate-50/80 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1.5">
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-1.5">
                       <div className="p-0.5 bg-white rounded-md shadow-2xs border border-slate-200 text-indigo-600">
@@ -2204,12 +2224,13 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                   
                   <div className="grid grid-cols-1 sm:grid-cols-12 gap-1.5 items-center">
-                    <div className="sm:col-span-8 flex items-center gap-1.5">
+                    <div className="sm:col-span-7 flex items-center gap-1.5">
                       <input 
                         type="number" 
                         inputMode="decimal"
-                        enterKeyHint="done"
-                        className="flex-1 min-w-0 px-2.5 py-1 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs sm:text-sm font-bold outline-none focus:border-emerald-500 transition-all font-mono" 
+                        min="0"
+                        step="any"
+                        className="flex-1 min-w-0 h-10 sm:h-9 px-3 py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm sm:text-sm font-bold outline-none focus:border-emerald-500 transition-all font-mono shadow-2xs" 
                         placeholder="0.00"
                         value={formData.misc_currency === 'USD' ? formData.misc_fee_usd : formData.misc_fee_htg} 
                         onChange={(e) => {
@@ -2243,18 +2264,18 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       />
                     </div>
 
-                    <div className="sm:col-span-4">
+                    <div className="sm:col-span-5">
                       <button 
                         type="button"
-                        className="w-full flex items-center gap-2 cursor-pointer p-1 bg-white border border-slate-200 rounded-lg hover:border-rose-300 transition-all text-left" 
+                        className="w-full min-h-[40px] sm:min-h-[36px] flex items-center gap-2 cursor-pointer px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg hover:border-rose-300 transition-all text-left shadow-2xs" 
                         onClick={() => setFormData({...formData, is_misc_mandatory: !formData.is_misc_mandatory})}
                       >
-                        <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center transition-all flex-shrink-0 ${formData.is_misc_mandatory ? 'bg-rose-600 border-rose-600 shadow-2xs' : 'bg-white border-slate-300'}`}>
-                          {formData.is_misc_mandatory && <CheckCircle2 size={10} className="text-white" />}
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all flex-shrink-0 ${formData.is_misc_mandatory ? 'bg-rose-600 border-rose-600 shadow-2xs' : 'bg-white border-slate-300'}`}>
+                          {formData.is_misc_mandatory && <CheckCircle2 size={11} className="text-white" />}
                         </div>
                         <div className="min-w-0">
-                          <span className="text-[10px] font-bold text-slate-800 leading-none block">Frais obligatoires</span>
-                          <span className="text-[8.5px] text-slate-500 font-medium block leading-tight truncate">À acquitter en priorité</span>
+                          <span className="text-[10.5px] font-bold text-slate-800 leading-none block">Frais obligatoires</span>
+                          <span className="text-[9px] text-slate-500 font-medium block leading-tight truncate">À acquitter en priorité</span>
                         </div>
                       </button>
                     </div>
@@ -2333,11 +2354,59 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
             />
           </div>
 
+          {/* Multi-Tenant / Campus Scope Selector for Migration */}
+          {school?.has_multi_campus && (
+            <div className="space-y-1">
+              <label className="block text-xs font-bold text-slate-700">
+                Périmètre des campus & annexes à migrer :
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setMigrateScope('current_campus')}
+                  className={`p-2 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
+                    migrateScope === 'current_campus'
+                      ? 'bg-blue-50/90 border-blue-500 ring-1 ring-blue-500/30 text-blue-950 font-semibold shadow-2xs'
+                      : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Building2 className={`shrink-0 mt-0.5 ${migrateScope === 'current_campus' ? 'text-blue-600' : 'text-slate-400'}`} size={15} />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 truncate">
+                      {currentCampusObj ? `Annexe : ${currentCampusObj.name}` : 'Campus Actuel Uniquement'}
+                    </div>
+                    <div className="text-[9.5px] text-slate-500 truncate">
+                      Classes de cette annexe uniquement
+                    </div>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMigrateScope('all_campuses')}
+                  className={`p-2 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
+                    migrateScope === 'all_campuses'
+                      ? 'bg-blue-50/90 border-blue-500 ring-1 ring-blue-500/30 text-blue-950 font-semibold shadow-2xs'
+                      : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
+                  }`}
+                >
+                  <Globe className={`shrink-0 mt-0.5 ${migrateScope === 'all_campuses' ? 'text-blue-600' : 'text-slate-400'}`} size={15} />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 truncate">Toutes les Annexes & Siège</div>
+                    <div className="text-[9.5px] text-slate-500 truncate">
+                      Réseau complet ({campuses?.length || 1} campus)
+                    </div>
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+
           {migrateSourceId && (
             <div className="p-2.5 bg-emerald-50 border border-emerald-200 rounded-xl text-emerald-900 text-xs flex items-center gap-2">
               <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
               <span>
-                Prêt à dupliquer la grille complète de <strong>{academicYears.find(y => y.id === migrateSourceId)?.label}</strong> vers <strong>{currentYearObj?.label}</strong>.
+                Prêt à dupliquer la grille complète de <strong>{academicYears.find(y => y.id === migrateSourceId)?.label}</strong> vers <strong>{currentYearObj?.label}</strong> ({school?.has_multi_campus ? (migrateScope === 'all_campuses' ? 'Réseau complet' : (currentCampusObj ? currentCampusObj.name : 'Campus actuel')) : 'Établissement'}).
               </span>
             </div>
           )}
@@ -2362,51 +2431,54 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* MODALE DE PROPAGATION GLOBALE MODERNE & FLUIDE */}
       {pendingPropagation && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2.5 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-xl my-auto shadow-2xl border border-slate-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh] sm:max-h-[85vh]">
-            {/* Header */}
-            <div className="px-4 sm:px-5 py-3 sm:py-3.5 bg-gradient-to-r from-blue-700 via-indigo-700 to-purple-800 text-white flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-lg my-auto shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            {/* Header Moderne et Sobre */}
+            <div className="px-3.5 sm:px-5 py-2.5 sm:py-3 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/20">
-                  <Sparkles className="text-yellow-300" size={16} />
+                <div className="p-1 sm:p-1.5 bg-blue-600 text-white rounded-lg shadow-sm">
+                  <Sparkles size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-wide">Propagation Globale des Frais</h3>
-                  <p className="text-blue-100/90 text-[10px] sm:text-[11px] font-medium">Application d'un tarif uniforme à plusieurs classes</p>
+                  <h3 className="text-xs sm:text-sm font-black tracking-tight font-serif">Propagation Globale des Frais</h3>
+                  <p className="text-[9.5px] sm:text-[10px] text-blue-300 font-bold uppercase tracking-wider">
+                    Application d'un tarif uniforme en 1 clic
+                  </p>
                 </div>
               </div>
               <button 
                 type="button"
                 onClick={() => setPendingPropagation(null)}
-                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white cursor-pointer"
+                className="p-1 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
                 title="Fermer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-3.5 sm:p-4 space-y-2.5 sm:space-y-3 overflow-y-auto custom-scrollbar flex-1">
+            <div className="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto custom-scrollbar flex-1">
               {/* Academic Year Clarity Box */}
               {currentYearObj && (
-                <div className="flex items-center justify-between p-2.5 bg-blue-50/80 border border-blue-200/80 rounded-xl text-xs font-bold text-blue-950">
-                  <div className="flex items-center gap-2">
-                    <CalendarDays size={15} className="text-blue-600 shrink-0" />
-                    <span>Session concernée : <strong className="text-blue-900">{currentYearObj.label}</strong></span>
+                <div className="flex items-center justify-between px-3 py-1.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-bold text-slate-900">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CalendarDays size={14} className="text-blue-600 shrink-0" />
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider text-slate-500">Session cible :</span>
+                      <strong className="text-xs font-black text-slate-900 truncate">{currentYearObj.label}</strong>
+                    </div>
                   </div>
-                  <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
-                    currentYearObj.status === 'FUTURE' ? 'bg-amber-100 text-amber-900 border border-amber-200' : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-                  }`}>
-                    {currentYearObj.status === 'FUTURE' ? 'Préparation' : 'Active'}
+                  <span className="text-[8.5px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded bg-blue-100 text-blue-800 border border-blue-200 shrink-0">
+                    Uniformisation
                   </span>
                 </div>
               )}
 
               {/* Fee Category Selector Tabs */}
-              <div>
-                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+              <div className="space-y-1">
+                <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-600 block">
                   1. Choisir la Catégorie de Frais à Propager
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {[
                     { id: 'inscription', label: "Frais d'Inscription", icon: CreditCard },
                     { id: 'reenrollment', label: "Réinscription", icon: RefreshCw },
@@ -2452,17 +2524,14 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             label: labelName
                           });
                         }}
-                        className={`p-2 sm:p-2.5 rounded-xl border text-left flex flex-col justify-between gap-1 transition-all cursor-pointer ${
+                        className={`h-8 sm:h-8 px-2.5 rounded-lg border text-left flex items-center gap-1.5 transition-all cursor-pointer ${
                           isSelected
-                            ? 'bg-slate-900 text-white border-slate-900 ring-2 ring-slate-300 shadow-sm scale-[1.01]'
-                            : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                            ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
                         }`}
                       >
-                        <div className="flex items-center justify-between">
-                          <Icon size={14} className={isSelected ? 'text-blue-400' : 'text-slate-500'} />
-                          {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />}
-                        </div>
-                        <span className="text-[10px] sm:text-[11px] font-bold leading-tight truncate">{cat.label}</span>
+                        <Icon size={13} className={isSelected ? 'text-blue-400 shrink-0' : 'text-slate-400 shrink-0'} />
+                        <span className="text-[11px] font-bold truncate">{cat.label}</span>
                       </button>
                     );
                   })}
@@ -2471,16 +2540,18 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* Amount and Currency Controls */}
               {pendingPropagation.type !== 'all' && (
-                <div className="bg-slate-50/90 p-2.5 sm:p-3 rounded-xl border border-slate-200/80 space-y-1">
-                  <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600 block">
+                <div className="bg-slate-50/80 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                  <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-700 block">
                     2. Montant Uniforme à Appliquer
                   </label>
-                  <div className="flex gap-2">
+                  <div className="flex gap-1.5">
                     <div className="relative flex-1">
                       <input
                         type="number"
+                        inputMode="decimal"
                         min="0"
-                        className="w-full pl-3 pr-2.5 py-2 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs sm:text-sm font-black outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 transition-all font-mono"
+                        step="any"
+                        className="w-full h-10 sm:h-9 pl-3 pr-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-blue-500 focus:bg-white transition-all font-mono shadow-2xs"
                         value={pendingPropagation.val || ''}
                         onChange={(e) => setPendingPropagation({ ...pendingPropagation, val: parseFloat(e.target.value) || 0 })}
                         placeholder="Montant du frais"
@@ -2504,25 +2575,27 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
 
               {/* Multi-Tenant / Campus Scope Selector */}
-              <div>
-                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+              <div className="space-y-1">
+                <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-600 block">
                   3. Périmètre d'Application
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setPendingPropagation({ ...pendingPropagation, scope: 'current_campus' })}
-                    className={`p-2.5 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
+                    className={`p-2 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
                       (pendingPropagation.scope || 'current_campus') === 'current_campus'
-                        ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20 text-blue-950 font-semibold'
-                        : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        ? 'bg-blue-50/90 border-blue-500 ring-1 ring-blue-500/30 text-blue-950 font-semibold shadow-2xs'
+                        : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
                     }`}
                   >
-                    <Building2 className={`shrink-0 mt-0.5 ${pendingPropagation.scope !== 'all_campuses' ? 'text-blue-600' : 'text-slate-400'}`} size={16} />
-                    <div>
-                      <div className="text-xs font-bold text-slate-900">Campus Actuel Uniquement</div>
-                      <div className="text-[10px] text-slate-500 mt-0.5">
-                        Appliquer aux {validClasses?.length || classes.length} classes de cet établissement
+                    <Building2 className={`shrink-0 mt-0.5 ${(pendingPropagation.scope || 'current_campus') === 'current_campus' ? 'text-blue-600' : 'text-slate-400'}`} size={15} />
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-slate-900 truncate">
+                        {currentCampusObj ? `Annexe : ${currentCampusObj.name}` : 'Campus Actuel Uniquement'}
+                      </div>
+                      <div className="text-[9.5px] text-slate-500 truncate">
+                        {validClasses?.length || classes.length} classes ciblées
                       </div>
                     </div>
                   </button>
@@ -2531,17 +2604,17 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <button
                       type="button"
                       onClick={() => setPendingPropagation({ ...pendingPropagation, scope: 'all_campuses' })}
-                      className={`p-2.5 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
+                      className={`p-2 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
                         pendingPropagation.scope === 'all_campuses'
-                          ? 'bg-purple-50 border-purple-500 ring-2 ring-purple-500/20 text-purple-950 font-semibold'
-                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          ? 'bg-blue-50/90 border-blue-500 ring-1 ring-blue-500/30 text-blue-950 font-semibold shadow-2xs'
+                          : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
                       }`}
                     >
-                      <Globe className={`shrink-0 mt-0.5 ${pendingPropagation.scope === 'all_campuses' ? 'text-purple-600' : 'text-slate-400'}`} size={16} />
-                      <div>
-                        <div className="text-xs font-bold text-slate-900">Toutes les Annexes & Campus</div>
-                        <div className="text-[10px] text-slate-500 mt-0.5">
-                          Réseau ({campuses?.length || 1} établissement(s))
+                      <Globe className={`shrink-0 mt-0.5 ${pendingPropagation.scope === 'all_campuses' ? 'text-blue-600' : 'text-slate-400'}`} size={15} />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 truncate">Toutes les Annexes & Siège</div>
+                        <div className="text-[9.5px] text-slate-500 truncate">
+                          Réseau complet ({campuses?.length || 1} campus)
                         </div>
                       </div>
                     </button>
@@ -2550,21 +2623,20 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {/* Real-time Summary Badge */}
-              <div className="p-2.5 sm:p-3 bg-emerald-50/90 border border-emerald-200/80 rounded-xl flex items-start gap-2 text-emerald-950">
-                <CheckCircle2 className="shrink-0 text-emerald-600 mt-0.5" size={15} />
-                <div className="text-[11px] leading-relaxed font-medium">
-                  <strong>Résumé :</strong> <strong className="font-extrabold text-emerald-900 font-mono">{pendingPropagation.val.toLocaleString()} {pendingPropagation.currency}</strong> ({pendingPropagation.label}) pour <strong className="font-black text-emerald-900">{pendingPropagation.scope === 'all_campuses' ? 'toutes les classes de toutes les annexes' : `${validClasses?.length || classes.length} classes`}</strong> (session <strong className="text-emerald-900">{currentYearObj?.label}</strong>).
-                  <span className="block text-[9px] text-emerald-700 mt-0.5 italic">Les autres postes et sessions restent inchangés.</span>
+              <div className="p-2 bg-emerald-50/70 border border-emerald-200/70 rounded-xl flex items-center gap-2 text-emerald-950 text-xs">
+                <CheckCircle2 className="shrink-0 text-emerald-600" size={14} />
+                <div className="text-[11px] leading-relaxed font-medium truncate">
+                  <strong className="font-extrabold text-emerald-900 font-mono">{pendingPropagation.val.toLocaleString()} {pendingPropagation.currency}</strong> ({pendingPropagation.label}) pour <strong className="font-black text-emerald-900">{pendingPropagation.scope === 'all_campuses' ? 'toutes les annexes du réseau' : (currentCampusObj ? `l'annexe "${currentCampusObj.name}"` : `${validClasses?.length || classes.length} classes`)}</strong>
                 </div>
               </div>
             </div>
 
-            {/* Footer buttons */}
-            <div className="px-4 py-2.5 sm:py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+            {/* Footer buttons Compact */}
+            <div className="px-3.5 sm:px-5 py-2 bg-white border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setPendingPropagation(null)}
-                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer"
+                className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 Annuler
               </button>
@@ -2572,16 +2644,16 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 type="button"
                 disabled={isSubmitting}
                 onClick={executePropagation}
-                className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw size={14} className="animate-spin" />
+                    <RefreshCw size={13} className="animate-spin" />
                     Propagation...
                   </>
                 ) : (
                   <>
-                    <Sparkles size={14} />
+                    <Sparkles size={13} />
                     Propager maintenant
                   </>
                 )}
@@ -2593,44 +2665,46 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* MODALE D'AJUSTEMENT GLOBAL / MAJORATION EN MASSE */}
       {showBulkAdjustModal && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 backdrop-blur-sm p-2.5 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl w-full max-w-xl my-auto shadow-2xl border border-slate-100 overflow-hidden transform transition-all animate-in zoom-in-95 duration-200 flex flex-col max-h-[92vh] sm:max-h-[85vh]">
-            {/* Header */}
-            <div className="px-4 sm:px-5 py-3 sm:py-3.5 bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-800 text-white flex items-center justify-between shrink-0">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/80 backdrop-blur-sm p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-150">
+          <div className="bg-white rounded-2xl w-full max-w-lg my-auto shadow-2xl border border-slate-200 overflow-hidden transform transition-all animate-in zoom-in-95 duration-150 flex flex-col max-h-[92vh]">
+            {/* Header Moderne et Sobre */}
+            <div className="px-3.5 sm:px-5 py-2.5 sm:py-3 bg-slate-900 text-white flex items-center justify-between sticky top-0 z-10 border-b border-slate-800 shrink-0">
               <div className="flex items-center gap-2 sm:gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 border border-white/20">
-                  <SlidersHorizontal className="text-emerald-300" size={16} />
+                <div className="p-1 sm:p-1.5 bg-emerald-600 text-white rounded-lg shadow-sm">
+                  <SlidersHorizontal size={16} />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-black tracking-wide">Ajustement & Réévaluation Globale</h3>
-                  <p className="text-emerald-100/90 text-[10px] sm:text-[11px] font-medium">Majoration ou montant forfaitaire en 1 clic</p>
+                  <h3 className="text-xs sm:text-sm font-black tracking-tight font-serif">Ajustement & Réévaluation Globale</h3>
+                  <p className="text-[9.5px] sm:text-[10px] text-emerald-300 font-bold uppercase tracking-wider">
+                    Majoration ou montant forfaitaire en 1 clic
+                  </p>
                 </div>
               </div>
               <button 
                 type="button"
-                onClick={() => setShowBulkAdjustModal(false)}
-                className="p-1 hover:bg-white/10 rounded-lg transition-colors text-white cursor-pointer"
+                onClick={() => setShowBulkAdjustModal(false)} 
+                className="p-1 hover:bg-white/10 rounded-lg text-slate-300 hover:text-white transition-all cursor-pointer"
                 title="Fermer"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <div className="p-3.5 sm:p-4 space-y-2.5 sm:space-y-3 overflow-y-auto custom-scrollbar flex-1">
-              {/* Target Session Clear Box */}
+            <div className="p-3 sm:p-3.5 space-y-2.5 overflow-y-auto custom-scrollbar flex-1">
+              {/* Target Session Compact Context Bar */}
               {currentYearObj && (
-                <div className={`p-2.5 sm:p-3 rounded-xl border flex items-center justify-between gap-2 ${
-                  currentYearObj.status === 'FUTURE' ? 'bg-amber-50 border-amber-200 text-amber-950' : 'bg-emerald-50 border-emerald-200 text-emerald-950'
+                <div className={`px-3 py-1.5 rounded-xl border flex items-center justify-between gap-2 ${
+                  currentYearObj.status === 'FUTURE' ? 'bg-amber-50/80 border-amber-200/80 text-amber-950' : 'bg-emerald-50/80 border-emerald-200/80 text-emerald-950'
                 }`}>
-                  <div className="flex items-center gap-2">
-                    <CalendarDays size={16} className={currentYearObj.status === 'FUTURE' ? "text-amber-600" : "text-emerald-600"} />
-                    <div>
-                      <div className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500">Session Cible de l'Ajustement</div>
-                      <div className="text-xs sm:text-sm font-black text-slate-900">{currentYearObj.label}</div>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <CalendarDays size={14} className={currentYearObj.status === 'FUTURE' ? "text-amber-600 shrink-0" : "text-emerald-600 shrink-0"} />
+                    <div className="flex items-center gap-1.5 truncate">
+                      <span className="text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider text-slate-500">Session cible :</span>
+                      <span className="text-xs font-black text-slate-900 truncate">{currentYearObj.label}</span>
                     </div>
                   </div>
-                  <span className={`text-[9px] sm:text-[10px] font-black uppercase px-2 py-0.5 rounded-md ${
-                    currentYearObj.status === 'FUTURE' ? 'bg-amber-200 text-amber-900' : 'bg-emerald-200 text-emerald-900'
+                  <span className={`text-[8.5px] sm:text-[9px] font-black uppercase px-2 py-0.5 rounded shrink-0 ${
+                    currentYearObj.status === 'FUTURE' ? 'bg-amber-200/80 text-amber-900 border border-amber-300/50' : 'bg-emerald-200/80 text-emerald-900 border border-emerald-300/50'
                   }`}>
                     {currentYearObj.status === 'FUTURE' ? 'Préparation' : 'Active'}
                   </span>
@@ -2638,80 +2712,88 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
 
               {/* 1. Fee target selector */}
-              <div>
-                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+              <div className="space-y-1">
+                <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-600 block">
                   1. Poste de frais à ajuster
                 </label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
                   {[
                     { id: 'tuition', label: terminology.tuition, icon: TrendingUp },
                     { id: 'inscription', label: "Frais d'Inscription", icon: CreditCard },
                     { id: 'reenrollment', label: "Réinscription", icon: RefreshCw },
                     { id: 'misc', label: "Frais Divers", icon: CheckCircle2 },
                     { id: 'all', label: "Tous les frais", icon: Layers },
-                  ].map(item => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, feeTarget: item.id as any })}
-                      className={`p-2 rounded-xl border text-left flex items-center gap-1.5 sm:gap-2 transition-all cursor-pointer ${
-                        bulkAdjustConfig.feeTarget === item.id 
-                          ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-xs' 
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      <item.icon size={14} className={bulkAdjustConfig.feeTarget === item.id ? 'text-emerald-400' : 'text-slate-500'} />
-                      <span className="text-[10px] sm:text-xs truncate">{item.label}</span>
-                    </button>
-                  ))}
+                  ].map(item => {
+                    const isSelected = bulkAdjustConfig.feeTarget === item.id;
+                    const Icon = item.icon;
+                    return (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, feeTarget: item.id as any })}
+                        className={`h-8 sm:h-8 px-2.5 rounded-lg border text-left flex items-center gap-1.5 transition-all cursor-pointer ${
+                          isSelected 
+                            ? 'bg-slate-900 text-white border-slate-900 font-bold shadow-2xs' 
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
+                        }`}
+                      >
+                        <Icon size={13} className={isSelected ? 'text-emerald-400 shrink-0' : 'text-slate-400 shrink-0'} />
+                        <span className="text-[11px] font-bold truncate">{item.label}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* 2. Adjustment Mode */}
-              <div>
-                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+              <div className="space-y-1">
+                <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-600 block">
                   2. Type d'Ajustement
                 </label>
-                <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
                   {[
                     { id: 'PERCENT', label: "Pourcentage (%)", desc: "ex: +10% inflation" },
                     { id: 'ADD_AMOUNT', label: "Montant Forfaitaire", desc: "ex: +1 000 G" },
                     { id: 'SET_FIXED', label: "Montant Fixe", desc: "ex: = 25 000 G" }
-                  ].map(mode => (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, adjustType: mode.id as any })}
-                      className={`p-2 rounded-xl border text-left flex flex-col justify-between gap-0.5 transition-all cursor-pointer ${
-                        bulkAdjustConfig.adjustType === mode.id
-                          ? 'bg-emerald-50 border-emerald-500 text-emerald-950 ring-2 ring-emerald-500/20 font-bold'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
-                      }`}
-                    >
-                      <span className="text-[10px] sm:text-xs font-black truncate">{mode.label}</span>
-                      <span className="text-[9px] text-slate-400 truncate">{mode.desc}</span>
-                    </button>
-                  ))}
+                  ].map(mode => {
+                    const isSelected = bulkAdjustConfig.adjustType === mode.id;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, adjustType: mode.id as any })}
+                        className={`p-2 rounded-xl border text-left flex flex-col justify-between gap-0.5 transition-all cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-50/90 border-emerald-500 text-emerald-950 ring-1 ring-emerald-500/30 font-bold shadow-2xs'
+                            : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-200/90'
+                        }`}
+                      >
+                        <span className="text-[11px] font-black truncate">{mode.label}</span>
+                        <span className="text-[8.5px] sm:text-[9px] text-slate-400 font-medium truncate">{mode.desc}</span>
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
 
               {/* 3. Value & Currency Input */}
-              <div className="bg-slate-50/90 p-2.5 sm:p-3 rounded-xl border border-slate-200 space-y-1">
-                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600 block">
+              <div className="bg-slate-50/80 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1">
+                <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-700 block">
                   3. Valeur de l'ajustement
                 </label>
-                <div className="flex gap-2">
+                <div className="flex gap-1.5">
                   <div className="relative flex-1">
                     <input
                       type="number"
+                      inputMode="decimal"
                       step={bulkAdjustConfig.adjustType === 'PERCENT' ? '1' : '100'}
-                      className="w-full pl-3 pr-2.5 py-2 bg-white text-slate-900 border border-slate-300 rounded-xl text-xs sm:text-sm font-black outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 transition-all font-mono"
+                      className="w-full h-10 sm:h-9 pl-3 pr-8 py-1.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-sm font-bold outline-none focus:border-emerald-500 focus:bg-white transition-all font-mono shadow-2xs"
                       value={bulkAdjustConfig.value}
                       onChange={(e) => setBulkAdjustConfig({ ...bulkAdjustConfig, value: parseFloat(e.target.value) || 0 })}
                       placeholder={bulkAdjustConfig.adjustType === 'PERCENT' ? '10' : '1000'}
                     />
                     {bulkAdjustConfig.adjustType === 'PERCENT' && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-slate-400 text-xs sm:text-sm">%</span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 font-black text-slate-400 text-sm">%</span>
                     )}
                   </div>
                   {bulkAdjustConfig.adjustType !== 'PERCENT' && (
@@ -2733,11 +2815,11 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {/* 4. Target Cycle filter */}
-              <div>
-                <label className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500 mb-1 block">
+              <div className="space-y-1">
+                <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-600 block">
                   4. Classes / Cycles Ciblés
                 </label>
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1">
                   {availableCycles.map(c => {
                     const isAll = c === 'Tous';
                     const isSel = isAll ? bulkAdjustConfig.cycleTarget === 'ALL' : bulkAdjustConfig.cycleTarget === c;
@@ -2747,7 +2829,7 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         type="button"
                         onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, cycleTarget: isAll ? 'ALL' : c })}
                         className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
-                          isSel ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          isSel ? 'bg-emerald-600 text-white shadow-2xs' : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                         }`}
                       >
                         {c}
@@ -2757,29 +2839,76 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
 
-              {/* Live Preview / Safety Note */}
-              <div className="p-2.5 sm:p-3 bg-emerald-50/80 border border-emerald-200/80 rounded-xl text-emerald-950 text-xs space-y-0.5">
-                <div className="font-bold flex items-center gap-1.5">
-                  <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
-                  <span>Sécurisation & Résumé de l'opération :</span>
+              {/* 5. Périmètre Multi-Campus / Annexes */}
+              {school?.has_multi_campus && (
+                <div className="space-y-1">
+                  <label className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-600 block">
+                    5. Périmètre d'Application (Annexes)
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, scope: 'current_campus' })}
+                      className={`p-2 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
+                        (bulkAdjustConfig.scope || 'current_campus') === 'current_campus'
+                          ? 'bg-emerald-50/90 border-emerald-500 ring-1 ring-emerald-500/30 text-emerald-950 font-semibold shadow-2xs'
+                          : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Building2 className={`shrink-0 mt-0.5 ${(bulkAdjustConfig.scope || 'current_campus') === 'current_campus' ? 'text-emerald-600' : 'text-slate-400'}`} size={15} />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 truncate">
+                          {currentCampusObj ? `Annexe : ${currentCampusObj.name}` : 'Campus Actuel Uniquement'}
+                        </div>
+                        <div className="text-[9.5px] text-slate-500 truncate">
+                          Classes de ce campus uniquement
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setBulkAdjustConfig({ ...bulkAdjustConfig, scope: 'all_campuses' })}
+                      className={`p-2 rounded-xl border text-left flex items-start gap-2 transition-all cursor-pointer ${
+                        bulkAdjustConfig.scope === 'all_campuses'
+                          ? 'bg-emerald-50/90 border-emerald-500 ring-1 ring-emerald-500/30 text-emerald-950 font-semibold shadow-2xs'
+                          : 'bg-white border-slate-200/90 text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <Globe className={`shrink-0 mt-0.5 ${bulkAdjustConfig.scope === 'all_campuses' ? 'text-emerald-600' : 'text-slate-400'}`} size={15} />
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 truncate">Toutes les Annexes & Siège</div>
+                        <div className="text-[9.5px] text-slate-500 truncate">
+                          Réseau complet ({campuses?.length || 1} campus)
+                        </div>
+                      </div>
+                    </button>
+                  </div>
                 </div>
-                <p className="text-[11px] leading-relaxed text-emerald-900 font-medium">
-                  {bulkAdjustConfig.adjustType === 'PERCENT' && `Les montants seront majorés de +${bulkAdjustConfig.value}% pour l'ensemble des classes ciblées.`}
-                  {bulkAdjustConfig.adjustType === 'ADD_AMOUNT' && `Un supplément de +${bulkAdjustConfig.value.toLocaleString()} ${bulkAdjustConfig.currency} sera ajouté aux montants existants.`}
-                  {bulkAdjustConfig.adjustType === 'SET_FIXED' && `Le tarif sera fixé à ${bulkAdjustConfig.value.toLocaleString()} ${bulkAdjustConfig.currency} pour toutes les classes ciblées.`}
-                </p>
-                <p className="text-[10px] text-emerald-700 italic">
-                  🔒 L'année active 2025-2026 ne subira aucune modification. Seule la session {currentYearObj?.label} sera mise à jour.
+              )}
+
+              {/* Live Preview / Safety Note Compact */}
+              <div className="p-2 bg-emerald-50/70 border border-emerald-200/70 rounded-xl text-emerald-950 text-xs space-y-0.5">
+                <div className="font-bold flex items-center gap-1.5 text-[11px]">
+                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                  <span>
+                    {bulkAdjustConfig.adjustType === 'PERCENT' && `Majoration uniforme de +${bulkAdjustConfig.value}% sur les classes ciblées.`}
+                    {bulkAdjustConfig.adjustType === 'ADD_AMOUNT' && `Supplément de +${bulkAdjustConfig.value.toLocaleString()} ${bulkAdjustConfig.currency} appliqué.`}
+                    {bulkAdjustConfig.adjustType === 'SET_FIXED' && `Tarif fixé à ${bulkAdjustConfig.value.toLocaleString()} ${bulkAdjustConfig.currency} pour les classes ciblées.`}
+                  </span>
+                </div>
+                <p className="text-[9.5px] text-emerald-800/90 font-medium pl-4.5">
+                  🔒 Périmètre : <strong>{bulkAdjustConfig.scope === 'all_campuses' ? 'Toutes les annexes' : (currentCampusObj ? currentCampusObj.name : 'Campus actuel')}</strong> • Cycle : <strong>{bulkAdjustConfig.cycleTarget === 'ALL' ? 'Tous les cycles' : bulkAdjustConfig.cycleTarget}</strong> • Session : <strong>{currentYearObj?.label}</strong>.
                 </p>
               </div>
             </div>
 
-            {/* Footer */}
-            <div className="px-4 py-2.5 sm:py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+            {/* Footer Compact Sticky */}
+            <div className="px-3.5 sm:px-5 py-2 bg-white border-t border-slate-200 flex items-center justify-end gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowBulkAdjustModal(false)}
-                className="px-3.5 py-1.5 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-xl border border-slate-200 transition-all cursor-pointer"
+                className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 text-xs font-bold rounded-xl transition-all cursor-pointer"
               >
                 Annuler
               </button>
@@ -2787,16 +2916,16 @@ const FeePlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 type="button"
                 disabled={isSubmitting}
                 onClick={executeBulkAdjustment}
-                className="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-extrabold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <>
-                    <RefreshCw size={14} className="animate-spin" />
+                    <RefreshCw size={13} className="animate-spin" />
                     Application...
                   </>
                 ) : (
                   <>
-                    <SlidersHorizontal size={14} />
+                    <SlidersHorizontal size={13} />
                     Appliquer l'Ajustement
                   </>
                 )}
