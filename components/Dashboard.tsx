@@ -1522,23 +1522,26 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* Header Section */}
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-        <div className="flex items-center gap-4 sm:gap-5">
-          <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
+        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
             {schoolInfo.logo_url ? (
               <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5 sm:p-2" />
             ) : (
-              <School size={28} className="text-slate-400" />
+              <School size={24} className="text-slate-400" />
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight text-slate-900 break-words flex flex-wrap items-center gap-x-3 gap-y-1.5" title={schoolInfo.name}>
-              <span>{schoolInfo.name}</span>
+            <h1 
+              className="text-sm sm:text-base md:text-lg lg:text-xl font-black tracking-tight text-slate-900 truncate whitespace-nowrap block" 
+              title={schoolInfo.name}
+            >
+              {schoolInfo.name}
             </h1>
             
-            <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
               {/* User Identity Pill */}
-              <div className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs">
+              <div className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs shrink-0">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>

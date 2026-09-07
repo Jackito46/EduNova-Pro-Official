@@ -900,7 +900,7 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
         const sName = a.staff ? `${a.staff.first_name || ''} ${a.staff.last_name || ''}`.toLowerCase() : '';
         const cName = (a.class_name || '').toLowerCase();
         const subName = (a.subject_name || '').toLowerCase();
-        const room = (a.room || a.classroom || '').toLowerCase();
+        const room = ((a as any).room || (a as any).classroom || '').toLowerCase();
         if (!sName.includes(q) && !cName.includes(q) && !subName.includes(q) && !room.includes(q)) {
           return false;
         }
@@ -1377,7 +1377,7 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
                 <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
                   <div className="flex items-center justify-between gap-1">
                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
-                      <span>{school?.education_level ? 'Classe / Promo' : 'Classe'}</span>
+                      <span>{isUniversity || isProfessional ? 'Classe / Promo' : 'Classe'}</span>
                       {availableClasses.length > 0 && (
                         <span className="text-[10px] text-slate-400 font-normal">({availableClasses.length} dispo.)</span>
                       )}
@@ -1737,7 +1737,7 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
                       const sName = a.staff ? `${a.staff.first_name || ''} ${a.staff.last_name || ''}`.toLowerCase() : '';
                       const cName = (a.class_name || '').toLowerCase();
                       const subName = (a.subject_name || '').toLowerCase();
-                      const room = (a.room || a.classroom || '').toLowerCase();
+                      const room = ((a as any).room || (a as any).classroom || '').toLowerCase();
                       if (!sName.includes(q) && !cName.includes(q) && !subName.includes(q) && !room.includes(q)) {
                         return false;
                       }
