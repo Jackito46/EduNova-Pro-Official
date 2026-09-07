@@ -92,6 +92,7 @@ import {
   DEFAULT_PAYMENT_METHODS 
 } from '../lib/paymentMethods';
 import { PaymentMethodManager } from './PaymentMethodManager';
+import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 
 type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'gateways' | 'security';
 
@@ -3382,148 +3383,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         )}
 
         {activeTab === 'gateways' && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-500">
-            {!canManageAllCampuses && (
-              <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800">
-                <div className="flex items-center gap-2.5">
-                  <Lock size={16} className="text-amber-700 shrink-0" />
-                  <p className="font-medium">
-                    <strong className="font-bold">Passerelle API verrouillée (Annexe) :</strong> Seuls les administrateurs du Siège Social peuvent modifier la clé de service MonCash.
-                  </p>
-                </div>
-                <span className="px-2 py-0.5 bg-amber-100/80 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
-                  Lecture Seule
-                </span>
-              </div>
-            )}
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              {/* Header */}
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
-                    <Key size={18} />
-                  </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Intégration MonCash</h3>
-                    <p className="text-xs text-slate-500 font-medium">Configuration des API pour Digicel MonCash</p>
-                  </div>
-                </div>
-                <button 
-                  onClick={handleUpdateMoncash} 
-                  disabled={saving || !canManageAllCampuses} 
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-                >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  Enregistrer
-                </button>
-              </div>
-
-              <div className="p-4 sm:p-6 space-y-4">
-                {/* Developer Portal Box */}
-                <div className="bg-indigo-50/80 p-3.5 rounded-xl border border-indigo-100 flex items-start gap-3">
-                  <AlertCircle className="text-indigo-600 mt-0.5 shrink-0" size={16} />
-                  <div className="space-y-1">
-                    <h4 className="text-xs font-bold text-indigo-900 font-mono uppercase tracking-wider">Portail Développeur MonCash</h4>
-                    <p className="text-[11px] font-medium text-indigo-800/80 leading-relaxed">
-                      Identifiants nécessaires pour traiter les paiements mobiles des {terminology.student.toLowerCase()}s. 
-                      Générez-les sur le <a href="https://moncashbutton.digicelgroup.com/Moncash-developer/" target="_blank" rel="noopener noreferrer" className="underline font-bold text-indigo-700 hover:text-indigo-900">portail MonCash</a>.
-                    </p>
-                    <div className="flex items-center gap-1.5 pt-0.5">
-                      <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
-                      <span className="text-[10px] font-mono font-bold text-indigo-700 uppercase">
-                        Utilisez le mode 'Live' uniquement en production.
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Form Fields */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 ml-0.5">Client ID</label>
-                    <input 
-                      type="text" 
-                      className="w-full px-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg font-mono text-xs font-bold tracking-wider outline-none focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
-                      value={moncashConfig.client_id || ''}
-                      disabled={!canManageAllCampuses}
-                      onChange={e => setMoncashConfig({...moncashConfig, client_id: e.target.value})}
-                      placeholder="Ex: 1234567890abcdef..."
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 ml-0.5">Client Secret</label>
-                    <div className="relative">
-                      <input 
-                        type={showPassword ? "text" : "password"}
-                        className="w-full pl-3 pr-9 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg font-mono text-xs font-bold tracking-wider outline-none focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
-                        value={moncashConfig.client_secret || ''}
-                        disabled={!canManageAllCampuses}
-                        onChange={e => setMoncashConfig({...moncashConfig, client_secret: e.target.value})}
-                        placeholder="••••••••••••••••"
-                      />
-                      <button 
-                        type="button" 
-                        onClick={() => setShowPassword(!showPassword)} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
-                        title={showPassword ? "Masquer" : "Afficher"}
-                      >
-                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 ml-0.5">Business Key (Clé Marchand)</label>
-                    <input 
-                      type="text" 
-                      className="w-full px-3 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg font-mono text-xs font-bold tracking-wider outline-none focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
-                      value={moncashConfig.business_key || ''}
-                      disabled={!canManageAllCampuses}
-                      onChange={e => setMoncashConfig({...moncashConfig, business_key: e.target.value})}
-                      placeholder="Ex: MS_12345"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 ml-0.5">Environnement</label>
-                    <div className="relative">
-                      <select 
-                        className="w-full pl-3 pr-8 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:bg-white focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 appearance-none cursor-pointer shadow-xs"
-                        value={moncashConfig.mode || 'sandbox'}
-                        disabled={!canManageAllCampuses}
-                        onChange={e => setMoncashConfig({...moncashConfig, mode: e.target.value})}
-                      >
-                        <option value="sandbox">Sandbox (Développement)</option>
-                        <option value="live">Live (Production)</option>
-                      </select>
-                      <Globe size={15} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-                    </div>
-                  </div>
-
-                  <div className="col-span-1 sm:col-span-2 pt-1">
-                    <label className={`p-3 bg-slate-50/80 border border-slate-200/80 rounded-xl flex items-center gap-3 transition-all ${!canManageAllCampuses ? 'opacity-75 cursor-not-allowed' : 'cursor-pointer hover:bg-slate-100/60'}`}>
-                      <div className={`w-5 h-5 rounded border flex items-center justify-center transition-all shrink-0 ${moncashConfig.is_active ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-white border-slate-300'}`}>
-                        {moncashConfig.is_active && <CheckCircle2 size={14} />}
-                      </div>
-                      <input 
-                        type="checkbox" 
-                        id="moncash_active"
-                        className="hidden"
-                        checked={moncashConfig.is_active}
-                        disabled={!canManageAllCampuses}
-                        onChange={e => setMoncashConfig({...moncashConfig, is_active: e.target.checked})}
-                      />
-                      <div>
-                        <p className="text-xs font-bold text-slate-900">Activer MonCash sur le guichet</p>
-                        <p className="text-[11px] text-slate-500 font-medium">Permet aux {terminology.student.toLowerCase()}s de payer directement via leur compte MonCash.</p>
-                      </div>
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
+          <div className="animate-in slide-in-from-right duration-500">
+            <MonCashGatewaySettings
+              moncashConfig={moncashConfig}
+              setMoncashConfig={setMoncashConfig}
+              onSave={handleUpdateMoncash}
+              saving={saving}
+              canManageAllCampuses={canManageAllCampuses}
+              user={user}
+            />
           </div>
         )}
 

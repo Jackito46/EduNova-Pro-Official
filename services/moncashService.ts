@@ -56,7 +56,11 @@ export class MonCashService {
     // Since we are in a client-side environment, sensitive API calls should be handled by a backend.
     // We can use a Supabase Edge Function for this.
     
-    return `https://moncashbutton.digicelgroup.com/Moncash-middleware/Checkout/${config.business_key}?token=MOCK_TOKEN`;
+    const baseUrl = config.mode === 'live'
+      ? 'https://moncashbutton.digicelgroup.com'
+      : 'https://sandbox.moncashbutton.digicelgroup.com';
+
+    return `${baseUrl}/Moncash-middleware/Checkout/${config.business_key}?token=MOCK_TOKEN`;
   }
 
   /**

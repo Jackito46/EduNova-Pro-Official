@@ -445,6 +445,97 @@ async function startServer() {
     }
   });
 
+  // API Route for testing Digicel MonCash credentials & endpoint connection
+  app.post('/api/moncash/test-connection', async (req, res) => {
+    const { client_id, client_secret, business_key, mode } = req.body;
+
+    if (!client_id || !client_id.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Le Client ID MonCash est obligatoire pour tester la connexion.' 
+      });
+    }
+
+    if (!client_secret || !client_secret.trim()) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Le Client Secret MonCash est obligatoire pour tester la connexion.' 
+      });
+    }
+
+    const selectedMode = mode === 'live' ? 'live' : 'sandbox';
+    const baseUrl = selectedMode === 'live' 
+      ? 'https://moncashbutton.digicelgroup.com' 
+      : 'https://sandbox.moncashbutton.digicelgroup.com';
+    const tokenUrl = `${baseUrl}/Api/oauth/token`;
+
+    try {
+      const basicAuth = Buffer.from(`${client_id.trim()}:${client_secret.trim()}`).toString('base64');
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+      const response = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'Authorization': `Basic ${basicAuth}`,
+        },
+        body: new URLSearchParams({
+          scope: 'read,write',
+          grant_type: 'client_credentials'
+        }).toString(),
+        signal: controller.signal
+      });
+
+      clearTimeout(timeoutId);
+
+      const responseData = await response.json().catch(() => null);
+
+      if (response.ok && responseData?.access_token) {
+        return res.json({
+          success: true,
+          mode: selectedMode,
+          token_type: responseData.token_type || 'Bearer',
+          expires_in: responseData.expires_in || 3600,
+          scope: responseData.scope || 'read,write',
+          endpoint: tokenUrl,
+          message: `Connexion établie avec succès ! Vos clés MonCash (${selectedMode === 'live' ? 'Production Live' : 'Sandbox Développement'}) ont été validées par le serveur Digicel.`
+        });
+      }
+
+      if (response.status === 401 || response.status === 403) {
+        return res.status(401).json({
+          success: false,
+          mode: selectedMode,
+          status: response.status,
+          error: `Identifiants rejetés par MonCash (HTTP ${response.status}) : Le Client ID ou le Client Secret est incorrect pour le mode ${selectedMode === 'live' ? 'Live' : 'Sandbox'}.`
+        });
+      }
+
+      const errorDetail = responseData?.error_description || responseData?.message || responseData?.error || `Réponse HTTP ${response.status}`;
+      return res.status(response.status >= 400 && response.status < 600 ? response.status : 400).json({
+        success: false,
+        mode: selectedMode,
+        status: response.status,
+        error: `Erreur retournée par le serveur MonCash : ${errorDetail}`
+      });
+    } catch (err: any) {
+      console.error('Erreur lors du test de connexion MonCash:', err);
+      if (err.name === 'AbortError') {
+        return res.status(504).json({
+          success: false,
+          error: `Délai d'attente dépassé (12s) lors de la tentative de contact du serveur MonCash (${tokenUrl}).`
+        });
+      }
+      return res.status(502).json({
+        success: false,
+        error: `Impossible de joindre le serveur MonCash (${err.message || 'Erreur réseau'}).`
+      });
+    }
+  });
+
   // API Route for testing SMTP settings
   app.post('/api/test-smtp', async (req, res) => {
     const { smtp_host, smtp_port, smtp_user, smtp_pass, email_from_address, email_from_name } = req.body;
