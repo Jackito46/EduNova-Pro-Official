@@ -1080,7 +1080,7 @@ export const DatePickerPill: React.FC<DatePickerPillProps> = ({
                   {shortFormattedDisplay}
                 </span>
                 {showTodayBadge && isToday && !isBirthDate && (
-                  <span className="shrink-0 px-1.5 py-0.5 text-[9px] sm:text-[9.5px] font-black bg-emerald-100 text-emerald-800 rounded border border-emerald-200/80 hidden md:inline-flex">
+                  <span className="shrink-0 px-1.5 py-0.5 text-[9px] sm:text-[9.5px] font-black bg-emerald-100 text-emerald-800 rounded border border-emerald-200/80 hidden xl:inline-flex">
                     Aujourd'hui
                   </span>
                 )}

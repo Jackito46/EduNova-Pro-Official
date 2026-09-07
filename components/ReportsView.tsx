@@ -65,6 +65,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   const [paymentMethodFilter, setPaymentMethodFilter] = useState<string>('ALL');
   const [feeTypeFilter, setFeeTypeFilter] = useState<string>('ALL');
   const [payments, setPayments] = useState<any[]>([]);
+  const [financeCurrentPage, setFinanceCurrentPage] = useState<number>(1);
+  const [financeItemsPerPage, setFinanceItemsPerPage] = useState<number>(25);
   const [financeStats, setFinanceStats] = useState({ 
     totalHTG: 0, 
     totalUSD: 0,
@@ -553,6 +555,77 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     });
   }, [payments, searchTerm, paymentMethodFilter, feeTypeFilter]);
 
+  const financeTotalPages = Math.max(1, Math.ceil(filteredPayments.length / financeItemsPerPage));
+
+  // Reset or adjust page when out of bounds
+  useEffect(() => {
+    if (financeCurrentPage > financeTotalPages) {
+      setFinanceCurrentPage(financeTotalPages);
+    }
+  }, [financeTotalPages, financeCurrentPage]);
+
+  // Reset to page 1 when dataset or filters change
+  useEffect(() => {
+    setFinanceCurrentPage(1);
+  }, [paymentMethodFilter, feeTypeFilter, startDate, endDate, selectedCampusFilter, payments.length]);
+
+  const paginatedPayments = useMemo(() => {
+    const start = (financeCurrentPage - 1) * financeItemsPerPage;
+    return filteredPayments.slice(start, start + financeItemsPerPage);
+  }, [filteredPayments, financeCurrentPage, financeItemsPerPage]);
+
+  const financePageSubtotals = useMemo(() => {
+    let htg = 0;
+    let usd = 0;
+    paginatedPayments.forEach(p => {
+      if (p.currency !== 'HTG') {
+        usd += Number(p.original_amount || 0);
+      }
+      htg += Number(p.amount || 0);
+    });
+    return { htg, usd };
+  }, [paginatedPayments]);
+
+  const financeFilteredTotals = useMemo(() => {
+    let htg = 0;
+    let usd = 0;
+    filteredPayments.forEach(p => {
+      if (p.currency !== 'HTG') {
+        usd += Number(p.original_amount || 0);
+      }
+      htg += Number(p.amount || 0);
+    });
+    return { htg, usd };
+  }, [filteredPayments]);
+
+  const financePaginationPages = useMemo(() => {
+    const total = financeTotalPages;
+    const current = financeCurrentPage;
+    if (total <= 5) {
+      return Array.from({ length: total }, (_, i) => i + 1);
+    }
+    const pages: (number | string)[] = [];
+    pages.push(1);
+    
+    if (current > 3) {
+      pages.push('ellipsis-start');
+    }
+
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+
+    for (let i = start; i <= end; i++) {
+      pages.push(i);
+    }
+
+    if (current < total - 2) {
+      pages.push('ellipsis-end');
+    }
+    
+    pages.push(total);
+    return pages;
+  }, [financeTotalPages, financeCurrentPage]);
+
   // Client-side search and filtering for Students
   const filteredStudents = useMemo(() => {
     let list = students;
@@ -907,14 +980,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
       {activeTab === 'FINANCE' && (
         <div className="space-y-6">
           
-          {/* TOOLBAR DE CONTRÔLE & FILTRES BILAN FINANCIER (HARMONISÉ STYLE PILLULE FEUILLE DE PRÉSENCE) */}
-          <div className="bg-white rounded-xl shadow-xs border border-slate-200/90 p-3.5 sm:p-4 space-y-3 print:hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+          {/* TOOLBAR DE CONTRÔLE & FILTRES BILAN FINANCIER (HARMONISÉ ET RESPONSIVE TOUS ÉCRANS) */}
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 sm:p-4 md:p-5 space-y-3.5 print:hidden">
+            
+            {/* LIGNE 1 : SÉLECTION DE PÉRIODE & PLAGE DE DATES (3 COLONNES DÉDIÉES POUR PROTÉGER LES CHAMPS SUR 14 POUCES ET MOBILE) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3.5 items-end">
               
               {/* Sélecteur de Période Prédéfinie (Pill) */}
-              <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+              <div className="sm:col-span-2 md:col-span-1 space-y-1.5 min-w-0">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
-                  <Calendar size={13} className="text-blue-600" />
+                  <Calendar size={13} className="text-blue-600 shrink-0" />
                   <span>Période d'Analyse</span>
                 </label>
                 <SelectPill
@@ -936,12 +1011,16 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
               </div>
 
               {/* Sélecteur Date Début (Harmonisé DatePickerPill) */}
-              <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+              <div className="sm:col-span-1 md:col-span-1 space-y-1.5 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
                     Date de Début
                   </label>
-                  {startDate !== todayStr && (
+                  {startDate === todayStr ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200/80 shrink-0">
+                      Aujourd'hui
+                    </span>
+                  ) : (
                     <button
                       type="button"
                       onClick={() => {
@@ -965,18 +1044,22 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                   colorScheme="blue"
                   showShortcuts={false}
                   showQuickArrows={true}
-                  showTodayBadge={true}
+                  showTodayBadge={false}
                   className="w-full"
                 />
               </div>
 
               {/* Sélecteur Date Fin (Harmonisé DatePickerPill) */}
-              <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+              <div className="sm:col-span-1 md:col-span-1 space-y-1.5 min-w-0">
                 <div className="flex items-center justify-between gap-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
                     Date de Fin
                   </label>
-                  {endDate !== todayStr && (
+                  {endDate === todayStr ? (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200/80 shrink-0">
+                      Aujourd'hui
+                    </span>
+                  ) : (
                     <button
                       type="button"
                       onClick={() => {
@@ -1000,33 +1083,20 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                   colorScheme="blue"
                   showShortcuts={false}
                   showQuickArrows={true}
-                  showTodayBadge={true}
+                  showTodayBadge={false}
                   className="w-full"
                 />
               </div>
 
-              {/* Bouton Actualiser */}
-              <div className="sm:col-span-1 lg:col-span-3 flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => fetchFinanceData()}
-                  disabled={loading}
-                  className="w-full h-[36px] bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer disabled:opacity-50"
-                >
-                  <RefreshCcw size={14} className={loading ? 'animate-spin' : ''} />
-                  <span>{loading ? 'Calcul en cours...' : 'Actualiser le Bilan'}</span>
-                </button>
-              </div>
-
             </div>
 
-            {/* LIGNE SECONDAIRE DE FILTRAGE PAR PILLS (Modes de règlement, Type de frais, Annexe) */}
-            <div className="pt-2.5 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+            {/* LIGNE 2 : FILTRES SPÉCIFIQUES & BOUTON D'ACTION ACTUALISER */}
+            <div className={`pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 ${hasMultiCampus && !user.campus_id ? 'lg:grid-cols-4' : 'md:grid-cols-3'} gap-3.5 items-end`}>
               
               {/* Filtre Mode de Règlement (Pill) */}
-              <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+              <div className="space-y-1.5 min-w-0">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
-                  <CreditCard size={13} className="text-emerald-600" />
+                  <CreditCard size={13} className="text-emerald-600 shrink-0" />
                   <span>Mode de Règlement</span>
                 </label>
                 <SelectPill
@@ -1042,9 +1112,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
               </div>
 
               {/* Filtre Type de Frais (Pill) */}
-              <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+              <div className="space-y-1.5 min-w-0">
                 <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
-                  <Tag size={13} className="text-purple-600" />
+                  <Tag size={13} className="text-purple-600 shrink-0" />
                   <span>Type de Frais</span>
                 </label>
                 <SelectPill
@@ -1061,9 +1131,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
               {/* Multi-Campus / Annexe Filter (If multi-campus school) */}
               {hasMultiCampus && !user.campus_id && (
-                <div className="sm:col-span-1 lg:col-span-4 space-y-1 min-w-0">
+                <div className="space-y-1.5 min-w-0">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
-                    <Building2 size={13} className="text-blue-600" />
+                    <Building2 size={13} className="text-blue-600 shrink-0" />
                     <span>Annexe / Campus</span>
                   </label>
                   <SelectPill
@@ -1080,6 +1150,29 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                   />
                 </div>
               )}
+
+              {/* Bouton Actualiser le Bilan (Intégré avec ergonomie fluide) */}
+              <div className={`space-y-1.5 min-w-0 ${!hasMultiCampus || user.campus_id ? 'sm:col-span-2 md:col-span-1' : 'sm:col-span-2 lg:col-span-1'}`}>
+                <div className="flex items-center justify-between gap-1.5">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                    <RefreshCcw size={12} className={`text-indigo-600 shrink-0 ${loading ? 'animate-spin' : ''}`} />
+                    <span>Synchronisation</span>
+                  </label>
+                  <span className="text-[10px] text-slate-400 font-medium hidden sm:inline truncate">
+                    {loading ? 'Calcul...' : 'Temps réel'}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => fetchFinanceData()}
+                  disabled={loading}
+                  className="w-full h-[36px] bg-slate-900 hover:bg-indigo-600 active:bg-indigo-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-xs hover:shadow-md flex items-center justify-center gap-2 active:scale-98 cursor-pointer disabled:opacity-50 group"
+                  title="Recalculer et actualiser les données financières"
+                >
+                  <RefreshCcw size={14} className={`group-hover:rotate-180 transition-transform duration-500 shrink-0 ${loading ? 'animate-spin' : ''}`} />
+                  <span className="truncate">{loading ? 'Calcul en cours...' : 'Actualiser le Bilan'}</span>
+                </button>
+              </div>
 
             </div>
           </div>
@@ -1276,50 +1369,78 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
           <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
             
             {/* TABLE CONTROLS & EXPORTS */}
-            <div className="p-6 bg-slate-50/60 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+            <div className="p-4 sm:p-6 bg-slate-50/60 border-b border-slate-100 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
               
               {/* Search Bar */}
               <div className="relative flex-1 max-w-md">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
                 <input
                   type="text"
                   placeholder="Rechercher par élève, frais, mode de paiement, annexe..."
                   value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                  onChange={(e) => {
+                    setSearchTerm(e.target.value);
+                    setFinanceCurrentPage(1);
+                  }}
+                  className="w-full pl-10 pr-9 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                 />
+                {searchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setFinanceCurrentPage(1);
+                    }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 rounded-full hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Effacer la recherche"
+                  >
+                    <X size={14} />
+                  </button>
+                )}
               </div>
 
-              {/* Right Action Buttons */}
-              <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                <span className="text-xs font-bold text-slate-500 mr-2">
-                  {filteredPayments.length} transaction(s)
-                </span>
+              {/* Right Action Buttons & Pagination Indicator */}
+              <div className="flex items-center gap-2 shrink-0 flex-wrap justify-between sm:justify-end">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500">
+                    {filteredPayments.length} transaction(s)
+                  </span>
 
-                <button 
-                  onClick={() => fetchFinanceData()}
-                  className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
-                  disabled={loading}
-                  title="Rafraîchir les données"
-                >
-                  <RefreshCcw size={15} className={loading ? 'animate-spin' : ''} />
-                </button>
+                  {financeTotalPages > 1 && (
+                    <span className="px-2.5 py-0.5 bg-indigo-100/80 text-indigo-900 text-[11px] font-black rounded-lg border border-indigo-200/60 inline-flex">
+                      Page {financeCurrentPage} / {financeTotalPages}
+                    </span>
+                  )}
+                </div>
 
-                <button 
-                  onClick={exportFinancePDF}
-                  disabled={filteredPayments.length === 0}
-                  className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-rose-200/60"
-                >
-                  <Download size={14} /> PDF
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button 
+                    onClick={() => fetchFinanceData()}
+                    className="p-2.5 bg-white border border-slate-200 text-slate-600 rounded-xl hover:bg-slate-50 transition-all cursor-pointer disabled:opacity-50"
+                    disabled={loading}
+                    title="Rafraîchir les données"
+                  >
+                    <RefreshCcw size={15} className={loading ? 'animate-spin' : ''} />
+                  </button>
 
-                <button 
-                  onClick={exportFinanceExcel}
-                  disabled={filteredPayments.length === 0}
-                  className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-emerald-200/60"
-                >
-                  <FileSpreadsheet size={14} /> Excel
-                </button>
+                  <button 
+                    onClick={exportFinancePDF}
+                    disabled={filteredPayments.length === 0}
+                    title="Exporter l'intégralité des transactions filtrées au format PDF"
+                    className="px-3.5 sm:px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-rose-200/60"
+                  >
+                    <Download size={14} /> PDF
+                  </button>
+
+                  <button 
+                    onClick={exportFinanceExcel}
+                    disabled={filteredPayments.length === 0}
+                    title="Exporter l'intégralité des transactions filtrées au format Excel"
+                    className="px-3.5 sm:px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-emerald-200/60"
+                  >
+                    <FileSpreadsheet size={14} /> Excel
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -1332,157 +1453,561 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                 />
                 <SkeletonTable rows={5} />
               </div>
+            ) : filteredPayments.length === 0 ? (
+              <div className="py-16 px-4 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center mx-auto text-indigo-500 shadow-2xs">
+                  <Search size={22} />
+                </div>
+                <div className="space-y-1 max-w-md mx-auto">
+                  <p className="text-slate-800 font-black text-sm">
+                    {payments.length === 0 
+                      ? "Aucun encaissement pour cette période"
+                      : "Aucune transaction ne correspond à vos filtres"}
+                  </p>
+                  <p className="text-slate-500 text-xs font-medium">
+                    {payments.length === 0
+                      ? "Aucun paiement n'a été enregistré entre les dates sélectionnées."
+                      : `Aucun résultat pour la recherche « ${searchTerm} » ou les critères sélectionnés.`}
+                  </p>
+                </div>
+                {(searchTerm || paymentMethodFilter !== 'ALL' || feeTypeFilter !== 'ALL') && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm('');
+                      setPaymentMethodFilter('ALL');
+                      setFeeTypeFilter('ALL');
+                      setFinanceCurrentPage(1);
+                    }}
+                    className="px-4 py-2 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded-xl text-xs font-black transition-all cursor-pointer border border-indigo-200 inline-flex items-center gap-1.5"
+                  >
+                    <RefreshCcw size={12} />
+                    <span>Réinitialiser les filtres</span>
+                  </button>
+                )}
+              </div>
             ) : (
-            <div className="overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-              <table className="w-full text-left border-collapse min-w-[900px]">
-                <thead>
-                  <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-indigo-100 text-[11px] font-black uppercase tracking-wider border-b border-indigo-900/60 shadow-xs select-none">
-                    <th className="px-4 py-3.5 min-w-[130px]">
-                      <span className="text-indigo-200 flex items-center gap-1.5">
-                        <Calendar size={13} className="text-indigo-400" /> Date & Heure
-                      </span>
-                    </th>
-                    <th className="px-4 py-3.5 min-w-[210px]">
-                      <span className="text-indigo-200 flex items-center gap-1.5">
-                        <Users size={13} className="text-indigo-400" /> {terminology.student}
-                      </span>
-                    </th>
-                    <th className="px-4 py-3.5 min-w-[110px]">
-                      <span className="text-indigo-200 flex items-center gap-1.5">
-                        <Layers size={13} className="text-indigo-400" /> {terminology.option}
-                      </span>
-                    </th>
-                    {hasMultiCampus && (
-                      <th className="px-4 py-3.5 min-w-[140px]">
-                        <span className="text-indigo-200 flex items-center gap-1.5">
-                          <Building2 size={13} className="text-indigo-400" /> Annexe / Campus
-                        </span>
-                      </th>
-                    )}
-                    <th className="px-4 py-3.5 min-w-[150px]">
-                      <span className="text-indigo-200 flex items-center gap-1.5">
-                        <Tag size={13} className="text-indigo-400" /> Type de Frais
-                      </span>
-                    </th>
-                    <th className="px-4 py-3.5 min-w-[120px]">
-                      <span className="text-indigo-200 flex items-center gap-1.5">
-                        <CreditCard size={13} className="text-indigo-400" /> Mode
-                      </span>
-                    </th>
-                    <th className="px-4 py-3.5 text-right min-w-[130px]">
-                      <span className="text-indigo-200 flex items-center justify-end gap-1.5">
-                        <DollarSign size={13} className="text-indigo-400" /> Montant
-                      </span>
-                    </th>
-                    <th className="px-4 py-3.5 text-center min-w-[100px]">
-                      <span className="text-indigo-200">Action</span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {filteredPayments.length === 0 ? (
-                    <tr>
-                      <td colSpan={hasMultiCampus ? 8 : 7} className="py-16 text-center text-slate-500 font-bold text-xs italic">
-                        Aucune transaction trouvée pour ces critères.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredPayments.map((p) => (
-                      <tr key={p.id} className="hover:bg-indigo-50/40 transition-colors group">
-                        
-                        {/* Date & Heure (Harmonisé Pillule DateTime) */}
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs">
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-700 font-bold">
-                            <Calendar size={12} className="text-blue-600 shrink-0" />
-                            <span>{new Date(p.created_at).toLocaleDateString('fr-FR')}</span>
-                            <span className="text-[10.5px] text-slate-400 font-medium font-mono">
-                              {new Date(p.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+              <>
+                {/* VUE MOBILE : CARTES RESPONSIVES (< 768px) */}
+                <div className="md:hidden divide-y divide-slate-100">
+                  {paginatedPayments.map((p, index) => {
+                    const globalIndex = (financeCurrentPage - 1) * financeItemsPerPage + index + 1;
+                    return (
+                      <div key={p.id} className="p-4 hover:bg-indigo-50/30 transition-colors space-y-3">
+                        {/* Ligne Supérieure : N°, Date & Heure, Montant */}
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 font-black text-[10px] flex items-center justify-center shrink-0 border border-slate-200/60">
+                              #{globalIndex}
                             </span>
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/70 text-slate-700 text-[11px] font-bold">
+                              <Calendar size={11} className="text-blue-600 shrink-0" />
+                              <span>{new Date(p.created_at).toLocaleDateString('fr-FR')}</span>
+                              <span className="text-[10px] text-slate-400 font-mono">
+                                {new Date(p.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                            </div>
                           </div>
-                        </td>
+                          
+                          {/* Montant */}
+                          <div className="text-right shrink-0">
+                            {p.currency !== 'HTG' ? (
+                              <div>
+                                <span className="text-xs font-black text-teal-700 font-mono">
+                                  {p.original_amount?.toLocaleString('fr-FR')} {p.currency}
+                                </span>
+                                <span className="text-[10px] text-slate-400 block font-mono">
+                                  Eq: {p.amount?.toLocaleString('fr-FR')} HTG
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-xs font-black text-emerald-700 font-mono">
+                                {p.amount?.toLocaleString('fr-FR')} HTG
+                              </span>
+                            )}
+                          </div>
+                        </div>
 
-                        {/* Student - Full Name NEVER Truncated */}
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs font-extrabold text-slate-900">
+                        {/* Élève & Classe */}
+                        <div className="flex items-center justify-between gap-2">
                           {p.students ? (
-                            <div className="flex items-center gap-2.5">
+                            <div className="flex items-center gap-2 min-w-0">
                               <div className="w-7 h-7 rounded-lg bg-indigo-100/80 text-indigo-800 font-black text-[10px] flex items-center justify-center shrink-0 border border-indigo-200/50">
                                 {p.students.first_name?.charAt(0)}{p.students.last_name?.charAt(0)}
                               </div>
-                              <span className="whitespace-nowrap font-black text-slate-900 text-xs">
-                                {formatStudentName(p.students.last_name, p.students.first_name).fullName}
-                              </span>
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-900 truncate">
+                                  {formatStudentName(p.students.last_name, p.students.first_name).fullName}
+                                </p>
+                                {p.students.className && (
+                                  <p className="text-[10.5px] font-semibold text-slate-500 truncate">
+                                    {p.students.className}
+                                  </p>
+                                )}
+                              </div>
                             </div>
                           ) : (
-                            <span className="text-slate-400 italic font-semibold">Divers / Vente directe</span>
-                          )}
-                        </td>
-
-                        {/* Class */}
-                        <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-600">
-                          {p.students?.className ? (
-                            <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-extrabold border border-slate-200/50">
-                              {p.students.className}
+                            <span className="text-xs text-slate-400 italic font-semibold">
+                              Divers / Vente directe
                             </span>
-                          ) : (
-                            <span className="text-slate-400 italic">Non assigné</span>
                           )}
-                        </td>
 
-                        {/* Campus (if multi-campus) */}
-                        {hasMultiCampus && (
-                          <td className="px-4 py-3.5 whitespace-nowrap text-xs">
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 font-extrabold text-[10px] rounded-lg border border-slate-200/60">
-                              📍 {p.campus_name}
-                            </span>
-                          </td>
-                        )}
-
-                        {/* Fee Type */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          <span className="inline-flex items-center px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-100">
-                            {p.type || 'Autre'}
-                          </span>
-                        </td>
-
-                        {/* Payment Method */}
-                        <td className="px-4 py-3.5 whitespace-nowrap">
-                          {getMethodBadge(p.method)}
-                        </td>
-
-                        {/* Amount */}
-                        <td className="px-4 py-3.5 whitespace-nowrap text-right">
-                          {p.currency !== 'HTG' ? (
-                            <div>
-                              <span className="text-xs font-black text-teal-700 font-mono">{p.original_amount.toLocaleString('fr-FR')} {p.currency}</span>
-                              <span className="text-[10px] text-slate-400 block font-mono">
-                                Eq: {p.amount.toLocaleString('fr-FR')} HTG
-                              </span>
-                            </div>
-                          ) : (
-                            <span className="text-xs font-black text-emerald-700 font-mono">{p.amount.toLocaleString('fr-FR')} HTG</span>
-                          )}
-                        </td>
-
-                        {/* Action */}
-                        <td className="px-4 py-3.5 whitespace-nowrap text-center">
+                          {/* Action Annuler si Superviseur */}
                           {canCancelTransaction && (
                             <button
                               type="button"
                               onClick={() => openCancelModal(p)}
-                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] rounded-lg border border-rose-200/60 transition-all inline-flex items-center gap-1 cursor-pointer"
-                              title="Annuler cette transaction (Superviseur sur place)"
+                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] rounded-lg border border-rose-200/60 transition-all inline-flex items-center gap-1 cursor-pointer shrink-0"
+                              title="Annuler cette transaction"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={11} />
                               <span>Annuler</span>
                             </button>
                           )}
-                        </td>
+                        </div>
+
+                        {/* Badges : Type de frais, Mode de règlement, Annexe */}
+                        <div className="flex items-center gap-1.5 flex-wrap pt-0.5 text-[10px]">
+                          <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 text-indigo-700 font-black uppercase tracking-wider rounded-lg border border-indigo-100">
+                            {p.type || 'Autre'}
+                          </span>
+                          {getMethodBadge(p.method)}
+                          {hasMultiCampus && p.campus_name && (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 font-bold rounded-lg border border-slate-200/60">
+                              📍 {p.campus_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Synthèse comptable en bas des cartes (Mobile) */}
+                  <div className="p-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl mx-3 my-3 shadow-md border border-indigo-900/50 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs pb-2 border-b border-indigo-800/40">
+                      <span className="text-indigo-200 font-bold">Sous-total page {financeCurrentPage} :</span>
+                      <div className="text-right font-mono font-black">
+                        <span className="text-emerald-400">{financePageSubtotals.htg.toLocaleString('fr-FR')} HTG</span>
+                        {financePageSubtotals.usd > 0 && (
+                          <span className="block text-[10.5px] text-teal-300">+{financePageSubtotals.usd.toLocaleString('fr-FR')} USD</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs pt-0.5">
+                      <span className="text-indigo-100 font-extrabold uppercase tracking-wide text-[11px]">
+                        Total Sélection ({filteredPayments.length} tx) :
+                      </span>
+                      <div className="text-right font-mono font-black text-sm">
+                        <span className="text-emerald-300 font-extrabold">{financeFilteredTotals.htg.toLocaleString('fr-FR')} HTG</span>
+                        {financeFilteredTotals.usd > 0 && (
+                          <span className="block text-[11px] text-teal-200 font-semibold">+{financeFilteredTotals.usd.toLocaleString('fr-FR')} USD</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* VUE TABLETTE & DESKTOP : TABLEAU COMPLET (>= 768px) */}
+                <div className="hidden md:block overflow-x-auto scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+                  <table className="w-full text-left border-collapse min-w-[900px]">
+                    <thead>
+                      <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-indigo-100 text-[11px] font-black uppercase tracking-wider border-b border-indigo-900/60 shadow-xs select-none">
+                        <th className="px-3.5 py-3.5 text-center min-w-[50px] w-12">
+                          <span className="text-indigo-200">N°</span>
+                        </th>
+                        <th className="px-4 py-3.5 min-w-[130px]">
+                          <span className="text-indigo-200 flex items-center gap-1.5">
+                            <Calendar size={13} className="text-indigo-400" /> Date & Heure
+                          </span>
+                        </th>
+                        <th className="px-4 py-3.5 min-w-[210px]">
+                          <span className="text-indigo-200 flex items-center gap-1.5">
+                            <Users size={13} className="text-indigo-400" /> {terminology.student}
+                          </span>
+                        </th>
+                        <th className="px-4 py-3.5 min-w-[110px]">
+                          <span className="text-indigo-200 flex items-center gap-1.5">
+                            <Layers size={13} className="text-indigo-400" /> {terminology.option}
+                          </span>
+                        </th>
+                        {hasMultiCampus && (
+                          <th className="px-4 py-3.5 min-w-[140px]">
+                            <span className="text-indigo-200 flex items-center gap-1.5">
+                              <Building2 size={13} className="text-indigo-400" /> Annexe / Campus
+                            </span>
+                          </th>
+                        )}
+                        <th className="px-4 py-3.5 min-w-[150px]">
+                          <span className="text-indigo-200 flex items-center gap-1.5">
+                            <Tag size={13} className="text-indigo-400" /> Type de Frais
+                          </span>
+                        </th>
+                        <th className="px-4 py-3.5 min-w-[120px]">
+                          <span className="text-indigo-200 flex items-center gap-1.5">
+                            <CreditCard size={13} className="text-indigo-400" /> Mode
+                          </span>
+                        </th>
+                        <th className="px-4 py-3.5 text-right min-w-[130px]">
+                          <span className="text-indigo-200 flex items-center justify-end gap-1.5">
+                            <DollarSign size={13} className="text-indigo-400" /> Montant
+                          </span>
+                        </th>
+                        <th className="px-4 py-3.5 text-center min-w-[100px]">
+                          <span className="text-indigo-200">Action</span>
+                        </th>
                       </tr>
-                    ))
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {paginatedPayments.map((p, index) => {
+                        const globalIndex = (financeCurrentPage - 1) * financeItemsPerPage + index + 1;
+                        return (
+                          <tr key={p.id} className="hover:bg-indigo-50/40 transition-colors group">
+                            
+                            {/* N° Index */}
+                            <td className="px-3.5 py-3.5 text-center text-xs font-bold text-slate-400">
+                              {globalIndex}
+                            </td>
+
+                            {/* Date & Heure (Harmonisé Pillule DateTime) */}
+                            <td className="px-4 py-3.5 whitespace-nowrap text-xs">
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-700 font-bold">
+                                <Calendar size={12} className="text-blue-600 shrink-0" />
+                                <span>{new Date(p.created_at).toLocaleDateString('fr-FR')}</span>
+                                <span className="text-[10.5px] text-slate-400 font-medium font-mono">
+                                  {new Date(p.created_at).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}
+                                </span>
+                              </div>
+                            </td>
+
+                            {/* Student - Full Name NEVER Truncated */}
+                            <td className="px-4 py-3.5 whitespace-nowrap text-xs font-extrabold text-slate-900">
+                              {p.students ? (
+                                <div className="flex items-center gap-2.5">
+                                  <div className="w-7 h-7 rounded-lg bg-indigo-100/80 text-indigo-800 font-black text-[10px] flex items-center justify-center shrink-0 border border-indigo-200/50">
+                                    {p.students.first_name?.charAt(0)}{p.students.last_name?.charAt(0)}
+                                  </div>
+                                  <span className="whitespace-nowrap font-black text-slate-900 text-xs">
+                                    {formatStudentName(p.students.last_name, p.students.first_name).fullName}
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-slate-400 italic font-semibold">Divers / Vente directe</span>
+                              )}
+                            </td>
+
+                            {/* Class */}
+                            <td className="px-4 py-3.5 whitespace-nowrap text-xs font-bold text-slate-600">
+                              {p.students?.className ? (
+                                <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-extrabold border border-slate-200/50">
+                                  {p.students.className}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 italic">Non assigné</span>
+                              )}
+                            </td>
+
+                            {/* Campus (if multi-campus) */}
+                            {hasMultiCampus && (
+                              <td className="px-4 py-3.5 whitespace-nowrap text-xs">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 font-extrabold text-[10px] rounded-lg border border-slate-200/60">
+                                  📍 {p.campus_name}
+                                </span>
+                              </td>
+                            )}
+
+                            {/* Fee Type */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <span className="inline-flex items-center px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-100">
+                                {p.type || 'Autre'}
+                              </span>
+                            </td>
+
+                            {/* Payment Method */}
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              {getMethodBadge(p.method)}
+                            </td>
+
+                            {/* Amount */}
+                            <td className="px-4 py-3.5 whitespace-nowrap text-right">
+                              {p.currency !== 'HTG' ? (
+                                <div>
+                                  <span className="text-xs font-black text-teal-700 font-mono">{p.original_amount.toLocaleString('fr-FR')} {p.currency}</span>
+                                  <span className="text-[10px] text-slate-400 block font-mono">
+                                    Eq: {p.amount.toLocaleString('fr-FR')} HTG
+                                  </span>
+                                </div>
+                              ) : (
+                                <span className="text-xs font-black text-emerald-700 font-mono">{p.amount.toLocaleString('fr-FR')} HTG</span>
+                              )}
+                            </td>
+
+                            {/* Action */}
+                            <td className="px-4 py-3.5 whitespace-nowrap text-center">
+                              {canCancelTransaction && (
+                                <button
+                                  type="button"
+                                  onClick={() => openCancelModal(p)}
+                                  className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] rounded-lg border border-rose-200/60 transition-all inline-flex items-center gap-1 cursor-pointer"
+                                  title="Annuler cette transaction (Superviseur sur place)"
+                                >
+                                  <Trash2 size={12} />
+                                  <span>Annuler</span>
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+
+                    {/* PIED DE TABLEAU COMPTABLE (Desktop & Tablette) */}
+                    <tfoot>
+                      {/* Ligne 1 : Sous-total de la page affichée */}
+                      <tr className="bg-slate-100/90 border-t-2 border-slate-200 text-slate-700 font-extrabold text-xs">
+                        <td colSpan={hasMultiCampus ? 7 : 6} className="px-4 py-3 text-right">
+                          <span className="text-[11px] uppercase tracking-wider text-slate-500 font-black">
+                            Sous-total Page {financeCurrentPage} ({paginatedPayments.length} transaction{paginatedPayments.length > 1 ? 's' : ''}) :
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right whitespace-nowrap font-mono font-black text-xs">
+                          <span className="text-emerald-700">{financePageSubtotals.htg.toLocaleString('fr-FR')} HTG</span>
+                          {financePageSubtotals.usd > 0 && (
+                            <span className="block text-[10.5px] text-teal-700 font-bold">
+                              +{financePageSubtotals.usd.toLocaleString('fr-FR')} USD
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3"></td>
+                      </tr>
+
+                      {/* Ligne 2 : Total de la sélection filtrée */}
+                      <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-white font-extrabold text-xs border-t border-indigo-900/60">
+                        <td colSpan={hasMultiCampus ? 7 : 6} className="px-4 py-3.5 text-right">
+                          <span className="text-[11px] uppercase tracking-wider text-indigo-300 font-black">
+                            Total Période Sélectionnée ({filteredPayments.length} transaction{filteredPayments.length > 1 ? 's' : ''}) :
+                          </span>
+                        </td>
+                        <td className="px-4 py-3.5 text-right whitespace-nowrap font-mono font-black text-xs text-white">
+                          <span className="text-emerald-300 text-sm font-black">{financeFilteredTotals.htg.toLocaleString('fr-FR')} HTG</span>
+                          {financeFilteredTotals.usd > 0 && (
+                            <span className="block text-[11px] text-teal-300 font-bold">
+                              +{financeFilteredTotals.usd.toLocaleString('fr-FR')} USD
+                            </span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5"></td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                {/* BARRE DE PIED DE PAGE & PAGINATION HAUTEMENT ADAPTATIVE */}
+                <div className="p-4 sm:p-5 bg-slate-50/80 border-t border-slate-200/80 flex flex-col gap-3.5">
+                  
+                  {/* Ligne 1 : Résumé & Sélecteur Par page (Zéro encombrement, Zéro écrasement) */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-bold text-slate-600">
+                    
+                    {/* Compteur de transactions */}
+                    <div className="text-center sm:text-left">
+                      Affichage de <span className="font-extrabold text-slate-900">{(financeCurrentPage - 1) * financeItemsPerPage + 1}</span> à{' '}
+                      <span className="font-extrabold text-slate-900">
+                        {Math.min(financeCurrentPage * financeItemsPerPage, filteredPayments.length)}
+                      </span>{' '}
+                      sur <span className="font-extrabold text-slate-900">{filteredPayments.length}</span> transaction(s)
+                      {searchTerm && filteredPayments.length !== payments.length && (
+                        <span className="text-slate-400 font-medium ml-1">
+                          (filtrées sur {payments.length})
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Sélecteur Par page (Parfaitement aligné, sans wrap vertical) */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-slate-500 font-semibold text-xs whitespace-nowrap">Par page :</span>
+                      <SelectPill
+                        options={[
+                          { value: '10', label: '10 / page' },
+                          { value: '25', label: '25 / page' },
+                          { value: '50', label: '50 / page' },
+                          { value: '100', label: '100 / page' },
+                          { value: '200', label: '200 / page' }
+                        ]}
+                        value={financeItemsPerPage.toString()}
+                        onChange={(val) => {
+                          setFinanceItemsPerPage(Number(val));
+                          setFinanceCurrentPage(1);
+                        }}
+                        variant="field"
+                        size="xs"
+                        colorScheme="slate"
+                        portal={true}
+                        className="w-28 shrink-0"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ligne 2 : Navigation de pagination (Mobile & Desktop adaptés) */}
+                  {financeTotalPages > 1 && (
+                    <div className="pt-2.5 border-t border-slate-200/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                      
+                      {/* Badge page pour grand écran & tablette */}
+                      <div className="hidden sm:inline-flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                        <span>Page</span>
+                        <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-200/80 rounded-md font-black text-indigo-700 font-mono">
+                          {financeCurrentPage}
+                        </span>
+                        <span>sur</span>
+                        <span className="font-extrabold text-slate-700 font-mono">{financeTotalPages}</span>
+                      </div>
+
+                      {/* Contrôles Desktop & Tablette (>= 640px) */}
+                      <div className="hidden sm:flex items-center gap-1 justify-center flex-wrap">
+                        {/* Première page */}
+                        <button
+                          onClick={() => setFinanceCurrentPage(1)}
+                          disabled={financeCurrentPage === 1}
+                          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                          title="Première page"
+                          aria-label="Première page"
+                        >
+                          <ChevronsLeft size={15} />
+                        </button>
+
+                        {/* Page précédente */}
+                        <button
+                          onClick={() => setFinanceCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={financeCurrentPage === 1}
+                          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                          title="Page précédente"
+                          aria-label="Page précédente"
+                        >
+                          <ChevronLeft size={15} />
+                        </button>
+
+                        {/* Numéros de page ultra-compacts (max 5) */}
+                        <div className="flex items-center gap-1">
+                          {financePaginationPages.map((page, idx) => {
+                            if (typeof page === 'string') {
+                              return (
+                                <span key={`ellipsis-${idx}`} className="px-1.5 py-1 text-slate-400 text-xs font-black select-none">
+                                  •••
+                                </span>
+                              );
+                            }
+
+                            const isActive = page === financeCurrentPage;
+                            return (
+                              <button
+                                key={page}
+                                onClick={() => setFinanceCurrentPage(page)}
+                                className={`min-w-[32px] h-[32px] px-2 rounded-xl text-xs font-black transition-all cursor-pointer ${
+                                  isActive
+                                    ? 'bg-gradient-to-tr from-indigo-600 to-indigo-500 text-white shadow-sm shadow-indigo-500/20 scale-105'
+                                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200/80 shadow-2xs'
+                                }`}
+                              >
+                                {page}
+                              </button>
+                            );
+                          })}
+                        </div>
+
+                        {/* Page suivante */}
+                        <button
+                          onClick={() => setFinanceCurrentPage(prev => Math.min(financeTotalPages, prev + 1))}
+                          disabled={financeCurrentPage === financeTotalPages}
+                          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                          title="Page suivante"
+                          aria-label="Page suivante"
+                        >
+                          <ChevronRight size={15} />
+                        </button>
+
+                        {/* Dernière page */}
+                        <button
+                          onClick={() => setFinanceCurrentPage(financeTotalPages)}
+                          disabled={financeCurrentPage === financeTotalPages}
+                          className="p-2 bg-white border border-slate-200 rounded-xl text-slate-600 hover:text-indigo-600 hover:bg-slate-50 disabled:opacity-30 disabled:hover:bg-white disabled:hover:text-slate-600 transition-all shadow-2xs cursor-pointer"
+                          title="Dernière page"
+                          aria-label="Dernière page"
+                        >
+                          <ChevronsRight size={15} />
+                        </button>
+
+                        {/* Saisie rapide si > 5 pages */}
+                        {financeTotalPages > 5 && (
+                          <div className="flex items-center gap-1.5 pl-2 ml-1 border-l border-slate-200 text-xs font-bold text-slate-500">
+                            <span className="text-[11px]">Aller à :</span>
+                            <input
+                              type="number"
+                              min={1}
+                              max={financeTotalPages}
+                              value={financeCurrentPage}
+                              onChange={(e) => {
+                                const val = Number(e.target.value);
+                                if (val >= 1 && val <= financeTotalPages) {
+                                  setFinanceCurrentPage(val);
+                                }
+                              }}
+                              className="w-12 py-1 px-1 bg-white border border-slate-200 rounded-lg text-center text-xs font-black text-slate-800 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                              title="Saisir un numéro de page"
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Contrôles Mobile (< 640px) */}
+                      <div className="sm:hidden w-full flex items-center justify-between gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setFinanceCurrentPage(1)}
+                          disabled={financeCurrentPage === 1}
+                          className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 disabled:opacity-30 flex items-center justify-center shadow-2xs cursor-pointer"
+                          title="Première page"
+                        >
+                          <ChevronsLeft size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setFinanceCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={financeCurrentPage === 1}
+                          className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-700 disabled:opacity-30 flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <ChevronLeft size={16} />
+                          <span className="hidden xs:inline">Préc.</span>
+                        </button>
+
+                        <div className="px-3 py-2 flex items-center justify-center bg-indigo-50/90 border border-indigo-200/90 rounded-xl text-xs font-black text-indigo-900 shrink-0 font-mono">
+                          {financeCurrentPage} / {financeTotalPages}
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => setFinanceCurrentPage(prev => Math.min(financeTotalPages, prev + 1))}
+                          disabled={financeCurrentPage === financeTotalPages}
+                          className="px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-black text-slate-700 disabled:opacity-30 flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <span className="hidden xs:inline">Suiv.</span>
+                          <ChevronRight size={16} />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => setFinanceCurrentPage(financeTotalPages)}
+                          disabled={financeCurrentPage === financeTotalPages}
+                          className="p-2.5 bg-white border border-slate-200 rounded-xl text-slate-600 disabled:opacity-30 flex items-center justify-center shadow-2xs cursor-pointer"
+                          title="Dernière page"
+                        >
+                          <ChevronsRight size={16} />
+                        </button>
+                      </div>
+
+                    </div>
                   )}
-                </tbody>
-              </table>
-            </div>
+
+                </div>
+              </>
             )}
           </div>
 
