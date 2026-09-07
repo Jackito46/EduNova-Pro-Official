@@ -64,7 +64,8 @@ import {
   ArrowDown,
   BookOpen,
   GraduationCap,
-  Wrench
+  Wrench,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '../supabase';
@@ -2191,17 +2192,33 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                        </div>
                        
                        <div className="relative group">
-                         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-slate-800 transition-colors">
-                           <Link size={11} />
+                         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-600 transition-colors">
+                           <Link size={12} />
                          </div>
                          <input 
                            type="text" 
                            placeholder="OU coller l'URL de votre logo ici..."
-                           className="w-full pl-7 pr-2.5 py-1 bg-white border border-slate-200 rounded-lg text-[11px] font-medium outline-none focus:border-slate-900 transition-all font-mono"
+                           className="w-full pl-7.5 pr-8 py-1.5 bg-white border border-slate-300 text-slate-900 font-semibold text-xs rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400 placeholder:font-normal placeholder:italic transition-all font-mono shadow-2xs selection:bg-blue-600 selection:text-white"
                            value={schoolData.logo_url && !schoolData.logo_url.startsWith('data:') ? schoolData.logo_url : ''}
                            onChange={e => setSchoolData({...schoolData, logo_url: e.target.value})}
                          />
+                         {schoolData.logo_url && !schoolData.logo_url.startsWith('data:') && (
+                           <button
+                             type="button"
+                             onClick={() => setSchoolData({...schoolData, logo_url: ''})}
+                             className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                             title="Effacer l'URL"
+                           >
+                             <X size={13} />
+                           </button>
+                         )}
                        </div>
+                       {schoolData.logo_url && schoolData.logo_url.startsWith('data:') && (
+                         <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-bold bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/60 w-fit mt-1">
+                           <Check size={11} className="text-emerald-600" />
+                           <span>Logo importé via fichier local</span>
+                         </div>
+                       )}
                      </div>
                    </div>
                  </div>
