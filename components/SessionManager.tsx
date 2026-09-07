@@ -32,6 +32,7 @@ import { UserProfile, SchoolType } from '../types';
 import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
 import Modal from './Modal';
+import { DatePickerPill } from './DatePickerPill';
 
 interface SessionManagerProps {
   user: UserProfile;
@@ -145,6 +146,60 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
           classes: 'bg-indigo-50 text-indigo-800 border-indigo-200'
         };
     }
+  };
+
+  // Helper to format academic date range with pill style matching AttendanceView
+  const formatAcademicDateRange = (startDate?: string | null, endDate?: string | null) => {
+    if (!startDate && !endDate) {
+      return {
+        startText: 'Date non définie',
+        endText: 'Date non définie',
+        duration: null,
+        hasDates: false
+      };
+    }
+
+    const formatDate = (dStr: string) => {
+      try {
+        const dateObj = new Date(dStr.includes('T') ? dStr : `${dStr}T00:00:00`);
+        return dateObj.toLocaleDateString('fr-FR', {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric'
+        });
+      } catch {
+        return dStr;
+      }
+    };
+
+    const startText = startDate ? formatDate(startDate) : 'Non définie';
+    const endText = endDate ? formatDate(endDate) : 'Non définie';
+
+    let duration: string | null = null;
+    if (startDate && endDate) {
+      try {
+        const s = new Date(startDate.includes('T') ? startDate : `${startDate}T00:00:00`);
+        const e = new Date(endDate.includes('T') ? endDate : `${endDate}T00:00:00`);
+        const diffTime = e.getTime() - s.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        const diffMonths = Math.round(diffDays / 30.4375);
+        if (diffMonths >= 12 && diffMonths % 12 === 0) {
+          const yrs = diffMonths / 12;
+          duration = `${yrs} an${yrs > 1 ? 's' : ''}`;
+        } else if (diffMonths > 0) {
+          duration = `${diffMonths} mois`;
+        } else if (diffDays > 0) {
+          duration = `${diffDays} j`;
+        }
+      } catch {}
+    }
+
+    return {
+      startText,
+      endText,
+      duration,
+      hasDates: Boolean(startDate || endDate)
+    };
   };
 
   const handleAddYear = async () => {
@@ -796,34 +851,51 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             </div>
           )}
 
-          {/* Dates */}
-          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-0.5`}>
-            <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block">
+          {/* Dates avec DatePickerPill harmonisé */}
+          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-1 min-w-0`}>
+            <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">
               Début {isHigherEd ? 'session' : "d'année scolaire"}
             </label>
-            <input 
-              type="date" 
-              className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
-              value={newYearData.startDate}
-              onChange={e => {
-                setNewYearData({...newYearData, startDate: e.target.value});
+            <DatePickerPill
+              selectedDate={newYearData.startDate}
+              onSelectDate={(newDate) => {
+                setNewYearData(prev => ({ ...prev, startDate: newDate }));
                 if (selectedPreset) setSelectedPreset('');
               }}
+              labelPrefix="Du"
+              placeholder="Date d'ouverture"
+              variant="field"
+              size="sm"
+              colorScheme="indigo"
+              showShortcuts={false}
+              showQuickArrows={false}
+              showTodayBadge={true}
+              clearable={true}
+              className="w-full"
             />
           </div>
 
-          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-0.5`}>
-            <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block">
+          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-2' : 'md:col-span-4'} space-y-1 min-w-0`}>
+            <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">
               Fin {isHigherEd ? 'session' : "d'année scolaire"}
             </label>
-            <input 
-              type="date" 
-              className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-mono"
-              value={newYearData.endDate}
-              onChange={e => {
-                setNewYearData({...newYearData, endDate: e.target.value});
+            <DatePickerPill
+              selectedDate={newYearData.endDate}
+              onSelectDate={(newDate) => {
+                setNewYearData(prev => ({ ...prev, endDate: newDate }));
                 if (selectedPreset) setSelectedPreset('');
               }}
+              labelPrefix="Au"
+              placeholder="Date de clôture"
+              variant="field"
+              size="sm"
+              colorScheme="indigo"
+              showShortcuts={false}
+              showQuickArrows={false}
+              showTodayBadge={false}
+              clearable={true}
+              dropdownAlign="right"
+              className="w-full"
             />
           </div>
         </div>
@@ -955,12 +1027,42 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                         {year.label}
                       </h3>
                       
-                      <div className="flex items-center gap-1.5 text-slate-600">
-                        <Calendar size={12} className="text-slate-500" />
-                        <span className="text-[11px] font-bold uppercase tracking-tight">
-                          {year.start_date ? new Date(year.start_date).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : 'N/A'} — {year.end_date ? new Date(year.end_date).toLocaleDateString('fr-FR', {month: 'long', year: 'numeric'}) : 'N/A'}
-                        </span>
-                      </div>
+                      {/* DateTime Range Pill (Harmonisé Feuille de Présence) */}
+                      {(() => {
+                        const range = formatAcademicDateRange(year.start_date, year.end_date);
+                        return (
+                          <div className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200/90 shadow-2xs transition-colors">
+                            <Calendar size={12} className="text-indigo-600 shrink-0 stroke-[2.2]" />
+                            <span className="font-extrabold text-[11px] text-slate-800">
+                              {range.startText}
+                            </span>
+                            <ArrowRight size={10} className="text-slate-400 shrink-0" />
+                            <span className="font-extrabold text-[11px] text-slate-800">
+                              {range.endText}
+                            </span>
+                            {range.duration && (
+                              <>
+                                <span className="text-slate-300 font-light">•</span>
+                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 bg-white text-indigo-700 rounded border border-indigo-100 shadow-2xs font-mono">
+                                  {range.duration}
+                                </span>
+                              </>
+                            )}
+                            {year.created_at && (
+                              <>
+                                <span className="text-slate-300 font-light">•</span>
+                                <Clock size={11} className="text-slate-400 shrink-0" />
+                                <span className="font-mono text-[10px] text-slate-500 font-semibold">
+                                  {new Date(year.created_at).toLocaleDateString('fr-FR', {
+                                    day: '2-digit',
+                                    month: 'short'
+                                  })}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     <div className="flex flex-col items-end gap-1 shrink-0">
@@ -1116,19 +1218,40 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                   )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
-                  <div>
-                    <span className="text-slate-500 text-[9px] uppercase font-bold block">Début :</span>
-                    <span className="font-extrabold text-slate-900 text-[11px] sm:text-xs">
-                      {confirmState.year.start_date ? new Date(confirmState.year.start_date).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'}) : 'Non spécifié'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 text-[9px] uppercase font-bold block">Fin :</span>
-                    <span className="font-extrabold text-slate-900 text-[11px] sm:text-xs">
-                      {confirmState.year.end_date ? new Date(confirmState.year.end_date).toLocaleDateString('fr-FR', {day: 'numeric', month: 'long', year: 'numeric'}) : 'Non spécifiée'}
-                    </span>
-                  </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-semibold text-slate-700">
+                  {(() => {
+                    const confirmRange = formatAcademicDateRange(confirmState.year.start_date, confirmState.year.end_date);
+                    return (
+                      <>
+                        <div className="space-y-1">
+                          <span className="text-slate-500 text-[9px] uppercase font-bold tracking-wider block">
+                            Date d'ouverture (Début) :
+                          </span>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-800 rounded-lg border border-slate-200/90 font-bold text-xs shadow-2xs">
+                            <Calendar size={12} className="text-indigo-600 shrink-0 stroke-[2.2]" />
+                            <span>{confirmRange.startText}</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-slate-500 text-[9px] uppercase font-bold tracking-wider block">
+                            Date de clôture (Fin) :
+                          </span>
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-800 rounded-lg border border-slate-200/90 font-bold text-xs shadow-2xs">
+                            <Calendar size={12} className="text-indigo-600 shrink-0 stroke-[2.2]" />
+                            <span>{confirmRange.endText}</span>
+                            {confirmRange.duration && (
+                              <>
+                                <span className="text-slate-300 font-light">•</span>
+                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 bg-white text-indigo-700 rounded border border-indigo-100 shadow-2xs font-mono">
+                                  {confirmRange.duration}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               </div>
 
@@ -1221,9 +1344,34 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
 
             {/* Content Body */}
             <div className="p-4 sm:p-5 space-y-3 bg-slate-50/50">
-              <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed">
-                Vous êtes sur le point de supprimer définitivement {isHigherEd ? 'la session' : "l'année scolaire"} <strong className="text-slate-950 font-black">{sessionToDelete.label}</strong>.
-              </p>
+              <div className="space-y-2">
+                <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed">
+                  Vous êtes sur le point de supprimer définitivement {isHigherEd ? 'la session' : "l'année scolaire"} <strong className="text-slate-950 font-black">{sessionToDelete.label}</strong>.
+                </p>
+
+                {(() => {
+                  const delRange = formatAcademicDateRange(sessionToDelete.start_date, sessionToDelete.end_date);
+                  if (delRange.hasDates) {
+                    return (
+                      <div className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 bg-white rounded-lg border border-slate-200 text-slate-700 text-xs font-semibold shadow-2xs">
+                        <Calendar size={12} className="text-rose-500 shrink-0" />
+                        <span>{delRange.startText}</span>
+                        <ArrowRight size={10} className="text-slate-400 shrink-0" />
+                        <span>{delRange.endText}</span>
+                        {delRange.duration && (
+                          <>
+                            <span className="text-slate-300 font-light">•</span>
+                            <span className="text-[10px] font-black uppercase px-1.5 py-0.5 bg-slate-100 text-slate-700 rounded border border-slate-200 font-mono">
+                              {delRange.duration}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
 
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-medium text-rose-950 space-y-1.5">
                 <span className="font-extrabold uppercase tracking-wide text-rose-900 block text-[10px]">⚠️ ATTENTION : ACTION IRRÉVERSIBLE</span>

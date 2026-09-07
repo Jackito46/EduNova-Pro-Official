@@ -780,9 +780,15 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                       variant="field"
                       size="sm"
                       colorScheme="blue"
-                      showShortcuts={false}
-                      showQuickArrows={true}
-                      placeholder="Sélectionner la date..."
+                      isBirthDate={true}
+                      minYear={1940}
+                      maxYear={new Date().getFullYear()}
+                      maxDate={new Date().toISOString().split('T')[0]}
+                      showShortcuts={true}
+                      showQuickArrows={false}
+                      placeholder="Ex : 12/01/1988 ou choisir..."
+                      title="Date de Naissance de l'Employé"
+                      clearable={true}
                       className="w-full"
                     />
                   </div>

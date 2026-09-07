@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { User, ChevronDown, Check, Search, X, Users, BookOpen } from 'lucide-react';
 import { formatStudentName } from '../utils/formatters';
 
@@ -29,6 +30,7 @@ export interface StaffSelectorPillProps {
   dropdownAlign?: 'left' | 'right';
   className?: string;
   disabled?: boolean;
+  portal?: boolean;
 }
 
 export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
@@ -44,12 +46,68 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
   colorScheme = 'indigo',
   dropdownAlign,
   className = '',
-  disabled = false
+  disabled = false,
+  portal = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    const minWidth = variant === 'field' ? Math.max(rect.width, 280) : 280;
+    const popoverWidth = Math.min(minWidth, Math.max(viewportWidth - 24, 240));
+
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const preferUpward = spaceBelow < 250 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(160, Math.min(320, preferUpward ? spaceAbove - 12 : spaceBelow - 12));
+
+    let left = rect.left;
+    if (dropdownAlign === 'right' || effectiveAlign === 'right') {
+      left = rect.right - popoverWidth;
+    }
+
+    if (left + popoverWidth > viewportWidth - 12) {
+      left = viewportWidth - popoverWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    if (preferUpward) {
+      setPopoverCoords({
+        bottom: viewportHeight - rect.top + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: true
+      });
+    } else {
+      setPopoverCoords({
+        top: rect.bottom + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: false
+      });
+    }
+  }, [dropdownAlign, effectiveAlign, variant]);
 
   useEffect(() => {
     if (dropdownAlign) {
@@ -65,8 +123,24 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
   }, [dropdownAlign, isOpen]);
 
   useEffect(() => {
+    if (isOpen && portal) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen, portal, updatePosition]);
+
+  useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const inContainer = containerRef.current && containerRef.current.contains(target);
+      const inPopover = popoverRef.current && popoverRef.current.contains(target);
+      if (!inContainer && !inPopover) {
         setIsOpen(false);
       }
     };
@@ -247,130 +321,147 @@ export const StaffSelectorPill: React.FC<StaffSelectorPillProps> = ({
         </div>
       </button>
 
-      {isOpen && (
-        <div
-          className={`absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 min-w-full max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-[100] animate-in fade-in zoom-in-95 duration-150`}
-        >
-          {/* Header */}
-          <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
-              <Users size={12} className={scheme.iconText} />
-              Enseignants
-            </span>
-            <span className="text-[10px] font-bold text-slate-800">
-              {staffList.length} disponible{staffList.length > 1 ? 's' : ''}
-            </span>
-          </div>
+      {/* Modern Floating Dropdown Menu */}
+      {isOpen && (() => {
+        const popoverContent = (
+          <div
+            ref={popoverRef}
+            style={portal && popoverCoords ? {
+              position: 'fixed',
+              top: popoverCoords.openUpward ? undefined : popoverCoords.top,
+              bottom: popoverCoords.openUpward ? popoverCoords.bottom : undefined,
+              left: popoverCoords.left,
+              width: popoverCoords.width,
+              zIndex: 9999
+            } : undefined}
+            className={`${portal ? '' : `absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 min-w-full max-w-[calc(100vw-2rem)] z-[100]`} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 animate-in fade-in zoom-in-95 duration-150`}
+          >
+            {/* Header */}
+            <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-900 flex items-center gap-1.5">
+                <Users size={12} className={scheme.iconText} />
+                {labelPrefix ? labelPrefix.replace(':', '').trim() : 'Enseignants'}
+              </span>
+              <span className="text-[10px] font-bold text-slate-800">
+                {staffList.length} disponible{staffList.length > 1 ? 's' : ''}
+              </span>
+            </div>
 
-          {/* Search */}
-          <div className="relative mb-2">
-            <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700" />
-            <input
-              type="text"
-              autoFocus
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher par nom ou spécialité..."
-              className={`w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-bold text-slate-950 placeholder:text-slate-600 rounded-xl border border-slate-200 ${scheme.focusBorder} focus:ring-2 outline-none transition-all`}
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 p-0.5"
-              >
-                <X size={12} />
-              </button>
-            )}
-          </div>
+            {/* Search */}
+            <div className="relative mb-2">
+              <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-700" />
+              <input
+                type="text"
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Rechercher par nom ou spécialité..."
+                className={`w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-bold text-slate-950 placeholder:text-slate-600 rounded-xl border border-slate-200 ${scheme.focusBorder} focus:ring-2 outline-none transition-all`}
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-900 p-0.5"
+                >
+                  <X size={12} />
+                </button>
+              )}
+            </div>
 
-          <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
-            {allowAll && (
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectStaff('all');
-                  setIsOpen(false);
-                }}
-                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                  isAllSelected
-                    ? scheme.highlightBg + ' shadow-2xs font-bold'
-                    : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAllSelected ? scheme.dotColor : 'bg-slate-400'}`} />
-                  <div className="min-w-0">
-                    <span className="text-xs font-black text-slate-950 tracking-tight block truncate">
-                      {allLabel}
-                    </span>
-                    <span className="text-[10px] font-semibold text-slate-700 block">
-                      Afficher tous les créneaux ou professeurs
-                    </span>
-                  </div>
-                </div>
-                {isAllSelected && (
-                  <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                )}
-              </button>
-            )}
-
-            {filteredStaff.length === 0 ? (
-              <div className="p-3 text-center text-slate-700 text-xs font-bold">
-                Aucun enseignant trouvé
-              </div>
-            ) : (
-              filteredStaff.map((s) => {
-                const isSelected = selectedStaffId === s.id;
-                const displayName = getDisplayName(s);
-                const spec = s.specialty || s.subject_specialty;
-
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectStaff(s.id);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                      isSelected
-                        ? scheme.highlightBg + ' shadow-2xs font-bold'
-                        : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-400'}`} />
-                      <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
-                        {s.photo_url ? (
-                          <img src={s.photo_url} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          displayName.charAt(0).toUpperCase()
-                        )}
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
-                          {displayName}
-                        </span>
-                        {spec && (
-                          <span className="text-[10px] font-bold text-slate-700 block truncate flex items-center gap-1">
-                            <BookOpen size={10} className="text-slate-500" />
-                            {spec}
-                          </span>
-                        )}
-                      </div>
+            <div className="max-h-60 overflow-y-auto space-y-1 custom-scrollbar">
+              {allowAll && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onSelectStaff('all');
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                    isAllSelected
+                      ? scheme.highlightBg + ' shadow-2xs font-bold'
+                      : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isAllSelected ? scheme.dotColor : 'bg-slate-400'}`} />
+                    <div className="min-w-0">
+                      <span className="text-xs font-black text-slate-950 tracking-tight block truncate">
+                        {allLabel}
+                      </span>
+                      <span className="text-[10px] font-semibold text-slate-700 block">
+                        Afficher tous les créneaux ou professeurs
+                      </span>
                     </div>
+                  </div>
+                  {isAllSelected && (
+                    <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                  )}
+                </button>
+              )}
 
-                    {isSelected && (
-                      <Check size={13} className={`${scheme.checkColor} stroke-[3] ml-2 shrink-0`} />
-                    )}
-                  </button>
-                );
-              })
-            )}
+              {filteredStaff.length === 0 ? (
+                <div className="p-3 text-center text-slate-700 text-xs font-bold">
+                  Aucun enseignant trouvé
+                </div>
+              ) : (
+                filteredStaff.map((s) => {
+                  const isSelected = selectedStaffId === s.id;
+                  const displayName = getDisplayName(s);
+                  const spec = s.specialty || s.subject_specialty;
+
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => {
+                        onSelectStaff(s.id);
+                        setIsOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                        isSelected
+                          ? scheme.highlightBg + ' shadow-2xs font-bold'
+                          : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-400'}`} />
+                        <div className="w-7 h-7 rounded-lg bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 overflow-hidden">
+                          {s.photo_url ? (
+                            <img src={s.photo_url} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            displayName.charAt(0).toUpperCase()
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
+                            {displayName}
+                          </span>
+                          {spec && (
+                            <span className="text-[10px] font-bold text-slate-700 block truncate flex items-center gap-1">
+                              <BookOpen size={10} className="text-slate-500" />
+                              {spec}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {isSelected && (
+                        <Check size={13} className={`${scheme.checkColor} stroke-[3] ml-2 shrink-0`} />
+                      )}
+                    </button>
+                  );
+                })
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+
+        if (portal && typeof document !== 'undefined') {
+          return createPortal(popoverContent, document.body);
+        }
+        return popoverContent;
+      })()}
     </div>
   );
 };

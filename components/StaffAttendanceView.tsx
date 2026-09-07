@@ -4,7 +4,7 @@ import {
   FileText, UserCheck, Lock, ChevronLeft, ChevronRight, CheckCheck,
   Users, PieChart, Filter, RefreshCw, Printer, CalendarDays, Grid,
   Info, Sparkles, ShieldCheck, User, PenTool, ChevronDown, BookOpen,
-  Building2, GraduationCap, Briefcase
+  Building2, GraduationCap, Briefcase, Layers, X, RotateCcw
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { StaffMember, StaffAssignment, StaffAttendance, UserProfile, SchoolType } from '../types';
@@ -13,6 +13,9 @@ import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
 import { DatePickerPill } from './DatePickerPill';
 import { SelectPill } from './SelectPill';
+import { StaffSelectorPill } from './StaffSelectorPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SubjectSelectorPill } from './SubjectSelectorPill';
 
 interface StaffAttendanceViewProps {
   user: UserProfile;
@@ -40,6 +43,12 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
     new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().substring(0, 7)
   );
   const [selectedStaffFilter, setSelectedStaffFilter] = useState<string>('ALL');
+  const [selectedClassFilter, setSelectedClassFilter] = useState<string>('ALL');
+  const [selectedSubjectFilter, setSelectedSubjectFilter] = useState<string>('ALL');
+  const [selectedDayFilter, setSelectedDayFilter] = useState<string>('ALL');
+  const [searchWeekly, setSearchWeekly] = useState<string>('');
+  const [classesList, setClassesList] = useState<any[]>([]);
+  const [subjectsList, setSubjectsList] = useState<any[]>([]);
   const [monthlyAttendances, setMonthlyAttendances] = useState<StaffAttendance[]>([]);
   const [allSchoolAssignments, setAllSchoolAssignments] = useState<StaffAssignment[]>([]);
   const [loadingMonthly, setLoadingMonthly] = useState<boolean>(false);
@@ -128,6 +137,33 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
 
       const { data: attData } = await attQuery;
       setMonthlyAttendances(attData || []);
+
+      // 3. Fetch classes and subjects for dropdown selectors
+      try {
+        let classesQuery = supabase
+          .from('classes')
+          .select('*')
+          .eq('school_id', user.school_id)
+          .order('name');
+        if (currentCampusId) {
+          classesQuery = classesQuery.eq('campus_id', currentCampusId);
+        }
+        const { data: cData } = await classesQuery;
+        if (cData && cData.length > 0) {
+          setClassesList(cData);
+        }
+
+        const { data: subData } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('school_id', user.school_id)
+          .order('name');
+        if (subData && subData.length > 0) {
+          setSubjectsList(subData);
+        }
+      } catch (e) {
+        // Classes/subjects tables are optional; fallback to assignments list
+      }
     } catch (err) {
       console.error("Error loading monthly data:", err);
     } finally {
@@ -798,12 +834,89 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
   }, [isUniversity, isProfessional, dayOfWeekName, selectedDateObj]);
 
   const activeWeekdays = useMemo(() => {
-    const hasSundayCourses = assignments.some(a => a.day_of_week === 'Dimanche');
+    const hasSundayCourses = assignments.some(a => a.day_of_week === 'Dimanche') || allSchoolAssignments.some(a => a.day_of_week === 'Dimanche');
     if (isUniversity || isProfessional || hasSundayCourses) {
       return ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
     }
     return ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
-  }, [isUniversity, isProfessional, assignments]);
+  }, [isUniversity, isProfessional, assignments, allSchoolAssignments]);
+
+  // Classes list for selector (with fallback from assignments)
+  const availableClasses = useMemo(() => {
+    if (classesList.length > 0) return classesList;
+    const map = new Map<string, { id: string; name: string; grade_level?: string }>();
+    allSchoolAssignments.forEach(a => {
+      if (a.class_id && a.class_name && !map.has(a.class_id)) {
+        map.set(a.class_id, { id: a.class_id, name: a.class_name });
+      }
+    });
+    return Array.from(map.values());
+  }, [classesList, allSchoolAssignments]);
+
+  // Subjects list for selector (with fallback from assignments)
+  const availableSubjects = useMemo(() => {
+    if (subjectsList.length > 0) return subjectsList;
+    const map = new Map<string, { id: string; name: string }>();
+    allSchoolAssignments.forEach(a => {
+      if (a.subject_id && a.subject_name && !map.has(a.subject_id)) {
+        map.set(a.subject_id, { id: a.subject_id, name: a.subject_name });
+      }
+    });
+    return Array.from(map.values());
+  }, [subjectsList, allSchoolAssignments]);
+
+  // Active filters detection & reset for Weekly view
+  const hasActiveWeeklyFilters = useMemo(() => {
+    return selectedStaffFilter !== 'ALL' || 
+           selectedClassFilter !== 'ALL' || 
+           selectedSubjectFilter !== 'ALL' || 
+           selectedDayFilter !== 'ALL' || 
+           Boolean(searchWeekly.trim());
+  }, [selectedStaffFilter, selectedClassFilter, selectedSubjectFilter, selectedDayFilter, searchWeekly]);
+
+  const handleResetWeeklyFilters = useCallback(() => {
+    setSelectedStaffFilter('ALL');
+    setSelectedClassFilter('ALL');
+    setSelectedSubjectFilter('ALL');
+    setSelectedDayFilter('ALL');
+    setSearchWeekly('');
+  }, []);
+
+  // Filtered days for weekly timetable view
+  const daysToDisplay = useMemo(() => {
+    if (selectedDayFilter === 'ALL') return activeWeekdays;
+    return activeWeekdays.filter(d => d.toLowerCase() === selectedDayFilter.toLowerCase());
+  }, [activeWeekdays, selectedDayFilter]);
+
+  // Global stats for Weekly planning view
+  const weeklyStats = useMemo(() => {
+    const filtered = allSchoolAssignments.filter(a => {
+      if (selectedDayFilter !== 'ALL' && a.day_of_week !== selectedDayFilter) return false;
+      if (selectedStaffFilter !== 'ALL' && a.staff_id !== selectedStaffFilter) return false;
+      if (selectedClassFilter !== 'ALL' && a.class_id !== selectedClassFilter) return false;
+      if (selectedSubjectFilter !== 'ALL' && a.subject_id !== selectedSubjectFilter) return false;
+      if (searchWeekly.trim()) {
+        const q = searchWeekly.toLowerCase().trim();
+        const sName = a.staff ? `${a.staff.first_name || ''} ${a.staff.last_name || ''}`.toLowerCase() : '';
+        const cName = (a.class_name || '').toLowerCase();
+        const subName = (a.subject_name || '').toLowerCase();
+        const room = (a.room || a.classroom || '').toLowerCase();
+        if (!sName.includes(q) && !cName.includes(q) && !subName.includes(q) && !room.includes(q)) {
+          return false;
+        }
+      }
+      return true;
+    });
+
+    const uniqueStaff = new Set(filtered.map(a => a.staff_id).filter(Boolean));
+    const uniqueClasses = new Set(filtered.map(a => a.class_id).filter(Boolean));
+
+    return {
+      totalSessions: filtered.length,
+      staffCount: uniqueStaff.size,
+      classCount: uniqueClasses.size,
+    };
+  }, [allSchoolAssignments, selectedDayFilter, selectedStaffFilter, selectedClassFilter, selectedSubjectFilter, searchWeekly]);
 
   const getCampusName = useCallback((campusId?: string | null) => {
     if (!campusId || !campuses || campuses.length === 0) return null;
@@ -1165,59 +1278,245 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
               {/* Staff Selector Filter */}
               <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
                 <span className="text-xs font-bold text-slate-500 flex items-center gap-1 shrink-0">
-                  <Filter size={14} className="text-indigo-600" /> Intervenant :
+                  <Filter size={14} className="text-blue-600" /> Intervenant :
                 </span>
-                <div className="w-full sm:w-64 min-w-0">
-                  <SelectPill
-                    options={[
-                      { value: 'ALL', label: 'Tous les collaborateurs' },
-                      ...staff.map(s => ({
-                        value: s.id,
-                        label: `${formatStudentName(s.last_name, s.first_name).fullName} (${s.role})`
-                      }))
-                    ]}
-                    value={selectedStaffFilter}
-                    onChange={(val) => setSelectedStaffFilter(val)}
+                <div className="w-full sm:w-72 min-w-0">
+                  <StaffSelectorPill
+                    staffList={staff}
+                    selectedStaffId={selectedStaffFilter}
+                    onSelectStaff={(val) => setSelectedStaffFilter(val)}
+                    allowAll={true}
+                    allLabel="Tous les collaborateurs"
                     variant="field"
                     size="sm"
-                    colorScheme="indigo"
-                    searchable={true}
-                    placeholder="Choisir collaborateur..."
+                    colorScheme="blue"
                     className="w-full"
+                    portal={true}
                   />
                 </div>
               </div>
             </div>
           ) : activeTab === 'weekly' ? (
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 w-full">
-              <div className="flex items-center gap-2">
-                <Grid size={18} className="text-indigo-600" />
-                <h3 className="text-sm font-bold text-slate-900">
-                  Planning Hebdomadaire des Cours & Co-Enseignants
-                </h3>
+            <div className="w-full space-y-3.5">
+              {/* Header Title & Quick Badges */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-3 border-b border-slate-200/80">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+                    <Grid size={16} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-slate-900 leading-tight">
+                      Planning Hebdomadaire des Cours & Co-Enseignants
+                    </h3>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Emploi du temps par jour, affectations d'enseignants et détection des binômes
+                    </p>
+                  </div>
+                </div>
+
+                {/* Quick Indicators & Reset */}
+                <div className="flex items-center gap-2 flex-wrap self-end sm:self-auto">
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-100 flex items-center gap-1">
+                    <Calendar size={12} />
+                    {weeklyStats.totalSessions} créneau{weeklyStats.totalSessions > 1 ? 'x' : ''}
+                  </span>
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-slate-100 text-slate-700 border border-slate-200 flex items-center gap-1">
+                    <Users size={12} />
+                    {weeklyStats.staffCount} prof{weeklyStats.staffCount > 1 ? 's' : ''}
+                  </span>
+                  {hasActiveWeeklyFilters && (
+                    <button
+                      type="button"
+                      onClick={handleResetWeeklyFilters}
+                      className="px-2.5 py-1 rounded-lg text-[11px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Réinitialiser tous les filtres"
+                    >
+                      <RotateCcw size={11} />
+                      Effacer filtres
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex items-center gap-2 min-w-0 flex-1 sm:flex-initial">
-                <span className="text-xs font-bold text-slate-500 flex items-center gap-1 shrink-0">
-                  <Filter size={14} className="text-indigo-600" /> Filtrer par Prof :
-                </span>
-                <div className="w-full sm:w-64 min-w-0">
-                  <SelectPill
-                    options={[
-                      { value: 'ALL', label: 'Tous les enseignants' },
-                      ...staff.map(s => ({
-                        value: s.id,
-                        label: formatStudentName(s.last_name, s.first_name).fullName
-                      }))
-                    ]}
-                    value={selectedStaffFilter}
-                    onChange={(val) => setSelectedStaffFilter(val)}
+
+              {/* Harmonized Selector Grid - Exact Pill Style as Feuille de Présence */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+                {/* 1. Sélecteur Enseignant (Pillule harmonisée) */}
+                <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                      <span>Enseignant</span>
+                      {staff.length > 0 && (
+                        <span className="text-[10px] text-slate-400 font-normal">({staff.length} dispo.)</span>
+                      )}
+                    </label>
+                    {selectedStaffFilter !== 'ALL' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedStaffFilter('ALL')}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer shrink-0"
+                      >
+                        Tous
+                      </button>
+                    )}
+                  </div>
+                  <StaffSelectorPill
+                    staffList={staff}
+                    selectedStaffId={selectedStaffFilter}
+                    onSelectStaff={(id) => setSelectedStaffFilter(id)}
+                    allowAll={true}
+                    allLabel="Tous les enseignants"
                     variant="field"
                     size="sm"
-                    colorScheme="indigo"
-                    searchable={true}
-                    placeholder="Choisir enseignant..."
+                    colorScheme="blue"
+                    className="w-full"
+                    portal={true}
+                  />
+                </div>
+
+                {/* 2. Sélecteur Classe (Pillule harmonisée) */}
+                <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5 truncate">
+                      <span>{school?.education_level ? 'Classe / Promo' : 'Classe'}</span>
+                      {availableClasses.length > 0 && (
+                        <span className="text-[10px] text-slate-400 font-normal">({availableClasses.length} dispo.)</span>
+                      )}
+                    </label>
+                    {selectedClassFilter !== 'ALL' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClassFilter('ALL')}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer shrink-0"
+                      >
+                        Toutes
+                      </button>
+                    )}
+                  </div>
+                  <ClassSelectorPill
+                    classes={availableClasses}
+                    selectedClassId={selectedClassFilter}
+                    onSelectClass={(id) => setSelectedClassFilter(id)}
+                    allowAll={true}
+                    allLabel="Toutes les classes"
+                    emptyLabel="Choisir une classe..."
+                    variant="field"
+                    size="sm"
+                    colorScheme="blue"
+                    labelPrefix=""
+                    className="w-full"
+                    portal={true}
+                  />
+                </div>
+
+                {/* 3. Sélecteur Matière / Discipline (Pillule harmonisée) */}
+                <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate">
+                      Discipline / Matière
+                    </label>
+                    {selectedSubjectFilter !== 'ALL' && (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedSubjectFilter('ALL')}
+                        className="text-[10px] font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer shrink-0"
+                      >
+                        Toutes
+                      </button>
+                    )}
+                  </div>
+                  <SubjectSelectorPill
+                    subjects={availableSubjects}
+                    selectedSubjectId={selectedSubjectFilter}
+                    onSelectSubject={(id) => setSelectedSubjectFilter(id)}
+                    allLabel="Toutes les matières"
+                    variant="field"
+                    size="sm"
+                    colorScheme="blue"
                     className="w-full"
                   />
+                </div>
+
+                {/* 4. Recherche Instantanée (Harmonisée) */}
+                <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 truncate block">
+                    Recherche Instantanée
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                    <input
+                      type="text"
+                      placeholder="Prof, cours, classe, salle..."
+                      value={searchWeekly}
+                      onChange={(e) => setSearchWeekly(e.target.value)}
+                      className="w-full pl-8.5 pr-7 py-2 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all placeholder:text-slate-400"
+                    />
+                    {searchWeekly && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchWeekly('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Day Chips Row with counts */}
+              <div className="pt-2.5 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mr-1">
+                    Jour :
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDayFilter('ALL')}
+                    className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                      selectedDayFilter === 'ALL'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                    }`}
+                  >
+                    Tous les jours
+                  </button>
+                  {activeWeekdays.map((d) => {
+                    const count = allSchoolAssignments.filter(a => {
+                      if (a.day_of_week !== d) return false;
+                      if (selectedStaffFilter !== 'ALL' && a.staff_id !== selectedStaffFilter) return false;
+                      if (selectedClassFilter !== 'ALL' && a.class_id !== selectedClassFilter) return false;
+                      if (selectedSubjectFilter !== 'ALL' && a.subject_id !== selectedSubjectFilter) return false;
+                      return true;
+                    }).length;
+
+                    const isSelected = selectedDayFilter.toLowerCase() === d.toLowerCase();
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setSelectedDayFilter(isSelected ? 'ALL' : d)}
+                        className={`px-2.5 py-1 rounded-full text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                          isSelected
+                            ? 'bg-blue-600 text-white shadow-xs'
+                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                        }`}
+                      >
+                        <span>{d}</span>
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${
+                          isSelected ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-700'
+                        }`}>
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Additional KPI Pill */}
+                <div className="text-[11px] font-medium text-slate-500 flex items-center gap-2">
+                  <span>
+                    {daysToDisplay.length} jour{daysToDisplay.length > 1 ? 's' : ''} affiché{daysToDisplay.length > 1 ? 's' : ''}
+                  </span>
                 </div>
               </div>
             </div>
@@ -1426,28 +1725,53 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
             /* WEEKLY TIMETABLE & MULTI-TEACHER VIEW */
             <div className="p-6 space-y-5">
               {/* Weekly Timetable Columns */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {activeWeekdays.map((dayName) => {
+              <div className={`grid grid-cols-1 ${daysToDisplay.length === 1 ? 'max-w-2xl mx-auto' : daysToDisplay.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-2 lg:grid-cols-3'} gap-4`}>
+                {daysToDisplay.map((dayName) => {
                   const dayAssignments = allSchoolAssignments.filter(a => {
                     if (a.day_of_week !== dayName) return false;
                     if (selectedStaffFilter !== 'ALL' && a.staff_id !== selectedStaffFilter) return false;
+                    if (selectedClassFilter !== 'ALL' && a.class_id !== selectedClassFilter) return false;
+                    if (selectedSubjectFilter !== 'ALL' && a.subject_id !== selectedSubjectFilter) return false;
+                    if (searchWeekly.trim()) {
+                      const q = searchWeekly.toLowerCase().trim();
+                      const sName = a.staff ? `${a.staff.first_name || ''} ${a.staff.last_name || ''}`.toLowerCase() : '';
+                      const cName = (a.class_name || '').toLowerCase();
+                      const subName = (a.subject_name || '').toLowerCase();
+                      const room = (a.room || a.classroom || '').toLowerCase();
+                      if (!sName.includes(q) && !cName.includes(q) && !subName.includes(q) && !room.includes(q)) {
+                        return false;
+                      }
+                    }
                     return true;
                   });
 
                   return (
-                    <div key={dayName} className="bg-slate-50/70 rounded-2xl border border-slate-200 p-4 space-y-3">
+                    <div key={dayName} className="bg-slate-50/80 rounded-2xl border border-slate-200/90 p-4 space-y-3">
                       <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                         <h4 className="font-black text-slate-900 text-sm flex items-center gap-2">
-                          <Calendar size={14} className="text-indigo-600" /> {dayName}
+                          <Calendar size={14} className="text-blue-600" /> {dayName}
                         </h4>
-                        <span className="text-[10px] font-extrabold bg-indigo-100 text-indigo-800 px-2.5 py-0.5 rounded-full">
+                        <span className="text-[10px] font-extrabold bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full">
                           {dayAssignments.length} {dayAssignments.length <= 1 ? terms.sessionSingular.toLowerCase() : terms.sessionPlural.toLowerCase()}
                         </span>
                       </div>
 
                       {dayAssignments.length === 0 ? (
-                        <div className="py-8 text-center text-slate-400 text-xs italic">
-                          Aucun {terms.sessionSingular.toLowerCase()} programmé
+                        <div className="py-8 text-center text-slate-400 text-xs">
+                          {hasActiveWeeklyFilters ? (
+                            <div className="space-y-1.5">
+                              <p className="italic">Aucun cours ne correspond aux filtres pour ce jour</p>
+                              <button
+                                type="button"
+                                onClick={handleResetWeeklyFilters}
+                                className="text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer inline-flex items-center gap-1 text-[11px]"
+                              >
+                                <RotateCcw size={11} /> Réinitialiser les filtres
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="italic">Aucun {terms.sessionSingular.toLowerCase()} programmé</span>
+                          )}
                         </div>
                       ) : (
                         <div className="space-y-2.5">
@@ -1468,31 +1792,41 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
                             return (
                               <div
                                 key={a.id}
-                                className="p-3 bg-white rounded-xl border border-slate-200 shadow-sm space-y-1.5 hover:border-indigo-300 transition-all"
+                                className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs space-y-2 hover:border-blue-300 hover:shadow-sm transition-all"
                               >
-                                <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md">
-                                    {a.start_time.substring(0, 5)} - {a.end_time.substring(0, 5)}
+                                <div className="flex items-center justify-between gap-1.5">
+                                  <span className="text-[10px] font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <Clock size={10} className="text-slate-500" />
+                                    {a.start_time ? a.start_time.substring(0, 5) : '--:--'} - {a.end_time ? a.end_time.substring(0, 5) : '--:--'}
                                   </span>
-                                  <span className="text-[10px] font-black text-indigo-600 uppercase">
+                                  <span className="text-[10px] font-black text-blue-700 bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md uppercase truncate max-w-[120px]">
                                     {a.class_name}
                                   </span>
                                 </div>
 
-                                <h5 className="font-bold text-slate-900 text-xs">
-                                  {a.subject_name}
-                                </h5>
+                                <div className="flex items-start gap-1.5">
+                                  <BookOpen size={13} className="text-blue-600 shrink-0 mt-0.5" />
+                                  <h5 className="font-black text-slate-900 text-xs leading-tight">
+                                    {a.subject_name}
+                                  </h5>
+                                </div>
 
-                                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-700">
-                                  <User size={13} className="text-indigo-500" />
-                                  <span>{staffName}</span>
+                                <div className="flex items-center gap-2 text-xs font-semibold text-slate-700 pt-0.5 border-t border-slate-100">
+                                  <div className="w-5 h-5 rounded-full bg-blue-100 text-blue-700 font-bold text-[10px] flex items-center justify-center shrink-0 overflow-hidden">
+                                    {a.staff?.photo_url ? (
+                                      <img src={a.staff.photo_url} alt="" className="w-full h-full object-cover" />
+                                    ) : (
+                                      staffName.charAt(0).toUpperCase()
+                                    )}
+                                  </div>
+                                  <span className="truncate">{staffName}</span>
                                 </div>
 
                                 {/* Co-teachers badge */}
                                 {coTeachers.length > 0 && (
-                                  <div className="pt-1.5 border-t border-slate-100 flex items-center gap-1 text-[10px] text-amber-800 font-bold bg-amber-50 p-1.5 rounded-lg border border-amber-200/60">
+                                  <div className="pt-1.5 border-t border-amber-100/80 flex items-center gap-1 text-[10px] text-amber-800 font-bold bg-amber-50/90 p-1.5 rounded-lg border border-amber-200/60">
                                     <Users size={12} className="text-amber-600 shrink-0" />
-                                    <span>
+                                    <span className="truncate">
                                       Co-intervenant(s) : {coTeachers.map(c => formatStudentName(c.staff?.last_name, c.staff?.first_name).fullName).join(', ')}
                                     </span>
                                   </div>
