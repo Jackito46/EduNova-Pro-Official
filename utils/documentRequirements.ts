@@ -89,65 +89,6 @@ export const PROFESSIONAL_DOCUMENTS: DocumentDefinition[] = [
   }
 ];
 
-export const KINDERGARTEN_DOCUMENTS: DocumentDefinition[] = [
-  {
-    id: 'birthCert',
-    name: "Acte de Naissance / Extrait d'Archives",
-    description: "Document officiel légalisé de l'état civil certifiant la filiation de l'enfant.",
-    required: true,
-  },
-  {
-    id: 'vaccines',
-    name: "Carnet de Santé & Vaccinations Pédiatriques",
-    description: "Carnet de vaccination pédiatrique à jour (BCG, Polio, Pentavalent, Rougeole/Rubéole).",
-    required: true,
-  },
-  {
-    id: 'photos',
-    name: "Photos d'Identité Récentes de l'Enfant (2x)",
-    description: "Photos d'identité couleur format passeport pour le carnet de liaison et le badge.",
-    required: true,
-  },
-  {
-    id: 'emergencyContact',
-    name: "Fiche d'Urgence & Personnes Autorisées",
-    description: "Contacts d'urgence et liste officielle des personnes autorisées à récupérer l'enfant.",
-    required: true,
-  }
-];
-
-export interface DocumentSuggestion {
-  name: string;
-  description: string;
-  required: boolean;
-}
-
-export const DOCUMENT_SUGGESTIONS_BY_TYPE: Record<string, DocumentSuggestion[]> = {
-  UNIVERSITY: [
-    { name: "Relevé de Notes du Baccalauréat", description: "Relevé officiel délivré par le MENFP (Bac II ou Secondaire 4).", required: true },
-    { name: "Pièce d'Identité (CIN / NIF / Passeport)", description: "Copie certifiée d'une pièce d'identité légale en cours de validité.", required: true },
-    { name: "Relevés de Notes / Transcripts Universitaires", description: "Relevés semestriels ou dossier officiel de transfert inter-universitaire.", required: false },
-    { name: "Fiche Médicale & Bilan d'Aptitude", description: "Certificat médical d'aptitude délivré par un médecin agréé.", required: true },
-    { name: "Diplôme de Licence ou Attestation de Réussite", description: "Pour les admissions en Master ou programmes de spécialisation.", required: false },
-    { name: "Lettre de Recommandation Académique", description: "Lettre de recommandation d'un professeur ou tuteur académique.", required: false }
-  ],
-  PROFESSIONAL: [
-    { name: "Pièce d'Identité Officielle (CIN / NIF)", description: "Pièce d'identité légale avec photo pour immatriculation au registre pro.", required: true },
-    { name: "Dernier Diplôme ou Attestation d'Études", description: "Justificatif du niveau prérequis (BNS, Certificat de niveau, Bac).", required: true },
-    { name: "Contrat de Formation Professionnelle Signé", description: "Convention d'apprentissage et engagement aux ateliers et stages pratiques.", required: true },
-    { name: "Curriculum Vitae (CV) & Entretien de Sélection", description: "Parcours initial et profil pour l'orientation en filière technique.", required: false },
-    { name: "Certificat Médical d'Aptitude aux Ateliers", description: "Certificat d'aptitude aux travaux pratiques, machines et sécurité en atelier.", required: true }
-  ],
-  CLASSIC: [
-    { name: "Acte de Naissance / Extrait d'Archives", description: "Document officiel légalisé de l'état civil ou extrait des archives nationales.", required: true },
-    { name: "Photos d'Identité Récentes (2x)", description: "Photos couleur format passeport pour le badge et le livret scolaire.", required: true },
-    { name: "Bulletins / Carnet de Notes Antérieurs", description: "Dernier bulletin ou carnet de notes officiel de la classe précédente.", required: true },
-    { name: "Certificat Médical / Carnet de Santé", description: "Certificat médical d'aptitude physique et carnet de vaccination à jour.", required: true },
-    { name: "Certificat de Sortie / Fiche de Transfert", description: "Attestation de transfert délivrée par la direction de l'école de provenance.", required: false },
-    { name: "Fiche d'Engagement Parental Signée", description: "Règlement intérieur et charte éducative signés par les tuteurs légaux.", required: false }
-  ]
-};
-
 export interface DocumentPreset {
   id: string;
   label: string;
@@ -156,36 +97,154 @@ export interface DocumentPreset {
   docs: DocumentDefinition[];
 }
 
+export interface DocumentSuggestion {
+  name: string;
+  description: string;
+  required: boolean;
+}
+
 export const DOCUMENT_PRESETS: DocumentPreset[] = [
   {
-    id: 'classic',
-    label: 'Standard Scolaire (Fondamental & Secondaire)',
-    badge: 'École K-12',
-    description: "Standard officiel MENFP pour écoles fondamentales, collèges et lycées.",
-    docs: CLASSIC_SCHOOL_DOCUMENTS
+    id: 'menfp_standard',
+    label: 'Standard Scolaire MENFP (Haïti)',
+    badge: 'Fondamental & Secondaire',
+    description: "Dossier réglementaire standard exigé par le Ministère de l'Éducation Nationale (Fondamental et Secondaire).",
+    docs: [
+      ...CLASSIC_SCHOOL_DOCUMENTS,
+      {
+        id: 'transferCert',
+        name: "Certificat de Transfert / Quitus Scolaire",
+        description: "Certificat officiel de changement d'établissement ou quitus administratif.",
+        required: false,
+      }
+    ]
   },
   {
-    id: 'university',
-    label: 'Standard Universitaire (Enseignement Supérieur)',
-    badge: 'Université',
-    description: "Standard académique pour Facultés, Licences, Masters et Instituts Supérieurs.",
+    id: 'university_standard',
+    label: 'Standard Universitaire & Supérieur',
+    badge: 'Facultés & Instituts',
+    description: "Dossier académique complet pour l'enseignement supérieur (Bac, relevés de notes, CIN/NIF).",
     docs: UNIVERSITY_DOCUMENTS
   },
   {
-    id: 'professional',
-    label: 'Standard Formation Professionnelle & Technique',
-    badge: 'Centre Pro',
-    description: "Standard technique pour Centres de Métiers, Ateliers et Écoles Professionnelles.",
+    id: 'professional_standard',
+    label: 'Standard Formation Professionnelle',
+    badge: 'Centres Métiers & INFP',
+    description: "Dossier pour filières professionnelles, ateliers et centres d'apprentissage technique.",
     docs: PROFESSIONAL_DOCUMENTS
   },
   {
-    id: 'kindergarten',
-    label: 'Standard Préscolaire & Maternelle',
-    badge: 'Maternelle',
-    description: "Standard adapté aux tout-petits : carnet pédiatrique, fiche d'urgence et extrait de naissance.",
-    docs: KINDERGARTEN_DOCUMENTS
+    id: 'international_standard',
+    label: 'Standard International & Bilingue',
+    badge: 'Mobilité & Bilingue',
+    description: "Dossier renforcé avec passeport valide, bilans médicaux complets et équivalences de diplômes.",
+    docs: [
+      {
+        id: 'passport',
+        name: "Passeport Valide ou Pièce Consulaire",
+        description: "Document de voyage officiel valide ou pièce d'identité légalisée.",
+        required: true,
+      },
+      {
+        id: 'equivalency',
+        name: "Équivalence de Diplôme & Transcripts",
+        description: "Attestation officielle d'équivalence de niveau d'études délivrée par l'autorité compétente.",
+        required: true,
+      },
+      {
+        id: 'healthFull',
+        name: "Bilan Sanitaire Complet & Vaccinations",
+        description: "Bilan médical général, sérologie et carnet de vaccination international.",
+        required: true,
+      },
+      {
+        id: 'financialProof',
+        name: "Prise en Charge / Caution Financière",
+        description: "Garantie financière ou engagement légalisé du tuteur légal.",
+        required: false,
+      }
+    ]
   }
 ];
+
+export const DOCUMENT_SUGGESTIONS_BY_TYPE: Record<string, DocumentSuggestion[]> = {
+  CLASSIC: [
+    {
+      name: "Certificat de Transfert / Quitus Scolaire",
+      description: "Certificat officiel de changement d'établissement ou quitus administratif.",
+      required: false
+    },
+    {
+      name: "Certificat de Baptême / Dédicace",
+      description: "Attestation religieuse ou certificat de dédicace pour établissement confessionnel.",
+      required: false
+    },
+    {
+      name: "Fiche d'Urgence Médicale & Groupe Sanguin",
+      description: "Fiche détaillée avec contacts d'urgence, allergies et groupe sanguin officiel.",
+      required: true
+    },
+    {
+      name: "Attestation de Bonne Conduite / Vie et Mœurs",
+      description: "Attestation de bonne conduite délivrée par la direction précédente.",
+      required: false
+    },
+    {
+      name: "Justificatif de Domicile des Parents",
+      description: "Facture de service public (électricité, eau) ou attestation de résidence.",
+      required: false
+    }
+  ],
+  UNIVERSITY: [
+    {
+      name: "Extrait de Casier Judiciaire Récent",
+      description: "Certificat de casier judiciaire vierge datant de moins de 3 mois.",
+      required: false
+    },
+    {
+      name: "Lettre de Motivation & Projet Académique",
+      description: "Exposé des motifs de candidature et orientation professionnelle visée.",
+      required: true
+    },
+    {
+      name: "Lettres de Recommandation Académiques (2x)",
+      description: "Recommandations signées par des professeurs ou encadrants certifiés.",
+      required: false
+    },
+    {
+      name: "Attestation d'Assurance Responsabilité Civile",
+      description: "Police d'assurance couvrant les stages et la scolarité universitaire.",
+      required: false
+    },
+    {
+      name: "Matricule Fiscale NIF / Attestation DGI",
+      description: "Numéro d'Immatriculation Fiscale officiel de l'étudiant.",
+      required: false
+    }
+  ],
+  PROFESSIONAL: [
+    {
+      name: "Certificat d'Aptitude Médicale aux Ateliers",
+      description: "Certificat médical d'aptitude au port d'équipements de protection et travaux pratiques.",
+      required: true
+    },
+    {
+      name: "Convention de Stage / Entreprise Partenaire",
+      description: "Engagement formel de stage ou de contrat d'alternance professionnelle.",
+      required: false
+    },
+    {
+      name: "Attestations de Compétences / Certifications Antérieures",
+      description: "Certificats de formation continue ou attestations de pratique professionnelle.",
+      required: false
+    },
+    {
+      name: "Permis de Conduire / CACES",
+      description: "Permis de conduire valide pour les filières transport ou logistique.",
+      required: false
+    }
+  ]
+};
 
 export function getDocumentDefinitionsForSchoolType(
   schoolType?: string | null,
