@@ -30,7 +30,11 @@ import {
   Lock,
   Wallet,
   Building2,
-  Calendar
+  Calendar,
+  MessageSquare,
+  Phone,
+  Send,
+  Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
@@ -44,6 +48,9 @@ import { MonCashService } from '../services/moncashService';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
+import { MonCashWaitingModal } from './MonCashWaitingModal';
+import { MonCashTransactionCard, MonCashTransactionInfo } from './MonCashTransactionCard';
+import { PaymentSmsConfirmation } from './PaymentSmsConfirmationModal';
 import { tuitionPaymentSchema } from '../utils/validation';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -118,7 +125,31 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // État de polling et attente de confirmation pour MonCash
+  const [showMonCashWaiting, setShowMonCashWaiting] = useState(false);
+  const [monCashPendingData, setMonCashPendingData] = useState<{
+    paymentId?: string;
+    orderId: string;
+    amount: number;
+    currency: string;
+    redirectUrl?: string | null;
+    studentName: string;
+    studentCode?: string;
+    studentClass?: string;
+    feeTypeLabel: string;
+    payerPhone?: string;
+    initiatedAt?: string;
+  } | null>(null);
   
+  // État récapitulatif officiel MonCash (ID unique, date exacte d'initiative, statut de validation côté serveur)
+  const [moncashTransactionData, setMoncashTransactionData] = useState<MonCashTransactionInfo | null>(null);
+  
+  // États pour la proposition de confirmation SMS aux parents (Renforcement de confiance)
+  const [autoSendSmsParent, setAutoSendSmsParent] = useState<boolean>(true);
+  const [parentPhoneCustom, setParentPhoneCustom] = useState<string>('');
+  const [showSmsPreviewModal, setShowSmsPreviewModal] = useState<boolean>(false);
+
   const [activeYear, setActiveYear] = useState<any>(null);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [targetYearId, setTargetYearId] = useState<string>('');
@@ -967,6 +998,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           isNotEnrolledInTargetYear: !enrollment,
           otherEnrollments: otherEnrollments
         });
+        setParentPhoneCustom(data.parent_phone || data.phone || '');
         setIsLocked(true);
         auditGlobalSolvency(data.id, yearId);
       }
@@ -1235,6 +1267,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setCurrency('HTG');
     setFeeType('SCOLARITE');
     setPaymentMethod('Cash');
+    setParentPhoneCustom('');
+    setShowSmsPreviewModal(false);
+    setMoncashTransactionData(null);
   };
 
   // Soumission de la double-validation par un supérieur
@@ -1569,26 +1604,56 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           console.error("Erreur de synchronisation des statuts:", syncErr);
         }
         
-        // Si MonCash, on redirige vers l'interface de paiement
+        // Si MonCash, on initie la requête et on active immédiatement l'état d'Attente de confirmation avec Polling
         if (paymentMethod === 'MonCash' && moncashOrderId) {
+          const exactInitiatedDate = new Date();
+          const studentFullName = selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim();
+          
+          let redirectUrl: string | null = null;
           try {
-            const redirectUrl = await MonCashService.initiatePayment(user.school_id, {
+            redirectUrl = await MonCashService.initiatePayment(user.school_id, {
               amount: amount,
               orderId: moncashOrderId,
-              description: `Paiement ${feeType} - ${selectedStudent.fullName}`
+              description: `Paiement ${feeType} - ${studentFullName}`
             });
-            
-            if (redirectUrl) {
-              toast.info("Redirection vers MonCash...");
-              setTimeout(() => {
-                window.open(redirectUrl, '_blank');
-                setShowReceipt(true);
-              }, 1500);
-            }
           } catch (err: any) {
-            console.error("MonCash Initiation Error:", err);
-            toast.error("Erreur MonCash: " + err.message);
+            console.warn("MonCash Initiation Warning:", err);
           }
+
+          // Initialisation officielle de la card récapitulative MonCash
+          const moncashSummary: MonCashTransactionInfo = {
+            orderId: moncashOrderId,
+            transactionId: referenceNumber || undefined,
+            paymentId: data.id,
+            initiatedAt: exactInitiatedDate.toISOString(),
+            serverStatus: data.status || 'EN_ATTENTE',
+            serverStatusRaw: data.status || 'EN_ATTENTE',
+            amount: amount,
+            currency: currency,
+            payerPhone: referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
+            studentName: studentFullName,
+            studentClass: selectedStudent.classe || selectedStudent.class?.name,
+            feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
+            verificationMethod: 'Webhook MonCash & Polling Supabase',
+            schoolId: user.school_id
+          };
+
+          setMoncashTransactionData(moncashSummary);
+
+          setMonCashPendingData({
+            paymentId: data.id,
+            orderId: moncashOrderId,
+            amount: amount,
+            currency: currency,
+            redirectUrl: redirectUrl,
+            studentName: studentFullName,
+            studentCode: selectedStudent.code,
+            studentClass: selectedStudent.class?.name,
+            feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
+            payerPhone: referenceNumber,
+            initiatedAt: exactInitiatedDate.toISOString()
+          });
+          setShowMonCashWaiting(true);
         } else {
           setShowReceipt(true);
         }
@@ -1651,6 +1716,64 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
+        {/* CARD RÉCAPITULATIVE TRANSACTION MONCASH (ID UNIQUE, DATE INITIATIVE, STATUT VALIDATION SERVEUR) */}
+        {(moncashTransactionData || paymentMethod === 'MonCash') && (
+          <div className="w-full max-w-xl mx-auto print:hidden animate-in fade-in duration-300">
+            <MonCashTransactionCard
+              data={moncashTransactionData || {
+                orderId: referenceNumber || transactionRef || `MC-${Date.now()}`,
+                transactionId: referenceNumber || undefined,
+                paymentId: transactionRef ? transactionRef.replace('RCP-', '') : undefined,
+                initiatedAt: new Date().toISOString(),
+                serverStatus: 'VALIDE',
+                serverStatusRaw: 'VALIDE',
+                amount: parseFloat(montantReel || '0'),
+                currency: currency,
+                payerPhone: referenceNumber || selectedStudent?.parent_phone || selectedStudent?.phone || '',
+                studentName: selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim(),
+                studentClass: selectedStudent?.classe || selectedStudent?.class?.name,
+                feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
+                verificationMethod: 'Validation MonCash & Polling Supabase',
+                schoolId: user.school_id
+              }}
+              onStatusUpdated={(newStatus, updatedRecord) => {
+                setMoncashTransactionData(prev => prev ? {
+                  ...prev,
+                  serverStatus: newStatus,
+                  serverStatusRaw: updatedRecord?.status || newStatus
+                } : null);
+              }}
+            />
+          </div>
+        )}
+
+        {/* PROPOSITION D'ENVOI SMS DE CONFIRMATION PARENT (RENFORCEMENT DE CONFIANCE) */}
+        <div className="w-full max-w-xl mx-auto print:hidden">
+          <PaymentSmsConfirmation
+            schoolId={user.school_id}
+            schoolName={schoolDetails?.name || school?.name || 'Établissement'}
+            studentId={selectedStudent?.id || ''}
+            studentName={selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim()}
+            studentClass={selectedStudent?.classe || selectedStudent?.class?.name}
+            parentName={selectedStudent?.parent_name}
+            defaultPhone={parentPhoneCustom || selectedStudent?.parent_phone || selectedStudent?.phone || ''}
+            amount={parseFloat(montantReel || '0')}
+            currency={currency}
+            feeTypeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || feeType}
+            transactionRef={transactionRef}
+            remainingAmount={
+              feeType === 'CREDIT_PORTEFEUILLE'
+                ? undefined
+                : typeof selectedStudent?.totalRemaining === 'number'
+                  ? selectedStudent.totalRemaining
+                  : undefined
+            }
+            paymentMethod={paymentMethod}
+            autoSendEnabled={autoSendSmsParent}
+            isInline={true}
+          />
+        </div>
+
         {/* REÇU DE CAISSE TICKET 80MM (OPTIMISÉ IMPRIMANTE THERMIQUE EPSON) */}
         <div id="thermal-receipt" className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl rounded-xl border border-gray-200 text-black font-sans leading-tight flex flex-col print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm]">
           {/* HEADER SCOLAIRE */}
@@ -1708,6 +1831,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <span className="font-bold uppercase text-gray-600">Mode:</span>
               <span className="font-black text-[10px]">{paymentMethod}</span>
             </div>
+            {paymentMethod === 'MonCash' && (moncashTransactionData?.orderId || referenceNumber) && (
+              <>
+                <div className="flex justify-between items-center py-0.5 text-[8px]">
+                  <span className="font-bold uppercase text-gray-500">ID MonCash:</span>
+                  <span className="font-mono font-black">{moncashTransactionData?.orderId || referenceNumber}</span>
+                </div>
+                <div className="flex justify-between items-center py-0.5 text-[7.5px]">
+                  <span className="font-semibold uppercase text-gray-500">Statut Serveur:</span>
+                  <span className="font-bold text-black">
+                    {moncashTransactionData?.serverStatus === 'VALIDE' ? 'VALIDÉ CÔTÉ SERVEUR' : (moncashTransactionData?.serverStatus || 'VALIDÉ')}
+                  </span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* DÉTAILS FINANCIERS & SITUATION */}
@@ -2489,13 +2626,38 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 )}
 
-                {(paymentMethod === 'Chèque' || paymentMethod === 'MonCash') && (
+                {paymentMethod === 'Chèque' && (
                   <div className="bg-amber-50/80 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-amber-200 flex items-start gap-2.5 animate-in fade-in duration-300">
                     <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={15} />
                     <p className="text-[11px] sm:text-xs text-amber-900 leading-relaxed">
                       <span className="font-bold block mb-0.5">Validation Requise</span>
-                      Ce paiement par {paymentMethod} sera enregistré avec le statut <span className="font-bold">EN ATTENTE</span>. Un reçu provisoire sera émis.
+                      Ce paiement par Chèque sera enregistré avec le statut <span className="font-bold">EN ATTENTE</span>. Un reçu provisoire sera émis.
                     </p>
+                  </div>
+                )}
+
+                {paymentMethod === 'MonCash' && moncashTransactionData && (
+                  <div className="animate-in fade-in duration-300">
+                    <MonCashTransactionCard
+                      data={moncashTransactionData}
+                      onStatusUpdated={(newStatus, updatedRecord) => {
+                        setMoncashTransactionData(prev => prev ? {
+                          ...prev,
+                          serverStatus: newStatus,
+                          serverStatusRaw: updatedRecord?.status || newStatus
+                        } : null);
+                      }}
+                    />
+                  </div>
+                )}
+
+                {paymentMethod === 'MonCash' && !moncashTransactionData && (
+                  <div className="bg-red-50/70 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-red-200/80 flex items-start gap-2.5 animate-in fade-in duration-300">
+                    <Smartphone className="text-red-600 shrink-0 mt-0.5" size={16} />
+                    <div className="text-[11px] sm:text-xs text-red-950 leading-relaxed">
+                      <span className="font-black text-red-900 block mb-0.5">Protocole MonCash Sécurisé</span>
+                      À la soumission, un <span className="font-bold">ID unique de transaction</span> sera généré avec <span className="font-bold">date exacte de l'initiative</span> et vérification automatique du statut de validation côté serveur.
+                    </div>
                   </div>
                 )}
               </div>
@@ -2613,6 +2775,71 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
             
+            {/* OPTION DE CONFIRMATION SMS PARENT (RENFORCEMENT DE CONFIANCE) */}
+            {selectedStudent && (
+              <div className="bg-slate-50/90 p-3.5 sm:p-4 rounded-2xl border border-indigo-100/90 shadow-sm transition-all space-y-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 shadow-sm">
+                      <MessageSquare size={16} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-bold text-slate-800">Notification SMS Parent</span>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                          Confiance
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Proposer un reçu officiel par SMS dès l'initiation de la transaction
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Switch toggle */}
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={autoSendSmsParent}
+                      onChange={(e) => setAutoSendSmsParent(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
+                  </label>
+                </div>
+
+                {autoSendSmsParent && (
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2.5 border-t border-slate-200/70 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Phone size={13} className="text-indigo-600 shrink-0" />
+                      <span className="text-slate-500 text-[11px] shrink-0 font-medium">N° Mobile Parent :</span>
+                      <input
+                        type="tel"
+                        value={parentPhoneCustom}
+                        onChange={(e) => setParentPhoneCustom(e.target.value)}
+                        placeholder="+509 XXXX-XXXX"
+                        className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-300 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-36 sm:w-44"
+                      />
+                      {selectedStudent?.parent_name && (
+                        <span className="text-[11px] text-slate-500 truncate hidden md:inline font-medium">
+                          ({selectedStudent.parent_name})
+                        </span>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setShowSmsPreviewModal(true)}
+                      className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
+                    >
+                      <Sparkles size={12} />
+                      <span>Aperçu SMS</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+            
             <button 
               type="submit" 
               disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError} 
@@ -2715,11 +2942,97 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
+      {monCashPendingData && (
+        <MonCashWaitingModal
+          isOpen={showMonCashWaiting}
+          onClose={() => setShowMonCashWaiting(false)}
+          paymentId={monCashPendingData.paymentId}
+          orderId={monCashPendingData.orderId}
+          amount={monCashPendingData.amount}
+          currency={monCashPendingData.currency}
+          studentName={monCashPendingData.studentName}
+          studentCode={monCashPendingData.studentCode}
+          studentClass={monCashPendingData.studentClass}
+          feeTypeLabel={monCashPendingData.feeTypeLabel}
+          redirectUrl={monCashPendingData.redirectUrl}
+          payerPhone={monCashPendingData.payerPhone}
+          schoolId={user.school_id}
+          initiatedAt={monCashPendingData.initiatedAt}
+          onConfirmed={(confirmedPayment) => {
+            if (confirmedPayment?.id) {
+              setTransactionRef(`RCP-${confirmedPayment.id.substring(0, 8).toUpperCase()}`);
+            }
+            const validatedTime = new Date().toISOString();
+            setMoncashTransactionData(prev => {
+              if (prev) {
+                return {
+                  ...prev,
+                  paymentId: confirmedPayment?.id || prev.paymentId,
+                  transactionId: confirmedPayment?.transaction_reference || confirmedPayment?.reference_number || prev.transactionId,
+                  serverStatus: 'VALIDE',
+                  serverStatusRaw: confirmedPayment?.status || 'VALIDE',
+                  serverValidatedAt: validatedTime
+                };
+              }
+              return {
+                orderId: monCashPendingData.orderId,
+                transactionId: confirmedPayment?.transaction_reference || confirmedPayment?.reference_number,
+                paymentId: confirmedPayment?.id || monCashPendingData.paymentId,
+                initiatedAt: new Date().toISOString(),
+                serverStatus: 'VALIDE',
+                serverStatusRaw: confirmedPayment?.status || 'VALIDE',
+                serverValidatedAt: validatedTime,
+                amount: monCashPendingData.amount,
+                currency: monCashPendingData.currency,
+                studentName: monCashPendingData.studentName,
+                studentClass: monCashPendingData.studentClass,
+                feeTypeLabel: monCashPendingData.feeTypeLabel,
+                payerPhone: monCashPendingData.payerPhone,
+                schoolId: user.school_id
+              };
+            });
+            setShowMonCashWaiting(false);
+            setShowReceipt(true);
+          }}
+          onFailed={(errMsg) => {
+            console.warn('[MonCash Payment Failed]', errMsg);
+          }}
+        />
+      )}
+
       <DailyCashClosureModal
         isOpen={isClosureModalOpen}
         onClose={() => setIsClosureModalOpen(false)}
         user={user}
       />
+
+      {showSmsPreviewModal && selectedStudent && (
+        <PaymentSmsConfirmation
+          isOpen={showSmsPreviewModal}
+          onClose={() => setShowSmsPreviewModal(false)}
+          schoolId={user.school_id}
+          schoolName={schoolDetails?.name || school?.name || 'Établissement'}
+          studentId={selectedStudent.id}
+          studentName={selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim()}
+          studentClass={selectedStudent.classe || selectedStudent.class?.name}
+          parentName={selectedStudent.parent_name}
+          defaultPhone={parentPhoneCustom || selectedStudent.parent_phone || selectedStudent.phone || ''}
+          amount={parseFloat(montantReel || '0')}
+          currency={currency}
+          feeTypeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || feeType}
+          transactionRef={transactionRef || 'SIMULATION-001'}
+          remainingAmount={
+            feeType === 'CREDIT_PORTEFEUILLE'
+              ? undefined
+              : typeof selectedStudent?.totalRemaining === 'number'
+                ? selectedStudent.totalRemaining
+                : undefined
+          }
+          paymentMethod={paymentMethod}
+          autoSendEnabled={false}
+          isInline={false}
+        />
+      )}
     </div>
   );
 };

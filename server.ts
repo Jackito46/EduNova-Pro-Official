@@ -10,6 +10,8 @@ import webpush from 'web-push';
 import { GoogleGenAI } from '@google/genai';
 import { BackupBackendService } from './services/backupBackendService';
 import { exportProjectToGitHub } from './services/githubExporterService';
+import { handleMonCashWebhook } from './src/utils/payment';
+import { sendMonCashPaymentPushNotification } from './services/moncashPushService';
 
 dotenv.config();
 
@@ -449,28 +451,31 @@ async function startServer() {
   app.post('/api/moncash/test-connection', async (req, res) => {
     const { client_id, client_secret, business_key, mode } = req.body;
 
-    if (!client_id || !client_id.trim()) {
+    const effectiveClientId = (client_id || process.env.MONCASH_CLIENT_ID || '').trim();
+    const effectiveClientSecret = (client_secret || process.env.MONCASH_CLIENT_SECRET || '').trim();
+    const selectedMode = (mode || process.env.MONCASH_MODE || 'sandbox') === 'live' ? 'live' : 'sandbox';
+
+    if (!effectiveClientId) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Le Client ID MonCash est obligatoire pour tester la connexion.' 
+        error: 'Le Client ID MonCash est obligatoire (via le formulaire ou la variable MONCASH_CLIENT_ID).' 
       });
     }
 
-    if (!client_secret || !client_secret.trim()) {
+    if (!effectiveClientSecret) {
       return res.status(400).json({ 
         success: false, 
-        error: 'Le Client Secret MonCash est obligatoire pour tester la connexion.' 
+        error: 'Le Client Secret MonCash est obligatoire (via le formulaire ou la variable MONCASH_CLIENT_SECRET).' 
       });
     }
 
-    const selectedMode = mode === 'live' ? 'live' : 'sandbox';
     const baseUrl = selectedMode === 'live' 
       ? 'https://moncashbutton.digicelgroup.com' 
       : 'https://sandbox.moncashbutton.digicelgroup.com';
     const tokenUrl = `${baseUrl}/Api/oauth/token`;
 
     try {
-      const basicAuth = Buffer.from(`${client_id.trim()}:${client_secret.trim()}`).toString('base64');
+      const basicAuth = Buffer.from(`${effectiveClientId}:${effectiveClientSecret}`).toString('base64');
       
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 12000);
@@ -532,6 +537,50 @@ async function startServer() {
       return res.status(502).json({
         success: false,
         error: `Impossible de joindre le serveur MonCash (${err.message || 'Erreur réseau'}).`
+      });
+    }
+  });
+
+  // API Route for MonCash Asynchronous Webhook Notifications
+  app.post('/api/moncash/webhook', async (req, res) => {
+    try {
+      const result = await handleMonCashWebhook(req.body, {
+        headers: req.headers as Record<string, string | string[] | undefined>,
+        supabaseClient: supabase
+      });
+
+      // Notification Push automatique aux parents dès que le paiement est validé
+      if (result.success && (result.status === 'COMPLETED' || (result as any).status === 'VALIDE' || result.paymentRecord?.status === 'VALIDE')) {
+        try {
+          const pushResult = await sendMonCashPaymentPushNotification(
+            {
+              schoolId: result.paymentRecord?.school_id || '',
+              studentId: result.paymentRecord?.student_id,
+              paymentId: result.paymentRecord?.id,
+              orderId: result.orderId,
+              transactionId: result.transactionId,
+              amount: result.amount || result.paymentRecord?.amount || 0,
+              currency: result.currency || result.paymentRecord?.currency || 'HTG',
+              payerPhone: result.payerPhone
+            },
+            {
+              supabaseClient: supabase,
+              webpushClient: webpush
+            }
+          );
+          console.log('[MonCash Webhook] Notification Push parent transmise avec succès:', pushResult);
+          (result as any).pushNotification = pushResult;
+        } catch (pushErr: any) {
+          console.error('[MonCash Webhook] Échec lors de la notification Push parent:', pushErr?.message || pushErr);
+        }
+      }
+
+      return res.status(result.httpStatusCode).json(result);
+    } catch (error: any) {
+      console.error('Erreur non interceptée dans le webhook MonCash:', error);
+      return res.status(500).json({
+        success: false,
+        error: error?.message || 'Erreur interne du serveur lors du traitement du webhook MonCash'
       });
     }
   });
@@ -1373,6 +1422,42 @@ async function startServer() {
     } catch (err: any) {
       console.error('Error in send_push:', err);
       res.status(500).json({ error: err.message });
+    }
+  });
+
+  // Route dédiée pour déclencher / tester l'envoi de notification Push automatique MonCash
+  app.post('/api/push/send-moncash-confirmation', async (req, res) => {
+    const { schoolId, studentId, paymentId, orderId, transactionId, amount, currency, payerPhone, targetUserId } = req.body;
+
+    if (!schoolId && !paymentId && !orderId) {
+      return res.status(400).json({ error: 'schoolId, paymentId ou orderId est requis' });
+    }
+
+    try {
+      if (!supabase) throw new Error('Client Supabase non initialisé sur le serveur');
+
+      const pushResult = await sendMonCashPaymentPushNotification(
+        {
+          schoolId: schoolId || '',
+          studentId,
+          paymentId,
+          orderId,
+          transactionId,
+          amount: amount ? Number(amount) : 0,
+          currency: currency || 'HTG',
+          payerPhone,
+          targetUserId
+        },
+        {
+          supabaseClient: supabase,
+          webpushClient: webpush
+        }
+      );
+
+      return res.status(200).json(pushResult);
+    } catch (err: any) {
+      console.error('Erreur dans /api/push/send-moncash-confirmation:', err);
+      return res.status(500).json({ error: err.message || 'Erreur serveur push MonCash' });
     }
   });
 

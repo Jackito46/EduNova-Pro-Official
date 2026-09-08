@@ -1,5 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { Send, Bell, UserCheck, ShieldAlert, Loader2, Smartphone, GraduationCap, Copy, Search, Link as LinkIcon } from 'lucide-react';
+import { 
+  Send, 
+  Bell, 
+  UserCheck, 
+  ShieldAlert, 
+  Loader2, 
+  Smartphone, 
+  GraduationCap, 
+  Copy, 
+  Search, 
+  Link as LinkIcon,
+  Zap,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+  History,
+  RotateCw
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { UserProfile } from '../types';
 import { subscribeToPush } from '../utils/pushHelper';
@@ -22,9 +39,19 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [testLoading, setTestLoading] = useState(false);
+  const [testMonCashLoading, setTestMonCashLoading] = useState(false);
   const [pushStatus, setPushStatus] = useState<string>('checking...');
+  const [pushLogs, setPushLogs] = useState<any[]>([]);
+  const [isLoadingLogs, setIsLoadingLogs] = useState(false);
+  const [filterLogType, setFilterLogType] = useState<'all' | 'moncash' | 'manual'>('all');
 
   const templates = [
+    { 
+      label: 'Validation MonCash', 
+      title: 'Paiement MonCash validé ! 📲', 
+      body: 'Le paiement MonCash pour les frais scolaires a été validé avec succès. Reçu officiel disponible sur votre portail.', 
+      url: '/finance' 
+    },
     { label: 'Retard de paiement', title: 'Rappel de Paiement', body: `N'oubliez pas que votre versement pour ce mois est attendu. Merci de régulariser votre situation.`, url: '/finance' },
     { label: 'Alerte Absence', title: 'Alerte Absence', body: `Ceci est une notification pour vous informer de l'absence de votre enfant en cours aujourd'hui.`, url: '/absences' },
     { label: 'Réunion Parents', title: 'Réunion', body: `Une réunion est prévue ce vendredi. Votre présence est vivement souhaitée.`, url: '/' },
@@ -37,13 +64,32 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
     if (t.url) setUrl(t.url);
   };
 
+  const fetchPushLogs = async () => {
+    setIsLoadingLogs(true);
+    try {
+      const { data, error } = await supabase
+        .from('communication_logs')
+        .select('id, type, subject, content, recipient_type, recipient_count, status, created_at')
+        .eq('school_id', user.school_id)
+        .eq('type', 'push')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (data) setPushLogs(data);
+    } catch (e) {
+      console.warn('Error fetching push logs:', e);
+    } finally {
+      setIsLoadingLogs(false);
+    }
+  };
+
   useEffect(() => {
     if (!('Notification' in window)) {
       setPushStatus('unsupported');
     } else {
       setPushStatus(Notification.permission);
     }
-  }, []);
+    fetchPushLogs();
+  }, [user.school_id]);
 
   useEffect(() => {
     const fetchClasses = async () => {
@@ -93,6 +139,47 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
     }
   };
 
+  const handleTestMonCashPush = async () => {
+    try {
+      setTestMonCashLoading(true);
+
+      // Si pas encore abonné, tenter l'autorisation
+      if (pushStatus !== 'granted' && 'Notification' in window) {
+        const permission = await Notification.requestPermission();
+        setPushStatus(permission);
+        if (permission === 'granted') {
+          await subscribeToPush(user.id, user.school_id || '', true);
+        } else {
+          toast.warning('Autorisez les notifications push pour voir l\'alerte sur cet appareil.');
+        }
+      }
+
+      const dummyOrderId = `MC-${Date.now().toString().slice(-6)}`;
+      const res = await fetch('/api/push/send-moncash-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolId: user.school_id,
+          amount: 3500,
+          currency: 'HTG',
+          orderId: dummyOrderId,
+          transactionId: `TX-DIGI-${Math.floor(100000 + Math.random() * 900000)}`,
+          targetUserId: user.id
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Erreur lors du test push');
+
+      toast.success('Test Push MonCash déclenché avec succès !');
+      fetchPushLogs();
+    } catch (err: any) {
+      toast.error('Erreur lors du test Push MonCash: ' + err.message);
+    } finally {
+      setTestMonCashLoading(false);
+    }
+  };
+
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !body) {
@@ -121,8 +208,6 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
 
       if (data.sent > 0) {
         toast.success(`${data.sent} notification(s) envoyée(s) avec succès !`);
-        // Silently ignore failures if we have at least one success, 
-        // to avoid worrying the user about old devices being cleaned up.
       } else if (data.failed > 0) {
         toast.warning(`Aucun appareil actif trouvé. Les anciens abonnements ont été nettoyés.`);
       } else {
@@ -134,12 +219,20 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
       setUrl('');
       setRoleFilters([]);
       setClassId('');
+      fetchPushLogs();
     } catch (error: any) {
       toast.error('Erreur lors de l\'envoi: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
+
+  const filteredLogs = pushLogs.filter(log => {
+    const isMonCash = log.subject?.toLowerCase().includes('moncash') || log.content?.toLowerCase().includes('moncash');
+    if (filterLogType === 'moncash') return isMonCash;
+    if (filterLogType === 'manual') return !isMonCash;
+    return true;
+  });
 
   return (
     <div className="space-y-3.5 sm:space-y-4 pb-10 animate-in fade-in slide-in-from-bottom-2 duration-300">
@@ -161,12 +254,64 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
         </div>
       </div>
 
+      {/* BANNIÈRE AUTOMATISATION MONCASH WEBHOOK */}
+      <div className="bg-linear-to-r from-red-500/10 via-amber-500/5 to-indigo-500/10 border border-red-200/80 rounded-2xl p-4 sm:p-5 shadow-xs">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="flex items-start gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-md shadow-red-600/20 shrink-0 mt-0.5">
+              <Zap size={20} className="animate-pulse" />
+            </div>
+            <div className="space-y-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                  Notification Push Automatique MonCash
+                </h3>
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
+                  <CheckCircle2 size={11} /> Actif & Connecté au Webhook
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-slate-600 leading-relaxed font-medium">
+                Dès qu'un paiement MonCash est validé par le webhook serveur (<code className="text-red-700 bg-red-50 px-1 py-0.5 rounded font-mono text-[11px]">/api/moncash/webhook</code>), une notification Push instantanée est automatiquement expédiée sur le smartphone des parents concernés.
+              </p>
+              <div className="flex items-center gap-2 pt-1 text-[11px] text-slate-500">
+                <span className="inline-flex items-center gap-1 font-semibold text-slate-700">
+                  <Sparkles size={12} className="text-amber-500" />
+                  Format automatique :
+                </span>
+                <span className="font-mono bg-white/80 border border-slate-200/80 px-2 py-0.5 rounded text-slate-700 text-[10px]">
+                  "Paiement MonCash de [montant] HTG pour [élève] ([classe]) validé avec succès."
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-red-100">
+            <button
+              type="button"
+              onClick={handleTestMonCashPush}
+              disabled={testMonCashLoading}
+              className="h-9 px-4 rounded-xl text-xs font-bold text-white bg-red-600 hover:bg-red-700 active:scale-95 transition-all shadow-xs flex items-center gap-1.5 disabled:opacity-50"
+            >
+              {testMonCashLoading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Zap size={14} />
+              )}
+              Tester Push MonCash
+            </button>
+            <span className="text-[10px] text-slate-500 font-medium">
+              Simule la réception parent
+            </span>
+          </div>
+        </div>
+      </div>
+
       {pushStatus !== 'granted' && (
         <div className="bg-indigo-50/70 border border-indigo-100 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
           <div className="min-w-0 flex-1">
             <h3 className="font-bold text-xs sm:text-sm text-indigo-900 flex items-center gap-1.5">
               <Smartphone size={16} className="text-indigo-600" />
-              Enregistrer cet appareil
+              Enregistrer cet appareil pour recevoir les alertes
             </h3>
             <p className="text-xs text-indigo-800/80 mt-0.5">
               Statut actuel : <strong className="uppercase font-bold">{pushStatus}</strong>
@@ -178,7 +323,7 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
               </p>
             ) : (
               <p className="text-[11px] text-indigo-700 mt-0.5">
-                Autorisez les notifications dans votre navigateur pour tester la réception en temps réel.
+                Autorisez les notifications dans votre navigateur pour tester la réception des alertes parents en direct.
               </p>
             )}
           </div>
@@ -193,7 +338,15 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
         </div>
       )}
 
+      {/* FORMULAIRE D'ENVOI MANUEL */}
       <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm sm:text-base font-bold text-slate-900">Envoi d'une Notification Push Manuelle</h2>
+            <p className="text-xs text-slate-500">Diffusez une alerte immédiate ciblée par rôle ou classe.</p>
+          </div>
+        </div>
+
         <form onSubmit={handleSend} className="p-4 sm:p-5 space-y-4">
           <div className="space-y-3.5 p-3.5 sm:p-4 bg-slate-50/70 border border-slate-100 rounded-xl">
             {/* Quick Templates */}
@@ -331,7 +484,118 @@ const PushModule: React.FC<PushModuleProps> = ({ user }) => {
         </form>
       </div>
 
+      {/* HISTORIQUE RÉCENT DES NOTIFICATIONS PUSH */}
+      <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+              <History size={16} />
+            </div>
+            <div>
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">Journal des Notifications Push</h2>
+              <p className="text-xs text-slate-500">Traçabilité des envois automatiques MonCash et manuels.</p>
+            </div>
+          </div>
 
+          <div className="flex items-center gap-2">
+            <div className="flex bg-slate-100 p-0.5 rounded-lg text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setFilterLogType('all')}
+                className={`px-2.5 py-1 rounded-md transition-all ${filterLogType === 'all' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                Tous
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterLogType('moncash')}
+                className={`px-2.5 py-1 rounded-md transition-all ${filterLogType === 'moncash' ? 'bg-white text-red-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                MonCash Auto
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterLogType('manual')}
+                className={`px-2.5 py-1 rounded-md transition-all ${filterLogType === 'manual' ? 'bg-white text-slate-900 shadow-xs' : 'text-slate-600 hover:text-slate-900'}`}
+              >
+                Manuels
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={fetchPushLogs}
+              disabled={isLoadingLogs}
+              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+              title="Rafraîchir l'historique"
+            >
+              <RotateCw size={14} className={isLoadingLogs ? 'animate-spin' : ''} />
+            </button>
+          </div>
+        </div>
+
+        <div className="divide-y divide-slate-100">
+          {isLoadingLogs ? (
+            <div className="p-8 text-center text-slate-400 flex items-center justify-center gap-2 text-xs">
+              <Loader2 size={16} className="animate-spin text-indigo-600" />
+              Chargement des notifications push...
+            </div>
+          ) : filteredLogs.length === 0 ? (
+            <div className="p-8 text-center text-slate-400 text-xs font-medium">
+              Aucune notification push enregistrée pour l'instant.
+            </div>
+          ) : (
+            filteredLogs.map((log) => {
+              const isMonCash = log.subject?.toLowerCase().includes('moncash') || log.content?.toLowerCase().includes('moncash');
+              return (
+                <div key={log.id} className="p-3.5 sm:p-4 hover:bg-slate-50/70 transition-colors flex items-start justify-between gap-3">
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-bold text-xs sm:text-sm text-slate-900 truncate">
+                        {log.subject || 'Notification Push'}
+                      </span>
+                      {isMonCash ? (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-red-100 text-red-700 border border-red-200">
+                          Webhook MonCash
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700 border border-indigo-200">
+                          Envoi Manuel
+                        </span>
+                      )}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        log.status === 'sent' 
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' 
+                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                      }`}>
+                        {log.status === 'sent' ? 'Délivré' : log.status}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-600 line-clamp-2">
+                      {log.content}
+                    </p>
+
+                    <div className="flex items-center gap-3 text-[11px] text-slate-400 pt-0.5">
+                      <span className="flex items-center gap-1">
+                        <Clock size={11} />
+                        {new Date(log.created_at).toLocaleString('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </span>
+                      <span>•</span>
+                      <span>Destinataire(s) : {log.recipient_count || 1} {log.recipient_type || 'parents'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
     </div>
   );
 };
