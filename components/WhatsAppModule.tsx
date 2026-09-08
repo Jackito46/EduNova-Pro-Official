@@ -414,79 +414,85 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
       {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
       <CommunicationTabBar activeChannel="whatsapp" />
 
-      {/* HEADER SECTION (STANDARDIZED WITH SMS, EMAIL & PUSH) */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-3">
+      {/* HEADER SECTION (STANDARDIZED WITH SMS, EMAIL & PUSH - FULLY RESPONSIVE) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 sm:w-11 sm:h-11 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-emerald-600/20 shrink-0">
             <MessageCircle size={22} />
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Communication WhatsApp</h1>
-            <p className="text-slate-500 text-xs sm:text-sm font-medium">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate sm:whitespace-normal">
+              Communication WhatsApp
+            </h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium line-clamp-1 sm:line-clamp-none">
               Diffusion ciblée et notifications officielles aux familles et au personnel.
             </p>
           </div>
         </div>
 
-        {/* TAB BUTTONS (STANDARDIZED SIZES & STYLING) */}
-        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200 self-start md:self-auto gap-1">
-          <button
-            type="button"
-            onClick={() => setActiveTab('send')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'send'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <Send size={14} />
-            Envoi
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('templates')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'templates'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <Sparkles size={14} />
-            Modèles Officiels
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'history'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <History size={14} />
-            Historique
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'settings'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <Settings size={14} />
-            Paramètres
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowGuideModal(true)}
-            className="flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all text-slate-600 hover:bg-slate-200/60"
-            title="Guide WhatsApp"
-          >
-            <BookOpen size={14} />
-            Guide
-          </button>
+        {/* TAB BUTTONS (RESPONSIVE SCROLLBAR-FREE PILL BAR ON MOBILE) */}
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1">
+          <div className="inline-flex sm:flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/90 gap-1 min-w-max sm:min-w-0">
+            <button
+              type="button"
+              onClick={() => setActiveTab('send')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'send'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <Send size={14} />
+              <span>Envoi</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('templates')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'templates'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <Sparkles size={14} />
+              <span className="hidden sm:inline">Modèles Officiels</span>
+              <span className="sm:hidden">Modèles</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'history'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <History size={14} />
+              <span>Historique</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'settings'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <Settings size={14} />
+              <span className="hidden sm:inline">Paramètres</span>
+              <span className="sm:hidden">Réglages</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowGuideModal(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all text-slate-600 hover:bg-slate-200/60 shrink-0"
+              title="Guide WhatsApp"
+            >
+              <BookOpen size={14} />
+              <span>Guide</span>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -662,19 +668,19 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
 
             {/* MESSAGE EDITOR */}
             <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
                 <label className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
                   <MessageCircle size={16} className="text-emerald-600" />
                   Rédiger le Message
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
                   <button
                     type="button"
                     onClick={() => setActiveTab('templates')}
                     className="text-xs font-bold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 transition-all"
                   >
                     <Sparkles size={13} />
-                    <span>Modèles officiels ({templates.length})</span>
+                    <span>Modèles ({templates.length})</span>
                   </button>
                   <span className="text-slate-300">|</span>
                   <span className="text-xs font-mono text-slate-400 font-bold">
@@ -684,7 +690,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
               </div>
 
               {/* QUICK TEMPLATE SELECTION BAR */}
-              <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-2">
                 <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider shrink-0">
                   Modèle rapide :
                 </span>
@@ -699,7 +705,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                       setSelectedTemplateId(null);
                     }
                   }}
-                  className="flex-1 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
+                  className="w-full sm:flex-1 text-xs font-medium bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-slate-700 outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
                 >
                   <option value="">Sélectionner un modèle officiel...</option>
                   {templates.map(t => (
@@ -783,7 +789,7 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-700">Mode de diffusion :</span>
                 </div>
-                <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 bg-slate-100 p-1 rounded-xl">
                   <button
                     type="button"
                     onClick={() => setDispatchMode('direct_wame')}
@@ -793,8 +799,8 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <ExternalLink size={14} className="text-emerald-600" />
-                    WhatsApp Web / App
+                    <ExternalLink size={14} className="text-emerald-600 shrink-0" />
+                    <span className="truncate">WhatsApp Web / App</span>
                   </button>
                   <button
                     type="button"
@@ -805,8 +811,8 @@ const WhatsAppModule: React.FC<WhatsAppModuleProps> = ({ user }) => {
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <Send size={14} className="text-emerald-600" />
-                    Envoi Automatique (API)
+                    <Send size={14} className="text-emerald-600 shrink-0" />
+                    <span className="truncate">Envoi Automatique (API)</span>
                   </button>
                 </div>
               </div>

@@ -80,11 +80,11 @@ export const CommunicationTabBar: React.FC<CommunicationTabBarProps> = ({
   const navigate = useNavigate();
 
   return (
-    <div className={`w-full ${className}`}>
+    <div className={`w-full max-w-full overflow-hidden ${className}`}>
       {/* Container segmenté compact et tactile */}
       <div className="bg-slate-100/90 p-1 rounded-xl border border-slate-200/80 shadow-2xs backdrop-blur-xs">
         <nav 
-          className="flex items-center gap-1 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5" 
+          className="grid grid-cols-4 gap-1 sm:flex sm:items-center py-0.5 px-0.5" 
           aria-label="Canaux de communication"
         >
           {TABS.map((tab) => {
@@ -100,7 +100,7 @@ export const CommunicationTabBar: React.FC<CommunicationTabBarProps> = ({
                     navigate(tab.path);
                   }
                 }}
-                className={`flex-1 min-w-[90px] sm:min-w-0 flex items-center justify-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-lg text-xs font-semibold tracking-tight transition-all duration-150 shrink-0 select-none ${
+                className={`w-full sm:flex-1 min-w-0 flex items-center justify-center gap-1 sm:gap-2 px-1.5 sm:px-3 py-2 rounded-lg text-xs font-semibold tracking-tight transition-all duration-150 select-none ${
                   isActive
                     ? tab.colorClass.active
                     : tab.colorClass.hover
@@ -109,7 +109,7 @@ export const CommunicationTabBar: React.FC<CommunicationTabBarProps> = ({
               >
                 <Icon size={14} className="shrink-0 stroke-[2.2]" />
                 <span className="hidden sm:inline truncate">{tab.label}</span>
-                <span className="sm:hidden text-[11px] truncate">{tab.shortLabel || tab.label}</span>
+                <span className="sm:hidden text-[11px] font-bold truncate">{tab.shortLabel || tab.label}</span>
               </button>
             );
           })}

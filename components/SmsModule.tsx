@@ -338,46 +338,53 @@ const SmsModule: React.FC<SmsModuleProps> = ({ user }) => {
       {/* 4 CHANNELS TAB BAR (RESPONSIVE) */}
       <CommunicationTabBar activeChannel="sms" />
 
-      {/* HEADER COMPACT */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-3">
+      {/* HEADER COMPACT (FULLY RESPONSIVE) */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4 bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 sm:w-11 sm:h-11 bg-amber-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-amber-600/20 shrink-0">
             <MessageSquare size={22} />
           </div>
-          <div>
-            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Communication SMS</h1>
-            <p className="text-slate-500 text-xs sm:text-sm font-medium">Envoyez des messages courts et alertes urgentes aux parents et professeurs.</p>
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate sm:whitespace-normal">
+              Communication SMS
+            </h1>
+            <p className="text-slate-500 text-xs sm:text-sm font-medium line-clamp-1 sm:line-clamp-none">
+              Envoyez des messages courts et alertes urgentes aux parents et professeurs.
+            </p>
           </div>
         </div>
 
-        <div className="flex items-center bg-slate-100/80 p-1 rounded-xl border border-slate-200 self-start md:self-auto">
-          <button
-            onClick={() => setActiveTab('send')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'send' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <Send size={14} />
-            Envoi
-          </button>
-          <button
-            onClick={() => setActiveTab('history')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'history' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <History size={14} />
-            Historique
-          </button>
-          <button
-            onClick={() => setActiveTab('settings')}
-            className={`flex items-center gap-1.5 px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all ${
-              activeTab === 'settings' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
-            }`}
-          >
-            <Settings size={14} />
-            Paramètres
-          </button>
+        <div className="w-full md:w-auto overflow-x-auto no-scrollbar py-0.5 -mx-1 px-1">
+          <div className="inline-flex sm:flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200 gap-1 min-w-max sm:min-w-0">
+            <button
+              onClick={() => setActiveTab('send')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'send' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <Send size={14} />
+              <span>Envoi</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'history' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <History size={14} />
+              <span>Historique</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('settings')}
+              className={`flex items-center gap-1.5 px-3 py-1.5 sm:py-2 rounded-lg text-xs font-bold transition-all shrink-0 ${
+                activeTab === 'settings' ? 'bg-amber-600 text-white shadow-xs' : 'text-slate-600 hover:bg-slate-200/60'
+              }`}
+            >
+              <Settings size={14} />
+              <span className="hidden sm:inline">Paramètres</span>
+              <span className="sm:hidden">Réglages</span>
+            </button>
+          </div>
         </div>
       </div>
 
