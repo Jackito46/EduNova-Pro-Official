@@ -12,7 +12,7 @@ import { BackupBackendService } from './services/backupBackendService';
 import { exportProjectToGitHub } from './services/githubExporterService';
 import { handleMonCashWebhook } from './src/utils/payment';
 import { sendMonCashPaymentPushNotification } from './services/moncashPushService';
-import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './server/cryptoVault';
+import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault';
 
 dotenv.config();
 

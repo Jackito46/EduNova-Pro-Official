@@ -14,7 +14,7 @@ const ALLOWED_ROOT_FILES = new Set([
 ]);
 
 const ALLOWED_DIRS = new Set([
-  'components', 'contexts', 'hooks', 'lib', 'public', 'scripts', 'services', 'src', 'utils', 'sql'
+  'components', 'contexts', 'hooks', 'lib', 'public', 'scripts', 'services', 'src', 'utils', 'sql', 'server'
 ]);
 
 const EXCLUDE_DIRS = new Set([
