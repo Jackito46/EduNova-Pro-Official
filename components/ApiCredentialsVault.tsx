@@ -15,8 +15,6 @@ import {
   Save, 
   Zap, 
   Smartphone, 
-  Mail, 
-  Cpu, 
   Globe, 
   Server, 
   Database, 
@@ -26,7 +24,6 @@ import {
   ShieldCheck,
   Radio,
   Sliders,
-  Sparkles,
   CreditCard,
   Building,
   PhoneCall,
@@ -47,7 +44,7 @@ interface ApiCredentialsVaultProps {
   savingLegacy: boolean;
 }
 
-type VaultTab = 'kobara' | 'moncash' | 'natcash' | 'smtp' | 'gemini';
+type VaultTab = 'kobara' | 'moncash' | 'natcash';
 
 export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   user,
@@ -271,7 +268,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   };
 
   // Sauvegarde sécurisée avec chiffrement AES-256-GCM
-  const handleSaveService = async (service: 'kobara' | 'moncash' | 'natcash' | 'smtp') => {
+  const handleSaveService = async (service: 'kobara' | 'moncash' | 'natcash') => {
     if (!user.school_id) return;
     setSaving(true);
     try {
@@ -344,7 +341,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   };
 
   // Test de connexion & validation en direct
-  const handleTestConnection = async (service: 'kobara' | 'moncash' | 'natcash' | 'gemini') => {
+  const handleTestConnection = async (service: 'kobara' | 'moncash' | 'natcash') => {
     setTesting(true);
     try {
       if (service === 'kobara') {
@@ -525,32 +522,6 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <Smartphone size={13} />
           <span>Natcash</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('smtp')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-            activeTab === 'smtp'
-              ? 'bg-blue-600 text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Mail size={13} />
-          <span>SMTP & E-mails</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('gemini')}
-          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
-            activeTab === 'gemini'
-              ? 'bg-purple-600 text-white shadow-xs'
-              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
-          }`}
-        >
-          <Cpu size={13} />
-          <span>Gemini IA</span>
         </button>
       </div>
 
@@ -1391,72 +1362,6 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
               <Save size={13} />
               <span>Enregistrer Natcash</span>
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== ONGLET MESSAGERIE & SMTP ===================== */}
-      {activeTab === 'smtp' && (
-        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0">
-              <Mail size={18} />
-            </div>
-            <div>
-              <h4 className="text-sm font-black text-slate-900 tracking-tight">
-                Messagerie & Passerelles d'Envoi
-              </h4>
-              <p className="text-[11px] text-slate-500">
-                Paramètres SMTP sécurisés pour reçus de paiement et alertes scolarité
-              </p>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
-            <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
-            <p className="leading-relaxed">
-              Mots de passe d'envoi SMTP (Google Workspace, Brevo, SendGrid) chiffrés avec AES-256-GCM dans <code className="font-mono font-bold">communication_settings</code>.
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* ===================== ONGLET GEMINI AI ===================== */}
-      {activeTab === 'gemini' && (
-        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
-            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center shrink-0">
-              <Sparkles size={18} />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h4 className="text-sm font-black text-slate-900 tracking-tight">
-                  Google Gemini API
-                </h4>
-                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase ${
-                  vaultData.gemini.api_key_configured
-                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                    : 'bg-amber-100 text-amber-800 border border-amber-300'
-                }`}>
-                  {vaultData.gemini.api_key_configured ? 'Active' : 'Non configurée'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-500">
-                Sécurisation hermétique côté serveur Node.js (`process.env.GEMINI_API_KEY`)
-              </p>
-            </div>
-          </div>
-
-          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
-            <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-700">Statut GEMINI_API_KEY :</span>
-              <span className="font-mono font-bold text-purple-700">
-                {vaultData.gemini.masked_key || (vaultData.gemini.api_key_configured ? '••••••••••••••••' : 'Non détectée')}
-              </span>
-            </div>
-            <p className="text-[11px] text-slate-500 leading-relaxed">
-              La clé d'API Gemini n'est jamais exposée au navigateur client.
-            </p>
           </div>
         </div>
       )}
