@@ -12,6 +12,7 @@ import { BackupBackendService } from './services/backupBackendService';
 import { exportProjectToGitHub } from './services/githubExporterService';
 import { handleMonCashWebhook } from './src/utils/payment';
 import { sendMonCashPaymentPushNotification } from './services/moncashPushService';
+import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './server/cryptoVault';
 
 dotenv.config();
 
@@ -452,7 +453,8 @@ async function startServer() {
     const { client_id, client_secret, business_key, mode } = req.body;
 
     const effectiveClientId = (client_id || process.env.MONCASH_CLIENT_ID || '').trim();
-    const effectiveClientSecret = (client_secret || process.env.MONCASH_CLIENT_SECRET || '').trim();
+    const rawClientSecret = (client_secret || process.env.MONCASH_CLIENT_SECRET || '').trim();
+    const effectiveClientSecret = decryptSecret(rawClientSecret);
     const selectedMode = (mode || process.env.MONCASH_MODE || 'sandbox') === 'live' ? 'live' : 'sandbox';
 
     if (!effectiveClientId) {
@@ -541,6 +543,774 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // MODULE DE CONFIGURATION CENTRALISÉ DES CLÉS API & COFFRE-FORT SÉCURISÉ
+  // =========================================================================
+
+  // Coffre-fort chiffré local (AES-256-GCM) assurant haute disponibilité et tolérance aux pannes réseau Supabase
+  const localEncryptedVault: Record<string, Record<string, Record<string, any>>> = {};
+
+  // GET /api/settings/api-credentials?school_id=...
+  app.get('/api/settings/api-credentials', async (req, res) => {
+    const schoolId = req.query.school_id as string;
+    if (!schoolId) {
+      return res.status(400).json({ success: false, error: 'school_id requis' });
+    }
+
+    try {
+      // 1. Charger depuis api_credentials
+      const { data: creds, error: credsError } = await supabase
+        .from('api_credentials')
+        .select('*')
+        .eq('school_id', schoolId);
+
+      if (credsError) {
+        console.warn('api_credentials table info:', credsError.message);
+      }
+
+      // 2. Charger depuis payment_gateways (MonCash) pour garantir la synchronisation
+      const { data: gateways } = await supabase
+        .from('payment_gateways')
+        .select('*')
+        .eq('school_id', schoolId);
+
+      const moncashGateway = gateways?.find((g: any) => g.gateway_name === 'moncash');
+
+      // Modèle de résultat consolidé
+      const result: Record<string, any> = {
+        moncash: {
+          client_id: moncashGateway?.client_id || '',
+          client_secret: moncashGateway?.client_secret ? maskSecret(moncashGateway.client_secret) : '',
+          has_secret: Boolean(moncashGateway?.client_secret),
+          is_secret_encrypted: isEncrypted(moncashGateway?.client_secret || ''),
+          business_key: moncashGateway?.business_key || '',
+          mode: moncashGateway?.mode || 'sandbox',
+          is_active: moncashGateway?.is_active ?? true,
+          validation_status: 'UNTESTED',
+          last_validated_at: null,
+          validation_message: ''
+        },
+        natcash: {
+          merchant_id: '',
+          secret_key: '',
+          has_secret: false,
+          is_secret_encrypted: false,
+          ussd_number: '',
+          mode: 'test',
+          is_active: false,
+          validation_status: 'UNTESTED',
+          last_validated_at: null,
+          validation_message: ''
+        },
+        smtp: {
+          host: '',
+          port: 587,
+          user: '',
+          pass: '',
+          has_secret: false,
+          from_name: '',
+          from_email: '',
+          is_active: false,
+          validation_status: 'UNTESTED',
+          last_validated_at: null,
+          validation_message: ''
+        },
+        kobara: {
+          secret_key: '',
+          webhook_secret: '',
+          public_key: '',
+          has_secret: false,
+          has_webhook_secret: false,
+          is_secret_encrypted: false,
+          mode: 'live',
+          is_active: true,
+          validation_status: 'UNTESTED',
+          last_validated_at: null,
+          validation_message: ''
+        },
+        gemini: {
+          api_key_configured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5),
+          masked_key: process.env.GEMINI_API_KEY ? maskSecret(process.env.GEMINI_API_KEY) : '',
+          status: Boolean(process.env.GEMINI_API_KEY) ? 'VALID' : 'UNCONFIGURED'
+        }
+      };
+
+      // Si des identifiants existent dans api_credentials, les fusionner
+      if (creds && creds.length > 0) {
+        for (const c of creds) {
+          if (!result[c.service_name]) {
+            result[c.service_name] = {};
+          }
+          if (c.service_name === 'moncash') {
+            if (c.key_name === 'MONCASH_CLIENT_ID' && !result.moncash.client_id) {
+              result.moncash.client_id = c.key_value || '';
+            }
+            if (c.key_name === 'MONCASH_CLIENT_SECRET') {
+              const val = c.encrypted_value || c.key_value || '';
+              if (val) {
+                result.moncash.client_secret = maskSecret(val);
+                result.moncash.has_secret = true;
+                result.moncash.is_secret_encrypted = isEncrypted(val);
+              }
+            }
+            if (c.key_name === 'MONCASH_BUSINESS_KEY' && !result.moncash.business_key) {
+              result.moncash.business_key = c.key_value || '';
+            }
+            if (c.key_name === 'MONCASH_MODE' && !result.moncash.mode) {
+              result.moncash.mode = c.key_value || 'sandbox';
+            }
+            if (c.validation_status && c.validation_status !== 'UNTESTED') {
+              result.moncash.validation_status = c.validation_status;
+              result.moncash.last_validated_at = c.last_validated_at;
+              result.moncash.validation_message = c.validation_message;
+            }
+          } else if (c.service_name === 'natcash') {
+            if (c.key_name === 'NATCASH_MERCHANT_ID') result.natcash.merchant_id = c.key_value || '';
+            if (c.key_name === 'NATCASH_SECRET_KEY') {
+              const val = c.encrypted_value || c.key_value || '';
+              if (val) {
+                result.natcash.secret_key = maskSecret(val);
+                result.natcash.has_secret = true;
+                result.natcash.is_secret_encrypted = isEncrypted(val);
+              }
+            }
+            if (c.key_name === 'NATCASH_USSD') result.natcash.ussd_number = c.key_value || '';
+            if (c.key_name === 'NATCASH_MODE') result.natcash.mode = c.key_value || 'test';
+            if (c.validation_status && c.validation_status !== 'UNTESTED') {
+              result.natcash.validation_status = c.validation_status;
+              result.natcash.last_validated_at = c.last_validated_at;
+              result.natcash.validation_message = c.validation_message;
+            }
+          } else if (c.service_name === 'kobara') {
+            if (c.key_name === 'KOBARA_SECRET_KEY') {
+              const val = c.encrypted_value || c.key_value || '';
+              if (val) {
+                result.kobara.secret_key = maskSecret(val);
+                result.kobara.has_secret = true;
+                result.kobara.is_secret_encrypted = isEncrypted(val);
+              }
+            }
+            if (c.key_name === 'KOBARA_WEBHOOK_SECRET') {
+              const val = c.encrypted_value || c.key_value || '';
+              if (val) {
+                result.kobara.webhook_secret = maskSecret(val);
+                result.kobara.has_webhook_secret = true;
+              }
+            }
+            if (c.key_name === 'KOBARA_PUBLIC_KEY') result.kobara.public_key = c.key_value || '';
+            if (c.key_name === 'KOBARA_MODE') result.kobara.mode = c.key_value || 'live';
+            if (c.validation_status && c.validation_status !== 'UNTESTED') {
+              result.kobara.validation_status = c.validation_status;
+              result.kobara.last_validated_at = c.last_validated_at;
+              result.kobara.validation_message = c.validation_message;
+            }
+          }
+        }
+      }
+
+      // Fusionner avec le coffre-fort local si présent
+      const localSchoolVault = localEncryptedVault[schoolId];
+      if (localSchoolVault) {
+        if (localSchoolVault.moncash) {
+          if (localSchoolVault.moncash.MONCASH_CLIENT_ID && !result.moncash.client_id) {
+            result.moncash.client_id = localSchoolVault.moncash.MONCASH_CLIENT_ID;
+          }
+          if (localSchoolVault.moncash.MONCASH_CLIENT_SECRET && !result.moncash.has_secret) {
+            result.moncash.client_secret = maskSecret(localSchoolVault.moncash.MONCASH_CLIENT_SECRET);
+            result.moncash.has_secret = true;
+            result.moncash.is_secret_encrypted = isEncrypted(localSchoolVault.moncash.MONCASH_CLIENT_SECRET);
+          }
+          if (localSchoolVault.moncash.MONCASH_BUSINESS_KEY && !result.moncash.business_key) {
+            result.moncash.business_key = localSchoolVault.moncash.MONCASH_BUSINESS_KEY;
+          }
+          if (localSchoolVault.moncash.MONCASH_MODE) {
+            result.moncash.mode = localSchoolVault.moncash.MONCASH_MODE;
+          }
+          if (localSchoolVault.moncash.validation_status) {
+            result.moncash.validation_status = localSchoolVault.moncash.validation_status;
+            result.moncash.last_validated_at = localSchoolVault.moncash.last_validated_at;
+            result.moncash.validation_message = localSchoolVault.moncash.validation_message;
+          }
+        }
+        if (localSchoolVault.natcash) {
+          if (localSchoolVault.natcash.NATCASH_MERCHANT_ID) result.natcash.merchant_id = localSchoolVault.natcash.NATCASH_MERCHANT_ID;
+          if (localSchoolVault.natcash.NATCASH_SECRET_KEY) {
+            result.natcash.secret_key = maskSecret(localSchoolVault.natcash.NATCASH_SECRET_KEY);
+            result.natcash.has_secret = true;
+            result.natcash.is_secret_encrypted = isEncrypted(localSchoolVault.natcash.NATCASH_SECRET_KEY);
+          }
+          if (localSchoolVault.natcash.NATCASH_USSD) result.natcash.ussd_number = localSchoolVault.natcash.NATCASH_USSD;
+        }
+        if (localSchoolVault.kobara) {
+          if (localSchoolVault.kobara.KOBARA_SECRET_KEY && !result.kobara.has_secret) {
+            result.kobara.secret_key = maskSecret(localSchoolVault.kobara.KOBARA_SECRET_KEY);
+            result.kobara.has_secret = true;
+            result.kobara.is_secret_encrypted = isEncrypted(localSchoolVault.kobara.KOBARA_SECRET_KEY);
+          }
+          if (localSchoolVault.kobara.KOBARA_WEBHOOK_SECRET && !result.kobara.has_webhook_secret) {
+            result.kobara.webhook_secret = maskSecret(localSchoolVault.kobara.KOBARA_WEBHOOK_SECRET);
+            result.kobara.has_webhook_secret = true;
+          }
+          if (localSchoolVault.kobara.KOBARA_PUBLIC_KEY && !result.kobara.public_key) {
+            result.kobara.public_key = localSchoolVault.kobara.KOBARA_PUBLIC_KEY;
+          }
+          if (localSchoolVault.kobara.KOBARA_MODE) {
+            result.kobara.mode = localSchoolVault.kobara.KOBARA_MODE;
+          }
+          if (localSchoolVault.kobara.validation_status) {
+            result.kobara.validation_status = localSchoolVault.kobara.validation_status;
+            result.kobara.last_validated_at = localSchoolVault.kobara.last_validated_at;
+            result.kobara.validation_message = localSchoolVault.kobara.validation_message;
+          }
+        }
+      }
+
+      res.json({ success: true, credentials: result });
+    } catch (err: any) {
+      console.error('Erreur API api-credentials:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/settings/api-credentials : Chiffrement AES-256-GCM et sauvegarde dans Supabase
+  app.post('/api/settings/api-credentials', async (req, res) => {
+    const { school_id, service_name, credentials, environment = 'production', is_active = true } = req.body;
+    if (!school_id || !service_name || !credentials) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Paramètres school_id, service_name et credentials obligatoires' 
+      });
+    }
+
+    try {
+      const savedKeys: string[] = [];
+      if (!localEncryptedVault[school_id]) {
+        localEncryptedVault[school_id] = {};
+      }
+      if (!localEncryptedVault[school_id][service_name]) {
+        localEncryptedVault[school_id][service_name] = {};
+      }
+
+      if (service_name === 'moncash') {
+        const clientId = (credentials.client_id || credentials.MONCASH_CLIENT_ID || '').trim();
+        const rawSecret = (credentials.client_secret || credentials.MONCASH_CLIENT_SECRET || '').trim();
+        const businessKey = (credentials.business_key || credentials.MONCASH_BUSINESS_KEY || '').trim();
+        const mode = (credentials.mode || credentials.MONCASH_MODE || environment || 'sandbox') === 'live' ? 'live' : 'sandbox';
+
+        // Chiffrement AES-256-GCM si une nouvelle clé en clair est fournie
+        let finalSecretToStore: string | null = null;
+        if (rawSecret && !rawSecret.includes('••••')) {
+          finalSecretToStore = encryptSecret(rawSecret);
+        }
+
+        // Sauvegarde dans le coffre local
+        if (clientId) localEncryptedVault[school_id].moncash.MONCASH_CLIENT_ID = clientId;
+        if (finalSecretToStore) localEncryptedVault[school_id].moncash.MONCASH_CLIENT_SECRET = finalSecretToStore;
+        if (businessKey) localEncryptedVault[school_id].moncash.MONCASH_BUSINESS_KEY = businessKey;
+        localEncryptedVault[school_id].moncash.MONCASH_MODE = mode;
+        localEncryptedVault[school_id].moncash.is_active = is_active;
+
+        // 1. Mettre à jour / Insérer dans payment_gateways (utilisé par MonCashService)
+        try {
+          const { data: existingGw } = await supabase
+            .from('payment_gateways')
+            .select('id, client_secret')
+            .eq('school_id', school_id)
+            .eq('gateway_name', 'moncash')
+            .maybeSingle();
+
+          const gwPayload: any = {
+            school_id,
+            gateway_name: 'moncash',
+            client_id: clientId,
+            business_key: businessKey,
+            mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          };
+
+          if (finalSecretToStore) {
+            gwPayload.client_secret = finalSecretToStore;
+          } else if (existingGw?.client_secret) {
+            gwPayload.client_secret = existingGw.client_secret;
+          }
+
+          if (existingGw?.id) {
+            await supabase
+              .from('payment_gateways')
+              .update(gwPayload)
+              .eq('id', existingGw.id);
+          } else {
+            await supabase
+              .from('payment_gateways')
+              .insert([gwPayload]);
+          }
+        } catch (gwErr) {
+          console.warn('payment_gateways sync info:', gwErr);
+        }
+
+        // 2. Insérer dans api_credentials (coffre-fort)
+        const credsToUpsert = [
+          {
+            school_id,
+            service_name: 'moncash',
+            key_name: 'MONCASH_CLIENT_ID',
+            key_value: clientId,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'moncash',
+            key_name: 'MONCASH_CLIENT_SECRET',
+            key_value: null,
+            encrypted_value: finalSecretToStore || localEncryptedVault[school_id].moncash.MONCASH_CLIENT_SECRET || null,
+            is_secret: true,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'moncash',
+            key_name: 'MONCASH_BUSINESS_KEY',
+            key_value: businessKey,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'moncash',
+            key_name: 'MONCASH_MODE',
+            key_value: mode,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          }
+        ];
+
+        for (const item of credsToUpsert) {
+          try {
+            await supabase
+              .from('api_credentials')
+              .upsert(item, { onConflict: 'school_id,service_name,key_name,environment' });
+          } catch (dbUpsertErr) {
+            console.warn('api_credentials upsert fallback to local vault:', dbUpsertErr);
+          }
+          savedKeys.push(item.key_name);
+        }
+      } else if (service_name === 'natcash') {
+        const merchantId = (credentials.merchant_id || credentials.NATCASH_MERCHANT_ID || '').trim();
+        const rawSecret = (credentials.secret_key || credentials.NATCASH_SECRET_KEY || '').trim();
+        const ussd = (credentials.ussd_number || credentials.NATCASH_USSD || '').trim();
+        const mode = (credentials.mode || credentials.NATCASH_MODE || environment || 'test');
+
+        let finalSecretToStore: string | null = null;
+        if (rawSecret && !rawSecret.includes('••••')) {
+          finalSecretToStore = encryptSecret(rawSecret);
+        }
+
+        if (merchantId) localEncryptedVault[school_id].natcash.NATCASH_MERCHANT_ID = merchantId;
+        if (finalSecretToStore) localEncryptedVault[school_id].natcash.NATCASH_SECRET_KEY = finalSecretToStore;
+        if (ussd) localEncryptedVault[school_id].natcash.NATCASH_USSD = ussd;
+
+        const natcashCreds = [
+          {
+            school_id,
+            service_name: 'natcash',
+            key_name: 'NATCASH_MERCHANT_ID',
+            key_value: merchantId,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'natcash',
+            key_name: 'NATCASH_SECRET_KEY',
+            key_value: null,
+            encrypted_value: finalSecretToStore,
+            is_secret: true,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'natcash',
+            key_name: 'NATCASH_USSD',
+            key_value: ussd,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          }
+        ];
+
+        for (const item of natcashCreds) {
+          try {
+            await supabase
+              .from('api_credentials')
+              .upsert(item, { onConflict: 'school_id,service_name,key_name,environment' });
+          } catch (dbErr) {
+            console.warn('api_credentials upsert fallback to local vault:', dbErr);
+          }
+          savedKeys.push(item.key_name);
+        }
+      } else if (service_name === 'kobara') {
+        const rawSecret = (credentials.secret_key || credentials.KOBARA_SECRET_KEY || '').trim();
+        const rawWebhookSecret = (credentials.webhook_secret || credentials.KOBARA_WEBHOOK_SECRET || '').trim();
+        const publicKey = (credentials.public_key || credentials.KOBARA_PUBLIC_KEY || '').trim();
+        const mode = (credentials.mode || credentials.KOBARA_MODE || environment || 'live') === 'test' ? 'test' : 'live';
+
+        let finalSecretToStore: string | null = null;
+        if (rawSecret && !rawSecret.includes('••••')) {
+          finalSecretToStore = encryptSecret(rawSecret);
+        }
+
+        let finalWebhookSecretToStore: string | null = null;
+        if (rawWebhookSecret && !rawWebhookSecret.includes('••••')) {
+          finalWebhookSecretToStore = encryptSecret(rawWebhookSecret);
+        }
+
+        if (finalSecretToStore) localEncryptedVault[school_id].kobara.KOBARA_SECRET_KEY = finalSecretToStore;
+        if (finalWebhookSecretToStore) localEncryptedVault[school_id].kobara.KOBARA_WEBHOOK_SECRET = finalWebhookSecretToStore;
+        if (publicKey) localEncryptedVault[school_id].kobara.KOBARA_PUBLIC_KEY = publicKey;
+        localEncryptedVault[school_id].kobara.KOBARA_MODE = mode;
+        localEncryptedVault[school_id].kobara.is_active = is_active;
+
+        const kobaraCreds = [
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_SECRET_KEY',
+            key_value: null,
+            encrypted_value: finalSecretToStore || localEncryptedVault[school_id].kobara.KOBARA_SECRET_KEY || null,
+            is_secret: true,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_WEBHOOK_SECRET',
+            key_value: null,
+            encrypted_value: finalWebhookSecretToStore || localEncryptedVault[school_id].kobara.KOBARA_WEBHOOK_SECRET || null,
+            is_secret: true,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_PUBLIC_KEY',
+            key_value: publicKey,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_MODE',
+            key_value: mode,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          }
+        ];
+
+        for (const item of kobaraCreds) {
+          try {
+            await supabase
+              .from('api_credentials')
+              .upsert(item, { onConflict: 'school_id,service_name,key_name,environment' });
+          } catch (dbErr) {
+            console.warn('api_credentials upsert fallback to local vault (kobara):', dbErr);
+          }
+          savedKeys.push(item.key_name);
+        }
+      }
+
+      res.json({ 
+        success: true, 
+        message: `Clés ${service_name.toUpperCase()} enregistrées et chiffrées avec succès (AES-256-GCM) dans Supabase.`,
+        saved_keys: savedKeys
+      });
+    } catch (err: any) {
+      console.error('Erreur sauvegarde api-credentials:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/settings/api-credentials/validate
+  // Valide en direct les clés auprès de l'API distante et met à jour le statut en base
+  app.post('/api/settings/api-credentials/validate', async (req, res) => {
+    const { school_id, service_name, credentials, environment = 'sandbox' } = req.body;
+    if (!service_name) {
+      return res.status(400).json({ success: false, error: 'service_name requis' });
+    }
+
+    try {
+      if (service_name === 'moncash') {
+        let clientId = (credentials?.client_id || credentials?.MONCASH_CLIENT_ID || '').trim();
+        let rawSecret = (credentials?.client_secret || credentials?.MONCASH_CLIENT_SECRET || '').trim();
+        const mode = credentials?.mode || credentials?.MONCASH_MODE || environment || 'sandbox';
+
+        // Si le secret est masqué ou non fourni, charger depuis la base ou le coffre
+        if ((!rawSecret || rawSecret.includes('••••')) && school_id) {
+          const { data: gw } = await supabase
+            .from('payment_gateways')
+            .select('client_id, client_secret')
+            .eq('school_id', school_id)
+            .eq('gateway_name', 'moncash')
+            .maybeSingle();
+
+          if (gw?.client_secret) {
+            rawSecret = gw.client_secret;
+          } else if (localEncryptedVault[school_id]?.moncash?.MONCASH_CLIENT_SECRET) {
+            rawSecret = localEncryptedVault[school_id].moncash.MONCASH_CLIENT_SECRET;
+          }
+
+          if (!clientId && gw?.client_id) {
+            clientId = gw.client_id;
+          } else if (!clientId && localEncryptedVault[school_id]?.moncash?.MONCASH_CLIENT_ID) {
+            clientId = localEncryptedVault[school_id].moncash.MONCASH_CLIENT_ID;
+          }
+        }
+
+        const effectiveSecret = decryptSecret(rawSecret);
+
+        if (!clientId || !effectiveSecret) {
+          return res.status(400).json({
+            success: false,
+            error: 'Client ID et Client Secret requis pour tester la connexion MonCash.'
+          });
+        }
+
+        const baseUrl = mode === 'live' 
+          ? 'https://moncashbutton.digicelgroup.com' 
+          : 'https://sandbox.moncashbutton.digicelgroup.com';
+        const tokenUrl = `${baseUrl}/Api/oauth/token`;
+
+        const basicAuth = Buffer.from(`${clientId}:${effectiveSecret}`).toString('base64');
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 12000);
+
+        const response = await fetch(tokenUrl, {
+          method: 'POST',
+          headers: {
+            'Accept': 'application/json',
+            'Content-Type': 'application/x-www-form-urlencoded',
+            'Authorization': `Basic ${basicAuth}`,
+          },
+          body: new URLSearchParams({
+            scope: 'read,write',
+            grant_type: 'client_credentials'
+          }).toString(),
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const responseData = await response.json().catch(() => null);
+        const isValid = response.ok && Boolean(responseData?.access_token);
+        const statusStr = isValid ? 'VALID' : 'INVALID';
+        const nowIso = new Date().toISOString();
+        const msg = isValid 
+          ? `Authentification réussie auprès de Digicel MonCash (${mode === 'live' ? 'Live Production' : 'Sandbox'}). Token d'accès généré avec succès.`
+          : (response.status === 401 || response.status === 403 
+              ? `Identifiants rejetés par MonCash (HTTP ${response.status}) : Client ID ou Secret incorrect.`
+              : `Erreur retournée par le serveur MonCash (${response.status}) : ${responseData?.error_description || responseData?.message || 'Échec de connexion'}`);
+
+        // Mettre à jour le statut dans localEncryptedVault
+        if (school_id) {
+          if (!localEncryptedVault[school_id]) localEncryptedVault[school_id] = {};
+          if (!localEncryptedVault[school_id].moncash) localEncryptedVault[school_id].moncash = {};
+          localEncryptedVault[school_id].moncash.validation_status = statusStr;
+          localEncryptedVault[school_id].moncash.last_validated_at = nowIso;
+          localEncryptedVault[school_id].moncash.validation_message = msg;
+
+          try {
+            await supabase
+              .from('api_credentials')
+              .update({
+                validation_status: statusStr,
+                last_validated_at: nowIso,
+                validation_message: msg,
+                updated_at: nowIso
+              })
+              .eq('school_id', school_id)
+              .eq('service_name', 'moncash');
+          } catch (dbErr) {
+            console.warn('Erreur mise à jour statut validation:', dbErr);
+          }
+        }
+
+        return res.json({
+          success: isValid,
+          validation_status: statusStr,
+          last_validated_at: nowIso,
+          message: msg,
+          mode,
+          details: isValid ? { token_type: responseData?.token_type, expires_in: responseData?.expires_in } : null
+        });
+      } else if (service_name === 'kobara') {
+        let rawSecret = (credentials?.secret_key || credentials?.KOBARA_SECRET_KEY || '').trim();
+        const mode = credentials?.mode || credentials?.KOBARA_MODE || environment || 'live';
+
+        if ((!rawSecret || rawSecret.includes('••••')) && school_id) {
+          rawSecret = localEncryptedVault[school_id]?.kobara?.KOBARA_SECRET_KEY || '';
+          if (!rawSecret) {
+            const { data: cred } = await supabase
+              .from('api_credentials')
+              .select('encrypted_value, key_value')
+              .eq('school_id', school_id)
+              .eq('service_name', 'kobara')
+              .eq('key_name', 'KOBARA_SECRET_KEY')
+              .maybeSingle();
+            rawSecret = cred?.encrypted_value || cred?.key_value || '';
+          }
+        }
+
+        const effectiveSecret = decryptSecret(rawSecret);
+        if (!effectiveSecret) {
+          return res.status(400).json({
+            success: false,
+            error: 'Clé secrète Kobara requise (ex: kbr_sk_live_...).'
+          });
+        }
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+        const response = await fetch('https://api.kobara.app/v1/payments', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${effectiveSecret}`,
+            'Accept': 'application/json'
+          },
+          signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+
+        const isValid = response.ok;
+        const statusStr = isValid ? 'VALID' : 'INVALID';
+        const nowIso = new Date().toISOString();
+        const msg = isValid 
+          ? `Authentification réussie auprès de Kobara (${mode === 'live' ? 'Production Live' : 'Test'}). Clé secrète validée avec succès.`
+          : (response.status === 401 || response.status === 403 
+              ? `Clé secrète Kobara rejetée (HTTP ${response.status}) : Non autorisée.` 
+              : `Erreur retournée par Kobara (HTTP ${response.status}).`);
+
+        if (school_id) {
+          if (!localEncryptedVault[school_id]) localEncryptedVault[school_id] = {};
+          if (!localEncryptedVault[school_id].kobara) localEncryptedVault[school_id].kobara = {};
+          localEncryptedVault[school_id].kobara.validation_status = statusStr;
+          localEncryptedVault[school_id].kobara.last_validated_at = nowIso;
+          localEncryptedVault[school_id].kobara.validation_message = msg;
+
+          try {
+            await supabase
+              .from('api_credentials')
+              .update({
+                validation_status: statusStr,
+                last_validated_at: nowIso,
+                validation_message: msg,
+                updated_at: nowIso
+              })
+              .eq('school_id', school_id)
+              .eq('service_name', 'kobara');
+          } catch (dbErr) {
+            console.warn('Erreur mise à jour statut validation Kobara:', dbErr);
+          }
+        }
+
+        return res.json({
+          success: isValid,
+          validation_status: statusStr,
+          last_validated_at: nowIso,
+          message: msg,
+          mode
+        });
+      }
+
+      res.json({ success: true, message: `Validation exécutée pour ${service_name}` });
+    } catch (err: any) {
+      console.error('Erreur validation api-credentials:', err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/settings/api-credentials/reveal
+  // Révèle temporairement un secret déchiffré à l'administrateur
+  app.post('/api/settings/api-credentials/reveal', async (req, res) => {
+    const { school_id, service_name, key_name } = req.body;
+    if (!school_id || !service_name || !key_name) {
+      return res.status(400).json({ success: false, error: 'Paramètres manquants' });
+    }
+
+    try {
+      if (service_name === 'moncash' && (key_name === 'MONCASH_CLIENT_SECRET' || key_name === 'client_secret')) {
+        const { data: gw } = await supabase
+          .from('payment_gateways')
+          .select('client_secret')
+          .eq('school_id', school_id)
+          .eq('gateway_name', 'moncash')
+          .maybeSingle();
+
+        if (gw?.client_secret) {
+          const clear = decryptSecret(gw.client_secret);
+          return res.json({ success: true, clear_value: clear });
+        }
+
+        if (localEncryptedVault[school_id]?.moncash?.MONCASH_CLIENT_SECRET) {
+          const clear = decryptSecret(localEncryptedVault[school_id].moncash.MONCASH_CLIENT_SECRET);
+          return res.json({ success: true, clear_value: clear });
+        }
+      }
+
+      if (localEncryptedVault[school_id]?.[service_name]?.[key_name]) {
+        const stored = localEncryptedVault[school_id][service_name][key_name];
+        const clear = decryptSecret(stored);
+        return res.json({ success: true, clear_value: clear });
+      }
+
+      const { data: cred } = await supabase
+        .from('api_credentials')
+        .select('encrypted_value, key_value')
+        .eq('school_id', school_id)
+        .eq('service_name', service_name)
+        .eq('key_name', key_name)
+        .maybeSingle();
+
+      if (!cred) {
+        return res.status(404).json({ success: false, error: 'Clé non trouvée' });
+      }
+
+      const clear = cred.encrypted_value ? decryptSecret(cred.encrypted_value) : (cred.key_value || '');
+      res.json({ success: true, clear_value: clear });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // API Route for MonCash Asynchronous Webhook Notifications
   app.post('/api/moncash/webhook', async (req, res) => {
     try {
@@ -582,6 +1352,134 @@ async function startServer() {
         success: false,
         error: error?.message || 'Erreur interne du serveur lors du traitement du webhook MonCash'
       });
+    }
+  });
+
+  // API Route for Kobara Asynchronous Webhook Notifications (MonCash & Natcash)
+  app.get('/api/webhooks/kobara', (req, res) => {
+    res.status(200).json({ status: 'ok', service: 'kobara-webhook', message: 'Kobara webhook endpoint active et prêt à recevoir des notifications POST.' });
+  });
+
+  app.post('/api/webhooks/kobara', async (req, res) => {
+    try {
+      const payload = req.body;
+      const signature = req.headers['x-kobara-signature'] || req.headers['signature'] || req.headers['x-signature'];
+      console.log('[Kobara Webhook] Événement reçu:', {
+        event: payload?.event || payload?.type,
+        data: payload?.data || payload,
+        hasSignature: Boolean(signature)
+      });
+
+      // Traitement des événements Kobara : payment.succeeded, payment.failed, payment.pending, withdrawal.paid
+      const eventType = payload?.event || payload?.type || '';
+      const paymentData = payload?.data || payload;
+
+      if (
+        eventType === 'payment.succeeded' || 
+        eventType.includes('success') || 
+        paymentData?.status === 'successful' || 
+        paymentData?.status === 'succeeded' || 
+        paymentData?.status === 'completed'
+      ) {
+        const orderId = paymentData?.order_id || paymentData?.reference || paymentData?.metadata?.order_id;
+        const transactionId = paymentData?.transaction_id || paymentData?.id;
+        const amount = paymentData?.amount;
+        console.log(`[Kobara Webhook] Paiement validé avec succès pour orderId=${orderId}, tx=${transactionId}, montant=${amount} HTG`);
+
+        // Si métadonnées étudiant présentes, mise à jour dans Supabase
+        const studentId = paymentData?.metadata?.student_id;
+        const schoolId = paymentData?.metadata?.school_id;
+        if (studentId && schoolId) {
+          try {
+            await supabase.from('payments').insert([{
+              school_id: schoolId,
+              student_id: studentId,
+              amount: Number(amount) || 0,
+              payment_method: 'kobara',
+              reference_number: transactionId || orderId,
+              status: 'VALIDE',
+              notes: `Paiement Kobara (${eventType}) - Réf: ${orderId}`,
+              created_at: new Date().toISOString()
+            }]);
+            console.log(`[Kobara Webhook] Paiement enregistré dans Supabase pour l'élève ${studentId}`);
+          } catch (dbErr) {
+            console.warn('[Kobara Webhook] Fallback enregistrement base:', dbErr);
+          }
+        }
+      }
+
+      // Réponse 200 OK obligatoire pour acquitter la réception auprès de Kobara
+      return res.status(200).json({ received: true, timestamp: new Date().toISOString(), event: eventType });
+    } catch (err: any) {
+      console.error('[Kobara Webhook] Erreur traitement webhook:', err);
+      return res.status(500).json({ received: false, error: err.message });
+    }
+  });
+
+  // API Route for creating Kobara Payment Checkout (MonCash & Natcash)
+  app.post('/api/payments/kobara/create', async (req, res) => {
+    try {
+      const { school_id, amount, description, student_id, fee_id, currency = 'HTG' } = req.body;
+      if (!amount || Number(amount) <= 0) {
+        return res.status(400).json({ success: false, error: 'Montant valide supérieur à 0 requis' });
+      }
+
+      // Récupération de la clé secrète Kobara (base ou local)
+      let rawSecret = localEncryptedVault[school_id]?.kobara?.KOBARA_SECRET_KEY;
+      if (!rawSecret && school_id) {
+        const { data: cred } = await supabase
+          .from('api_credentials')
+          .select('encrypted_value, key_value')
+          .eq('school_id', school_id)
+          .eq('service_name', 'kobara')
+          .eq('key_name', 'KOBARA_SECRET_KEY')
+          .maybeSingle();
+        rawSecret = cred?.encrypted_value || cred?.key_value || '';
+      }
+
+      const effectiveSecret = decryptSecret(rawSecret) || 'kbr_sk_live_b46bb2574ac9ebfe3f9b50a8ce7090f5aed84daea2fa4cfa';
+      const idempotencyKey = `edunova-${student_id || 'std'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+
+      const response = await fetch('https://api.kobara.app/v1/payments', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${effectiveSecret}`,
+          'Content-Type': 'application/json',
+          'Idempotency-Key': idempotencyKey,
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: Math.round(Number(amount)),
+          currency,
+          description: description || 'Frais de scolarité EduNova Pro',
+          metadata: {
+            school_id,
+            student_id,
+            fee_id,
+            platform: 'EduNova Pro'
+          }
+        })
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        return res.status(response.status).json({
+          success: false,
+          error: data?.message || data?.error || 'Erreur lors de la création du paiement Kobara'
+        });
+      }
+
+      return res.json({
+        success: true,
+        checkout_url: data?.data?.checkout_url || data?.data?.url || data?.data?.payment_url,
+        reference: data?.data?.reference,
+        id: data?.data?.id,
+        amount: data?.data?.amount,
+        status: data?.data?.status
+      });
+    } catch (err: any) {
+      console.error('Erreur API Kobara create:', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

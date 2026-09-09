@@ -93,6 +93,7 @@ import {
 } from '../lib/paymentMethods';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
+import { ApiCredentialsVault } from './ApiCredentialsVault';
 
 type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'gateways' | 'security';
 
@@ -1722,7 +1723,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     { id: 'academic', label: terminology.academicYears, icon: Calendar },
     { id: 'finance', label: 'Finance & Taux', icon: CircleDollarSign },
     { id: 'payment_methods', label: 'Modes de Règlement & Banques', icon: Wallet },
-    { id: 'gateways', label: 'Passerelles API', icon: Key },
+    { id: 'gateways', label: 'Coffre-fort & Clés API', icon: Key },
     { id: 'security', label: 'Sécurité', icon: Shield }
   ];
 
@@ -3384,13 +3385,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
         {activeTab === 'gateways' && (
           <div className="animate-in slide-in-from-right duration-500">
-            <MonCashGatewaySettings
+            <ApiCredentialsVault
+              user={user}
+              canManageAllCampuses={canManageAllCampuses}
               moncashConfig={moncashConfig}
               setMoncashConfig={setMoncashConfig}
-              onSave={handleUpdateMoncash}
-              saving={saving}
-              canManageAllCampuses={canManageAllCampuses}
-              user={user}
+              onSaveMoncashLegacy={handleUpdateMoncash}
+              savingLegacy={saving}
             />
           </div>
         )}

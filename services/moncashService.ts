@@ -20,19 +20,52 @@ export interface MonCashPaymentResponse {
 
 export class MonCashService {
   private static async getGatewayConfig(schoolId: string): Promise<PaymentGateway | null> {
-    const { data, error } = await supabase
-      .from('payment_gateways')
-      .select('*')
-      .eq('school_id', schoolId)
-      .eq('gateway_name', 'moncash')
-      .eq('is_active', true)
-      .single();
+    try {
+      const { data: gatewayData, error } = await supabase
+        .from('payment_gateways')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('gateway_name', 'moncash')
+        .eq('is_active', true)
+        .maybeSingle();
 
-    if (error) {
-      console.error('Error fetching MonCash config:', error);
+      if (gatewayData) {
+        return gatewayData;
+      }
+
+      // Récupération depuis le coffre-fort api_credentials
+      const { data: creds } = await supabase
+        .from('api_credentials')
+        .select('*')
+        .eq('school_id', schoolId)
+        .eq('service_name', 'moncash')
+        .eq('is_active', true);
+
+      if (creds && creds.length > 0) {
+        const clientId = creds.find(c => c.key_name === 'MONCASH_CLIENT_ID')?.key_value || '';
+        const clientSecret = creds.find(c => c.key_name === 'MONCASH_CLIENT_SECRET')?.encrypted_value || '';
+        const businessKey = creds.find(c => c.key_name === 'MONCASH_BUSINESS_KEY')?.key_value || '';
+        const mode = (creds.find(c => c.key_name === 'MONCASH_MODE')?.key_value || 'sandbox') as 'sandbox' | 'live';
+        
+        return {
+          id: creds[0].id,
+          school_id: schoolId,
+          gateway_name: 'moncash',
+          client_id: clientId,
+          client_secret: clientSecret,
+          business_key: businessKey,
+          mode,
+          is_active: true,
+          created_at: creds[0].created_at,
+          updated_at: creds[0].updated_at
+        } as PaymentGateway;
+      }
+
+      return null;
+    } catch (err) {
+      console.error('Error fetching MonCash config:', err);
       return null;
     }
-    return data;
   }
 
   /**
