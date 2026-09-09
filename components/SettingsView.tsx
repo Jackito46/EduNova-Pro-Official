@@ -94,8 +94,9 @@ import {
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { ApiCredentialsVault } from './ApiCredentialsVault';
+import { KobaraSettingsTab } from './KobaraSettingsTab';
 
-type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'gateways' | 'security';
+type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'kobara' | 'gateways' | 'security';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -1723,6 +1724,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     { id: 'academic', label: terminology.academicYears, icon: Calendar },
     { id: 'finance', label: 'Finance & Taux', icon: CircleDollarSign },
     { id: 'payment_methods', label: 'Modes de Règlement & Banques', icon: Wallet },
+    { id: 'kobara', label: 'Passerelle Kobara', icon: Smartphone },
     { id: 'gateways', label: 'Coffre-fort & Clés API', icon: Key },
     { id: 'security', label: 'Sécurité', icon: Shield }
   ];
@@ -3119,20 +3121,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
              </div>
            )}
 
-           <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden">
-            <div className="p-6 md:p-8 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-slate-50/50">
-             <div className="flex items-center gap-5">
-              <div className="w-14 h-14 bg-white border border-slate-200 text-emerald-600 rounded-2xl shadow-sm flex items-center justify-center">
-                <CircleDollarSign size={24} />
+           <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+            <div className="p-3.5 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
+             <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-white border border-slate-200 text-emerald-600 rounded-xl shadow-xs flex items-center justify-center shrink-0">
+                <CircleDollarSign size={20} />
               </div>
               <div>
-               <h3 className="text-xl font-bold tracking-tight text-slate-900">Gestion Monétaire</h3>
-               <p className="text-sm text-slate-700 font-medium tracking-tight mt-1">Configuration des devises et taux de change</p>
+               <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Finance & Devises</h3>
+               <p className="text-xs text-slate-500 font-medium">Configuration des devises et taux de change</p>
               </div>
              </div>
             </div>
 
-            <div className="p-4 sm:p-6 space-y-6">
+            <div className="p-3.5 sm:p-5 space-y-3.5">
               {/* Configuration des Devises */}
               <div className="space-y-4">
                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -3380,6 +3382,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             handleUpdateSchool={handleUpdateSchool}
             saving={saving}
             canManageAllCampuses={canManageAllCampuses}
+          />
+        )}
+
+        {activeTab === 'kobara' && (
+          <KobaraSettingsTab
+            user={user}
+            canManageAllCampuses={canManageAllCampuses}
+            school={school}
+            onSaved={fetchData}
           />
         )}
 

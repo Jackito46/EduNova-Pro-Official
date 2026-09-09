@@ -27,12 +27,16 @@ import {
   Radio,
   Sliders,
   Sparkles,
-  CreditCard
+  CreditCard,
+  Building,
+  PhoneCall,
+  Wallet
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { ApiVaultService } from '../services/apiVaultService';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { toast } from 'sonner';
+import { supabase } from '../supabase';
 
 interface ApiCredentialsVaultProps {
   user: UserProfile;
@@ -70,6 +74,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       secret_key: string;
       webhook_secret: string;
       public_key: string;
+      receiver_phone: string;
+      receiver_name: string;
+      receiver_operator: 'moncash' | 'natcash' | 'bank';
       has_secret: boolean;
       has_webhook_secret: boolean;
       is_secret_encrypted: boolean;
@@ -126,6 +133,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       secret_key: 'kbr_sk_live_b46bb2574ac9ebfe3f9b50a8ce7090f5aed84daea2fa4cfa',
       webhook_secret: 'whsec_81539ff02bf7f9',
       public_key: '',
+      receiver_phone: '',
+      receiver_name: '',
+      receiver_operator: 'moncash',
       has_secret: true,
       has_webhook_secret: true,
       is_secret_encrypted: true,
@@ -279,6 +289,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           KOBARA_SECRET_KEY: clearSecret,
           KOBARA_WEBHOOK_SECRET: clearWhSecret,
           KOBARA_PUBLIC_KEY: vaultData.kobara.public_key,
+          KOBARA_RECEIVER_PHONE: vaultData.kobara.receiver_phone,
+          KOBARA_RECEIVER_NAME: vaultData.kobara.receiver_name,
+          KOBARA_RECEIVER_OPERATOR: vaultData.kobara.receiver_operator,
           KOBARA_MODE: vaultData.kobara.mode
         };
         environment = vaultData.kobara.mode;
@@ -425,137 +438,119 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   const kobaraWebhookUrl = `${effectiveBaseUrl}/api/webhooks/kobara`;
 
   return (
-    <div className="space-y-6">
-      {/* BANNIÈRE DE SÉCURITÉ & COFFRE-FORT CENTRALISÉ */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-indigo-950 rounded-3xl p-5 sm:p-7 text-white shadow-xl border border-slate-800 relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 left-1/3 w-64 h-64 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-5">
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2.5">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold">
-                <ShieldCheck size={22} />
-              </div>
-              <div>
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
-                  <span>Coffre-fort & Clés API</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
-                    <Lock size={10} /> AES-256-GCM
-                  </span>
-                </h3>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium">
-                  Gestion centralisée, chiffrement avant stockage en base Supabase et validation temps réel des passerelles.
-                </p>
-              </div>
-            </div>
-
-            {/* Badges de conformité et sécurité */}
-            <div className="pt-2 flex flex-wrap items-center gap-2 text-xs">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 text-slate-200 border border-white/10 text-[11px] font-bold">
-                <Shield size={12} className="text-emerald-400" />
-                Isolation Multi-Tenant Supabase
+    <div className="space-y-3.5 animate-in slide-in-from-right duration-300">
+      {/* BANNIÈRE MODERNE & FLUIDE DU COFFRE-FORT */}
+      <div className="bg-slate-900 text-white rounded-2xl p-3.5 sm:p-4 border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center font-bold shrink-0 shadow-sm">
+            <ShieldCheck size={20} />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-base sm:text-lg font-bold tracking-tight text-white truncate">
+                Coffre-fort & Clés API
+              </h3>
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
+                <Lock size={10} /> AES-256-GCM
               </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 text-slate-200 border border-white/10 text-[11px] font-bold">
-                <Database size={12} className="text-blue-400" />
-                Secrets Chiffrés au Repos
-              </span>
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-white/10 text-slate-200 border border-white/10 text-[11px] font-bold">
-                <Zap size={12} className="text-amber-400" />
-                Vérification d'Endpoints API
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hidden sm:inline-flex items-center gap-1">
+                <Database size={10} /> Supabase Vault
               </span>
             </div>
+            <p className="text-xs text-slate-300 font-medium truncate mt-0.5">
+              Chiffrement matériel avant stockage et validation temps réel des passerelles
+            </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2.5 self-start md:self-center">
-            <button
-              type="button"
-              onClick={loadVaultData}
-              disabled={loading}
-              className="px-4 py-2.5 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 cursor-pointer border border-white/10 disabled:opacity-50"
-              title="Actualiser les statuts du coffre-fort"
-            >
-              <RefreshCw size={14} className={loading ? 'animate-spin text-indigo-300' : 'text-slate-300'} />
-              <span>Actualiser</span>
-            </button>
-          </div>
+        <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <button
+            type="button"
+            onClick={loadVaultData}
+            disabled={loading}
+            className="px-3 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10 disabled:opacity-50"
+            title="Actualiser les statuts du coffre-fort"
+          >
+            <RefreshCw size={13} className={loading ? 'animate-spin text-indigo-300' : 'text-slate-300'} />
+            <span>Actualiser</span>
+          </button>
         </div>
       </div>
 
-      {/* SÉLECTEUR D'ONGLETS DE SERVICES */}
-      <div className="flex flex-wrap gap-2 border-b border-slate-200 pb-3">
+      {/* SÉLECTEUR D'ONGLETS DE SERVICES COMPACT & RESPONSIVE */}
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar border-b border-slate-200">
         <button
           type="button"
           onClick={() => setActiveTab('kobara')}
-          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
             activeTab === 'kobara'
-              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-md shadow-orange-600/20'
+              ? 'bg-gradient-to-r from-orange-600 to-amber-600 text-white shadow-xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <CreditCard size={16} />
-          <span>Kobara (MonCash & Natcash)</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/20 text-white font-black uppercase tracking-wider">
+          <CreditCard size={13} />
+          <span>Kobara</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/20 text-white font-black uppercase">
             Recommandé
           </span>
           {vaultData.kobara.validation_status === 'VALID' && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('moncash')}
-          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
             activeTab === 'moncash'
-              ? 'bg-red-600 text-white shadow-md shadow-red-600/20'
+              ? 'bg-red-600 text-white shadow-xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Smartphone size={16} />
-          <span>Digicel MonCash Direct</span>
+          <Smartphone size={13} />
+          <span>MonCash</span>
           {vaultData.moncash.validation_status === 'VALID' && (
-            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
           )}
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('natcash')}
-          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
             activeTab === 'natcash'
-              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+              ? 'bg-amber-600 text-white shadow-xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Smartphone size={16} />
-          <span>Natcom Natcash</span>
+          <Smartphone size={13} />
+          <span>Natcash</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('smtp')}
-          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
             activeTab === 'smtp'
-              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+              ? 'bg-blue-600 text-white shadow-xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Mail size={16} />
-          <span>Messagerie & SMTP</span>
+          <Mail size={13} />
+          <span>SMTP & E-mails</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveTab('gemini')}
-          className={`flex items-center gap-2.5 px-4 py-2.5 rounded-xl font-bold text-xs sm:text-sm transition-all cursor-pointer ${
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
             activeTab === 'gemini'
-              ? 'bg-purple-600 text-white shadow-md shadow-purple-600/20'
+              ? 'bg-purple-600 text-white shadow-xs'
               : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
           }`}
         >
-          <Cpu size={16} />
-          <span>IA Gemini</span>
+          <Cpu size={13} />
+          <span>Gemini IA</span>
         </button>
       </div>
 
@@ -563,100 +558,69 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET KOBARA ===================== */}
       {activeTab === 'kobara' && (
-        <div className="space-y-6">
-          <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200 shadow-sm space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-              <div className="flex items-center gap-3.5">
-                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-black shadow-lg shadow-orange-600/20">
-                  <CreditCard size={24} />
+        <div className="space-y-3.5">
+          <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200 shadow-xs space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-black shadow-xs">
+                  <CreditCard size={18} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-lg font-black text-slate-900">Passerelle Kobara</h4>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-orange-100 text-orange-800 border border-orange-200">
+                  <div className="flex items-center gap-1.5">
+                    <h4 className="text-sm font-black text-slate-900">Passerelle Kobara</h4>
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-orange-100 text-orange-800 border border-orange-200">
                       MonCash & Natcash
                     </span>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
-                      Live Production
-                    </span>
                   </div>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Plateforme unifiée pour collecter les frais scolaires via MonCash et Natcash en direct avec webhooks automatisés.
-                  </p>
+                  <p className="text-[11px] text-slate-500">Collecte et webhooks sécurisés unifiés</p>
                 </div>
               </div>
 
               {/* Statut de validation */}
               <div className="flex items-center gap-2">
                 {vaultData.kobara.validation_status === 'VALID' ? (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-                    <CheckCircle2 size={16} className="text-emerald-600" />
-                    <span>API Connectée & Opérationnelle</span>
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
+                    <CheckCircle2 size={13} className="text-emerald-600" />
+                    <span>Connecté</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
-                    <AlertCircle size={16} className="text-amber-600" />
-                    <span>Configuration Prête</span>
+                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
+                    <AlertCircle size={13} className="text-amber-600" />
+                    <span>À vérifier</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Guide rapide des webhooks Kobara */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-orange-50 via-amber-50 to-orange-50 border border-orange-200 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-orange-950 flex items-center gap-1.5">
-                  <Globe size={14} className="text-orange-600" />
-                  URL de Webhook Kobara à configurer dans votre tableau de bord
-                </span>
-                <span className="text-[11px] font-bold text-orange-800 bg-orange-200/60 px-2 py-0.5 rounded-md">
-                  Méthode: POST
-                </span>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                <div className="flex-1 bg-white px-3.5 py-2.5 rounded-xl border border-orange-300 font-mono text-xs text-slate-800 break-all select-all font-semibold">
+            {/* Guide rapide des webhooks Kobara (Compact en 1 ligne) */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-orange-50/70 border border-orange-200 text-xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <Globe size={13} className="text-orange-600 shrink-0" />
+                <span className="font-bold text-orange-950 shrink-0 text-[11px]">Webhook :</span>
+                <code className="text-[11px] font-mono text-orange-900 bg-white px-2 py-0.5 rounded border border-orange-200 truncate select-all">
                   {kobaraWebhookUrl}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(kobaraWebhookUrl, 'kobara_webhook')}
-                  className="px-4 py-2.5 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm shadow-orange-600/20 shrink-0"
-                >
-                  {copiedKey === 'kobara_webhook' ? <Check size={14} /> : <Copy size={14} />}
-                  <span>{copiedKey === 'kobara_webhook' ? 'Copié !' : 'Copier l\'URL'}</span>
-                </button>
+                </code>
               </div>
-
-              <div className="text-[11px] text-orange-900/80 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <span className="font-bold">Événements Kobara à écouter :</span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/80 rounded border border-orange-200 font-mono text-[10px]">
-                  payment.succeeded
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/80 rounded border border-orange-200 font-mono text-[10px]">
-                  payment.failed
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/80 rounded border border-orange-200 font-mono text-[10px]">
-                  payment.pending
-                </span>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white/80 rounded border border-orange-200 font-mono text-[10px]">
-                  withdrawal.paid
-                </span>
-              </div>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(kobaraWebhookUrl, 'kobara_webhook')}
+                className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 self-end sm:self-auto"
+              >
+                {copiedKey === 'kobara_webhook' ? <Check size={12} /> : <Copy size={12} />}
+                <span>{copiedKey === 'kobara_webhook' ? 'Copié !' : 'Copier'}</span>
+              </button>
             </div>
 
             {/* Formulaire des Clés Kobara */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {/* Clé Secrète Kobara */}
-              <div className="space-y-1.5 md:col-span-2">
+              <div className="space-y-1 sm:col-span-2">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Key size={13} className="text-orange-600" />
-                    Clé Secrète Kobara (Secret Key) *
+                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                    <Key size={11} className="text-orange-600" />
+                    <span>Clé Secrète (Secret Key) *</span>
                   </label>
-                  <span className="text-[10px] font-bold text-slate-500">
-                    Format: kbr_sk_live_...
-                  </span>
+                  <span className="text-[9px] font-mono text-slate-400">kbr_sk_live_...</span>
                 </div>
                 <div className="relative flex items-center">
                   <input
@@ -802,6 +766,124 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   Votre clé commence par <code>kbr_sk_live_</code>, le mode Production Live est donc sélectionné.
                 </p>
               </div>
+
+              {/* Numéro de Téléphone Récepteur Kobara */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Smartphone size={13} className="text-orange-600" />
+                    Numéro de Téléphone Récepteur (MonCash / Natcash) *
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    Format: +509 3... / 4...
+                  </span>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={vaultData.kobara.receiver_phone || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVaultData(prev => ({
+                        ...prev,
+                        kobara: { ...prev.kobara, receiver_phone: val }
+                      }));
+                    }}
+                    placeholder="+509 3700 0000 ou 4600 0000"
+                    className="w-full pl-3.5 pr-10 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all"
+                  />
+                  <div className="absolute right-3 text-slate-400">
+                    <PhoneCall size={15} />
+                  </div>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Numéro de compte MonCash ou Natcash vers lequel les montants encaissés seront reversés.
+                </p>
+              </div>
+
+              {/* Titulaire / Nom du bénéficiaire */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Building size={13} className="text-orange-600" />
+                    Nom du Titulaire / Compte de Réception
+                  </label>
+                  <span className="text-[10px] font-bold text-slate-500">
+                    Ex: Collège Mixte / Direction
+                  </span>
+                </div>
+                <input
+                  type="text"
+                  value={vaultData.kobara.receiver_name || ''}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setVaultData(prev => ({
+                      ...prev,
+                      kobara: { ...prev.kobara, receiver_name: val }
+                    }));
+                  }}
+                  placeholder="Nom officiel du détenteur du compte"
+                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all"
+                />
+                <p className="text-[11px] text-slate-500">
+                  Nom qui apparaîtra sur les relevés de virement et dans les journaux de transaction.
+                </p>
+              </div>
+
+              {/* Opérateur de Réception */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Wallet size={13} className="text-orange-600" />
+                  Opérateur du Portefeuille Récepteur
+                </label>
+                <div className="grid grid-cols-3 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setVaultData(prev => ({
+                      ...prev,
+                      kobara: { ...prev.kobara, receiver_operator: 'moncash' }
+                    }))}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      vaultData.kobara.receiver_operator === 'moncash'
+                        ? 'bg-red-50 border-red-500 text-red-700 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
+                    <span>MonCash (Digicel)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVaultData(prev => ({
+                      ...prev,
+                      kobara: { ...prev.kobara, receiver_operator: 'natcash' }
+                    }))}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      vaultData.kobara.receiver_operator === 'natcash'
+                        ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    <span>Natcash (Natcom)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVaultData(prev => ({
+                      ...prev,
+                      kobara: { ...prev.kobara, receiver_operator: 'bank' }
+                    }))}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      vaultData.kobara.receiver_operator === 'bank'
+                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
+                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <span>Compte Bancaire</span>
+                  </button>
+                </div>
+              </div>
             </div>
 
             {/* Boutons d'action */}
@@ -832,22 +914,22 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET MONCASH ===================== */}
       {activeTab === 'moncash' && (
-        <div className="space-y-6">
+        <div className="space-y-3.5">
           {/* Toggle entre mode coffre-fort rapide et vue détaillée */}
-          <div className="flex items-center justify-between bg-slate-50 p-3 rounded-2xl border border-slate-200/80">
+          <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200/80">
             <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-700">Mode d'affichage MonCash :</span>
-              <span className="text-xs text-slate-500">
-                {showAdvancedMoncash ? 'Assistant détaillé & documentation' : 'Coffre-fort sécurisé & validation rapide'}
+              <span className="text-xs font-bold text-slate-700">Mode MonCash :</span>
+              <span className="text-[11px] text-slate-500 hidden sm:inline">
+                {showAdvancedMoncash ? 'Assistant détaillé' : 'Coffre-fort & validation directe'}
               </span>
             </div>
             <button
               type="button"
               onClick={() => setShowAdvancedMoncash(!showAdvancedMoncash)}
-              className="px-3 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-2.5 py-1 bg-white border border-slate-300 hover:bg-slate-100 text-slate-800 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
             >
-              <Sliders size={13} />
-              <span>{showAdvancedMoncash ? 'Afficher vue simplifiée' : 'Afficher vue avancée complète'}</span>
+              <Sliders size={12} />
+              <span>{showAdvancedMoncash ? 'Vue simplifiée' : 'Vue détaillée'}</span>
             </button>
           </div>
 
@@ -861,45 +943,45 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
               user={user}
             />
           ) : (
-            <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-6">
+            <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
               {/* En-tête du service MonCash */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-                <div className="flex items-center gap-3.5">
-                  <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 border border-red-200/60 flex items-center justify-center font-black text-xl shrink-0">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-red-50 text-red-600 border border-red-200/60 flex items-center justify-center font-black text-sm shrink-0">
                     MC
                   </div>
                   <div>
-                    <h4 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                      <span>Digicel MonCash Business API</span>
-                      <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    <div className="flex items-center gap-1.5">
+                      <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                        Digicel MonCash
+                      </h4>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase ${
                         vaultData.moncash.mode === 'live' 
                           ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
                           : 'bg-amber-100 text-amber-800 border border-amber-300'
                       }`}>
-                        {vaultData.moncash.mode === 'live' ? 'Mode Production Live' : 'Mode Sandbox Test'}
+                        {vaultData.moncash.mode === 'live' ? 'Live' : 'Sandbox'}
                       </span>
-                    </h4>
-                    <p className="text-xs text-slate-500 font-medium">
-                      Encaissement automatisé des frais scolaires par portefeuille électronique Digicel.
-                    </p>
+                    </div>
+                    <p className="text-[11px] text-slate-500">Paiements par portefeuille Digicel</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 self-end sm:self-center">
                   <a
                     href="https://moncashbutton.digicelgroup.com/Moncash-business/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3.5 py-2 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-xl transition-all flex items-center gap-1.5 border border-red-200/60"
+                    className="px-2.5 py-1 text-xs font-bold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 rounded-lg transition-all flex items-center gap-1 border border-red-200/60"
                   >
                     <span>Portail Développeur</span>
-                    <ExternalLink size={13} />
+                    <ExternalLink size={11} />
                   </a>
                 </div>
               </div>
 
               {/* STATUT DE VALIDATION EN DIRECT */}
-              <div className={`p-4 rounded-2xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+              <div className={`p-2.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs ${
                 vaultData.moncash.validation_status === 'VALID'
                   ? 'bg-emerald-50/80 border-emerald-200 text-emerald-900'
                   : vaultData.moncash.validation_status === 'INVALID'
@@ -1223,30 +1305,30 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET NATCASH ===================== */}
       {activeTab === 'natcash' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-5 border-b border-slate-100">
-            <div className="flex items-center gap-3.5">
-              <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-black text-xl shrink-0">
+        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-black text-sm shrink-0">
                 NC
               </div>
               <div>
-                <h4 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Natcom Natcash API</span>
-                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-300">
+                <div className="flex items-center gap-1.5">
+                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                    Natcom Natcash
+                  </h4>
+                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-600 border border-slate-300">
                     Bientôt Disponible
                   </span>
-                </h4>
-                <p className="text-xs text-slate-500 font-medium">
-                  Portefeuille électronique mobile Natcom pour les paiements de scolarité en Haïti.
-                </p>
+                </div>
+                <p className="text-[11px] text-slate-500">Paiements par portefeuille Natcom</p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* NATCASH_MERCHANT_ID */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
+            <div className="space-y-1">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
                 Natcash Merchant ID
               </label>
               <input
@@ -1257,16 +1339,16 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   natcash: { ...prev.natcash, merchant_id: e.target.value }
                 }))}
                 placeholder="Ex: NC-MERCHANT-001"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
               />
             </div>
 
             {/* NATCASH_SECRET_KEY */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                <span>Natcash Secret Key</span>
-                <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold">
-                  Chiffré AES-256
+            <div className="space-y-1">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                <span>Secret Key</span>
+                <span className="px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[8px] font-bold">
+                  AES-256
                 </span>
               </label>
               <input
@@ -1276,15 +1358,15 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   ...prev,
                   natcash: { ...prev.natcash, secret_key: e.target.value }
                 }))}
-                placeholder="Clé secrète fournie par Natcom"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                placeholder="Clé secrète Natcom"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
               />
             </div>
 
             {/* NATCASH USSD */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-bold uppercase tracking-wider text-slate-600">
-                Code Marchand USSD Natcash
+            <div className="space-y-1">
+              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+                Code USSD Natcash
               </label>
               <input
                 type="text"
@@ -1294,19 +1376,19 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   natcash: { ...prev.natcash, ussd_number: e.target.value }
                 }))}
                 placeholder="Ex: *202*12345#"
-                className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
               />
             </div>
           </div>
 
-          <div className="pt-4 border-t border-slate-100 flex justify-end">
+          <div className="pt-3 border-t border-slate-100 flex justify-end">
             <button
               type="button"
               onClick={() => handleSaveService('natcash')}
               disabled={saving}
-              className="px-6 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md flex items-center gap-2 cursor-pointer disabled:opacity-50"
+              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
-              <Save size={14} />
+              <Save size={13} />
               <span>Enregistrer Natcash</span>
             </button>
           </div>
@@ -1315,67 +1397,65 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET MESSAGERIE & SMTP ===================== */}
       {activeTab === 'smtp' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-6">
-          <div className="flex items-center gap-3.5 pb-5 border-b border-slate-100">
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0">
-              <Mail size={24} />
+        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0">
+              <Mail size={18} />
             </div>
             <div>
-              <h4 className="text-lg font-black text-slate-900 tracking-tight">
+              <h4 className="text-sm font-black text-slate-900 tracking-tight">
                 Messagerie & Passerelles d'Envoi
               </h4>
-              <p className="text-xs text-slate-500 font-medium">
-                Paramètres SMTP sécurisés pour l'envoi des reçus de paiement et bulletins aux parents.
+              <p className="text-[11px] text-slate-500">
+                Paramètres SMTP sécurisés pour reçus de paiement et alertes scolarité
               </p>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 flex items-start gap-3">
-            <Info size={16} className="text-blue-600 shrink-0 mt-0.5" />
-            <p>
-              Les mots de passe de vos comptes d'envoi SMTP (Google Workspace, Brevo, SendGrid) sont également chiffrés avec AES-256-GCM avant stockage dans la table <code className="font-mono font-bold">communication_settings</code> de Supabase.
+          <div className="p-3 rounded-xl bg-blue-50/70 border border-blue-200 text-xs text-blue-900 flex items-start gap-2.5">
+            <Info size={15} className="text-blue-600 shrink-0 mt-0.5" />
+            <p className="leading-relaxed">
+              Mots de passe d'envoi SMTP (Google Workspace, Brevo, SendGrid) chiffrés avec AES-256-GCM dans <code className="font-mono font-bold">communication_settings</code>.
             </p>
-          </div>
-
-          <div className="text-xs text-slate-500 font-medium">
-            Rendez-vous dans le module <span className="font-bold text-slate-700">Communication & Notifications</span> pour tester et configurer l'ensemble des modèles d'e-mails et de SMS.
           </div>
         </div>
       )}
 
       {/* ===================== ONGLET GEMINI AI ===================== */}
       {activeTab === 'gemini' && (
-        <div className="bg-white rounded-3xl p-6 sm:p-8 border border-slate-200/90 shadow-xs space-y-6">
-          <div className="flex items-center gap-3.5 pb-5 border-b border-slate-100">
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center shrink-0">
-              <Sparkles size={24} />
+        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
+          <div className="flex items-center gap-2.5 pb-3 border-b border-slate-100">
+            <div className="w-9 h-9 rounded-xl bg-purple-50 text-purple-600 border border-purple-200/60 flex items-center justify-center shrink-0">
+              <Sparkles size={18} />
             </div>
             <div>
-              <h4 className="text-lg font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <span>Google Gemini API Server-Side</span>
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+              <div className="flex items-center gap-1.5">
+                <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                  Google Gemini API
+                </h4>
+                <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase ${
                   vaultData.gemini.api_key_configured
                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                     : 'bg-amber-100 text-amber-800 border border-amber-300'
                 }`}>
-                  {vaultData.gemini.api_key_configured ? 'Clé Active sur le Serveur' : 'Non configurée'}
+                  {vaultData.gemini.api_key_configured ? 'Active' : 'Non configurée'}
                 </span>
-              </h4>
-              <p className="text-xs text-slate-500 font-medium">
-                Moteur d'analyse prédictive des paiements, génération de rapports pédagogiques et assistance intelligente.
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Sécurisation hermétique côté serveur Node.js (`process.env.GEMINI_API_KEY`)
               </p>
             </div>
           </div>
 
-          <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700">Statut de la clé GEMINI_API_KEY</span>
-              <span className="text-xs font-mono font-bold text-purple-700">
+          <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-2">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-bold text-slate-700">Statut GEMINI_API_KEY :</span>
+              <span className="font-mono font-bold text-purple-700">
                 {vaultData.gemini.masked_key || (vaultData.gemini.api_key_configured ? '••••••••••••••••' : 'Non détectée')}
               </span>
             </div>
-            <p className="text-xs text-slate-600 leading-relaxed">
-              Conformément aux normes de sécurité strictes, la clé d'API Gemini est gérée de manière totalement hermétique sur le serveur backend Node.js (`process.env.GEMINI_API_KEY`) et n'est jamais exposée dans le navigateur client.
+            <p className="text-[11px] text-slate-500 leading-relaxed">
+              La clé d'API Gemini n'est jamais exposée au navigateur client.
             </p>
           </div>
         </div>

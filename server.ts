@@ -619,6 +619,9 @@ async function startServer() {
           secret_key: '',
           webhook_secret: '',
           public_key: '',
+          receiver_phone: '',
+          receiver_name: '',
+          receiver_operator: 'moncash',
           has_secret: false,
           has_webhook_secret: false,
           is_secret_encrypted: false,
@@ -698,6 +701,9 @@ async function startServer() {
               }
             }
             if (c.key_name === 'KOBARA_PUBLIC_KEY') result.kobara.public_key = c.key_value || '';
+            if (c.key_name === 'KOBARA_RECEIVER_PHONE') result.kobara.receiver_phone = c.key_value || '';
+            if (c.key_name === 'KOBARA_RECEIVER_NAME') result.kobara.receiver_name = c.key_value || '';
+            if (c.key_name === 'KOBARA_RECEIVER_OPERATOR') result.kobara.receiver_operator = c.key_value || 'moncash';
             if (c.key_name === 'KOBARA_MODE') result.kobara.mode = c.key_value || 'live';
             if (c.validation_status && c.validation_status !== 'UNTESTED') {
               result.kobara.validation_status = c.validation_status;
@@ -754,6 +760,15 @@ async function startServer() {
           if (localSchoolVault.kobara.KOBARA_PUBLIC_KEY && !result.kobara.public_key) {
             result.kobara.public_key = localSchoolVault.kobara.KOBARA_PUBLIC_KEY;
           }
+          if (localSchoolVault.kobara.KOBARA_RECEIVER_PHONE && !result.kobara.receiver_phone) {
+            result.kobara.receiver_phone = localSchoolVault.kobara.KOBARA_RECEIVER_PHONE;
+          }
+          if (localSchoolVault.kobara.KOBARA_RECEIVER_NAME && !result.kobara.receiver_name) {
+            result.kobara.receiver_name = localSchoolVault.kobara.KOBARA_RECEIVER_NAME;
+          }
+          if (localSchoolVault.kobara.KOBARA_RECEIVER_OPERATOR && !result.kobara.receiver_operator) {
+            result.kobara.receiver_operator = localSchoolVault.kobara.KOBARA_RECEIVER_OPERATOR;
+          }
           if (localSchoolVault.kobara.KOBARA_MODE) {
             result.kobara.mode = localSchoolVault.kobara.KOBARA_MODE;
           }
@@ -764,6 +779,45 @@ async function startServer() {
           }
         }
       }
+
+      // Fallback depuis la table global_settings
+      try {
+        const { data: gsKobara } = await supabase
+          .from('global_settings')
+          .select('value')
+          .eq('key', 'kobara_config')
+          .maybeSingle();
+
+        if (gsKobara?.value) {
+          const val = gsKobara.value;
+          if (val.receiver_phone && !result.kobara.receiver_phone) result.kobara.receiver_phone = val.receiver_phone;
+          if (val.receiver_name && !result.kobara.receiver_name) result.kobara.receiver_name = val.receiver_name;
+          if (val.receiver_operator && !result.kobara.receiver_operator) result.kobara.receiver_operator = val.receiver_operator;
+          if (val.mode && !result.kobara.mode) result.kobara.mode = val.mode;
+        }
+      } catch (gsErr) {}
+
+      // Fallback depuis payment_gateways (gateway_name = 'kobara')
+      try {
+        const { data: pgKobara } = await supabase
+          .from('payment_gateways')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('gateway_name', 'kobara')
+          .maybeSingle();
+
+        if (pgKobara) {
+          if (pgKobara.business_key && !result.kobara.receiver_phone) {
+            result.kobara.receiver_phone = pgKobara.business_key;
+          }
+          if (pgKobara.client_id && !result.kobara.public_key) {
+            result.kobara.public_key = pgKobara.client_id;
+          }
+          if (pgKobara.mode && !result.kobara.mode) {
+            result.kobara.mode = pgKobara.mode;
+          }
+        }
+      } catch (pgErr) {}
 
       res.json({ success: true, credentials: result });
     } catch (err: any) {
@@ -972,6 +1026,9 @@ async function startServer() {
         const rawSecret = (credentials.secret_key || credentials.KOBARA_SECRET_KEY || '').trim();
         const rawWebhookSecret = (credentials.webhook_secret || credentials.KOBARA_WEBHOOK_SECRET || '').trim();
         const publicKey = (credentials.public_key || credentials.KOBARA_PUBLIC_KEY || '').trim();
+        const receiverPhone = (credentials.receiver_phone || credentials.KOBARA_RECEIVER_PHONE || '').trim();
+        const receiverName = (credentials.receiver_name || credentials.KOBARA_RECEIVER_NAME || '').trim();
+        const receiverOperator = (credentials.receiver_operator || credentials.KOBARA_RECEIVER_OPERATOR || 'moncash').trim();
         const mode = (credentials.mode || credentials.KOBARA_MODE || environment || 'live') === 'test' ? 'test' : 'live';
 
         let finalSecretToStore: string | null = null;
@@ -987,6 +1044,9 @@ async function startServer() {
         if (finalSecretToStore) localEncryptedVault[school_id].kobara.KOBARA_SECRET_KEY = finalSecretToStore;
         if (finalWebhookSecretToStore) localEncryptedVault[school_id].kobara.KOBARA_WEBHOOK_SECRET = finalWebhookSecretToStore;
         if (publicKey) localEncryptedVault[school_id].kobara.KOBARA_PUBLIC_KEY = publicKey;
+        if (receiverPhone) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_PHONE = receiverPhone;
+        if (receiverName) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_NAME = receiverName;
+        if (receiverOperator) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_OPERATOR = receiverOperator;
         localEncryptedVault[school_id].kobara.KOBARA_MODE = mode;
         localEncryptedVault[school_id].kobara.is_active = is_active;
 
@@ -1027,6 +1087,39 @@ async function startServer() {
           {
             school_id,
             service_name: 'kobara',
+            key_name: 'KOBARA_RECEIVER_PHONE',
+            key_value: receiverPhone,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_RECEIVER_NAME',
+            key_value: receiverName,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_RECEIVER_OPERATOR',
+            key_value: receiverOperator,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
             key_name: 'KOBARA_MODE',
             key_value: mode,
             encrypted_value: null,
@@ -1046,6 +1139,96 @@ async function startServer() {
             console.warn('api_credentials upsert fallback to local vault (kobara):', dbErr);
           }
           savedKeys.push(item.key_name);
+        }
+
+        // 1. Sauvegarder dans la table payment_gateways (passerelle unifiée Kobara)
+        try {
+          const pgPayload: any = {
+            school_id,
+            gateway_name: 'kobara',
+            client_id: publicKey || '',
+            client_secret: finalSecretToStore || (rawSecret && !rawSecret.includes('••••') ? encryptSecret(rawSecret) : '') || localEncryptedVault[school_id]?.kobara?.KOBARA_SECRET_KEY || '',
+            merchant_id: finalWebhookSecretToStore || (rawWebhookSecret && !rawWebhookSecret.includes('••••') ? encryptSecret(rawWebhookSecret) : '') || localEncryptedVault[school_id]?.kobara?.KOBARA_WEBHOOK_SECRET || '',
+            business_key: receiverPhone || '',
+            mode,
+            is_active
+          };
+
+          const { data: existingPg } = await supabase
+            .from('payment_gateways')
+            .select('id')
+            .eq('school_id', school_id)
+            .eq('gateway_name', 'kobara')
+            .maybeSingle();
+
+          if (existingPg?.id) {
+            await supabase.from('payment_gateways').update(pgPayload).eq('id', existingPg.id);
+          } else {
+            await supabase.from('payment_gateways').insert([pgPayload]);
+          }
+        } catch (pgErr) {
+          console.warn('payment_gateways sync error for kobara:', pgErr);
+        }
+
+        // 2. Sauvegarder dans la table global_settings (public.global_settings)
+        try {
+          const gsPayload = {
+            secret_key: rawSecret ? maskSecret(rawSecret) : undefined,
+            has_secret: Boolean(rawSecret || localEncryptedVault[school_id]?.kobara?.KOBARA_SECRET_KEY),
+            webhook_secret: rawWebhookSecret ? maskSecret(rawWebhookSecret) : undefined,
+            has_webhook_secret: Boolean(rawWebhookSecret || localEncryptedVault[school_id]?.kobara?.KOBARA_WEBHOOK_SECRET),
+            public_key: publicKey,
+            receiver_phone: receiverPhone,
+            receiver_name: receiverName,
+            receiver_operator: receiverOperator,
+            mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          };
+
+          await supabase
+            .from('global_settings')
+            .upsert({
+              key: 'kobara_config',
+              value: gsPayload,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'key' });
+        } catch (gsErr) {
+          console.warn('global_settings sync error for kobara:', gsErr);
+        }
+
+        // 3. Sauvegarder dans schools.global_settings
+        try {
+          const { data: currentSchool } = await supabase
+            .from('schools')
+            .select('global_settings')
+            .eq('id', school_id)
+            .maybeSingle();
+
+          let sSettings: any = {};
+          if (typeof currentSchool?.global_settings === 'string') {
+            try { sSettings = JSON.parse(currentSchool.global_settings); } catch (e) {}
+          } else {
+            sSettings = currentSchool?.global_settings || {};
+          }
+
+          sSettings.kobara = {
+            receiver_phone: receiverPhone,
+            receiver_name: receiverName,
+            receiver_operator: receiverOperator,
+            mode,
+            is_active,
+            has_secret: Boolean(rawSecret || localEncryptedVault[school_id]?.kobara?.KOBARA_SECRET_KEY),
+            has_webhook_secret: Boolean(rawWebhookSecret || localEncryptedVault[school_id]?.kobara?.KOBARA_WEBHOOK_SECRET),
+            updated_at: new Date().toISOString()
+          };
+
+          await supabase
+            .from('schools')
+            .update({ global_settings: sSettings })
+            .eq('id', school_id);
+        } catch (sErr) {
+          console.warn('schools.global_settings sync error for kobara:', sErr);
         }
       }
 
