@@ -6,7 +6,7 @@ import {
   FileText, CreditCard, GraduationCap, AlertCircle,
   History, Ban, CheckCircle2, ChevronLeft, ChevronRight,
   Printer, Download, Trash2, Edit2, Info, RefreshCw, Rocket, Copy, MessageCircle,
-  FileCheck2, Clock, XCircle, Smartphone, Wallet
+  FileCheck2, Clock, XCircle, Smartphone, Wallet, Eye, EyeOff, KeyRound, Sparkles
 } from 'lucide-react';
 import { supabase, supabaseUrl, supabaseAnonKey } from '../supabase';
 import { createClient } from '@supabase/supabase-js';
@@ -21,6 +21,7 @@ const secondarySupabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 import { UserProfile, UserRole, DocumentStatus } from '../types';
 import { formatStudentName } from '../utils/formatters';
+import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
 import { toast } from 'sonner';
 import Modal from './Modal';
 import { AuditLogger } from '../utils/auditLogger';
@@ -67,6 +68,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [isGeneratingAccess, setIsGeneratingAccess] = useState(false);
   const [accessEmail, setAccessEmail] = useState('');
   const [accessPassword, setAccessPassword] = useState('');
+  const [showAccessPassword, setShowAccessPassword] = useState(false);
   const [accessError, setAccessError] = useState<string | null>(null);
 
   const fetchStudentData = useCallback(async (studentId: string) => {
@@ -307,48 +309,95 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   const handleGenerateAccess = async () => {
-    if (!student || !accessEmail || !accessPassword) {
-      setAccessError("L'email et le mot de passe sont requis.");
+    if (!student) return;
+    const rawIdentifier = (accessEmail || '').trim();
+    if (!rawIdentifier) {
+      setAccessError("L'identifiant (pseudo) ou l'email est requis.");
       return;
     }
+
+    if (!accessPassword || accessPassword.length < 6) {
+      setAccessError("Le mot de passe temporaire doit comporter au moins 6 caractères.");
+      return;
+    }
+
+    const isEmail = rawIdentifier.includes('@');
+    if (!isEmail) {
+      const cleanPseudo = rawIdentifier.toLowerCase().replace(/[^a-z0-9._-]/g, '');
+      if (cleanPseudo.length < 2) {
+        setAccessError("Le pseudo doit contenir au moins 2 caractères valides (lettres, chiffres, tirets, points).");
+        return;
+      }
+    }
+
+    const normalizedEmail = normalizeIdentifier(rawIdentifier);
+    const friendlyIdentifier = displayIdentifier(normalizedEmail);
 
     setIsGeneratingAccess(true);
     setAccessError(null);
 
     try {
       const { data, error } = await secondarySupabase.auth.signUp({
-        email: accessEmail,
+        email: normalizedEmail,
         password: accessPassword,
         options: {
           data: {
             full_name: formatStudentName(student.last_name, student.first_name).fullName,
             role: UserRole.STUDENT,
             school_id: user.school_id,
+            student_id: student.id,
+            username: friendlyIdentifier,
           }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        if (error.message?.includes('already registered') || error.message?.includes('User already registered')) {
+          throw new Error(`L'identifiant ou email "${friendlyIdentifier}" est déjà utilisé par un autre compte.`);
+        }
+        throw error;
+      }
       
       const newUserId = data.user?.id;
       if (!newUserId || (data.user?.identities && data.user.identities.length === 0)) {
-        throw new Error("Cet email est déjà utilisé par un autre compte.");
+        throw new Error(`L'identifiant ou email "${friendlyIdentifier}" est déjà utilisé par un autre compte.`);
       }
 
-      // Link student_id and force password reset
+      // Link student_id and force password reset on the profile
       await supabase
         .from('profiles')
-        .update({ force_password_change: true })
-        .eq('id', newUserId)
-        .eq('school_id', user.school_id);
+        .update({ 
+          force_password_change: true,
+          role: UserRole.STUDENT,
+          school_id: user.school_id
+        })
+        .eq('id', newUserId);
         
-      // Ensure student object holds the latest email
-      await supabase.from('students').update({ parent_email: accessEmail }).eq('id', student.id).eq('school_id', user.school_id);
+      // Ensure student object holds the normalized access email
+      await supabase
+        .from('students')
+        .update({ parent_email: normalizedEmail })
+        .eq('id', student.id)
+        .eq('school_id', user.school_id);
 
-      toast.success("Compte étudiant créé avec succès.");
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'CREATE',
+        entity_type: 'user',
+        entity_id: student.id,
+        details: {
+          student_id: student.id,
+          identifier: rawIdentifier,
+          normalized_email: normalizedEmail,
+          role: UserRole.STUDENT
+        }
+      });
+
+      toast.success(`Accès Web généré avec succès pour ${friendlyIdentifier} !`);
       
       // Update local state if needed
-      setStudent({...student, parent_email: accessEmail});
+      setStudent({ ...student, parent_email: normalizedEmail });
       
       setShowAccessModal(false);
     } catch (err: any) {
@@ -523,13 +572,18 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button 
                 type="button"
                 onClick={() => {
-                  setAccessEmail(student.email || student.parent_email || "");
+                  const existingContact = student.email || student.parent_email || "";
+                  const initialIdentifier = existingContact.endsWith('@edunova.ht')
+                    ? displayIdentifier(existingContact)
+                    : existingContact;
+                  setAccessEmail(initialIdentifier);
                   setAccessPassword(Math.random().toString(36).slice(-8) + "A1!");
+                  setShowAccessPassword(false);
                   setAccessError(null);
                   setShowAccessModal(true);
                 }}
                 className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100 hover:border-indigo-300 rounded-xl transition-all flex items-center gap-1.5 h-8 sm:h-9 cursor-pointer shadow-xs font-bold text-[11px] sm:text-xs active:scale-[0.98] shrink-0" 
-                title="Générer un accès en ligne"
+                title="Générer un accès en ligne (Email ou Pseudo)"
               >
                 <User size={14} className="text-indigo-600 shrink-0" />
                 <span>Accès Web</span>
@@ -713,8 +767,21 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="flex items-center gap-3 p-2.5">
                   <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center shrink-0"><Mail size={18} /></div>
                   <div>
-                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email</p>
-                    <p className="text-sm font-bold text-gray-900">{student.parent_email || 'Non renseigné'}</p>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Email / Identifiant Web</p>
+                    {student.parent_email ? (
+                      student.parent_email.endsWith('@edunova.ht') ? (
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <span className="font-mono text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md text-xs font-bold">
+                            {displayIdentifier(student.parent_email)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-medium">(Pseudo Web)</span>
+                        </div>
+                      ) : (
+                        <p className="text-sm font-bold text-gray-900">{student.parent_email}</p>
+                      )
+                    ) : (
+                      <p className="text-sm font-bold text-gray-400 italic">Non renseigné</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1151,43 +1218,109 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         cancelLabel="Annuler"
       >
         <div className="space-y-4">
-          <div className="p-4 bg-indigo-50 rounded-xl border border-indigo-200 flex items-start gap-3">
-             <User className="text-indigo-600 shrink-0" size={20} />
-             <p className="text-sm font-medium text-indigo-800 leading-relaxed">
-               Vous allez créer un compte pour permettre à <strong>{fullName}</strong> (ou ses parents) de se connecter à la plateforme.
-             </p>
+          <div className="p-4 bg-indigo-50/80 rounded-2xl border border-indigo-200/80 flex items-start gap-3">
+             <User className="text-indigo-600 shrink-0 mt-0.5" size={20} />
+             <div className="text-xs text-indigo-900 leading-relaxed font-medium">
+               Vous allez créer un compte pour permettre à <strong className="font-bold text-indigo-950">{fullName}</strong> (ou ses parents) de se connecter à la plateforme.
+             </div>
           </div>
 
           {accessError && (
-             <div className="p-4 bg-rose-50 text-rose-700 text-sm font-bold rounded-xl border border-rose-200">
-               {accessError}
+             <div className="p-3.5 bg-rose-50 text-rose-700 text-xs font-bold rounded-xl border border-rose-200 flex items-start gap-2.5">
+               <AlertCircle size={16} className="text-rose-600 shrink-0 mt-0.5" />
+               <div className="flex-1">{accessError}</div>
              </div>
           )}
 
-          <div className="space-y-4 pt-2">
+          <div className="space-y-4 pt-1">
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">E-mail de connexion</label>
-              <input
-                required
-                type="email"
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-medium outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-sm"
-                placeholder="Ex: etudiant@gmail.com"
-                value={accessEmail}
-                onChange={(e) => setAccessEmail(e.target.value)}
-              />
-              <p className="text-[10px] text-slate-500 mt-1.5 px-1 font-medium">Cet adresse email sera utilisée comme identifiant de connexion.</p>
-            </div>
-            
-            <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1.5 uppercase tracking-wider">Mot de passe temporaire</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Identifiant / Pseudo ou Email
+                </label>
+                {accessEmail && !accessEmail.includes('@') && (
+                  <span className="text-[10px] font-extrabold px-2 py-0.5 bg-indigo-100 text-indigo-800 border border-indigo-200 rounded-md">
+                    Mode Pseudo
+                  </span>
+                )}
+              </div>
               <input
                 required
                 type="text"
-                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 font-mono outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-sm tracking-widest"
-                value={accessPassword}
-                onChange={(e) => setAccessPassword(e.target.value)}
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                className="w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-xs"
+                placeholder="Ex: HYPOPCARL ou parent@gmail.com"
+                value={accessEmail}
+                onChange={(e) => setAccessEmail(e.target.value)}
               />
-              <p className="text-[10px] text-slate-500 mt-1.5 px-1 font-medium italic">Un changement de mot de passe sera exigé à la première connexion.</p>
+              {accessEmail && !accessEmail.includes('@') ? (
+                <div className="mt-2 p-2.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-[11px] text-indigo-950 flex items-start gap-2">
+                  <Info size={14} className="text-indigo-600 shrink-0 mt-0.5" />
+                  <div>
+                    <span>Connexion simplifiée : le parent ou l'élève pourra se connecter avec son pseudo <strong>{accessEmail.trim().toUpperCase()}</strong> (identifiant système : <code className="text-indigo-700 font-mono font-bold">{normalizeIdentifier(accessEmail)}</code>).</span>
+                  </div>
+                </div>
+              ) : accessEmail && accessEmail.includes('@') ? (
+                <p className="text-[11px] text-slate-500 mt-1.5 px-1 font-medium">
+                  Cette adresse email sera utilisée comme identifiant de connexion et pour la transmission des avis.
+                </p>
+              ) : (
+                <div className="flex items-center justify-between mt-1.5 px-1 text-[11px] text-slate-500 font-medium">
+                  <span>Saisissez un pseudo (ex: HYPOPCARL) ou un email valide.</span>
+                  {student?.first_name && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cleanFirst = (student.first_name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                        const cleanLast = (student.last_name || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase();
+                        const suggested = cleanFirst && cleanLast ? `${cleanFirst}.${cleanLast}` : cleanFirst || 'eleve';
+                        setAccessEmail(suggested.toUpperCase());
+                      }}
+                      className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline cursor-pointer"
+                    >
+                      Suggérer un pseudo
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-xs font-black text-slate-700 uppercase tracking-wider">
+                  Mot de passe temporaire
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setAccessPassword(Math.random().toString(36).slice(-8) + "A1!")}
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <RefreshCw size={12} />
+                  <span>Régénérer</span>
+                </button>
+              </div>
+              <div className="relative">
+                <input
+                  required
+                  type={showAccessPassword ? "text" : "password"}
+                  className="w-full pl-4 pr-11 py-3 bg-white border border-slate-200 rounded-xl text-sm font-bold text-slate-900 font-mono outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-500/10 transition-all shadow-xs tracking-wider"
+                  value={accessPassword}
+                  onChange={(e) => setAccessPassword(e.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAccessPassword(!showAccessPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 cursor-pointer"
+                  tabIndex={-1}
+                >
+                  {showAccessPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1.5 px-1 font-medium italic">
+                Un changement de mot de passe sera exigé lors de la première connexion.
+              </p>
             </div>
           </div>
         </div>

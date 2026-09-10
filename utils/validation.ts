@@ -13,7 +13,17 @@ export const studentSchema = z.object({
   parentName: z.string().min(2, "Le nom du responsable doit contenir au moins 2 caractères"),
   parentRelation: z.string().min(1, "Le lien de parenté est obligatoire"),
   parentPhone: z.string().min(4, "Le téléphone du responsable est obligatoire"),
-  parentEmail: z.string().email("Email du responsable invalide").optional().or(z.literal('')),
+  parentEmail: z.string().refine(
+    (val) => {
+      if (!val || val.trim() === '') return true;
+      const trimmed = val.trim();
+      if (!trimmed.includes('@')) {
+        return /^[a-zA-Z0-9._-]{2,}$/.test(trimmed);
+      }
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed);
+    },
+    { message: "Email ou identifiant (pseudo) du responsable invalide" }
+  ).optional().or(z.literal('')),
   parentJob: z.string().optional()
 });
 

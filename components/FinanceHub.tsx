@@ -28,17 +28,20 @@ import {
   SearchCheck,
   Calculator,
   X,
-  Sliders
+  Sliders,
+  Radio
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ReevaluationModal, ReevaluatedStudentItem } from './ReevaluationModal';
+import { GatewayWebhookSimulatorModal } from './GatewayWebhookSimulatorModal';
 
 const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
   const { terminology, currentCampusId, school } = useSchool();
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
+  const [isWebhookSimulatorOpen, setIsWebhookSimulatorOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(132.50);
   
   const [todayCollection, setTodayCollection] = useState(0);
@@ -87,6 +90,79 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   });
   
   const [loading, setLoading] = useState(true);
+
+  // Mobile Money Gateways status & visual badges
+  const [simulatorOperator, setSimulatorOperator] = useState<'moncash' | 'natcash'>('moncash');
+  const [gatewayStatus, setGatewayStatus] = useState<{
+    moncash: { active: boolean; connected: boolean; mode: string; phone?: string; configured: boolean };
+    natcash: { active: boolean; connected: boolean; mode: string; phone?: string; configured: boolean };
+    unified: { active: boolean; receiver_phone?: string; mode: string; same_number: boolean };
+    loading: boolean;
+  }>({
+    moncash: { active: false, connected: false, mode: 'sandbox', configured: false },
+    natcash: { active: false, connected: false, mode: 'test', configured: false },
+    unified: { active: false, mode: 'live', same_number: true },
+    loading: true
+  });
+
+  const fetchGatewayStatus = useCallback(async () => {
+    if (!user?.school_id) return;
+    try {
+      const res = await fetch(`/api/settings/api-credentials?school_id=${user.school_id}`);
+      const data = await res.json();
+      if (data.success && data.credentials) {
+        const kobara = data.credentials.kobara || {};
+        const moncash = data.credentials.moncash || {};
+        const natcash = data.credentials.natcash || {};
+
+        const isKobaraActive = Boolean(kobara.is_active !== false && (kobara.secret_key || kobara.receiver_phone));
+        const receiverPhone = kobara.receiver_phone || '';
+        const receiverPhoneMonCash = kobara.receiver_phone_moncash || receiverPhone;
+        const receiverPhoneNatCash = kobara.receiver_phone_natcash || receiverPhone;
+
+        const isMonCashActive = Boolean(moncash.is_active || (isKobaraActive && (receiverPhoneMonCash || kobara.is_active)));
+        const isMonCashConnected = Boolean(
+          (moncash.client_id && moncash.client_id.length > 3) || 
+          (receiverPhoneMonCash && receiverPhoneMonCash.length >= 8) ||
+          (isKobaraActive && kobara.secret_key)
+        );
+
+        const isNatCashActive = Boolean(natcash.is_active || (isKobaraActive && (receiverPhoneNatCash || kobara.is_active)));
+        const isNatCashConnected = Boolean(
+          (natcash.merchant_id && natcash.merchant_id.length > 3) || 
+          (receiverPhoneNatCash && receiverPhoneNatCash.length >= 8) ||
+          (isKobaraActive && kobara.secret_key)
+        );
+
+        setGatewayStatus({
+          moncash: {
+            active: isMonCashActive,
+            connected: isMonCashConnected,
+            mode: moncash.mode || kobara.mode || 'sandbox',
+            phone: receiverPhoneMonCash || moncash.receiver_phone,
+            configured: isMonCashConnected
+          },
+          natcash: {
+            active: isNatCashActive,
+            connected: isNatCashConnected,
+            mode: natcash.mode || kobara.mode || 'test',
+            phone: receiverPhoneNatCash || natcash.receiver_phone,
+            configured: isNatCashConnected
+          },
+          unified: {
+            active: isKobaraActive,
+            receiver_phone: receiverPhone,
+            mode: kobara.mode || 'live',
+            same_number: kobara.same_receiver_number !== false
+          },
+          loading: false
+        });
+      }
+    } catch (err) {
+      console.warn('Erreur chargement statut passerelles:', err);
+      setGatewayStatus(prev => ({ ...prev, loading: false }));
+    }
+  }, [user?.school_id]);
 
   const fetchFinanceData = useCallback(async () => {
     if (!user?.school_id) return;
@@ -624,6 +700,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   useEffect(() => {
     fetchFinanceData();
+    fetchGatewayStatus();
 
     if (!user?.school_id) return;
 
@@ -747,6 +824,15 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       allowedRoles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY]
     },
     { 
+      title: 'Simulateur Webhook Passerelles', 
+      desc: 'Tests notifications MonCash & Natcash', 
+      icon: Radio, 
+      isSimulatorModal: true,
+      color: 'bg-purple-600', 
+      shadow: 'shadow-purple-200',
+      allowedRoles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT]
+    },
+    { 
       title: 'Audit Financier', 
       desc: 'Historique des modifs', 
       icon: ShieldAlert, 
@@ -770,9 +856,42 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
           <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 rounded-full text-[11px] font-bold uppercase tracking-wider backdrop-blur-md">
-              <ShieldCheck size={13} className="text-indigo-400" />
-              Unité de Pilotage Financier
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 rounded-full text-[11px] font-bold uppercase tracking-wider backdrop-blur-md">
+                <ShieldCheck size={13} className="text-indigo-400" />
+                Unité de Pilotage Financier
+              </div>
+
+              {/* Quick Gateway Status Pills in Header */}
+              <button
+                onClick={() => {
+                  setSimulatorOperator('moncash');
+                  setIsWebhookSimulatorOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full text-[10px] font-bold transition-all text-white backdrop-blur-md cursor-pointer"
+                title="MonCash : Cliquer pour simuler ou tester les webhooks"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${gatewayStatus.moncash.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>MonCash</span>
+                <span className={gatewayStatus.moncash.connected ? 'text-emerald-300' : 'text-amber-300'}>
+                  {gatewayStatus.moncash.connected ? 'Actif' : 'En attente'}
+                </span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setSimulatorOperator('natcash');
+                  setIsWebhookSimulatorOpen(true);
+                }}
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full text-[10px] font-bold transition-all text-white backdrop-blur-md cursor-pointer"
+                title="Natcash : Cliquer pour simuler ou tester les webhooks"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${gatewayStatus.natcash.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span>Natcash</span>
+                <span className={gatewayStatus.natcash.connected ? 'text-emerald-300' : 'text-amber-300'}>
+                  {gatewayStatus.natcash.connected ? 'Actif' : 'En attente'}
+                </span>
+              </button>
             </div>
             <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
               Direction de l'Économat
@@ -783,6 +902,14 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+            <button
+              onClick={() => setIsWebhookSimulatorOpen(true)}
+              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm hover:shadow-purple-500/25 flex items-center gap-1.5 active:scale-95 border border-purple-400/30"
+              title="Tester la réception des notifications Webhook pour MonCash et Natcash et valider la passerelle unifiée"
+            >
+              <Radio size={16} className="text-purple-200 animate-pulse" />
+              <span>Simuler Passerelles</span>
+            </button>
             <button
               onClick={() => setIsReevaluationModalOpen(true)}
               className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm hover:shadow-indigo-500/25 flex items-center gap-1.5 active:scale-95"
@@ -809,7 +936,112 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       </div>
 
-      {/* FINANCIAL KPI SUMMARY CARDS GRID */}
+      {/* MOBILE MONEY & GATEWAY STATUS BAR WITH DIRECT SIMULATOR LINK */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mr-1">
+            <Radio size={15} className="text-purple-600 animate-pulse" />
+            <span className="uppercase tracking-wider text-[11px] text-slate-500 font-extrabold">Passerelles Mobiles :</span>
+          </div>
+
+          {/* MonCash Badge (Clickable with direct link to Simulator) */}
+          <button
+            type="button"
+            onClick={() => {
+              setSimulatorOperator('moncash');
+              setIsWebhookSimulatorOpen(true);
+            }}
+            className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              gatewayStatus.moncash.connected
+                ? 'bg-rose-50/70 border-rose-200 text-rose-950 hover:bg-rose-100 hover:border-rose-300 shadow-2xs'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+            title="Cliquer pour simuler une notification de paiement MonCash"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              {gatewayStatus.moncash.connected && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
+              )}
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${gatewayStatus.moncash.connected ? 'bg-rose-600' : 'bg-slate-400'}`}></span>
+            </span>
+            <span className="font-black text-rose-700">MonCash (Digicel)</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
+              gatewayStatus.moncash.connected ? 'bg-rose-200/70 text-rose-900' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {gatewayStatus.moncash.connected ? 'Connecté' : 'En attente'}
+            </span>
+            {gatewayStatus.moncash.phone && (
+              <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                {gatewayStatus.moncash.phone}
+              </span>
+            )}
+            <span className="text-[11px] text-indigo-600 font-bold group-hover:underline flex items-center gap-0.5 ml-1">
+              <span>Tester</span>
+              <ArrowRight size={11} />
+            </span>
+          </button>
+
+          {/* Natcash Badge (Clickable with direct link to Simulator) */}
+          <button
+            type="button"
+            onClick={() => {
+              setSimulatorOperator('natcash');
+              setIsWebhookSimulatorOpen(true);
+            }}
+            className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
+              gatewayStatus.natcash.connected
+                ? 'bg-blue-50/70 border-blue-200 text-blue-950 hover:bg-blue-100 hover:border-blue-300 shadow-2xs'
+                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+            }`}
+            title="Cliquer pour simuler une notification de paiement Natcash"
+          >
+            <span className="relative flex h-2.5 w-2.5">
+              {gatewayStatus.natcash.connected && (
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
+              )}
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${gatewayStatus.natcash.connected ? 'bg-blue-600' : 'bg-slate-400'}`}></span>
+            </span>
+            <span className="font-black text-blue-700">Natcash (Natcom)</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
+              gatewayStatus.natcash.connected ? 'bg-blue-200/70 text-blue-900' : 'bg-slate-200 text-slate-600'
+            }`}>
+              {gatewayStatus.natcash.connected ? 'Connecté' : 'En attente'}
+            </span>
+            {gatewayStatus.natcash.phone && (
+              <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
+                {gatewayStatus.natcash.phone}
+              </span>
+            )}
+            <span className="text-[11px] text-indigo-600 font-bold group-hover:underline flex items-center gap-0.5 ml-1">
+              <span>Tester</span>
+              <ArrowRight size={11} />
+            </span>
+          </button>
+
+          {/* Unified Gateway Indicator */}
+          <div className="hidden xl:inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
+            <CheckCircle size={13} className="text-emerald-500" />
+            <span>Passerelle Fusionnée Kobara</span>
+            <span className="text-[10px] font-bold text-slate-700 bg-slate-200/70 px-1.5 py-0.5 rounded">
+              {gatewayStatus.unified.same_number ? 'Numéro Unique' : 'Numéros Séparés'}
+            </span>
+          </div>
+        </div>
+
+        {/* Action Link to Simulator Modal */}
+        <div className="flex items-center gap-2 self-end lg:self-auto">
+          <button
+            onClick={() => {
+              setSimulatorOperator('moncash');
+              setIsWebhookSimulatorOpen(true);
+            }}
+            className="text-xs font-bold text-purple-700 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl border border-purple-200 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
+          >
+            <Radio size={13} className="text-purple-600 animate-pulse" />
+            <span>Console Simulation Webhook</span>
+          </button>
+        </div>
+      </div>
       {canViewSensitiveStats && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
           {/* Card 1: Scolarité */}
@@ -980,6 +1212,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             onClick={() => {
               if (action.isModal) {
                 setIsClosureModalOpen(true);
+              } else if ((action as any).isSimulatorModal) {
+                setIsWebhookSimulatorOpen(true);
               } else if (action.path) {
                 navigate(action.path);
               }
@@ -1307,6 +1541,16 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         user={user}
         onClosureUpdated={fetchFinanceData}
       />
+
+      {user?.school_id && (
+        <GatewayWebhookSimulatorModal
+          isOpen={isWebhookSimulatorOpen}
+          onClose={() => setIsWebhookSimulatorOpen(false)}
+          schoolId={user.school_id}
+          initialOperator={simulatorOperator}
+          onSimulationSuccess={fetchFinanceData}
+        />
+      )}
     </div>
   );
 };

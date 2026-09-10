@@ -7,7 +7,7 @@ import {
   Layers, MapPin, Phone, Info, AlertTriangle, Baby, Sparkles,
   Building2, CreditCard, Receipt, Check, Calendar, Mail, Home, Clock,
   FileCheck2, XCircle, Search, School as SchoolIcon, ChevronRight,
-  Banknote
+  Banknote, Radio, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useParams, useLocation } from 'react-router-dom';
@@ -18,6 +18,7 @@ import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { AuditLogger } from '../utils/auditLogger';
 import { UserProfile, SchoolClass, SchoolLevel, DocumentStatus } from '../types';
 import { studentSchema } from '../utils/validation';
+import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
 import { formatStudentName, getDefiniteArticle } from '../utils/formatters';
 import { getAllowedClassesForReenrollment, getClassAgeRange, ACADEMIC_PATH, getNextClassLevel } from '../utils/academicPath';
 import { 
@@ -33,6 +34,10 @@ import {
   AcademicEvaluationStatus 
 } from './ReenrollmentEligibilityCard';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import { ClassSelectorPill } from './ClassSelectorPill';
+import { SelectPill } from './SelectPill';
+import { MonCashWaitingModal } from './MonCashWaitingModal';
+import { MonCashService } from '../services/moncashService';
 
 const InfoTooltip = ({ content, title }: { content: string; title?: string }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -259,6 +264,27 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [inscriptionPaymentMethod, setInscriptionPaymentMethod] = useState('Cash');
   const [inscriptionCurrency, setInscriptionCurrency] = useState('USD');
   const [exchangeRate, setExchangeRate] = useState<number>(0);
+
+  // Mobile Money (MonCash / Natcash) specific configuration & verification
+  const [moncashMode, setMoncashMode] = useState<'online' | 'manual'>('online');
+  const [moncashManualRef, setMoncashManualRef] = useState('');
+  const [moncashPayerPhone, setMoncashPayerPhone] = useState('');
+  const [showMonCashWaiting, setShowMonCashWaiting] = useState(false);
+  const [monCashPendingData, setMonCashPendingData] = useState<{
+    paymentId: string;
+    orderId: string;
+    amount: number;
+    currency: string;
+    studentName: string;
+    studentCode: string;
+    studentClass: string;
+    feeTypeLabel: string;
+    redirectUrl: string | null;
+    payerPhone?: string;
+    initiatedAt: string;
+    targetStudentId: string;
+    targetYearId: string;
+  } | null>(null);
 
   const activePaymentMethods = useMemo(() => {
     return getActiveSchoolPaymentMethods(school);
@@ -527,7 +553,8 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             dob: student.dob || '', pob: student.pob || '', nif: student.nif || '', address: student.address || '',
             phone: student.phone || '', email: student.email || '', reference_number: student.reference_number || '',
             parentName: student.parent_name || '', parentRelation: student.parent_relation || (isAdultLevel ? 'Conjoint(e)' : 'Père'),
-            parentPhone: student.parent_phone || '', parentEmail: student.parent_email || '', 
+            parentPhone: student.parent_phone || '', 
+            parentEmail: student.parent_email ? (student.parent_email.endsWith('@edunova.ht') ? displayIdentifier(student.parent_email) : student.parent_email) : '', 
             parentJob: student.parent_job || '', selectedClassId: initialSelectedClassId
           }));
 
@@ -714,7 +741,10 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         reference_number: formData.reference_number || null,
         parent_name: formData.parentName,
         parent_relation: formData.parentRelation, parent_phone: formData.parentPhone,
-        parent_email: formData.parentEmail, parent_job: formData.parentJob,
+        parent_email: formData.parentEmail?.trim() 
+          ? (formData.parentEmail.includes('@') ? formData.parentEmail.trim().toLowerCase() : normalizeIdentifier(formData.parentEmail.trim())) 
+          : null, 
+        parent_job: formData.parentJob,
         submitted_documents: submittedDocsPayload,
         status: initialStudentStatus
       };
@@ -796,7 +826,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       const targetStudentId = isReenroll ? id : savedStudentId;
 
-      // Encaissement optionnel immédiat
+      // Encaissement optionnel immédiat avec validation stricte Mobile Money (MonCash / Natcash)
       if (payInscriptionNow && currentPricing.inscription.amount > 0 && targetStudentId) {
         let amountToSave = currentPricing.inscription.amount;
         let equivalentHtgToSave = amountToSave;
@@ -815,6 +845,83 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
            paymentCurrency = 'HTG';
         }
 
+        // --- CAS 1 : MONCASH EN LIGNE (Passerelle avec vérification de débit réel) ---
+        if (inscriptionPaymentMethod === 'MonCash' && moncashMode === 'online') {
+          const orderId = `MC-REINSC-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+          // 1. Insertion du paiement en statut EN_ATTENTE (non validé tant que l'argent n'est pas prélevé)
+          const { data: pendingPayment, error: payErr } = await supabase.from('payments').insert({
+            school_id: user.school_id,
+            campus_id: resolvedCampusId,
+            student_id: targetStudentId,
+            academic_year_id: targetYearId,
+            date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+            amount: amountToSave,
+            amount_htg_equivalent: equivalentHtgToSave,
+            exchange_rate_applied: actualExchangeRate || 140,
+            currency: 'HTG',
+            nature: 'RECOUVREMENT',
+            type: 'Revenu',
+            fee_type: 'INSCRIPTION',
+            method: 'MonCash',
+            payment_method: 'MonCash',
+            status: 'EN_ATTENTE',
+            reference_number: orderId,
+            notes: `Réinscription MonCash initiée en ligne (Ordre: ${orderId}, Tél: ${moncashPayerPhone || formData.parentPhone || 'Non spécifié'})`
+          }).select().single();
+
+          if (payErr) throw payErr;
+
+          // 2. Initialisation de la transaction auprès de la passerelle MonCash
+          let redirectUrl: string | null = null;
+          try {
+            redirectUrl = await MonCashService.initiatePayment(user.school_id, {
+              amount: amountToSave,
+              orderId,
+              description: `Réinscription • ${formData.firstName} ${formData.lastName}`
+            });
+          } catch (initErr) {
+            console.warn('Initialisation MonCash warning:', initErr);
+          }
+
+          // 3. Stockage des données en attente et ouverture de la modal de paiement MonCash sécurisée
+          setMonCashPendingData({
+            paymentId: pendingPayment?.id || orderId,
+            orderId,
+            amount: amountToSave,
+            currency: 'HTG',
+            studentName: `${formData.firstName} ${formData.lastName}`.trim(),
+            studentCode: targetStudentId.substring(0, 8).toUpperCase(),
+            studentClass: selectedClass?.name || 'Réinscription',
+            feeTypeLabel: isReenroll ? 'Frais de Réinscription' : "Frais d'Inscription",
+            redirectUrl,
+            payerPhone: moncashPayerPhone || formData.parentPhone || formData.phone,
+            initiatedAt: new Date().toISOString(),
+            targetStudentId,
+            targetYearId
+          });
+
+          setShowMonCashWaiting(true);
+          clearDraft();
+          setSavedStudentId(targetStudentId);
+          setIsSubmitting(false);
+          return; // Arrêt : l'élève et la réinscription ne sont PAS validés gratuitement sans débit !
+        }
+
+        // --- CAS 2 : MONCASH MANUEL / GUICHET OU AUTRES MODES DE RÈGLEMENT ---
+        let paymentNotes = `Règlement frais d'inscription (${inscriptionPaymentMethod})`;
+        let transactionRef: string | undefined = undefined;
+
+        if (inscriptionPaymentMethod === 'MonCash') {
+          if (!moncashManualRef || moncashManualRef.trim().length < 4) {
+            setApiError("Veuillez saisir le numéro de transaction Digicel MonCash (ex: TX-98765432) certifiant le paiement reçu au guichet.");
+            setIsSubmitting(false);
+            return;
+          }
+          transactionRef = moncashManualRef.trim();
+          paymentNotes = `Transfert direct MonCash certifié au guichet (Réf: ${transactionRef}, Expéditeur: ${moncashPayerPhone || formData.parentPhone || 'Non spécifié'})`;
+        }
+
         await supabase.from('payments').insert({
           school_id: user.school_id,
           campus_id: resolvedCampusId,
@@ -830,7 +937,10 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           fee_type: 'INSCRIPTION',
           method: inscriptionPaymentMethod,
           payment_method: inscriptionPaymentMethod,
-          status: 'VALIDE'
+          status: 'VALIDE',
+          transaction_id: transactionRef,
+          reference_number: transactionRef,
+          notes: paymentNotes
         });
 
         await supabase.from('students').update({ status: 'Actif' }).eq('id', targetStudentId);
@@ -848,6 +958,55 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     } finally { 
       setIsSubmitting(false); 
     }
+  };
+
+  // Callback lorsque le paiement MonCash est validé par la passerelle ou webhook
+  const handleMonCashConfirmed = async (confirmedPayment: any) => {
+    if (!monCashPendingData) return;
+    const { targetStudentId, targetYearId, paymentId } = monCashPendingData;
+    try {
+      const txRef = confirmedPayment?.transaction_reference || confirmedPayment?.transaction_id || `MC-TX-${Date.now()}`;
+      
+      // 1. Marquer le paiement comme VALIDE avec la référence réelle
+      await supabase.from('payments').update({
+        status: 'VALIDE',
+        transaction_id: txRef,
+        reference_number: txRef,
+        receipt_number: `REC-${Date.now().toString().slice(-6)}`,
+        notes: `Paiement MonCash validé et encaissé avec succès (Réf: ${txRef})`
+      }).eq('id', paymentId);
+
+      // 2. Activer l'élève et son inscription académique
+      await supabase.from('students').update({ status: 'Actif' }).eq('id', targetStudentId);
+      await supabase.from('enrollments')
+        .update({ status: 'ACTIVE' })
+        .eq('student_id', targetStudentId)
+        .eq('academic_year_id', targetYearId);
+
+      setShowMonCashWaiting(false);
+      setMonCashPendingData(null);
+      setIsSuccess(true);
+    } catch (err: any) {
+      console.error("Erreur finalisation paiement MonCash:", err);
+      setApiError("Erreur lors de la validation du paiement MonCash : " + (err.message || ""));
+    }
+  };
+
+  // Callback lorsque l'utilisateur annule le paiement MonCash
+  const handleMonCashCancelled = async () => {
+    if (!monCashPendingData) return;
+    const { paymentId } = monCashPendingData;
+    try {
+      await supabase.from('payments').update({
+        status: 'ANNULE',
+        notes: 'Session de paiement MonCash annulée par l’utilisateur'
+      }).eq('id', paymentId);
+    } catch (err) {
+      console.warn("Erreur annulation paiement MonCash:", err);
+    }
+    setShowMonCashWaiting(false);
+    setMonCashPendingData(null);
+    setApiError("Le paiement MonCash n'a pas été validé. Vos fonds n'ont pas été prélevés sur votre compte MonCash. La réinscription reste en attente.");
   };
 
   if (loadingRefs) {
@@ -1291,44 +1450,39 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </label>
                       <InfoTooltip content="Lien relationnel avec l'élève ou étudiant." />
                     </div>
-                    <div className="relative">
-                      <select 
-                        name="parentRelation" 
-                        value={formData.parentRelation} 
-                        onChange={(e: any) => setFormData((prev: any) => ({ ...prev, parentRelation: e.target.value }))} 
-                        className="w-full px-3.5 py-2.5 min-h-[44px] bg-white text-slate-900 border border-slate-200 rounded-xl text-sm font-medium outline-none appearance-none cursor-pointer focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/15 transition-all"
-                      >
-                        {isAdultLevel ? (
-                          <>
-                            <option value="Conjoint(e)">Conjoint(e)</option>
-                            <option value="Père/Mère">Père / Mère</option>
-                            <option value="Tuteur">Tuteur Légal / Référent</option>
-                            <option value="Ami(e)">Ami(e) Proche</option>
-                            <option value="Autre">Autre</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="Père">Père</option>
-                            <option value="Mère">Mère</option>
-                            <option value="Tuteur">Tuteur Légal</option>
-                            <option value="Autre">Autre Responsable</option>
-                          </>
-                        )}
-                      </select>
-                      <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                    </div>
+                    <SelectPill
+                      options={isAdultLevel ? [
+                        { value: 'Conjoint(e)', label: 'Conjoint(e)', badge: 'Famille' },
+                        { value: 'Père/Mère', label: 'Père / Mère', badge: 'Parent' },
+                        { value: 'Tuteur', label: 'Tuteur Légal / Référent', badge: 'Légal' },
+                        { value: 'Ami(e)', label: 'Ami(e) Proche', badge: 'Proche' },
+                        { value: 'Autre', label: 'Autre Contact', badge: 'Autre' }
+                      ] : [
+                        { value: 'Père', label: 'Père', badge: 'Parent' },
+                        { value: 'Mère', label: 'Mère', badge: 'Parent' },
+                        { value: 'Tuteur', label: 'Tuteur Légal', badge: 'Légal' },
+                        { value: 'Autre', label: 'Autre Responsable', badge: 'Responsable' }
+                      ]}
+                      value={formData.parentRelation}
+                      onChange={(val) => setFormData((prev: any) => ({ ...prev, parentRelation: val }))}
+                      variant="field"
+                      size="md"
+                      colorScheme="indigo"
+                      icon={Users}
+                      className="w-full"
+                    />
                   </div>
 
                   <FormField 
-                    label="Email du Responsable" 
+                    label="Email ou Pseudo du Responsable" 
                     name="parentEmail" 
-                    type="email"
+                    type="text"
                     value={formData.parentEmail} 
                     onChange={(e: any) => setFormData((prev: any) => ({ ...prev, parentEmail: e.target.value }))} 
-                    placeholder="email@responsable.com" 
-                    autoComplete="email" 
+                    placeholder="ex: HYPOPCARL ou email@responsable.com" 
+                    autoComplete="off" 
                     icon={Mail}
-                    tooltip="Courriel pour la transmission des bulletins et des reçus de caisse." 
+                    tooltip="Courriel ou pseudo si le responsable n'a pas d'email (pour l'accès web)." 
                   />
 
                   <FormField 
@@ -1494,6 +1648,53 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </div>
                       </div>
                     )}
+
+                    {/* Sélection Directe de Classe / Promotion en Style 'Pillule' (Harmonisé avec Feuille de Présence) */}
+                    <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white p-3.5 rounded-2xl border border-blue-200/90 shadow-2xs space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <GraduationCap size={15} className="text-blue-600" />
+                          <span>{terminology.class} de Destination (Sélecteur Pillule)</span>
+                        </label>
+                        {formData.selectedClassId ? (
+                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                            <Check size={11} />
+                            {dbClasses.find(c => c.id === formData.selectedClassId)?.name || 'Sélectionnée'}
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-slate-400">
+                            {dbClasses.length} {terminology.classes.toLowerCase()} au total
+                          </span>
+                        )}
+                      </div>
+                      <ClassSelectorPill
+                        classes={dbClasses.map(c => ({
+                          id: c.id,
+                          name: c.name,
+                          cycle: (c as any).cycle || c.level || '',
+                          level: c.level || '',
+                          section: (c as any).section || '',
+                          students_count: c.students_count || 0
+                        }))}
+                        selectedClassId={formData.selectedClassId}
+                        onSelectClass={(id) => {
+                          setFormData((prev: any) => ({ ...prev, selectedClassId: id }));
+                          const chosen = dbClasses.find(c => c.id === id);
+                          if (chosen) {
+                            const cycleOrLevel = (chosen as any).cycle || chosen.level;
+                            if (cycleOrLevel) setSelectedCycle(cycleOrLevel);
+                          }
+                        }}
+                        allowAll={false}
+                        emptyLabel={dbClasses.length === 0 ? `Aucune ${terminology.class.toLowerCase()} disponible` : `Choisir une ${terminology.class.toLowerCase()} / promotion...`}
+                        variant="field"
+                        size="md"
+                        colorScheme="blue"
+                        labelPrefix=""
+                        disabled={dbClasses.length === 0}
+                        className="w-full"
+                      />
+                    </div>
 
                     {/* Cycle Selection Pills */}
                     <div className="space-y-2">
@@ -1939,60 +2140,177 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="pt-3 border-t border-slate-100 grid grid-cols-1 sm:grid-cols-2 gap-3"
+                          className="pt-3 border-t border-slate-100 space-y-3.5"
                         >
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                              Mode de Règlement
-                            </label>
-                            <div className="relative">
-                              <select 
-                                value={inscriptionPaymentMethod} 
-                                onChange={(e) => {
-                                  const val = e.target.value;
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                                Mode de Règlement (Pillule)
+                              </label>
+                              <SelectPill
+                                options={activePaymentMethods.map(m => {
+                                  let icon = Banknote;
+                                  let badge = 'Caisse';
+                                  if (m.code === 'MonCash') { icon = Smartphone; badge = 'Mobile Money'; }
+                                  else if (m.code === 'Natcash') { icon = Radio; badge = 'Mobile Money'; }
+                                  else if (m.code === 'Virement Bancaire') { icon = Building2; badge = 'Banque'; }
+                                  else if (m.code === 'Chèque') { icon = CreditCard; badge = 'Chèque'; }
+                                  else if (m.code === 'Carte Bancaire') { icon = CreditCard; badge = 'Carte'; }
+                                  return {
+                                    value: m.code,
+                                    label: m.name,
+                                    badge,
+                                    icon
+                                  };
+                                })}
+                                value={inscriptionPaymentMethod}
+                                onChange={(val) => {
                                   setInscriptionPaymentMethod(val);
                                   if (val === 'MonCash') setInscriptionCurrency('HTG');
                                 }}
-                                className="w-full text-xs font-bold rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 p-2.5 bg-white text-slate-900 shadow-2xs outline-none cursor-pointer appearance-none pr-8"
-                              >
-                                {activePaymentMethods.map(m => (
-                                  <option key={m.code} value={m.code} className="bg-white text-slate-900 font-medium">
-                                    {m.name}
-                                  </option>
-                                ))}
-                              </select>
-                              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
+                                variant="field"
+                                size="md"
+                                colorScheme={inscriptionPaymentMethod === 'MonCash' ? 'rose' : inscriptionPaymentMethod === 'Natcash' ? 'blue' : 'indigo'}
+                                className="w-full"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                                Devise Encaissée (Pillule)
+                              </label>
+                              <SelectPill
+                                options={(currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash') ? [
+                                  { value: 'HTG', label: 'HTG (Gourdes Haïtiennes)', badge: 'Gourdes' }
+                                ] : [
+                                  { value: 'USD', label: 'USD (Dollars Américains)', badge: 'USD' },
+                                  { value: 'HTG', label: 'HTG (Converti au taux officiel)', badge: 'HTG' }
+                                ]}
+                                value={inscriptionCurrency}
+                                onChange={(val) => setInscriptionCurrency(val)}
+                                disabled={currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash'}
+                                variant="field"
+                                size="md"
+                                colorScheme="slate"
+                                className="w-full"
+                              />
+                              {currentPricing.inscription.currency === 'USD' && (
+                                <p className="text-[10px] text-slate-600 font-medium mt-1">
+                                  Montant équivalent : <span className="font-bold text-slate-900">{inscriptionCurrency === 'HTG' ? `${((currentPricing.inscription.amount * (exchangeRate || 132.50))).toLocaleString()} HTG` : `${currentPricing.inscription.amount.toLocaleString()} USD`}</span>
+                                </p>
+                              )}
                             </div>
                           </div>
 
-                          <div>
-                            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                              Devise Encaissée
-                            </label>
-                            <div className="relative">
-                              <select
-                                value={inscriptionCurrency}
-                                onChange={(e) => setInscriptionCurrency(e.target.value)}
-                                disabled={currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash'}
-                                className="w-full text-xs font-bold rounded-xl border border-slate-300 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-600/20 p-2.5 bg-white text-slate-900 disabled:bg-slate-100 disabled:text-slate-500 shadow-2xs outline-none cursor-pointer appearance-none pr-8"
-                              >
-                                {(currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash') ? (
-                                  <option value="HTG" className="bg-white text-slate-900 font-medium">HTG (Gourdes Haïtiennes)</option>
-                                ) : (
-                                  <>
-                                    <option value="USD" className="bg-white text-slate-900 font-medium">USD (Dollars Américains)</option>
-                                    <option value="HTG" className="bg-white text-slate-900 font-medium">HTG (Converti au taux officiel)</option>
-                                  </>
-                                )}
-                              </select>
-                              <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-                            </div>
-                            {currentPricing.inscription.currency === 'USD' && (
-                              <p className="text-[10px] text-slate-600 font-medium mt-1">
-                                Montant équivalent : <span className="font-bold text-slate-900">{inscriptionCurrency === 'HTG' ? `${((currentPricing.inscription.amount * (exchangeRate || 132.50))).toLocaleString()} HTG` : `${currentPricing.inscription.amount.toLocaleString()} USD`}</span>
+                          {/* MODULE SPÉCIFIQUE MONCASH : CONTRÔLE DE DÉBIT RÉEL / ANTI-RÉINSCRIPTION SANS PAIEMENT */}
+                          {inscriptionPaymentMethod === 'MonCash' && (
+                            <div className="bg-rose-50/60 border border-rose-200/90 rounded-2xl p-3.5 space-y-3 text-rose-950">
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600 animate-pulse" />
+                                  <h4 className="text-xs font-black uppercase tracking-wider text-rose-900">
+                                    Vérification & Sécurité MonCash
+                                  </h4>
+                                </div>
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800 border border-rose-200">
+                                  Débit Exigé
+                                </span>
+                              </div>
+
+                              <p className="text-[11px] text-rose-800 font-medium leading-relaxed">
+                                Afin de garantir que l'argent est réellement perçu par l'école, choisissez comment valider ce règlement :
                               </p>
-                            )}
-                          </div>
+
+                              {/* Choice between Online Gateway Push and Cashier Direct Transfer receipt */}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                <button
+                                  type="button"
+                                  onClick={() => setMoncashMode('online')}
+                                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                                    moncashMode === 'online'
+                                      ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                      : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold">1. Passerelle En Ligne</span>
+                                    {moncashMode === 'online' && <Check size={14} />}
+                                  </div>
+                                  <span className={`text-[10px] font-normal leading-tight ${moncashMode === 'online' ? 'text-rose-100' : 'text-slate-500'}`}>
+                                    Notification Push / Validation sur le téléphone du payeur
+                                  </span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => setMoncashMode('manual')}
+                                  className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                                    moncashMode === 'manual'
+                                      ? 'bg-rose-600 text-white border-rose-600 shadow-xs'
+                                      : 'bg-white text-rose-900 border-rose-200 hover:bg-rose-50'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-extrabold">2. Reçu Transfert Guichet</span>
+                                    {moncashMode === 'manual' && <Check size={14} />}
+                                  </div>
+                                  <span className={`text-[10px] font-normal leading-tight ${moncashMode === 'manual' ? 'text-rose-100' : 'text-slate-500'}`}>
+                                    Saisie obligatoire du numéro de transaction Digicel
+                                  </span>
+                                </button>
+                              </div>
+
+                              {moncashMode === 'online' ? (
+                                <div className="p-2.5 bg-white rounded-xl border border-rose-200 space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <label className="text-[11px] font-bold text-slate-700">
+                                      Numéro MonCash du Débiteur (Téléphone)
+                                    </label>
+                                    <span className="text-[10px] text-slate-400">Pour confirmation SMS / Push</span>
+                                  </div>
+                                  <input
+                                    type="tel"
+                                    placeholder="Ex: +509 3700-0000 ou 37000000"
+                                    value={moncashPayerPhone || formData.parentPhone || formData.phone || ''}
+                                    onChange={(e) => setMoncashPayerPhone(e.target.value)}
+                                    className="w-full px-3 py-2 text-xs font-semibold rounded-lg border border-slate-300 focus:outline-none focus:border-rose-600 focus:ring-1 focus:ring-rose-600"
+                                  />
+                                  <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                                    <Info size={12} className="text-rose-600 shrink-0" />
+                                    <span>La modal de vérification s'ouvrira lors de la soumission. La réinscription ne sera validée qu'après confirmation réelle du paiement.</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="p-2.5 bg-white rounded-xl border border-rose-200 space-y-2.5">
+                                  <div>
+                                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                                      Numéro de Transaction MonCash (ID Digicel) <span className="text-rose-600">*</span>
+                                    </label>
+                                    <input
+                                      type="text"
+                                      required
+                                      placeholder="Ex: TX-987654321 ou Réf SMS reçu"
+                                      value={moncashManualRef}
+                                      onChange={(e) => setMoncashManualRef(e.target.value)}
+                                      className="w-full px-3 py-2 text-xs font-bold rounded-lg border border-rose-300 focus:outline-none focus:border-rose-600 focus:ring-1 focus:ring-rose-600 uppercase font-mono"
+                                    />
+                                  </div>
+                                  <div>
+                                    <label className="text-[11px] font-bold text-slate-700 block mb-1">
+                                      Numéro de Téléphone Expéditeur
+                                    </label>
+                                    <input
+                                      type="tel"
+                                      placeholder="Ex: +509 3700-0000"
+                                      value={moncashPayerPhone || formData.parentPhone || formData.phone || ''}
+                                      onChange={(e) => setMoncashPayerPhone(e.target.value)}
+                                      className="w-full px-3 py-2 text-xs font-medium rounded-lg border border-slate-300 focus:outline-none focus:border-rose-600"
+                                    />
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </motion.div>
                       )}
                     </div>
@@ -2061,6 +2379,31 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
       </form>
+
+      {/* MODAL DE VÉRIFICATION ET VALIDATION DU PAIEMENT MONCASH */}
+      {monCashPendingData && (
+        <MonCashWaitingModal
+          isOpen={showMonCashWaiting}
+          onClose={() => {
+            setShowMonCashWaiting(false);
+            handleMonCashCancelled();
+          }}
+          paymentId={monCashPendingData.paymentId}
+          orderId={monCashPendingData.orderId}
+          amount={monCashPendingData.amount}
+          currency={monCashPendingData.currency}
+          studentName={monCashPendingData.studentName}
+          studentCode={monCashPendingData.studentCode}
+          studentClass={monCashPendingData.studentClass}
+          feeTypeLabel={monCashPendingData.feeTypeLabel}
+          redirectUrl={monCashPendingData.redirectUrl}
+          payerPhone={monCashPendingData.payerPhone}
+          schoolId={user.school_id}
+          initiatedAt={monCashPendingData.initiatedAt}
+          onConfirmed={handleMonCashConfirmed}
+          onCancelled={handleMonCashCancelled}
+        />
+      )}
     </div>
   );
 };

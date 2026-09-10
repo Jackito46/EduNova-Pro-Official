@@ -1,5 +1,6 @@
 
 import fs from 'fs';
+import crypto from 'crypto';
 import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
@@ -550,6 +551,92 @@ async function startServer() {
   // Coffre-fort chiffré local (AES-256-GCM) assurant haute disponibilité et tolérance aux pannes réseau Supabase
   const localEncryptedVault: Record<string, Record<string, Record<string, any>>> = {};
 
+  // Journal d'audit en mémoire pour l'historique et la simulation des webhooks (MonCash & Natcash)
+  const webhookAuditLogs: Array<{
+    id: string;
+    timestamp: string;
+    school_id?: string;
+    gateway: 'kobara' | 'moncash';
+    operator: 'moncash' | 'natcash';
+    event_type: string;
+    order_id?: string;
+    transaction_id?: string;
+    amount: number;
+    currency: string;
+    payer_phone?: string;
+    receiver_phone?: string;
+    receiver_mode?: 'single_unified' | 'separated_operator';
+    signature_status?: 'valid' | 'invalid' | 'missing' | 'simulated';
+    persisted_to_db: boolean;
+    http_status: number;
+    simulated: boolean;
+    status: 'VALIDE' | 'EN_ATTENTE' | 'ECHOUE';
+    notes?: string;
+    raw_payload?: any;
+    student_name?: string;
+  }> = [];
+
+  async function getKobaraConfigForSchool(schoolId?: string) {
+    const config = {
+      secret_key: '',
+      webhook_secret: '',
+      public_key: '',
+      receiver_phone: '',
+      receiver_phone_moncash: '',
+      receiver_phone_natcash: '',
+      same_receiver_number: true,
+      auto_payout: true,
+      receiver_name: '',
+      receiver_operator: 'moncash',
+      mode: 'live'
+    };
+
+    if (!schoolId) return config;
+
+    const local = localEncryptedVault[schoolId]?.kobara;
+    if (local) {
+      config.secret_key = local.KOBARA_SECRET_KEY ? (isEncrypted(local.KOBARA_SECRET_KEY) ? decryptSecret(local.KOBARA_SECRET_KEY) : local.KOBARA_SECRET_KEY) : '';
+      config.webhook_secret = local.KOBARA_WEBHOOK_SECRET ? (isEncrypted(local.KOBARA_WEBHOOK_SECRET) ? decryptSecret(local.KOBARA_WEBHOOK_SECRET) : local.KOBARA_WEBHOOK_SECRET) : '';
+      config.public_key = local.KOBARA_PUBLIC_KEY || '';
+      config.receiver_phone = local.KOBARA_RECEIVER_PHONE || '';
+      config.receiver_phone_moncash = local.KOBARA_RECEIVER_PHONE_MONCASH || '';
+      config.receiver_phone_natcash = local.KOBARA_RECEIVER_PHONE_NATCASH || '';
+      config.same_receiver_number = local.KOBARA_SAME_RECEIVER_NUMBER !== 'false';
+      config.auto_payout = local.KOBARA_AUTO_PAYOUT !== 'false';
+      config.receiver_name = local.KOBARA_RECEIVER_NAME || '';
+      config.receiver_operator = local.KOBARA_RECEIVER_OPERATOR || 'moncash';
+      config.mode = local.KOBARA_MODE || 'live';
+    }
+
+    try {
+      const { data: creds } = await supabase
+        .from('api_credentials')
+        .select('key_name, key_value, encrypted_value')
+        .eq('school_id', schoolId)
+        .eq('service_name', 'kobara');
+      if (creds && creds.length > 0) {
+        for (const c of creds) {
+          const val = c.encrypted_value ? decryptSecret(c.encrypted_value) : (c.key_value || '');
+          if (c.key_name === 'KOBARA_SECRET_KEY' && val) config.secret_key = val;
+          if (c.key_name === 'KOBARA_WEBHOOK_SECRET' && val) config.webhook_secret = val;
+          if (c.key_name === 'KOBARA_PUBLIC_KEY' && val) config.public_key = val;
+          if (c.key_name === 'KOBARA_RECEIVER_PHONE' && val) config.receiver_phone = val;
+          if (c.key_name === 'KOBARA_RECEIVER_PHONE_MONCASH' && val) config.receiver_phone_moncash = val;
+          if (c.key_name === 'KOBARA_RECEIVER_PHONE_NATCASH' && val) config.receiver_phone_natcash = val;
+          if (c.key_name === 'KOBARA_SAME_RECEIVER_NUMBER') config.same_receiver_number = c.key_value === 'true' || c.key_value === '1';
+          if (c.key_name === 'KOBARA_AUTO_PAYOUT') config.auto_payout = c.key_value !== 'false';
+          if (c.key_name === 'KOBARA_RECEIVER_NAME' && val) config.receiver_name = val;
+          if (c.key_name === 'KOBARA_RECEIVER_OPERATOR' && val) config.receiver_operator = val;
+          if (c.key_name === 'KOBARA_MODE' && val) config.mode = val;
+        }
+      }
+    } catch (e) {
+      console.warn('[getKobaraConfigForSchool] Erreur DB:', e);
+    }
+
+    return config;
+  }
+
   // GET /api/settings/api-credentials?school_id=...
   app.get('/api/settings/api-credentials', async (req, res) => {
     const schoolId = req.query.school_id as string;
@@ -620,6 +707,10 @@ async function startServer() {
           webhook_secret: '',
           public_key: '',
           receiver_phone: '',
+          receiver_phone_moncash: '',
+          receiver_phone_natcash: '',
+          same_receiver_number: true,
+          auto_payout: true,
           receiver_name: '',
           receiver_operator: 'moncash',
           has_secret: false,
@@ -702,6 +793,10 @@ async function startServer() {
             }
             if (c.key_name === 'KOBARA_PUBLIC_KEY') result.kobara.public_key = c.key_value || '';
             if (c.key_name === 'KOBARA_RECEIVER_PHONE') result.kobara.receiver_phone = c.key_value || '';
+            if (c.key_name === 'KOBARA_RECEIVER_PHONE_MONCASH') result.kobara.receiver_phone_moncash = c.key_value || '';
+            if (c.key_name === 'KOBARA_RECEIVER_PHONE_NATCASH') result.kobara.receiver_phone_natcash = c.key_value || '';
+            if (c.key_name === 'KOBARA_SAME_RECEIVER_NUMBER') result.kobara.same_receiver_number = c.key_value === 'true' || c.key_value === '1';
+            if (c.key_name === 'KOBARA_AUTO_PAYOUT') result.kobara.auto_payout = c.key_value !== 'false';
             if (c.key_name === 'KOBARA_RECEIVER_NAME') result.kobara.receiver_name = c.key_value || '';
             if (c.key_name === 'KOBARA_RECEIVER_OPERATOR') result.kobara.receiver_operator = c.key_value || 'moncash';
             if (c.key_name === 'KOBARA_MODE') result.kobara.mode = c.key_value || 'live';
@@ -791,6 +886,10 @@ async function startServer() {
         if (gsKobara?.value) {
           const val = gsKobara.value;
           if (val.receiver_phone && !result.kobara.receiver_phone) result.kobara.receiver_phone = val.receiver_phone;
+          if (val.receiver_phone_moncash && !result.kobara.receiver_phone_moncash) result.kobara.receiver_phone_moncash = val.receiver_phone_moncash;
+          if (val.receiver_phone_natcash && !result.kobara.receiver_phone_natcash) result.kobara.receiver_phone_natcash = val.receiver_phone_natcash;
+          if (val.same_receiver_number !== undefined) result.kobara.same_receiver_number = val.same_receiver_number;
+          if (val.auto_payout !== undefined) result.kobara.auto_payout = val.auto_payout;
           if (val.receiver_name && !result.kobara.receiver_name) result.kobara.receiver_name = val.receiver_name;
           if (val.receiver_operator && !result.kobara.receiver_operator) result.kobara.receiver_operator = val.receiver_operator;
           if (val.mode && !result.kobara.mode) result.kobara.mode = val.mode;
@@ -1027,6 +1126,10 @@ async function startServer() {
         const rawWebhookSecret = (credentials.webhook_secret || credentials.KOBARA_WEBHOOK_SECRET || '').trim();
         const publicKey = (credentials.public_key || credentials.KOBARA_PUBLIC_KEY || '').trim();
         const receiverPhone = (credentials.receiver_phone || credentials.KOBARA_RECEIVER_PHONE || '').trim();
+        const receiverPhoneMoncash = (credentials.receiver_phone_moncash || credentials.KOBARA_RECEIVER_PHONE_MONCASH || '').trim();
+        const receiverPhoneNatcash = (credentials.receiver_phone_natcash || credentials.KOBARA_RECEIVER_PHONE_NATCASH || '').trim();
+        const sameReceiverNumber = credentials.same_receiver_number !== undefined ? Boolean(credentials.same_receiver_number) : true;
+        const autoPayout = credentials.auto_payout !== undefined ? Boolean(credentials.auto_payout) : true;
         const receiverName = (credentials.receiver_name || credentials.KOBARA_RECEIVER_NAME || '').trim();
         const receiverOperator = (credentials.receiver_operator || credentials.KOBARA_RECEIVER_OPERATOR || 'moncash').trim();
         const mode = (credentials.mode || credentials.KOBARA_MODE || environment || 'live') === 'test' ? 'test' : 'live';
@@ -1045,6 +1148,10 @@ async function startServer() {
         if (finalWebhookSecretToStore) localEncryptedVault[school_id].kobara.KOBARA_WEBHOOK_SECRET = finalWebhookSecretToStore;
         if (publicKey) localEncryptedVault[school_id].kobara.KOBARA_PUBLIC_KEY = publicKey;
         if (receiverPhone) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_PHONE = receiverPhone;
+        if (receiverPhoneMoncash) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_PHONE_MONCASH = receiverPhoneMoncash;
+        if (receiverPhoneNatcash) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_PHONE_NATCASH = receiverPhoneNatcash;
+        localEncryptedVault[school_id].kobara.KOBARA_SAME_RECEIVER_NUMBER = String(sameReceiverNumber);
+        localEncryptedVault[school_id].kobara.KOBARA_AUTO_PAYOUT = String(autoPayout);
         if (receiverName) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_NAME = receiverName;
         if (receiverOperator) localEncryptedVault[school_id].kobara.KOBARA_RECEIVER_OPERATOR = receiverOperator;
         localEncryptedVault[school_id].kobara.KOBARA_MODE = mode;
@@ -1089,6 +1196,50 @@ async function startServer() {
             service_name: 'kobara',
             key_name: 'KOBARA_RECEIVER_PHONE',
             key_value: receiverPhone,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_RECEIVER_PHONE_MONCASH',
+            key_value: receiverPhoneMoncash,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_RECEIVER_PHONE_NATCASH',
+            key_value: receiverPhoneNatcash,
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_SAME_RECEIVER_NUMBER',
+            key_value: String(sameReceiverNumber),
+            encrypted_value: null,
+            is_secret: false,
+            environment: mode,
+            is_active,
+            updated_at: new Date().toISOString()
+          },
+          {
+            school_id,
+            service_name: 'kobara',
+            key_name: 'KOBARA_AUTO_PAYOUT',
+            key_value: String(autoPayout),
             encrypted_value: null,
             is_secret: false,
             environment: mode,
@@ -1179,6 +1330,10 @@ async function startServer() {
             has_webhook_secret: Boolean(rawWebhookSecret || localEncryptedVault[school_id]?.kobara?.KOBARA_WEBHOOK_SECRET),
             public_key: publicKey,
             receiver_phone: receiverPhone,
+            receiver_phone_moncash: receiverPhoneMoncash,
+            receiver_phone_natcash: receiverPhoneNatcash,
+            same_receiver_number: sameReceiverNumber,
+            auto_payout: autoPayout,
             receiver_name: receiverName,
             receiver_operator: receiverOperator,
             mode,
@@ -1540,63 +1695,392 @@ async function startServer() {
 
   // API Route for Kobara Asynchronous Webhook Notifications (MonCash & Natcash)
   app.get('/api/webhooks/kobara', (req, res) => {
-    res.status(200).json({ status: 'ok', service: 'kobara-webhook', message: 'Kobara webhook endpoint active et prêt à recevoir des notifications POST.' });
+    res.status(200).json({ 
+      status: 'ok', 
+      service: 'kobara-webhook', 
+      message: 'Kobara webhook endpoint active et prêt à recevoir des notifications POST pour MonCash et Natcash.',
+      endpoints: {
+        live_webhook: '/api/webhooks/kobara',
+        simulate: '/api/webhooks/simulate',
+        logs: '/api/webhooks/logs'
+      }
+    });
   });
 
   app.post('/api/webhooks/kobara', async (req, res) => {
     try {
       const payload = req.body;
-      const signature = req.headers['x-kobara-signature'] || req.headers['signature'] || req.headers['x-signature'];
-      console.log('[Kobara Webhook] Événement reçu:', {
-        event: payload?.event || payload?.type,
-        data: payload?.data || payload,
-        hasSignature: Boolean(signature)
-      });
-
-      // Traitement des événements Kobara : payment.succeeded, payment.failed, payment.pending, withdrawal.paid
-      const eventType = payload?.event || payload?.type || '';
+      const rawSignature = (req.headers['x-kobara-signature'] || req.headers['signature'] || req.headers['x-signature'] || '') as string;
+      
+      const eventType = payload?.event || payload?.type || 'payment.succeeded';
       const paymentData = payload?.data || payload;
+      
+      // Détection de l'opérateur (MonCash vs Natcash)
+      const rawOp = String(paymentData?.operator || paymentData?.payment_method || payload?.operator || 'moncash').toLowerCase();
+      const operator: 'moncash' | 'natcash' = rawOp.includes('natcash') || rawOp.includes('natcom') ? 'natcash' : 'moncash';
 
-      if (
+      const orderId = paymentData?.order_id || paymentData?.reference || paymentData?.metadata?.order_id || `ORD-${Date.now()}`;
+      const transactionId = paymentData?.transaction_id || paymentData?.id || `TX-${Date.now()}`;
+      const amount = Number(paymentData?.amount) || 0;
+      const currency = paymentData?.currency || 'HTG';
+      const payerPhone = paymentData?.payer_phone || paymentData?.phone || paymentData?.customer?.phone || '';
+
+      let schoolId = paymentData?.metadata?.school_id || payload?.school_id || '';
+      let studentId = paymentData?.metadata?.student_id || payload?.student_id || '';
+      let studentName = paymentData?.metadata?.student_name || '';
+
+      // Si studentId fourni mais pas schoolId, chercher le schoolId
+      if (studentId && !schoolId) {
+        try {
+          const { data: std } = await supabase.from('students').select('id, school_id, first_name, last_name').eq('id', studentId).maybeSingle();
+          if (std) {
+            schoolId = std.school_id;
+            if (!studentName) studentName = `${std.first_name} ${std.last_name}`.trim();
+          }
+        } catch (e) {}
+      }
+
+      // Résolution de la passerelle unifiée et vérification du compte récepteur
+      const kobaraConfig = await getKobaraConfigForSchool(schoolId);
+      
+      let resolvedReceiverPhone = '';
+      let receiverMode: 'single_unified' | 'separated_operator' = 'single_unified';
+      
+      if (kobaraConfig.same_receiver_number) {
+        receiverMode = 'single_unified';
+        resolvedReceiverPhone = kobaraConfig.receiver_phone || kobaraConfig.receiver_phone_moncash || '';
+      } else {
+        receiverMode = 'separated_operator';
+        resolvedReceiverPhone = operator === 'natcash' 
+          ? (kobaraConfig.receiver_phone_natcash || '') 
+          : (kobaraConfig.receiver_phone_moncash || kobaraConfig.receiver_phone || '');
+      }
+
+      // Vérification de la signature si configurée
+      let signatureStatus: 'valid' | 'invalid' | 'missing' | 'simulated' = 'missing';
+      if (rawSignature) {
+        if (kobaraConfig.webhook_secret) {
+          const expectedSig = crypto.createHmac('sha256', kobaraConfig.webhook_secret).update(JSON.stringify(payload)).digest('hex');
+          signatureStatus = (rawSignature === expectedSig || rawSignature === `sha256=${expectedSig}`) ? 'valid' : 'invalid';
+        } else {
+          signatureStatus = 'valid'; // Pas de secret configuré, accepté
+        }
+      }
+
+      const isSuccess = 
         eventType === 'payment.succeeded' || 
         eventType.includes('success') || 
         paymentData?.status === 'successful' || 
         paymentData?.status === 'succeeded' || 
-        paymentData?.status === 'completed'
-      ) {
-        const orderId = paymentData?.order_id || paymentData?.reference || paymentData?.metadata?.order_id;
-        const transactionId = paymentData?.transaction_id || paymentData?.id;
-        const amount = paymentData?.amount;
-        console.log(`[Kobara Webhook] Paiement validé avec succès pour orderId=${orderId}, tx=${transactionId}, montant=${amount} HTG`);
+        paymentData?.status === 'completed';
 
-        // Si métadonnées étudiant présentes, mise à jour dans Supabase
-        const studentId = paymentData?.metadata?.student_id;
-        const schoolId = paymentData?.metadata?.school_id;
-        if (studentId && schoolId) {
-          try {
-            await supabase.from('payments').insert([{
-              school_id: schoolId,
-              student_id: studentId,
-              amount: Number(amount) || 0,
-              payment_method: 'kobara',
-              reference_number: transactionId || orderId,
-              status: 'VALIDE',
-              notes: `Paiement Kobara (${eventType}) - Réf: ${orderId}`,
-              created_at: new Date().toISOString()
-            }]);
-            console.log(`[Kobara Webhook] Paiement enregistré dans Supabase pour l'élève ${studentId}`);
-          } catch (dbErr) {
-            console.warn('[Kobara Webhook] Fallback enregistrement base:', dbErr);
-          }
+      const isPending = eventType === 'payment.pending' || paymentData?.status === 'pending';
+      const statusStr = isSuccess ? 'VALIDE' : (isPending ? 'EN_ATTENTE' : 'ECHOUE');
+
+      let persisted = false;
+      if (isSuccess && schoolId && amount > 0) {
+        try {
+          const feeType = paymentData?.metadata?.fee_type || 'SCOLARITE';
+          const methodLabel = operator === 'natcash' ? 'Natcash (Passerelle Kobara)' : 'MonCash (Passerelle Kobara)';
+          
+          await supabase.from('payments').insert([{
+            school_id: schoolId,
+            student_id: studentId || null,
+            amount: amount,
+            amount_htg_equivalent: amount,
+            currency: currency,
+            payment_method: operator,
+            method: methodLabel,
+            fee_type: feeType,
+            nature: 'RECOUVREMENT',
+            type: 'Revenu',
+            reference_number: transactionId || orderId,
+            status: 'VALIDE',
+            date: new Date().toISOString().split('T')[0],
+            notes: `Encaissement ${operator === 'natcash' ? 'Natcash' : 'MonCash'} via Passerelle Unifiée Kobara • Réf: ${orderId} • Compte récepteur: ${resolvedReceiverPhone || 'Défaut'}`,
+            created_at: new Date().toISOString()
+          }]);
+          persisted = true;
+          console.log(`[Kobara Webhook] Paiement de ${amount} HTG enregistré avec succès pour ${studentName || studentId || 'Général'}`);
+        } catch (dbErr) {
+          console.warn('[Kobara Webhook] Erreur insertion payments:', dbErr);
         }
       }
 
-      // Réponse 200 OK obligatoire pour acquitter la réception auprès de Kobara
-      return res.status(200).json({ received: true, timestamp: new Date().toISOString(), event: eventType });
+      // Log d'audit
+      const logEntry = {
+        id: `wh-log-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        school_id: schoolId,
+        gateway: 'kobara' as const,
+        operator,
+        event_type: eventType,
+        order_id: orderId,
+        transaction_id: transactionId,
+        amount,
+        currency,
+        payer_phone: payerPhone,
+        receiver_phone: resolvedReceiverPhone,
+        receiver_mode: receiverMode,
+        signature_status: signatureStatus,
+        persisted_to_db: persisted,
+        http_status: 200,
+        simulated: Boolean(payload?.is_simulated || req.headers['x-simulated']),
+        status: statusStr as any,
+        notes: `Notification ${operator === 'natcash' ? 'Natcash' : 'MonCash'} • ${eventType}`,
+        raw_payload: payload,
+        student_name: studentName
+      };
+
+      webhookAuditLogs.unshift(logEntry);
+      if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+
+      return res.status(200).json({
+        received: true,
+        timestamp: new Date().toISOString(),
+        event: eventType,
+        operator,
+        order_id: orderId,
+        persisted,
+        receiver_phone: resolvedReceiverPhone,
+        receiver_mode: receiverMode,
+        signature_status: signatureStatus
+      });
     } catch (err: any) {
       console.error('[Kobara Webhook] Erreur traitement webhook:', err);
       return res.status(500).json({ received: false, error: err.message });
     }
+  });
+
+  // API Route de Simulation Dédiée pour l'Économat (Teste la logique de fusion MonCash & Natcash)
+  app.post('/api/webhooks/simulate', async (req, res) => {
+    try {
+      const {
+        school_id,
+        gateway = 'kobara',
+        operator = 'moncash',
+        event_type = 'payment.succeeded',
+        amount = 2500,
+        currency = 'HTG',
+        payer_phone,
+        order_id,
+        transaction_id,
+        student_id,
+        fee_type = 'SCOLARITE',
+        sign_valid = true,
+        persist = true,
+        description
+      } = req.body;
+
+      if (!school_id) {
+        return res.status(400).json({ success: false, error: 'school_id requis pour la simulation' });
+      }
+
+      const effectiveOperator: 'moncash' | 'natcash' = operator === 'natcash' ? 'natcash' : 'moncash';
+      const effectiveOrderId = order_id || `ORD-SIM-${Date.now().toString().slice(-6)}`;
+      const effectiveTxId = transaction_id || `TX-SIM-${Date.now().toString().slice(-6)}`;
+      const effectiveAmount = Number(amount) || 0;
+      
+      const defaultPhone = effectiveOperator === 'natcash' ? '+509 2244 5566' : '+509 3788 9900';
+      const effectivePayerPhone = payer_phone || defaultPhone;
+
+      // Récupérer le nom de l'élève si un student_id est fourni
+      let studentName = '';
+      if (student_id) {
+        try {
+          const { data: std } = await supabase.from('students').select('id, first_name, last_name').eq('id', student_id).maybeSingle();
+          if (std) studentName = `${std.first_name} ${std.last_name}`.trim();
+        } catch (e) {}
+      }
+
+      // Résolution de la configuration de fusion Kobara
+      const kobaraConfig = await getKobaraConfigForSchool(school_id);
+
+      let resolvedReceiverPhone = '';
+      let receiverMode: 'single_unified' | 'separated_operator' = 'single_unified';
+      
+      if (kobaraConfig.same_receiver_number) {
+        receiverMode = 'single_unified';
+        resolvedReceiverPhone = kobaraConfig.receiver_phone || kobaraConfig.receiver_phone_moncash || 'Non configuré (Compte Unique)';
+      } else {
+        receiverMode = 'separated_operator';
+        resolvedReceiverPhone = effectiveOperator === 'natcash' 
+          ? (kobaraConfig.receiver_phone_natcash || 'Non configuré (Natcash)') 
+          : (kobaraConfig.receiver_phone_moncash || kobaraConfig.receiver_phone || 'Non configuré (MonCash)');
+      }
+
+      // Construction du payload webhook réaliste
+      const webhookPayload = {
+        event: event_type,
+        type: event_type,
+        is_simulated: true,
+        data: {
+          id: effectiveTxId,
+          transaction_id: effectiveTxId,
+          order_id: effectiveOrderId,
+          reference: effectiveOrderId,
+          amount: effectiveAmount,
+          currency: currency,
+          status: event_type === 'payment.succeeded' ? 'successful' : (event_type === 'payment.pending' ? 'pending' : 'failed'),
+          operator: effectiveOperator,
+          payment_method: effectiveOperator,
+          payer_phone: effectivePayerPhone,
+          receiver_phone: resolvedReceiverPhone,
+          receiver_name: kobaraConfig.receiver_name || 'Établissement Scolaire',
+          created_at: new Date().toISOString(),
+          metadata: {
+            school_id,
+            student_id: student_id || null,
+            student_name: studentName,
+            fee_type,
+            gateway: 'kobara_unified',
+            description: description || `Simulation Paiement ${effectiveOperator === 'natcash' ? 'Natcash' : 'MonCash'} Économat`,
+            simulation: true
+          }
+        }
+      };
+
+      // Calcul de la signature
+      const webhookSecret = kobaraConfig.webhook_secret || 'sim_whsec_kbr_test_default';
+      const calculatedSignature = crypto.createHmac('sha256', webhookSecret).update(JSON.stringify(webhookPayload)).digest('hex');
+      const signatureToUse = sign_valid ? calculatedSignature : 'sig_invalid_tampered_hash_00000000';
+
+      // Persistance réelle en base si demandée et si succès
+      let persistedRecord: any = null;
+      let dbError: string | null = null;
+      
+      if (persist && event_type === 'payment.succeeded' && effectiveAmount > 0) {
+        try {
+          const methodLabel = effectiveOperator === 'natcash' ? 'Natcash (Passerelle Kobara)' : 'MonCash (Passerelle Kobara)';
+          const insertData = {
+            school_id,
+            student_id: student_id || null,
+            amount: effectiveAmount,
+            amount_htg_equivalent: effectiveAmount,
+            currency: currency,
+            payment_method: effectiveOperator,
+            method: methodLabel,
+            fee_type,
+            nature: 'RECOUVREMENT',
+            type: 'Revenu',
+            reference_number: effectiveTxId,
+            status: 'VALIDE',
+            date: new Date().toISOString().split('T')[0],
+            notes: `[TEST SIMULATION ÉCONOMAT] Règlement ${effectiveOperator === 'natcash' ? 'Natcash' : 'MonCash'} via Passerelle Unifiée • Réf: ${effectiveOrderId}`,
+            created_at: new Date().toISOString()
+          };
+
+          const { data: inserted, error: insertErr } = await supabase.from('payments').insert([insertData]).select().single();
+          if (insertErr) {
+            dbError = insertErr.message;
+          } else {
+            persistedRecord = inserted;
+          }
+        } catch (err: any) {
+          dbError = err.message;
+        }
+      }
+
+      // Création du log d'audit
+      const logEntry = {
+        id: `sim-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        school_id,
+        gateway: 'kobara' as const,
+        operator: effectiveOperator,
+        event_type,
+        order_id: effectiveOrderId,
+        transaction_id: effectiveTxId,
+        amount: effectiveAmount,
+        currency,
+        payer_phone: effectivePayerPhone,
+        receiver_phone: resolvedReceiverPhone,
+        receiver_mode: receiverMode,
+        signature_status: sign_valid ? ('valid' as const) : ('invalid' as const),
+        persisted_to_db: Boolean(persistedRecord),
+        http_status: 200,
+        simulated: true,
+        status: event_type === 'payment.succeeded' ? ('VALIDE' as const) : (event_type === 'payment.pending' ? ('EN_ATTENTE' as const) : ('ECHOUE' as const)),
+        notes: `Simulation ${effectiveOperator === 'natcash' ? 'Natcash' : 'MonCash'} • ${event_type}`,
+        raw_payload: webhookPayload,
+        student_name: studentName
+      };
+
+      webhookAuditLogs.unshift(logEntry);
+      if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+
+      return res.status(200).json({
+        success: true,
+        http_status: 200,
+        message: `Simulation de notification Webhook ${effectiveOperator === 'natcash' ? 'Natcash' : 'MonCash'} traitée avec succès.`,
+        diagnostic: {
+          gateway_tested: 'Passerelle Unifiée Kobara (MonCash & Natcash)',
+          operator: effectiveOperator,
+          event_type,
+          receiver_resolution: {
+            configured_mode: receiverMode,
+            mode_label: receiverMode === 'single_unified' ? 'Numéro Unique Partagé (Coïncidence)' : 'Numéros Séparés par Opérateur',
+            resolved_phone: resolvedReceiverPhone,
+            is_configured: Boolean(resolvedReceiverPhone && !resolvedReceiverPhone.includes('Non configuré')),
+            auto_payout: kobaraConfig.auto_payout,
+            receiver_name: kobaraConfig.receiver_name || 'Non défini'
+          },
+          security: {
+            signature_simulated: signatureToUse,
+            signature_valid: sign_valid,
+            webhook_secret_configured: Boolean(kobaraConfig.webhook_secret),
+            signing_algorithm: 'HMAC-SHA256'
+          },
+          accounting: {
+            persisted_to_payments: Boolean(persistedRecord),
+            payment_id: persistedRecord?.id || null,
+            student_id: student_id || null,
+            student_name: studentName || 'Non rattaché',
+            amount: effectiveAmount,
+            currency,
+            db_error: dbError
+          }
+        },
+        payload_sent: webhookPayload,
+        headers_simulated: {
+          'x-kobara-signature': signatureToUse,
+          'content-type': 'application/json',
+          'user-agent': 'Kobara-Webhook-Simulator/2.0'
+        },
+        log_entry: logEntry
+      });
+    } catch (err: any) {
+      console.error('[Simulate Webhook] Erreur simulation:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // API Route pour consulter les logs d'audit Webhook récents
+  app.get('/api/webhooks/logs', (req, res) => {
+    const schoolId = req.query.school_id as string;
+    const filtered = schoolId 
+      ? webhookAuditLogs.filter(l => !l.school_id || l.school_id === schoolId)
+      : webhookAuditLogs;
+    res.json({
+      success: true,
+      count: filtered.length,
+      logs: filtered
+    });
+  });
+
+  // API Route pour vider les logs d'audit Webhook
+  app.post('/api/webhooks/logs/clear', (req, res) => {
+    const { school_id } = req.body;
+    if (school_id) {
+      for (let i = webhookAuditLogs.length - 1; i >= 0; i--) {
+        if (webhookAuditLogs[i].school_id === school_id) {
+          webhookAuditLogs.splice(i, 1);
+        }
+      }
+    } else {
+      webhookAuditLogs.length = 0;
+    }
+    res.json({ success: true, message: 'Logs de simulation réinitialisés.' });
   });
 
   // API Route for creating Kobara Payment Checkout (MonCash & Natcash)

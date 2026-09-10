@@ -72,6 +72,10 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       webhook_secret: string;
       public_key: string;
       receiver_phone: string;
+      receiver_phone_moncash: string;
+      receiver_phone_natcash: string;
+      same_receiver_number: boolean;
+      auto_payout: boolean;
       receiver_name: string;
       receiver_operator: 'moncash' | 'natcash' | 'bank';
       has_secret: boolean;
@@ -131,6 +135,10 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       webhook_secret: 'whsec_81539ff02bf7f9',
       public_key: '',
       receiver_phone: '',
+      receiver_phone_moncash: '',
+      receiver_phone_natcash: '',
+      same_receiver_number: true,
+      auto_payout: true,
       receiver_name: '',
       receiver_operator: 'moncash',
       has_secret: true,
@@ -287,6 +295,10 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           KOBARA_WEBHOOK_SECRET: clearWhSecret,
           KOBARA_PUBLIC_KEY: vaultData.kobara.public_key,
           KOBARA_RECEIVER_PHONE: vaultData.kobara.receiver_phone,
+          KOBARA_RECEIVER_PHONE_MONCASH: vaultData.kobara.same_receiver_number ? vaultData.kobara.receiver_phone : vaultData.kobara.receiver_phone_moncash,
+          KOBARA_RECEIVER_PHONE_NATCASH: vaultData.kobara.same_receiver_number ? vaultData.kobara.receiver_phone : vaultData.kobara.receiver_phone_natcash,
+          KOBARA_SAME_RECEIVER_NUMBER: vaultData.kobara.same_receiver_number,
+          KOBARA_AUTO_PAYOUT: vaultData.kobara.auto_payout,
           KOBARA_RECEIVER_NAME: vaultData.kobara.receiver_name,
           KOBARA_RECEIVER_OPERATOR: vaultData.kobara.receiver_operator,
           KOBARA_MODE: vaultData.kobara.mode
@@ -738,74 +750,226 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 </p>
               </div>
 
-              {/* Numéro de Téléphone Récepteur Kobara */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Smartphone size={13} className="text-orange-600" />
-                    Numéro de Téléphone Récepteur (MonCash / Natcash) *
-                  </label>
-                  <span className="text-[10px] font-bold text-slate-500">
-                    Format: +509 3... / 4...
-                  </span>
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type="text"
-                    value={vaultData.kobara.receiver_phone || ''}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setVaultData(prev => ({
+              {/* Configuration Réception : Numéro unique ou numéros séparés */}
+              <div className="space-y-3 md:col-span-2 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
+                  <div>
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                      <Smartphone size={14} className="text-orange-600" />
+                      Comptes de Réception & Reversement des Fonds
+                    </label>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      Définissez comment les fonds MonCash et Natcash encaissés vous sont reversés
+                    </p>
+                  </div>
+
+                  {/* Bascule Coïncidence ou Séparé */}
+                  <div className="inline-flex p-0.5 bg-white border border-slate-200 rounded-xl shadow-2xs self-start sm:self-auto">
+                    <button
+                      type="button"
+                      onClick={() => setVaultData(prev => ({
                         ...prev,
-                        kobara: { ...prev.kobara, receiver_phone: val }
-                      }));
-                    }}
-                    placeholder="+509 3700 0000 ou 4600 0000"
-                    className="w-full pl-3.5 pr-10 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all"
-                  />
-                  <div className="absolute right-3 text-slate-400">
-                    <PhoneCall size={15} />
+                        kobara: { ...prev.kobara, same_receiver_number: true }
+                      }))}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        vaultData.kobara.same_receiver_number
+                          ? 'bg-orange-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Check size={11} className={vaultData.kobara.same_receiver_number ? 'opacity-100' : 'opacity-0'} />
+                      <span>Numéro Unique (Coïncident)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setVaultData(prev => ({
+                        ...prev,
+                        kobara: { ...prev.kobara, same_receiver_number: false }
+                      }))}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                        !vaultData.kobara.same_receiver_number
+                          ? 'bg-orange-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Sliders size={11} className={!vaultData.kobara.same_receiver_number ? 'opacity-100' : 'opacity-0'} />
+                      <span>Numéros Séparés</span>
+                    </button>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500">
-                  Numéro de compte MonCash ou Natcash vers lequel les montants encaissés seront reversés.
-                </p>
-              </div>
 
-              {/* Titulaire / Nom du bénéficiaire */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Building size={13} className="text-orange-600" />
-                    Nom du Titulaire / Compte de Réception
-                  </label>
-                  <span className="text-[10px] font-bold text-slate-500">
-                    Ex: Collège Mixte / Direction
-                  </span>
+                {/* Cas 1 : Les 2 coïncident ensemble (Numéro Unique) */}
+                {vaultData.kobara.same_receiver_number ? (
+                  <div className="space-y-1.5 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Smartphone size={13} className="text-orange-600" />
+                        Numéro Récepteur Unique (MonCash & Natcash) *
+                      </label>
+                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        ✓ Coïncident ensemble
+                      </span>
+                    </div>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={vaultData.kobara.receiver_phone || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setVaultData(prev => ({
+                            ...prev,
+                            kobara: { 
+                              ...prev.kobara, 
+                              receiver_phone: val,
+                              receiver_phone_moncash: val,
+                              receiver_phone_natcash: val
+                            }
+                          }));
+                        }}
+                        placeholder="+509 3700 0000 ou 4600 0000"
+                        className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 focus:border-orange-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs"
+                      />
+                      <div className="absolute right-3 text-slate-400">
+                        <PhoneCall size={15} />
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500">
+                      Ce numéro unique reçoit l'ensemble des encaissements (MonCash et Natcash reversés sur ce même compte).
+                    </p>
+                  </div>
+                ) : (
+                  /* Cas 2 : Numéros distincts par opérateur (MonCash Digicel & Natcash Natcom) */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
+                    {/* Numéro Récepteur MonCash */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-red-500"></span>
+                          Numéro Récepteur MonCash (Digicel) *
+                        </label>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          3x / 4x
+                        </span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={vaultData.kobara.receiver_phone_moncash || vaultData.kobara.receiver_phone || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setVaultData(prev => ({
+                              ...prev,
+                              kobara: { 
+                                ...prev.kobara, 
+                                receiver_phone_moncash: val,
+                                receiver_phone: val || prev.kobara.receiver_phone 
+                              }
+                            }));
+                          }}
+                          placeholder="+509 3700 0000 ou 4600 0000"
+                          className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 focus:border-red-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs"
+                        />
+                        <div className="absolute right-3 text-red-400">
+                          <PhoneCall size={15} />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Compte Digicel dédié aux règlements par MonCash.
+                      </p>
+                    </div>
+
+                    {/* Numéro Récepteur Natcash */}
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
+                          Numéro Récepteur Natcash (Natcom) *
+                        </label>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          2x
+                        </span>
+                      </div>
+                      <div className="relative flex items-center">
+                        <input
+                          type="text"
+                          value={vaultData.kobara.receiver_phone_natcash || ''}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setVaultData(prev => ({
+                              ...prev,
+                              kobara: { ...prev.kobara, receiver_phone_natcash: val }
+                            }));
+                          }}
+                          placeholder="+509 2200 0000"
+                          className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 focus:border-blue-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs"
+                        />
+                        <div className="absolute right-3 text-blue-400">
+                          <PhoneCall size={15} />
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-500">
+                        Compte Natcom dédié aux règlements par Natcash.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Titulaire & Auto-Payout */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/60">
+                  {/* Titulaire / Nom du compte */}
+                  <div className="space-y-1">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Building size={13} className="text-orange-600" />
+                      Titulaire / Nom du Compte
+                    </label>
+                    <input
+                      type="text"
+                      value={vaultData.kobara.receiver_name || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setVaultData(prev => ({
+                          ...prev,
+                          kobara: { ...prev.kobara, receiver_name: val }
+                        }));
+                      }}
+                      placeholder="Ex: Direction Collège Mixte"
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-orange-500 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  {/* Auto-Payout switch */}
+                  <div className="space-y-1 flex flex-col justify-end">
+                    <div className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                      <div>
+                        <span className="text-xs font-bold text-slate-900 block">Auto-Payout en temps réel</span>
+                        <span className="text-[10px] text-slate-500 font-medium">Reversement automatique immédiat</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setVaultData(prev => ({
+                          ...prev,
+                          kobara: { ...prev.kobara, auto_payout: !prev.kobara.auto_payout }
+                        }))}
+                        className={`w-10 h-6 rounded-full transition-colors relative cursor-pointer ${
+                          vaultData.kobara.auto_payout ? 'bg-orange-600' : 'bg-slate-300'
+                        }`}
+                      >
+                        <span
+                          className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
+                            vaultData.kobara.auto_payout ? 'left-5' : 'left-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="text"
-                  value={vaultData.kobara.receiver_name || ''}
-                  onChange={(e) => {
-                    const val = e.target.value;
-                    setVaultData(prev => ({
-                      ...prev,
-                      kobara: { ...prev.kobara, receiver_name: val }
-                    }));
-                  }}
-                  placeholder="Nom officiel du détenteur du compte"
-                  className="w-full px-3.5 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all"
-                />
-                <p className="text-[11px] text-slate-500">
-                  Nom qui apparaîtra sur les relevés de virement et dans les journaux de transaction.
-                </p>
               </div>
 
-              {/* Opérateur de Réception */}
+              {/* Opérateur de Réception Principal */}
               <div className="space-y-1.5 md:col-span-2">
                 <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
                   <Wallet size={13} className="text-orange-600" />
-                  Opérateur du Portefeuille Récepteur
+                  Opérateur de Reversement Principal
                 </label>
                 <div className="grid grid-cols-3 gap-3">
                   <button

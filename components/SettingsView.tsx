@@ -1724,8 +1724,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     { id: 'academic', label: terminology.academicYears, icon: Calendar },
     { id: 'finance', label: 'Finance & Taux', icon: CircleDollarSign },
     { id: 'payment_methods', label: 'Modes de Règlement & Banques', icon: Wallet },
-    { id: 'kobara', label: 'Passerelle Kobara', icon: Smartphone },
-    { id: 'gateways', label: 'Coffre-fort & Clés API', icon: Key },
+    { id: 'gateways', label: 'Passerelles de Paiement & Clés API', icon: Key },
     { id: 'security', label: 'Sécurité', icon: Shield }
   ];
 
@@ -3385,16 +3384,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           />
         )}
 
-        {activeTab === 'kobara' && (
-          <KobaraSettingsTab
-            user={user}
-            canManageAllCampuses={canManageAllCampuses}
-            school={school}
-            onSaved={fetchData}
-          />
-        )}
-
-        {activeTab === 'gateways' && (
+        {(activeTab === 'gateways' || (activeTab as any) === 'kobara') && (
           <div className="animate-in slide-in-from-right duration-500">
             <ApiCredentialsVault
               user={user}

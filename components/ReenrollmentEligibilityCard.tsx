@@ -18,6 +18,7 @@ import {
   Info,
   ChevronDown
 } from 'lucide-react';
+import { SelectPill } from './SelectPill';
 
 export type AcademicEvaluationStatus = 
   | 'EXCELLENT_ADMIS' 
@@ -509,24 +510,28 @@ export const ReenrollmentEligibilityCard: React.FC<ReenrollmentEligibilityCardPr
                     <label className="text-[11px] font-bold uppercase tracking-wider text-amber-950 block mb-1">
                       Catégorie de Dérogation <span className="text-rose-500">*</span>
                     </label>
-                    <select
+                    <SelectPill
+                      options={[
+                        { value: 'ACADEMIC_PENDING', label: 'Notes en attente / Délibération ultérieure', badge: 'Académique' },
+                        { value: 'FINANCIAL_ARRANGEMENT', label: "Accord d'échéancier financier avec les parents", badge: 'Financier' },
+                        { value: 'COUNCIL_REPRIEVE', label: 'Repêchage du Conseil de Classe', badge: 'Pédagogique' },
+                        { value: 'DIRECTION_DECISION', label: 'Décision expresse de la Direction', badge: 'Direction' },
+                        { value: 'OTHER', label: 'Autre motif administratif', badge: 'Divers' }
+                      ]}
                       value={dispensation.category}
-                      onChange={(e) => {
-                        const cat = e.target.value as AdministrativeDispensation['category'];
+                      onChange={(val) => {
+                        const cat = val as AdministrativeDispensation['category'];
                         onDispensationChange({
                           ...dispensation,
                           category: cat,
                           reason: PRESET_REASONS[cat]
                         });
                       }}
-                      className="w-full text-xs font-semibold rounded-xl border border-amber-300 p-2 bg-white text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500/20"
-                    >
-                      <option value="ACADEMIC_PENDING">Notes en attente / Délibération ultérieure</option>
-                      <option value="FINANCIAL_ARRANGEMENT">Accord d'échéancier financier avec les parents</option>
-                      <option value="COUNCIL_REPRIEVE">Repêchage du Conseil de Classe</option>
-                      <option value="DIRECTION_DECISION">Décision expresse de la Direction</option>
-                      <option value="OTHER">Autre motif administratif</option>
-                    </select>
+                      variant="field"
+                      size="sm"
+                      colorScheme="amber"
+                      icon={Scale}
+                    />
                   </div>
 
                   <div>
