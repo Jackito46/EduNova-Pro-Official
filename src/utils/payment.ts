@@ -818,4 +818,69 @@ export async function confirmMonCashPaymentManually(params: {
   }
 }
 
+/**
+ * Permet d'annuler une transaction MonCash non aboutie (abandonnée par le parent,
+ * refus de saisie du PIN, erreur de numéro ou choix d'un autre mode d'encaissement).
+ * Met à jour le paiement en statut 'ANNULE' et 'CANCELLED' avec traçabilité d'audit.
+ */
+export async function cancelMonCashPayment(params: {
+  paymentId?: string;
+  orderId?: string;
+  supabaseClient: SupabaseClient;
+  cancelledBy?: string;
+  reason?: string;
+}): Promise<{ success: boolean; error?: string; paymentRecord?: any }> {
+  const { paymentId, orderId, supabaseClient, cancelledBy, reason } = params;
+
+  try {
+    let query = supabaseClient.from('payments').select('id, notes, status, moncash_status');
+    if (paymentId) {
+      query = query.eq('id', paymentId);
+    } else if (orderId) {
+      query = query.or(`moncash_order_id.eq.${orderId},transaction_reference.eq.${orderId}`);
+    }
+
+    const { data: record, error: findError } = await query.limit(1).maybeSingle();
+
+    if (findError || !record) {
+      // Si l'enregistrement n'a pas encore été persisté ou est introuvable, annulation locale réussie
+      return {
+        success: true,
+        error: undefined
+      };
+    }
+
+    // Sécurité : Ne pas annuler une transaction déjà validée/payée
+    if (record.status === 'VALIDE' || record.moncash_status === 'COMPLETED') {
+      return {
+        success: false,
+        error: 'Cette transaction a déjà été confirmée et validée par MonCash. Elle ne peut plus être annulée comme non aboutie.'
+      };
+    }
+
+    const cancelReason = reason || 'Annulé au guichet par l\'opérateur';
+    const updatedNotes = `${record.notes || ''} | Transaction MonCash non aboutie annulée (${cancelReason}${cancelledBy ? `, par: ${cancelledBy}` : ''} à ${new Date().toLocaleTimeString('fr-FR')})`.trim();
+
+    const { data: updated, error: updateError } = await supabaseClient
+      .from('payments')
+      .update({
+        status: 'ANNULE',
+        moncash_status: 'CANCELLED',
+        notes: updatedNotes,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', record.id)
+      .select()
+      .single();
+
+    if (updateError) {
+      return { success: false, error: updateError.message };
+    }
+
+    return { success: true, paymentRecord: updated };
+  } catch (err: any) {
+    return { success: false, error: err?.message || 'Erreur inattendue lors de l\'annulation' };
+  }
+}
+
 export default handleMonCashWebhook;

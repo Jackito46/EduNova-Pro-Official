@@ -368,7 +368,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
             setIsOpen(prev => !prev);
           }
         }}
-        className={`${getButtonClass()} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
+        className={`${getButtonClass()} ${disabled ? 'opacity-85 bg-slate-50/80 cursor-default' : 'cursor-pointer'}`}
       >
         <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {IconComponent && (
@@ -392,7 +392,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
           )}
           <ChevronDown
             size={size === 'xs' ? 12 : 14}
-            className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? `rotate-180 ${scheme.iconText}` : ''}`}
+            className={`${disabled ? 'text-slate-300' : 'text-slate-400'} transition-transform duration-200 shrink-0 ${isOpen ? `rotate-180 ${scheme.iconText}` : ''}`}
           />
         </div>
       </button>

@@ -22,6 +22,7 @@ import { ModernSaleReceiptModal } from './ModernSaleReceiptModal';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig } from '../lib/paymentMethods';
 import { SelectPill, SelectOption } from './SelectPill';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
+import { MonCashSummaryModal } from './MonCashSummaryModal';
 
 interface SuppliesPOSProps {
   user: UserProfile;
@@ -74,6 +75,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
   const [itemSearch, setItemSearch] = useState('');
   const [catalogViewMode, setCatalogViewMode] = useState<'grid' | 'table'>('grid');
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState(false);
+  const [showMonCashSummary, setShowMonCashSummary] = useState(false);
 
   // Fetch classes with active enrollments for the selected academic year & campus (multi-tenant)
   useEffect(() => {
@@ -539,7 +541,8 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
   const isWalletInsufficient = paymentMethod === 'Portefeuille' && studentWallet < requiredAmount;
 
   // --- PAYMENT VALIDATION ---
-  const handlePayment = async () => {
+  const handlePayment = async (bypassOrEvent?: boolean | React.MouseEvent) => {
+    const bypassSummary = typeof bypassOrEvent === 'boolean' ? bypassOrEvent : false;
     if (!selectedStudent || cart.length === 0 || !selectedYearId || refError) return;
     
     if (paymentMethod === 'Dépôt Bancaire' && depositDate) {
@@ -606,6 +609,13 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
            setIsSubmitting(false);
            return;
         }
+      }
+
+      // VÉRIFICATION PRÉ-PAIEMENT MONCASH : Afficher le récapitulatif pour prévenir toute erreur d'élève
+      if (paymentMethod === 'MonCash' && !bypassSummary) {
+        setIsSubmitting(false);
+        setShowMonCashSummary(true);
+        return;
       }
 
       const txId = `POS-${Date.now().toString().slice(-6)}`;
@@ -2221,7 +2231,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
               </div>
 
               <button 
-                onClick={handlePayment}
+                onClick={() => handlePayment()}
                 disabled={cart.length === 0 || !selectedStudent || isSubmitting || !!refError || (paymentMethod === 'Portefeuille' && isWalletInsufficient)}
                 className={`w-full py-4 font-black text-sm tracking-tight rounded-2xl shadow-xl active:scale-98 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[54px] ${
                   paymentMethod === 'Portefeuille' && isWalletInsufficient
@@ -2269,6 +2279,39 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
             setSelectedStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: newBalance } : prev);
             refreshStudentWallet();
           }}
+        />
+      )}
+
+      {/* Modal de récapitulatif anti-erreur MonCash */}
+      {selectedStudent && (
+        <MonCashSummaryModal
+          isOpen={showMonCashSummary}
+          onClose={() => setShowMonCashSummary(false)}
+          onConfirm={() => {
+            setShowMonCashSummary(false);
+            handlePayment(true);
+          }}
+          isSubmitting={isSubmitting}
+          student={{
+            id: selectedStudent.id,
+            first_name: selectedStudent.first_name,
+            last_name: selectedStudent.last_name,
+            code: selectedStudent.reference_number || selectedStudent.code,
+            reference_number: selectedStudent.reference_number,
+            class_name: selectedStudent.class_name || selectedStudent.classes?.name,
+            photo_url: selectedStudent.photo_url,
+            parent_name: selectedStudent.parent_name,
+            parent_phone: selectedStudent.parent_phone
+          }}
+          feeLabel={`Articles Boutique (${cart.length} item${cart.length > 1 ? 's' : ''})`}
+          feeCategory="Fournitures & Boutique"
+          amount={paymentCurrency === 'USD' ? cartTotals.totalUSD : cartTotals.convertedTotalHTG}
+          currency={paymentCurrency}
+          amountHTG={cartTotals.convertedTotalHTG}
+          payerPhone={referenceNumber || senderPhone || selectedStudent.parent_phone}
+          schoolName={school?.name}
+          academicYear={selectedYearLabel}
+          terminology={terminology}
         />
       )}
     </div>

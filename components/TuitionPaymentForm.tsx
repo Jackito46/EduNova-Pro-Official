@@ -49,6 +49,7 @@ import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
+import { MonCashSummaryModal } from './MonCashSummaryModal';
 import { MonCashTransactionCard, MonCashTransactionInfo } from './MonCashTransactionCard';
 import { PaymentSmsConfirmation } from './PaymentSmsConfirmationModal';
 import { tuitionPaymentSchema } from '../utils/validation';
@@ -127,6 +128,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [apiError, setApiError] = useState<string | null>(null);
 
   // État de polling et attente de confirmation pour MonCash
+  const [showMonCashSummary, setShowMonCashSummary] = useState(false);
   const [showMonCashWaiting, setShowMonCashWaiting] = useState(false);
   const [monCashPendingData, setMonCashPendingData] = useState<{
     paymentId?: string;
@@ -252,20 +254,109 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     return opts;
   }, [activePaymentMethods, feeType, currency, selectedStudent]);
 
-  const currencyOptions: SelectOption[] = useMemo(() => {
-    if (currentMethodConfig?.supported_currencies && currentMethodConfig.supported_currencies.length > 0) {
-      return currentMethodConfig.supported_currencies.map(cur => ({
-        value: cur,
-        label: cur === 'HTG' ? 'Gourdes (HTG)' : 'Dollars (USD)',
-        badge: cur,
-        icon: Banknote
-      }));
+  const hasUSDFees = useMemo(() => {
+    if (!selectedStudent || !selectedStudent.plan) return false;
+    const hasPlanUSD = (
+      Number(selectedStudent.plan.tuition_fee_usd || 0) > 0 ||
+      Number(selectedStudent.plan.inscription_fee_usd || 0) > 0 ||
+      Number(selectedStudent.plan.reenrollment_fee_usd || 0) > 0 ||
+      (selectedStudent.plan.is_misc_mandatory && Number(selectedStudent.plan.misc_fee_usd || 0) > 0)
+    );
+    const hasAdHocUSD = selectedStudent.adHocCampaigns?.some((c: any) => c.currency === 'USD');
+    return hasPlanUSD || hasAdHocUSD;
+  }, [selectedStudent]);
+
+  // Détermine la devise native du type de frais actif
+  const getActiveFeeTypeCurrency = useCallback((): 'HTG' | 'USD' => {
+    if (!selectedStudent) return 'HTG';
+    if (feeType.startsWith('ADHOC_')) {
+      const campaignId = feeType.replace('ADHOC_', '');
+      const campaign = selectedStudent.adHocCampaigns?.find((c: any) => c.id === campaignId);
+      return campaign?.currency === 'USD' ? 'USD' : 'HTG';
+    } else if (feeType === 'INSCRIPTION') {
+      return ((selectedStudent.inscriptionUSD || 0) > 0 && (selectedStudent.inscriptionNativeHTG || 0) === 0) ? 'USD' : 'HTG';
+    } else if (feeType === 'DIVERS') {
+      return ((selectedStudent.miscUSD || 0) > 0 && (selectedStudent.miscNativeHTG || 0) === 0) ? 'USD' : 'HTG';
+    } else if (feeType === 'CREDIT_PORTEFEUILLE') {
+      return (hasUSDFees || (selectedStudent.wallet_balance_usd && selectedStudent.wallet_balance_usd > 0)) ? 'USD' : 'HTG';
+    } else {
+      return ((selectedStudent.scolariteUSD || 0) > 0 && Number(selectedStudent.plan?.tuition_fee || 0) === 0) ? 'USD' : 'HTG';
     }
+  }, [selectedStudent, feeType, hasUSDFees]);
+
+  // Indique si le frais actif est originairement fixé en Dollars (USD)
+  const isCurrentFeeNativeUSD = useMemo(() => {
+    if (!selectedStudent) return false;
+    if (feeType === 'CREDIT_PORTEFEUILLE') {
+      return Boolean(hasUSDFees || (selectedStudent.wallet_balance_usd && selectedStudent.wallet_balance_usd > 0));
+    }
+    return getActiveFeeTypeCurrency() === 'USD';
+  }, [selectedStudent, feeType, hasUSDFees, getActiveFeeTypeCurrency]);
+
+  // Options de devises disponibles pour l'encaissement
+  // RÈGLE MÉTIER : 
+  // - Si le frais est en Gourdes (devise principale) : inutile et non pertinent de proposer des dollars. Seule la Gourde (HTG) est autorisée.
+  // - Si le frais est en Dollars : peut être réglé avec les 2 devises (USD ou HTG au taux de change du jour) comme planifié.
+  const currencyOptions: SelectOption[] = useMemo(() => {
+    // 1. Frais fixé en Gourdes (HTG) : restriction stricte à la Gourde
+    if (!isCurrentFeeNativeUSD && feeType !== 'CREDIT_PORTEFEUILLE') {
+      return [
+        { 
+          value: 'HTG', 
+          label: 'Gourdes (HTG)', 
+          badge: 'HTG', 
+          description: 'Devise Principale',
+          icon: Banknote 
+        }
+      ];
+    }
+
+    // 2. Frais fixé en Dollars (USD) ou Portefeuille bidevise
+    const methodSupported = currentMethodConfig?.supported_currencies;
+    
+    // Si la méthode restreint expressément (ex: MonCash = HTG uniquement)
+    if (paymentMethod === 'MonCash' || (methodSupported && methodSupported.length === 1 && methodSupported[0] === 'HTG')) {
+      return [
+        { 
+          value: 'HTG', 
+          label: 'Gourdes (HTG)', 
+          badge: 'HTG', 
+          description: isCurrentFeeNativeUSD ? `Converti à ${currentExchangeRate} HTG/$` : 'Devise Principale',
+          icon: Banknote 
+        }
+      ];
+    }
+
+    if (methodSupported && methodSupported.length === 1 && methodSupported[0] === 'USD') {
+      return [
+        { 
+          value: 'USD', 
+          label: 'Dollars (USD)', 
+          badge: 'USD', 
+          description: 'Devise du tarif',
+          icon: Banknote 
+        }
+      ];
+    }
+
+    // Proposer les 2 devises prévues pour un frais libellé en dollars :
     return [
-      { value: 'HTG', label: 'Gourdes (HTG)', badge: 'HTG', icon: Banknote },
-      ...(paymentMethod !== 'MonCash' ? [{ value: 'USD', label: 'Dollars (USD)', badge: 'USD', icon: Banknote }] : [])
+      { 
+        value: 'USD', 
+        label: 'Dollars (USD)', 
+        badge: 'USD', 
+        description: 'Devise d\'origine du frais',
+        icon: Banknote 
+      },
+      { 
+        value: 'HTG', 
+        label: 'Gourdes (HTG)', 
+        badge: 'HTG', 
+        description: `Converti à ${currentExchangeRate} HTG/$`,
+        icon: Banknote 
+      }
     ];
-  }, [currentMethodConfig, paymentMethod]);
+  }, [isCurrentFeeNativeUSD, feeType, currentMethodConfig, paymentMethod, currentExchangeRate]);
 
   const bankOptions: SelectOption[] = useMemo(() => {
     const banks = schoolDetails?.global_settings?.banks;
@@ -359,50 +450,38 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     
     // Automatically set currency based on the fee type's native plan currency
     if (selectedStudent) {
-      let planCur: 'HTG' | 'USD' = 'HTG';
+      let isUSD = false;
       if (newFeeType.startsWith('ADHOC_')) {
         const campaignId = newFeeType.replace('ADHOC_', '');
         const campaign = selectedStudent.adHocCampaigns?.find((c: any) => c.id === campaignId);
-        planCur = campaign?.currency === 'USD' ? 'USD' : 'HTG';
+        isUSD = campaign?.currency === 'USD';
       } else if (newFeeType === 'INSCRIPTION') {
-        planCur = ((selectedStudent.inscriptionUSD || 0) > 0 && (selectedStudent.inscriptionNativeHTG || 0) === 0) ? 'USD' : 'HTG';
+        isUSD = ((selectedStudent.inscriptionUSD || 0) > 0 && (selectedStudent.inscriptionNativeHTG || 0) === 0);
       } else if (newFeeType === 'DIVERS') {
-        planCur = ((selectedStudent.miscUSD || 0) > 0 && (selectedStudent.miscNativeHTG || 0) === 0) ? 'USD' : 'HTG';
+        isUSD = ((selectedStudent.miscUSD || 0) > 0 && (selectedStudent.miscNativeHTG || 0) === 0);
       } else if (newFeeType === 'SCOLARITE') {
-        planCur = ((selectedStudent.scolariteUSD || 0) > 0 && Number(selectedStudent.plan?.tuition_fee || 0) === 0) ? 'USD' : 'HTG';
+        isUSD = ((selectedStudent.scolariteUSD || 0) > 0 && Number(selectedStudent.plan?.tuition_fee || 0) === 0);
       }
       
-      if (paymentMethod === 'MonCash') {
+      // RÈGLE MÉTIER : Si le frais est fixé en Gourdes, seule la Gourde est autorisée
+      if (paymentMethod === 'MonCash' || !isUSD) {
         setCurrency('HTG');
       } else {
-        setCurrency(planCur);
+        setCurrency('USD');
       }
     }
   };
 
-  // Set initial currency when student or fee type changes based on plan rules
+  // Synchronisation stricte de la devise lorsque l'élève, le type de frais ou le mode de paiement changent
   useEffect(() => {
     if (selectedStudent) {
-      let planCur: 'HTG' | 'USD' = 'HTG';
-      if (feeType.startsWith('ADHOC_')) {
-        const campaignId = feeType.replace('ADHOC_', '');
-        const campaign = selectedStudent.adHocCampaigns?.find((c: any) => c.id === campaignId);
-        planCur = campaign?.currency === 'USD' ? 'USD' : 'HTG';
-      } else if (feeType === 'INSCRIPTION') {
-        planCur = ((selectedStudent.inscriptionUSD || 0) > 0 && (selectedStudent.inscriptionNativeHTG || 0) === 0) ? 'USD' : 'HTG';
-      } else if (feeType === 'DIVERS') {
-        planCur = ((selectedStudent.miscUSD || 0) > 0 && (selectedStudent.miscNativeHTG || 0) === 0) ? 'USD' : 'HTG';
-      } else if (feeType === 'SCOLARITE') {
-        planCur = ((selectedStudent.scolariteUSD || 0) > 0 && Number(selectedStudent.plan?.tuition_fee || 0) === 0) ? 'USD' : 'HTG';
-      }
-      
-      if (paymentMethod === 'MonCash') {
+      if (!isCurrentFeeNativeUSD && feeType !== 'CREDIT_PORTEFEUILLE') {
         setCurrency('HTG');
-      } else {
-        setCurrency(planCur);
+      } else if (paymentMethod === 'MonCash') {
+        setCurrency('HTG');
       }
     }
-  }, [selectedStudent?.id, feeType]); // Trigger on student load or explicit feeType change from auto-select
+  }, [selectedStudent?.id, feeType, isCurrentFeeNativeUSD, paymentMethod]);
 
   // Handle payment method change to enforce currency rules
   const handlePaymentMethodChange = (newMethod: string) => {
@@ -413,23 +492,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     const cfg = getPaymentMethodConfig(newMethod, schoolDetails || school);
     if (cfg?.supported_currencies && cfg.supported_currencies.length === 1) {
       setCurrency(cfg.supported_currencies[0]);
-    } else if (newMethod === 'MonCash') {
-      setCurrency('HTG'); // MonCash is HTG only
-    }
-  };
-
-  const getActiveFeeTypeCurrency = (): 'HTG' | 'USD' => {
-    if (!selectedStudent) return 'HTG';
-    if (feeType.startsWith('ADHOC_')) {
-      const campaignId = feeType.replace('ADHOC_', '');
-      const campaign = selectedStudent.adHocCampaigns?.find((c: any) => c.id === campaignId);
-      return campaign?.currency === 'USD' ? 'USD' : 'HTG';
-    } else if (feeType === 'INSCRIPTION') {
-      return (selectedStudent.inscriptionUSD > 0) ? 'USD' : 'HTG';
-    } else if (feeType === 'DIVERS') {
-      return (selectedStudent.miscUSD > 0) ? 'USD' : 'HTG';
-    } else {
-      return (selectedStudent.scolariteUSD > 0) ? 'USD' : 'HTG';
+    } else if (newMethod === 'MonCash' || (!isCurrentFeeNativeUSD && feeType !== 'CREDIT_PORTEFEUILLE')) {
+      setCurrency('HTG'); // MonCash est HTG uniquement, et les frais en Gourdes sont strictement en HTG
     }
   };
 
@@ -1093,18 +1157,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
-  const hasUSDFees = useMemo(() => {
-    if (!selectedStudent || !selectedStudent.plan) return false;
-    const hasPlanUSD = (
-      Number(selectedStudent.plan.tuition_fee_usd || 0) > 0 ||
-      Number(selectedStudent.plan.inscription_fee_usd || 0) > 0 ||
-      Number(selectedStudent.plan.reenrollment_fee_usd || 0) > 0 ||
-      (selectedStudent.plan.is_misc_mandatory && Number(selectedStudent.plan.misc_fee_usd || 0) > 0)
-    );
-    const hasAdHocUSD = selectedStudent.adHocCampaigns?.some((c: any) => c.currency === 'USD');
-    return hasPlanUSD || hasAdHocUSD;
-  }, [selectedStudent]);
-
   const paymentLogic = useMemo(() => {
     if (!selectedStudent) return null;
     
@@ -1318,7 +1370,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
       // 4. VALIDATION ET SCELLAGE DE LA TRANSACTION (SÉCURISÉ CONTRE ERREUR 23514)
-    const handleValidation = async (e?: React.FormEvent, superiorOverrideName?: string) => {
+    const handleValidation = async (e?: React.FormEvent, superiorOverrideName?: string, bypassSummary: boolean = false) => {
       if (e) e.preventDefault();
       
       if (!activeYear || !user?.school_id) {
@@ -1376,6 +1428,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (paymentLogic && feeType !== 'CREDIT_PORTEFEUILLE') {
           if (paymentLogic.resteTotal <= 0 && (!paymentLogic.resteUSD || paymentLogic.resteUSD <= 0)) {
             toast.error(`Ce frais a déjà été entièrement réglé. Aucun versement supplémentaire n'est requis.`);
+            setIsSubmitting(false);
+            return;
+          }
+
+          // RÈGLE MÉTIER : Un frais fixé en Gourdes (devise principale) ne peut pas être encaissé en devises étrangères (USD)
+          if (!paymentLogic.isUSDPlan && feeType !== 'CREDIT_PORTEFEUILLE' && currency === 'USD') {
+            toast.error("Ce frais est fixé en Gourdes (devise principale). Le paiement en Dollars n'est pas autorisé.");
             setIsSubmitting(false);
             return;
           }
@@ -1448,6 +1507,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
              setIsSubmitting(false);
              return;
           }
+        }
+
+        // VÉRIFICATION PRÉ-PAIEMENT MONCASH : Afficher le modal récapitulatif avec confirmation active de l'élève
+        if (paymentMethod === 'MonCash' && !bypassSummary) {
+          setIsSubmitting(false);
+          setShowMonCashSummary(true);
+          return;
         }
 
         const isPending = paymentMethod === 'Chèque' || paymentMethod === 'MonCash';
@@ -1831,16 +1897,24 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <span className="font-bold uppercase text-gray-600">Mode:</span>
               <span className="font-black text-[10px]">{paymentMethod}</span>
             </div>
-            {paymentMethod === 'MonCash' && (moncashTransactionData?.orderId || referenceNumber) && (
+            {paymentMethod === 'MonCash' && (
               <>
-                <div className="flex justify-between items-center py-0.5 text-[8px]">
-                  <span className="font-bold uppercase text-gray-500">ID MonCash:</span>
-                  <span className="font-mono font-black">{moncashTransactionData?.orderId || referenceNumber}</span>
-                </div>
+                {(moncashTransactionData?.transactionId || referenceNumber) && (
+                  <div className="flex justify-between items-center py-0.5 text-[8px]">
+                    <span className="font-bold uppercase text-gray-500">ID Trans. MonCash:</span>
+                    <span className="font-mono font-black">{moncashTransactionData?.transactionId || referenceNumber}</span>
+                  </div>
+                )}
+                {moncashTransactionData?.orderId && (
+                  <div className="flex justify-between items-center py-0.5 text-[7.5px]">
+                    <span className="font-medium uppercase text-gray-500">Réf. Commande:</span>
+                    <span className="font-mono font-bold text-gray-700">{moncashTransactionData.orderId}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center py-0.5 text-[7.5px]">
-                  <span className="font-semibold uppercase text-gray-500">Statut Serveur:</span>
-                  <span className="font-bold text-black">
-                    {moncashTransactionData?.serverStatus === 'VALIDE' ? 'VALIDÉ CÔTÉ SERVEUR' : (moncashTransactionData?.serverStatus || 'VALIDÉ')}
+                  <span className="font-semibold uppercase text-gray-500">Validation:</span>
+                  <span className="font-bold text-black uppercase">
+                    {moncashTransactionData?.serverStatus === 'VALIDE' ? 'CERTIFIÉ DIGICEL EN TEMPS RÉEL' : (moncashTransactionData?.serverStatus || 'VALIDÉ')}
                   </span>
                 </div>
               </>
@@ -2499,9 +2573,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   <div className="space-y-1 min-w-0">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Devise d'encaissement">
-                      Devise d'encaissement
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Devise d'encaissement">
+                        Devise d'encaissement
+                      </label>
+                      {!isCurrentFeeNativeUSD && feeType !== 'CREDIT_PORTEFEUILLE' ? (
+                        <span className="text-[9.5px] font-bold text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">
+                          Fixé en Gourdes
+                        </span>
+                      ) : (
+                        <span className="text-[9.5px] font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+                          Bidevise (USD / HTG)
+                        </span>
+                      )}
+                    </div>
                     <SelectPill
                       options={currencyOptions}
                       value={currency}
@@ -2509,7 +2594,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         setCurrency(val as any);
                         if (montantReel) setMontantReel('');
                       }}
-                      disabled={(currentMethodConfig?.supported_currencies && currentMethodConfig.supported_currencies.length === 1) || paymentMethod === 'MonCash'}
+                      disabled={currencyOptions.length <= 1 || paymentMethod === 'MonCash'}
                       icon={Banknote}
                       variant="field"
                       size="md"
@@ -2843,13 +2928,22 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button 
               type="submit" 
               disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError} 
-              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl sm:rounded-2xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 sm:mt-3 cursor-pointer active:scale-98 text-sm"
+              className={`w-full py-3.5 text-white font-bold rounded-xl sm:rounded-2xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 sm:mt-3 cursor-pointer active:scale-98 text-sm ${
+                paymentMethod === 'MonCash'
+                  ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-red-600/20'
+                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+              }`}
             >
               {isSubmitting ? (
                 <div className="flex items-center gap-2">
                   <Loader2 className="animate-spin" size={18} />
                   <span>Traitement de l'encaissement...</span>
                 </div>
+              ) : paymentMethod === 'MonCash' ? (
+                <>
+                  <Smartphone size={18} /> 
+                  <span>Vérifier & Payer via MonCash ({montantReel ? `${montantReel} ${currency}` : ''})</span>
+                </>
               ) : (
                 <>
                   <Save size={18} /> 
@@ -2942,6 +3036,39 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
+      {selectedStudent && (
+        <MonCashSummaryModal
+          isOpen={showMonCashSummary}
+          onClose={() => setShowMonCashSummary(false)}
+          onConfirm={() => {
+            setShowMonCashSummary(false);
+            handleValidation(undefined, authorizedSuperiorName || undefined, true);
+          }}
+          isSubmitting={isSubmitting}
+          student={{
+            id: selectedStudent.id,
+            first_name: selectedStudent.first_name,
+            last_name: selectedStudent.last_name,
+            code: selectedStudent.code,
+            reference_number: selectedStudent.reference_number,
+            class_name: selectedStudent.class?.name,
+            photo_url: selectedStudent.photo_url,
+            parent_name: selectedStudent.parent_name,
+            parent_phone: selectedStudent.parent_phone
+          }}
+          feeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || (feeType.startsWith('ADHOC_') ? (selectedStudent?.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Frais Ad Hoc') : feeType)}
+          feeCategory={feeType === 'SCOLARITE' ? terminology.tuition : feeType === 'INSCRIPTION' ? 'Inscription' : feeType === 'CREDIT_PORTEFEUILLE' ? 'Portefeuille' : 'Frais Scolaires'}
+          amount={parseFloat(montantReel) || 0}
+          currency={currency}
+          amountHTG={currency === 'USD' ? Math.round((parseFloat(montantReel) || 0) * (currentExchangeRate || 140)) : parseFloat(montantReel) || 0}
+          payerPhone={referenceNumber || selectedStudent.parent_phone}
+          schoolName={school?.name}
+          academicYear={activeYear?.name}
+          campusName={campuses.find(c => c.id === (selectedStudent.campus_id || currentCampusId))?.name}
+          terminology={terminology}
+        />
+      )}
+
       {monCashPendingData && (
         <MonCashWaitingModal
           isOpen={showMonCashWaiting}
@@ -2996,6 +3123,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }}
           onFailed={(errMsg) => {
             console.warn('[MonCash Payment Failed]', errMsg);
+          }}
+          onCancelled={(cancelledOrderId) => {
+            setShowMonCashWaiting(false);
+            setMonCashPendingData(null);
+            setMoncashTransactionData(null);
+            setIsSubmitting(false);
+            toast.info("Transaction MonCash annulée. Vous pouvez sélectionner un autre mode de paiement.");
           }}
         />
       )}

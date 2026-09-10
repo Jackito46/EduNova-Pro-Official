@@ -19,6 +19,9 @@ import {
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
+import { MonCashSummaryModal } from './MonCashSummaryModal';
+import { useSchool } from '../contexts/SchoolContext';
+import { getTerminology } from '../lib/terminology';
 
 export interface StudentWalletTopUpModalProps {
   isOpen: boolean;
@@ -49,12 +52,24 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   schoolId,
   onSuccess
 }) => {
+  let contextTerminology = null;
+  try {
+    const schoolCtx = useSchool();
+    contextTerminology = schoolCtx?.terminology;
+  } catch {
+    // Graceful fallback
+  }
+  const terminology = contextTerminology || getTerminology();
+
   const [selectedAmount, setSelectedAmount] = useState<number>(1000);
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCustom, setIsCustom] = useState(false);
   const [phone, setPhone] = useState(student.parent_phone?.replace(/\D/g, '') || '');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // État du modal récapitulatif avant confirmation finale MonCash
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   // État du modal d'attente MonCash
   const [isWaitingModalOpen, setIsWaitingModalOpen] = useState(false);
@@ -76,8 +91,8 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const cleanPhone = phone.replace(/\D/g, '');
   const displayPhone = cleanPhone.startsWith('509') ? cleanPhone.slice(3) : cleanPhone;
 
-  // Lancer la demande de recharge MonCash
-  const handleInitiateTopUp = async (e: React.FormEvent) => {
+  // 1. Étape de vérification pré-paiement : Contrôle de l'élève
+  const handlePreSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -91,6 +106,12 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       return;
     }
 
+    setShowSummaryModal(true);
+  };
+
+  // 2. Lancer la demande réelle de recharge MonCash après confirmation
+  const executeTopUp = async () => {
+    setError(null);
     setIsSubmitting(true);
 
     try {
@@ -329,7 +350,7 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleInitiateTopUp} className="space-y-4">
+              <form onSubmit={handlePreSubmit} className="space-y-4">
                 {/* Récapitulatif de l'élève & Solde actuel */}
                 <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -473,7 +494,7 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                   ) : (
                     <>
                       <Wallet size={16} />
-                      <span>Recharger {effectiveAmount > 0 ? `${effectiveAmount.toLocaleString()} HTG` : ''} via MonCash</span>
+                      <span>Vérifier & Recharger {effectiveAmount > 0 ? `${effectiveAmount.toLocaleString()} HTG` : ''} via MonCash</span>
                       <ArrowRight size={15} />
                     </>
                   )}
@@ -489,6 +510,33 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
           </div>
         </div>
       </div>
+
+      {/* Modal récapitulatif anti-erreur avant confirmation finale */}
+      <MonCashSummaryModal
+        isOpen={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        onConfirm={() => {
+          setShowSummaryModal(false);
+          executeTopUp();
+        }}
+        isSubmitting={isSubmitting}
+        student={{
+          id: student.id,
+          first_name: student.first_name,
+          last_name: student.last_name,
+          reference_number: student.reference_number,
+          class_name: student.class_name,
+          parent_name: student.parent_name,
+          parent_phone: student.parent_phone
+        }}
+        feeLabel={`Recharge Portefeuille ${terminology.student}`}
+        feeCategory="Portefeuille"
+        amount={effectiveAmount}
+        currency="HTG"
+        payerPhone={displayPhone}
+        schoolName={schoolName}
+        terminology={terminology}
+      />
 
       {/* Modal de suivi d'attente MonCash en temps réel */}
       {isWaitingModalOpen && (
@@ -510,6 +558,11 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
           onFailed={(err) => {
             setIsWaitingModalOpen(false);
             setError(err || 'Échec du paiement MonCash.');
+          }}
+          onCancelled={() => {
+            setIsWaitingModalOpen(false);
+            setIsSubmitting(false);
+            toast.info("Recharge MonCash annulée.");
           }}
         />
       )}
