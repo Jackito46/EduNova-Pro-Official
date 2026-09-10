@@ -539,6 +539,39 @@ export async function handleMonCashWebhook(
           paymentRecord = inserted;
         }
       }
+
+      // D. Si le paiement concerne une recharge de portefeuille (CREDIT_PORTEFEUILLE ou WLT-)
+      if (paymentRecord && paymentRecord.student_id && (
+        paymentRecord.fee_type === 'CREDIT_PORTEFEUILLE' || 
+        paymentRecord.fee_type === 'PORTEFEUILLE' || 
+        (paymentRecord.notes && (paymentRecord.notes.includes('Portefeuille') || paymentRecord.notes.includes('WLT-')))
+      )) {
+        try {
+          const creditAmount = Number(paymentRecord.amount || amount || 0);
+          if (creditAmount > 0) {
+            const { data: std } = await supabase
+              .from('students')
+              .select('id, wallet_balance_htg')
+              .eq('id', paymentRecord.student_id)
+              .maybeSingle();
+
+            if (std) {
+              const currentBalance = Number(std.wallet_balance_htg || 0);
+              const newBalance = currentBalance + creditAmount;
+              await supabase
+                .from('students')
+                .update({
+                  wallet_balance_htg: newBalance,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', std.id);
+              console.log(`[MonCash Webhook] Portefeuille élève ${std.id} crédité de +${creditAmount} HTG. Nouveau solde: ${newBalance} HTG`);
+            }
+          }
+        } catch (walletErr) {
+          console.warn('[MonCash Webhook] Erreur lors du crédit automatique du portefeuille:', walletErr);
+        }
+      }
     } catch (dbError: any) {
       console.error('[MonCash Webhook] Erreur lors de la persistance en base:', dbError);
       // On continue pour retourner la confirmation du webhook même si l'enregistrement a rencontré un écueil

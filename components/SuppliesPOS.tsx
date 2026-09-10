@@ -21,6 +21,7 @@ import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { ModernSaleReceiptModal } from './ModernSaleReceiptModal';
 import { getActiveSchoolPaymentMethods, getPaymentMethodConfig } from '../lib/paymentMethods';
 import { SelectPill, SelectOption } from './SelectPill';
+import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 
 interface SuppliesPOSProps {
   user: UserProfile;
@@ -72,6 +73,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
   const [selectedCategory, setSelectedCategory] = useState('ALL');
   const [itemSearch, setItemSearch] = useState('');
   const [catalogViewMode, setCatalogViewMode] = useState<'grid' | 'table'>('grid');
+  const [showWalletTopUpModal, setShowWalletTopUpModal] = useState(false);
 
   // Fetch classes with active enrollments for the selected academic year & campus (multi-tenant)
   useEffect(() => {
@@ -1270,6 +1272,17 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                   >
                     <RefreshCw size={13} />
                   </button>
+
+                  {/* Bouton recharge express MonCash */}
+                  <button
+                    type="button"
+                    onClick={() => setShowWalletTopUpModal(true)}
+                    title="Recharger le portefeuille via MonCash"
+                    className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl border border-red-600 shadow-2xs transition-all flex items-center gap-1.5 text-xs font-black cursor-pointer"
+                  >
+                    <Smartphone size={13} />
+                    <span>Recharger MonCash</span>
+                  </button>
                 </div>
               </div>
             )}
@@ -1926,11 +1939,21 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                   </div>
 
                   {studentWallet < requiredAmount ? (
-                    <div className="flex items-start gap-2 bg-rose-500/20 p-2.5 rounded-xl border border-rose-500/30 text-rose-300 text-xs font-bold">
-                      <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
-                      <span>
-                        Solde insuffisant pour finaliser cette transaction. Veuillez recharger le portefeuille de l'élève ou choisir un autre mode de paiement (Cash, Dépôt, etc.).
-                      </span>
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2 bg-rose-500/20 p-2.5 rounded-xl border border-rose-500/30 text-rose-300 text-xs font-bold">
+                        <AlertCircle size={16} className="shrink-0 mt-0.5 text-rose-400" />
+                        <span>
+                          Solde insuffisant pour finaliser cette transaction.
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowWalletTopUpModal(true)}
+                        className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-md shadow-red-950/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Smartphone size={13} />
+                        <span>Recharger le portefeuille via MonCash</span>
+                      </button>
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20 text-emerald-300 text-[11px] font-bold">
@@ -2226,6 +2249,28 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
         )}
 
       </div>
+
+      {/* Modal de recharge express du portefeuille MonCash */}
+      {selectedStudent && (
+        <StudentWalletTopUpModal
+          isOpen={showWalletTopUpModal}
+          onClose={() => setShowWalletTopUpModal(false)}
+          student={{
+            id: selectedStudent.id,
+            first_name: selectedStudent.first_name,
+            last_name: selectedStudent.last_name,
+            reference_number: selectedStudent.reference_number,
+            wallet_balance_htg: selectedStudent.wallet_balance_htg,
+            school_id: user.school_id
+          }}
+          schoolName={school?.name}
+          schoolId={user.school_id}
+          onSuccess={(newBalance) => {
+            setSelectedStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: newBalance } : prev);
+            refreshStudentWallet();
+          }}
+        />
+      )}
     </div>
   );
 };

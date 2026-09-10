@@ -51,7 +51,8 @@ import {
   Download,
   ChevronDown,
   Check,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { UserProfile, UserRole } from '../types';
@@ -65,6 +66,7 @@ import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ModernDashboardSkeleton } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import Logo from './Logo';
+import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 
 const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
@@ -174,6 +176,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     totalDue: 0,
     children: [] as any[]
   });
+
+  const [currentStudent, setCurrentStudent] = useState<any | null>(null);
+  const [selectedWalletStudent, setSelectedWalletStudent] = useState<any | null>(null);
+  const [showStudentWalletTopUp, setShowStudentWalletTopUp] = useState(false);
 
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
   const [dismissStockAlert, setDismissStockAlert] = useState(false);
@@ -868,6 +874,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           .maybeSingle();
 
         if (studentData) {
+          setCurrentStudent(studentData);
           // Fetch grades for average
           const { data: grades } = await supabase
             .from('grades')
@@ -2615,6 +2622,17 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <span className="font-black text-cyan-700">{studentStats.wallet_balance_usd?.toLocaleString()} USD</span>
                     </div>
                     <p className="text-[10px] text-slate-400 font-medium pt-1">Disponible pour futurs règlements</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedWalletStudent(currentStudent);
+                        setShowStudentWalletTopUp(true);
+                      }}
+                      className="w-full mt-2.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Smartphone size={13} />
+                      <span>Recharger via MonCash</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2720,10 +2738,27 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
                       <div className="min-w-0">
                         <p className="text-sm font-black text-slate-900 truncate">{formatStudentName(child.last_name, child.first_name).fullName}</p>
-                        <p className="text-xs text-slate-400 font-medium">{child.class?.name || 'Non assigné'}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs text-slate-400 font-medium">{child.class?.name || 'Non assigné'}</p>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                            👛 {(child.wallet_balance_htg || 0).toLocaleString()} HTG
+                          </span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2 shrink-0 ml-3">
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 ml-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedWalletStudent(child);
+                          setShowStudentWalletTopUp(true);
+                        }}
+                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                        title="Recharger le portefeuille de l'élève par MonCash"
+                      >
+                        <Smartphone size={13} />
+                        <span>Recharger MonCash</span>
+                      </button>
                       <button 
                         onClick={() => navigate('/economat/suivi', { state: { studentId: child.id } })}
                         className="px-3 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-all"
@@ -3532,6 +3567,41 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
         </>
+      )}
+
+      {/* Modal de recharge express du portefeuille MonCash */}
+      {selectedWalletStudent && (
+        <StudentWalletTopUpModal
+          isOpen={showStudentWalletTopUp}
+          onClose={() => {
+            setShowStudentWalletTopUp(false);
+            setSelectedWalletStudent(null);
+          }}
+          student={{
+            id: selectedWalletStudent.id,
+            first_name: selectedWalletStudent.first_name,
+            last_name: selectedWalletStudent.last_name,
+            reference_number: selectedWalletStudent.reference_number,
+            class_name: selectedWalletStudent.class?.name,
+            wallet_balance_htg: selectedWalletStudent.wallet_balance_htg,
+            parent_name: selectedWalletStudent.parent_name,
+            parent_phone: selectedWalletStudent.parent_phone,
+            school_id: selectedWalletStudent.school_id || user.school_id
+          }}
+          schoolName={school?.name}
+          schoolId={selectedWalletStudent.school_id || user.school_id}
+          onSuccess={(newBalance) => {
+            if (user.role === UserRole.STUDENT) {
+              setStudentStats(prev => ({ ...prev, wallet_balance_htg: newBalance }));
+              setCurrentStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: newBalance } : prev);
+            } else if (user.role === UserRole.PARENT) {
+              setParentStats(prev => ({
+                ...prev,
+                children: prev.children.map(c => c.id === selectedWalletStudent.id ? { ...c, wallet_balance_htg: newBalance } : c)
+              }));
+            }
+          }}
+        />
       )}
     </div>
   );

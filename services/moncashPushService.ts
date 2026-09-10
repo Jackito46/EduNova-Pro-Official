@@ -209,8 +209,14 @@ export async function sendMonCashPaymentPushNotification(
     }
 
     // 4. Préparation du contenu de la notification Push
-    const notificationTitle = `Paiement MonCash validé ! 📲`;
-    const notificationBody = `Le paiement MonCash de ${formattedAmount} pour ${studentFullName}${className ? ` (${className})` : ''} a été validé avec succès. Réf: ${refNumber}.`;
+    const isWalletTopup = resolvedPayment?.fee_type === 'CREDIT_PORTEFEUILLE' || 
+                          resolvedPayment?.fee_type === 'PORTEFEUILLE' || 
+                          (resolvedPayment?.notes && (resolvedPayment.notes.includes('Portefeuille') || resolvedPayment.notes.includes('WLT-')));
+
+    const notificationTitle = isWalletTopup ? `👛 Portefeuille Rechargé via MonCash !` : `Paiement MonCash validé ! 📲`;
+    const notificationBody = isWalletTopup
+      ? `Recharge réussie : +${formattedAmount} crédités sur le portefeuille élève de ${studentFullName}. Réf: ${refNumber}.`
+      : `Le paiement MonCash de ${formattedAmount} pour ${studentFullName}${className ? ` (${className})` : ''} a été validé avec succès. Réf: ${refNumber}.`;
 
     const pushPayload = JSON.stringify({
       title: notificationTitle,

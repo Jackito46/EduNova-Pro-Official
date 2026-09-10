@@ -14,7 +14,8 @@ import {
   Receipt,
   ArrowRight,
   Sparkles,
-  MessageSquare
+  MessageSquare,
+  Share2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
@@ -175,6 +176,18 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
       setTimeout(() => setCopied(false), 2000);
       toast.info("Référence de commande copiée !");
     }
+  };
+
+  // Partage instantané et 100% gratuit du reçu sur WhatsApp
+  const handleShareReceiptWhatsApp = () => {
+    const ref = confirmedPayment?.transaction_reference || transactionReference || orderId;
+    const cleanPhone = (payerPhone || '').replace(/\D/g, '');
+    const targetPhone = cleanPhone.startsWith('509') ? cleanPhone : (cleanPhone.length >= 8 ? `509${cleanPhone}` : '');
+    const msg = `*REÇU OFFICIEL DE PAIEMENT MONCASH* 📲\n------------------------------------\n*Élève* : ${studentName}${studentClass ? ` (${studentClass})` : ''}\n*Matricule* : ${studentCode || 'N/A'}\n*Motif* : ${feeTypeLabel}\n*Montant Réglé* : ${Math.round(amount).toLocaleString()} HTG\n*Réf. MonCash* : ${ref}\n*Date* : ${new Date().toLocaleDateString('fr-FR')} à ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}\n------------------------------------\n_Paiement validé avec succès par l'établissement. Merci !_`;
+    const url = targetPhone 
+      ? `https://wa.me/${targetPhone}?text=${encodeURIComponent(msg)}`
+      : `https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   // Validation manuelle de secours si le parent montre son SMS Digicel
@@ -455,23 +468,34 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
                 </div>
               </div>
 
-              {/* Mention SMS Parent pour sceller la confiance */}
-              <div className="w-full mb-4 px-3 py-2 bg-indigo-50/80 border border-indigo-200/60 rounded-xl flex items-center gap-2.5 text-left">
-                <MessageSquare size={16} className="text-indigo-600 shrink-0" />
-                <p className="text-[11px] text-indigo-900 leading-tight">
-                  <strong className="font-bold">Confirmation SMS :</strong> Le reçu et l'interface d'envoi du SMS personnalisé au parent sont prêts à l'écran.
+              {/* Mention Notification Gratuite (Push & WhatsApp) */}
+              <div className="w-full mb-3 px-3 py-2 bg-emerald-50/80 border border-emerald-200/60 rounded-xl flex items-center gap-2.5 text-left">
+                <Share2 size={16} className="text-emerald-600 shrink-0" />
+                <p className="text-[11px] text-emerald-950 leading-tight">
+                  <strong className="font-bold">Notification Sans Frais :</strong> Push transmise au smartphone du parent. Reçu WhatsApp prêt à l'envoi en 1 clic (0 HTG).
                 </p>
               </div>
 
-              <button
-                type="button"
-                onClick={() => onConfirmed(confirmedPayment)}
-                className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all active:scale-[0.98]"
-              >
-                <Receipt size={16} />
-                <span>Afficher et Imprimer le Reçu</span>
-                <ArrowRight size={15} />
-              </button>
+              <div className="w-full space-y-2">
+                <button
+                  type="button"
+                  onClick={handleShareReceiptWhatsApp}
+                  className="w-full flex items-center justify-center gap-2 py-3 px-5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm shadow-md shadow-emerald-600/20 transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <Share2 size={16} />
+                  <span>Envoyer le Reçu par WhatsApp (0 HTG)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onConfirmed(confirmedPayment)}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm shadow-sm transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <Receipt size={16} />
+                  <span>Afficher et Imprimer le Reçu</span>
+                  <ArrowRight size={15} />
+                </button>
+              </div>
             </div>
           )}
 

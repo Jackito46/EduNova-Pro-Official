@@ -6,7 +6,7 @@ import {
   FileText, CreditCard, GraduationCap, AlertCircle,
   History, Ban, CheckCircle2, ChevronLeft, ChevronRight,
   Printer, Download, Trash2, Edit2, Info, RefreshCw, Rocket, Copy, MessageCircle,
-  FileCheck2, Clock, XCircle
+  FileCheck2, Clock, XCircle, Smartphone, Wallet
 } from 'lucide-react';
 import { supabase, supabaseUrl, supabaseAnonKey } from '../supabase';
 import { createClient } from '@supabase/supabase-js';
@@ -28,6 +28,7 @@ import { RetryableError } from './RetryableError';
 import { getStudentAgeStatus } from '../utils/academicPath';
 import { useSchool } from '../contexts/SchoolContext';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';
+import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import { 
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments,
@@ -59,6 +60,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Documents status modal state
   const [showDocsModal, setShowDocsModal] = useState(false);
+  const [isWalletTopUpOpen, setIsWalletTopUpOpen] = useState(false);
   
   // Access generation states
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -1026,6 +1028,16 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <p className="text-sm font-black text-indigo-400">{(student.wallet_balance_usd || 0).toLocaleString()} $</p>
                 </div>
               </div>
+
+              {/* Bouton de recharge express MonCash */}
+              <button
+                type="button"
+                onClick={() => setIsWalletTopUpOpen(true)}
+                className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-md shadow-red-950/30 transition-all cursor-pointer"
+              >
+                <Smartphone size={13} />
+                <span>Recharger via MonCash</span>
+              </button>
             </div>
 
             <div className="pt-6 border-t border-white/10 space-y-4">
@@ -1198,6 +1210,30 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             if (id) {
               fetchStudentData(id);
             }
+          }}
+        />
+      )}
+
+      {/* Modal de recharge express du portefeuille MonCash */}
+      {student && (
+        <StudentWalletTopUpModal
+          isOpen={isWalletTopUpOpen}
+          onClose={() => setIsWalletTopUpOpen(false)}
+          student={{
+            id: student.id,
+            first_name: student.first_name,
+            last_name: student.last_name,
+            reference_number: student.reference_number,
+            class_name: student.class_name,
+            wallet_balance_htg: student.wallet_balance_htg,
+            parent_name: student.parent_name,
+            parent_phone: student.parent_phone,
+            school_id: student.school_id || user.school_id
+          }}
+          schoolName={school?.name}
+          schoolId={student.school_id || user.school_id}
+          onSuccess={(newBalance) => {
+            setStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: newBalance } : prev);
           }}
         />
       )}
