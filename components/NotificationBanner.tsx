@@ -23,7 +23,11 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   });
   const [pwaDismissed, setPwaDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true';
+    return (
+      window.localStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
+      window.sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
+      window.localStorage.getItem('edunova_pwa_installed') === 'true'
+    );
   });
 
   const { isInstalled, installPwa, platformName, canPromptDirectly, isInIframe } = usePwaInstall();
@@ -72,6 +76,11 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
     const handleAppInstalled = () => {
       setHasCapturedPrompt(false);
       logPromptState('appinstalled event');
+      try {
+        window.localStorage.setItem('edunova_pwa_installed', 'true');
+        window.localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
+      } catch (e) {}
+      setPwaDismissed(true);
       toast.success("✅ Application EduNova Pro installée avec succès !");
     };
 
@@ -143,6 +152,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   const handleDismissPwa = () => {
     setPwaDismissed(true);
     try {
+      window.localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
       window.sessionStorage.setItem('edunova_pwa_banner_dismissed', 'true');
     } catch (e) {}
   };
@@ -172,6 +182,10 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
         toast.success("✅ Application EduNova Pro installée avec succès !");
         (window as any).__edunova_deferred_prompt = null;
         setHasCapturedPrompt(false);
+        try {
+          window.localStorage.setItem('edunova_pwa_installed', 'true');
+          window.localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
+        } catch (e) {}
         setPwaDismissed(true);
       } else {
         toast.info("Installation différée.");
@@ -219,7 +233,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   return (
     <>
       {/* Dynamic PWA installation warning & action banner if app is not installed on device */}
-      {showPwaInstall && !isInstalled && !pwaDismissed && (
+      {showPwaInstall && !isInstalled && !pwaDismissed && !isInIframe && (
         <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-800 text-white p-3.5 sm:p-4 rounded-2xl shadow-lg mb-4 flex flex-col sm:flex-row items-center justify-between gap-4 animate-in fade-in slide-in-from-top-3 relative z-40 border border-blue-400/30">
           <div className="flex items-center gap-3.5 min-w-0">
             <div className="p-2.5 bg-white/15 backdrop-blur-md rounded-xl shrink-0 shadow-inner">

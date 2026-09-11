@@ -16,13 +16,13 @@ export const PwaInstallBanner: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    if (isInstalled) {
+    if (isInstalled || isInIframe) {
       setIsVisible(false);
       return;
     }
 
     try {
-      const dismissed = sessionStorage.getItem('edunova_pwa_banner_dismissed');
+      const dismissed = localStorage.getItem('edunova_pwa_banner_dismissed') || sessionStorage.getItem('edunova_pwa_banner_dismissed');
       if (dismissed === 'true') {
         setIsVisible(false);
         return;
@@ -37,16 +37,17 @@ export const PwaInstallBanner: React.FC = () => {
     }, 1200);
 
     return () => clearTimeout(timer);
-  }, [isInstalled]);
+  }, [isInstalled, isInIframe]);
 
   const handleDismiss = () => {
     setIsVisible(false);
     try {
+      localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
       sessionStorage.setItem('edunova_pwa_banner_dismissed', 'true');
     } catch (e) {}
   };
 
-  if (!isVisible || isInstalled) return null;
+  if (!isVisible || isInstalled || isInIframe) return null;
 
   return (
     <div 

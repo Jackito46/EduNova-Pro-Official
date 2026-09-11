@@ -29,7 +29,8 @@ import {
   Calculator,
   X,
   Sliders,
-  Radio
+  Radio,
+  Building2
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
@@ -846,225 +847,93 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const canViewSensitiveStats = [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT].includes(user.role);
 
   return (
-    <div className="max-w-7xl mx-auto space-y-5 sm:space-y-6 lg:space-y-8 animate-in fade-in duration-500 pb-16">
+    <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 lg:space-y-4.5 animate-in fade-in duration-500 pb-8">
       
       {/* HEADER HUB TITLE BANNER */}
-      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-5 lg:p-6 rounded-2xl shadow-xl text-white border border-slate-800 relative overflow-hidden">
+      <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 p-4 sm:p-5 lg:p-5.5 rounded-2xl shadow-xl text-white border border-slate-800/80 relative overflow-hidden backdrop-blur-md">
         {/* Subtle decorative background blur shapes */}
         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute right-1/3 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 sm:gap-6">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 rounded-full text-[11px] font-bold uppercase tracking-wider backdrop-blur-md">
-                <ShieldCheck size={13} className="text-indigo-400" />
-                Unité de Pilotage Financier
+        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4.5">
+          <div className="space-y-1.5 min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md">
+                <Building2 size={12} className="text-emerald-400 shrink-0" />
+                <span className="truncate max-w-[200px] sm:max-w-xs">{school?.name || 'Établissement Connecté'}</span>
+                <span className="text-indigo-400/50">•</span>
+                <span>Unité de Pilotage Financier</span>
               </div>
-
-              {/* Quick Gateway Status Pills in Header */}
-              <button
-                onClick={() => {
-                  setSimulatorOperator('moncash');
-                  setIsWebhookSimulatorOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full text-[10px] font-bold transition-all text-white backdrop-blur-md cursor-pointer"
-                title="MonCash : Cliquer pour simuler ou tester les webhooks"
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${gatewayStatus.moncash.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                <span>MonCash</span>
-                <span className={gatewayStatus.moncash.connected ? 'text-emerald-300' : 'text-amber-300'}>
-                  {gatewayStatus.moncash.connected ? 'Actif' : 'En attente'}
-                </span>
-              </button>
-
-              <button
-                onClick={() => {
-                  setSimulatorOperator('natcash');
-                  setIsWebhookSimulatorOpen(true);
-                }}
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-white/10 hover:bg-white/20 border border-white/15 rounded-full text-[10px] font-bold transition-all text-white backdrop-blur-md cursor-pointer"
-                title="Natcash : Cliquer pour simuler ou tester les webhooks"
-              >
-                <span className={`w-1.5 h-1.5 rounded-full ${gatewayStatus.natcash.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                <span>Natcash</span>
-                <span className={gatewayStatus.natcash.connected ? 'text-emerald-300' : 'text-amber-300'}>
-                  {gatewayStatus.natcash.connected ? 'Actif' : 'En attente'}
-                </span>
-              </button>
             </div>
-            <h1 className="text-xl sm:text-2xl lg:text-3xl font-black text-white tracking-tight">
+
+            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-white tracking-tight leading-tight">
               Direction de l'Économat
             </h1>
-            <p className="text-slate-300 text-xs sm:text-sm font-medium max-w-xl leading-relaxed">
+            <p className="text-slate-300 text-xs sm:text-xs md:text-sm font-medium max-w-2xl leading-relaxed line-clamp-2">
               Plateforme centrale de recouvrement, contrôle de caisse quotidien et audit financier académique.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* 3 ACTION BUTTONS - DYNAMICALLY RESPONSIVE, ZERO OVERFLOW */}
+          <div className="w-full lg:w-auto grid grid-cols-1 sm:grid-cols-3 lg:flex lg:flex-nowrap items-center gap-2 sm:gap-2.5 shrink-0 pt-1 lg:pt-0">
+            {/* Button 1: Réévaluer Objectif */}
             <button
-              onClick={() => setIsWebhookSimulatorOpen(true)}
-              className="px-3.5 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm hover:shadow-purple-500/25 flex items-center gap-1.5 active:scale-95 border border-purple-400/30"
-              title="Tester la réception des notifications Webhook pour MonCash et Natcash et valider la passerelle unifiée"
-            >
-              <Radio size={16} className="text-purple-200 animate-pulse" />
-              <span>Simuler Passerelles</span>
-            </button>
-            <button
+              type="button"
               onClick={() => setIsReevaluationModalOpen(true)}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm hover:shadow-indigo-500/25 flex items-center gap-1.5 active:scale-95"
-              title="Recalculer l'objectif net après déduction des bourses et réductions d'écolage"
+              className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold text-xs sm:text-xs md:text-sm rounded-xl transition-all shadow-xs hover:shadow-indigo-500/25 flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-400/30 whitespace-nowrap cursor-pointer"
+              title={`Recalculer l'objectif net après déduction des bourses et réductions de ${terminology.tuition}`}
             >
-              <Calculator size={16} className="text-white" />
-              <span>Réévaluer l'Objectif</span>
+              <Calculator size={15} className="shrink-0 text-indigo-200" />
+              <span className="whitespace-nowrap">Réévaluer Objectif</span>
             </button>
+
+            {/* Button 2: Clôture de Caisse */}
             <button
+              type="button"
               onClick={() => setIsClosureModalOpen(true)}
-              className="px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm rounded-xl transition-all shadow-sm hover:shadow-emerald-500/25 flex items-center gap-1.5 active:scale-95"
+              className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-xs md:text-sm rounded-xl transition-all shadow-xs hover:shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-[0.98] border border-emerald-400/40 whitespace-nowrap cursor-pointer"
+              title="Rapport officiel de clôture et audit de caisse journalière"
             >
-              <ShieldCheck size={16} className="text-slate-950" />
-              <span>Rapport Clôture Caisse</span>
+              <ShieldCheck size={15} className="shrink-0 text-slate-950" />
+              <span className="whitespace-nowrap">Clôture de Caisse</span>
             </button>
+
+            {/* Button 3: Encaisser un Frais */}
             <button
+              type="button"
               onClick={() => navigate('/economat/frais')}
-              className="px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm rounded-xl transition-all border border-white/15 flex items-center gap-1.5 active:scale-95 backdrop-blur-sm"
+              className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-xs md:text-sm rounded-xl transition-all border border-white/20 flex items-center justify-center gap-1.5 active:scale-[0.98] backdrop-blur-md whitespace-nowrap cursor-pointer"
+              title={`Encaisser un versement de ${terminology.tuition} ou autre frais`}
             >
-              <PlusCircle size={16} className="text-indigo-300" />
-              <span>Encaisser un Frais</span>
+              <PlusCircle size={15} className="shrink-0 text-indigo-300" />
+              <span className="whitespace-nowrap">Encaisser un Frais</span>
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* MOBILE MONEY & GATEWAY STATUS BAR WITH DIRECT SIMULATOR LINK */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 p-3 sm:p-4 shadow-xs flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2.5 sm:gap-3">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700 mr-1">
-            <Radio size={15} className="text-purple-600 animate-pulse" />
-            <span className="uppercase tracking-wider text-[11px] text-slate-500 font-extrabold">Passerelles Mobiles :</span>
-          </div>
-
-          {/* MonCash Badge (Clickable with direct link to Simulator) */}
-          <button
-            type="button"
-            onClick={() => {
-              setSimulatorOperator('moncash');
-              setIsWebhookSimulatorOpen(true);
-            }}
-            className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-              gatewayStatus.moncash.connected
-                ? 'bg-rose-50/70 border-rose-200 text-rose-950 hover:bg-rose-100 hover:border-rose-300 shadow-2xs'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-            }`}
-            title="Cliquer pour simuler une notification de paiement MonCash"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              {gatewayStatus.moncash.connected && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              )}
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${gatewayStatus.moncash.connected ? 'bg-rose-600' : 'bg-slate-400'}`}></span>
-            </span>
-            <span className="font-black text-rose-700">MonCash (Digicel)</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
-              gatewayStatus.moncash.connected ? 'bg-rose-200/70 text-rose-900' : 'bg-slate-200 text-slate-600'
-            }`}>
-              {gatewayStatus.moncash.connected ? 'Connecté' : 'En attente'}
-            </span>
-            {gatewayStatus.moncash.phone && (
-              <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
-                {gatewayStatus.moncash.phone}
-              </span>
-            )}
-            <span className="text-[11px] text-indigo-600 font-bold group-hover:underline flex items-center gap-0.5 ml-1">
-              <span>Tester</span>
-              <ArrowRight size={11} />
-            </span>
-          </button>
-
-          {/* Natcash Badge (Clickable with direct link to Simulator) */}
-          <button
-            type="button"
-            onClick={() => {
-              setSimulatorOperator('natcash');
-              setIsWebhookSimulatorOpen(true);
-            }}
-            className={`group inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer ${
-              gatewayStatus.natcash.connected
-                ? 'bg-blue-50/70 border-blue-200 text-blue-950 hover:bg-blue-100 hover:border-blue-300 shadow-2xs'
-                : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-            }`}
-            title="Cliquer pour simuler une notification de paiement Natcash"
-          >
-            <span className="relative flex h-2.5 w-2.5">
-              {gatewayStatus.natcash.connected && (
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
-              )}
-              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${gatewayStatus.natcash.connected ? 'bg-blue-600' : 'bg-slate-400'}`}></span>
-            </span>
-            <span className="font-black text-blue-700">Natcash (Natcom)</span>
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-extrabold uppercase ${
-              gatewayStatus.natcash.connected ? 'bg-blue-200/70 text-blue-900' : 'bg-slate-200 text-slate-600'
-            }`}>
-              {gatewayStatus.natcash.connected ? 'Connecté' : 'En attente'}
-            </span>
-            {gatewayStatus.natcash.phone && (
-              <span className="text-[10px] text-slate-500 font-mono hidden sm:inline">
-                {gatewayStatus.natcash.phone}
-              </span>
-            )}
-            <span className="text-[11px] text-indigo-600 font-bold group-hover:underline flex items-center gap-0.5 ml-1">
-              <span>Tester</span>
-              <ArrowRight size={11} />
-            </span>
-          </button>
-
-          {/* Unified Gateway Indicator */}
-          <div className="hidden xl:inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200">
-            <CheckCircle size={13} className="text-emerald-500" />
-            <span>Passerelle Fusionnée Kobara</span>
-            <span className="text-[10px] font-bold text-slate-700 bg-slate-200/70 px-1.5 py-0.5 rounded">
-              {gatewayStatus.unified.same_number ? 'Numéro Unique' : 'Numéros Séparés'}
-            </span>
-          </div>
-        </div>
-
-        {/* Action Link to Simulator Modal */}
-        <div className="flex items-center gap-2 self-end lg:self-auto">
-          <button
-            onClick={() => {
-              setSimulatorOperator('moncash');
-              setIsWebhookSimulatorOpen(true);
-            }}
-            className="text-xs font-bold text-purple-700 hover:text-purple-800 bg-purple-50 hover:bg-purple-100 px-3 py-1.5 rounded-xl border border-purple-200 transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-          >
-            <Radio size={13} className="text-purple-600 animate-pulse" />
-            <span>Console Simulation Webhook</span>
-          </button>
         </div>
       </div>
       {canViewSensitiveStats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
           {/* Card 1: Scolarité */}
-          <div className="bg-white p-4 sm:p-4.5 rounded-xl sm:rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 shadow-2xs hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 {terminology.tuition}
               </span>
-              <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Receipt size={16} />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                <Receipt size={15} />
               </div>
             </div>
 
             <div>
               <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={totalCollectedTuition.toLocaleString()}>
                 {loading ? (
-                  <RefreshCcw className="animate-spin text-slate-400" size={20} />
+                  <RefreshCcw className="animate-spin text-slate-400" size={18} />
                 ) : (
                   <>
-                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-slate-900 font-mono tracking-tight leading-none truncate">
+                    <span className="text-xl sm:text-2xl xl:text-[1.5rem] font-black text-slate-900 font-mono tracking-tight leading-none truncate">
                       {totalCollectedTuition.toLocaleString()}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-slate-500 tracking-normal shrink-0 whitespace-nowrap bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50">
+                    <span className="text-[10px] font-sans font-bold text-slate-500 tracking-normal shrink-0 whitespace-nowrap bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50">
                       HTG{(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}
                     </span>
                   </>
@@ -1072,7 +941,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[10px] sm:text-[11px]">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[10px]">
                   <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md border border-emerald-100 whitespace-nowrap">
                     {totalCollectedTuitionHTG.toLocaleString()} HTG
                   </span>
@@ -1085,26 +954,26 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Card 2: Fournitures */}
-          <div className="bg-white p-4 sm:p-4.5 rounded-xl sm:rounded-2xl border border-slate-100 shadow-xs hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-3">
+          <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-100 shadow-2xs hover:shadow-xs hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                 Fournitures & Ventes
               </span>
-              <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Package size={16} />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                <Package size={15} />
               </div>
             </div>
 
             <div>
               <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={totalCollectedSupplies.toLocaleString()}>
                 {loading ? (
-                  <RefreshCcw className="animate-spin text-slate-400" size={20} />
+                  <RefreshCcw className="animate-spin text-slate-400" size={18} />
                 ) : (
                   <>
-                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-slate-900 font-mono tracking-tight leading-none truncate">
+                    <span className="text-xl sm:text-2xl xl:text-[1.5rem] font-black text-slate-900 font-mono tracking-tight leading-none truncate">
                       {totalCollectedSupplies.toLocaleString()}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-slate-500 tracking-normal shrink-0 whitespace-nowrap bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50">
+                    <span className="text-[10px] font-sans font-bold text-slate-500 tracking-normal shrink-0 whitespace-nowrap bg-slate-100/80 px-1.5 py-0.5 rounded-md border border-slate-200/50">
                       HTG{(totalCollectedSuppliesUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}
                     </span>
                   </>
@@ -1112,7 +981,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && (totalCollectedSuppliesUSD > 0 || totalExpectedUSD > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-100 text-[10px] sm:text-[11px]">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-100 text-[10px]">
                   <span className="px-1.5 py-0.5 bg-emerald-50 text-emerald-700 font-bold rounded-md border border-emerald-100 whitespace-nowrap">
                     {totalCollectedSuppliesHTG.toLocaleString()} HTG
                   </span>
@@ -1125,26 +994,26 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Card 3: Recettes Globales */}
-          <div className="bg-slate-900 text-white p-4 sm:p-4.5 rounded-xl sm:rounded-2xl shadow-md border border-slate-800 hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-3">
+          <div className="bg-slate-900 text-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xs border border-slate-800 hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-slate-300 uppercase tracking-wider">
                 Recettes Globales
               </span>
-              <div className="w-8 h-8 rounded-lg bg-slate-800 text-emerald-400 flex items-center justify-center shrink-0 border border-slate-700">
-                <DollarSign size={16} />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-slate-800 text-emerald-400 flex items-center justify-center shrink-0 border border-slate-700">
+                <DollarSign size={15} />
               </div>
             </div>
 
             <div>
               <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={(totalCollectedTuition + totalCollectedSupplies).toLocaleString()}>
                 {loading ? (
-                  <RefreshCcw className="animate-spin text-slate-400" size={20} />
+                  <RefreshCcw className="animate-spin text-slate-400" size={18} />
                 ) : (
                   <>
-                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-white font-mono tracking-tight leading-none truncate">
+                    <span className="text-xl sm:text-2xl xl:text-[1.5rem] font-black text-white font-mono tracking-tight leading-none truncate">
                       {(totalCollectedTuition + totalCollectedSupplies).toLocaleString()}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-slate-400 tracking-normal shrink-0 whitespace-nowrap bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-700">
+                    <span className="text-[10px] font-sans font-bold text-slate-400 tracking-normal shrink-0 whitespace-nowrap bg-slate-800 px-1.5 py-0.5 rounded-md border border-slate-700">
                       HTG{((totalCollectedTuitionUSD + totalCollectedSuppliesUSD) > 0 || totalExpectedUSD > 0) ? " eq." : ""}
                     </span>
                   </>
@@ -1152,7 +1021,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && ((totalCollectedTuitionUSD + totalCollectedSuppliesUSD) > 0 || totalExpectedUSD > 0) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5 pt-2.5 border-t border-slate-800 text-[10px] sm:text-[11px]">
+                <div className="flex flex-wrap items-center gap-1.5 mt-2 pt-2 border-t border-slate-800 text-[10px]">
                   <span className="px-1.5 py-0.5 bg-slate-800 text-emerald-300 font-bold rounded-md border border-slate-700 whitespace-nowrap">
                     {(totalCollectedTuitionHTG + totalCollectedSuppliesHTG).toLocaleString()} HTG
                   </span>
@@ -1165,27 +1034,27 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Card 4: Recettes du Jour */}
-          <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-4 sm:p-4.5 rounded-xl sm:rounded-2xl shadow-lg shadow-emerald-500/10 border border-emerald-500 hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-3 relative overflow-hidden">
+          <div className="bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xs border border-emerald-500 hover:-translate-y-0.5 transition-all duration-200 flex flex-col justify-between space-y-2 relative overflow-hidden">
             <div className="flex items-center justify-between relative z-10">
               <span className="text-[11px] font-bold text-emerald-100 uppercase tracking-wider flex items-center gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-emerald-300 animate-pulse" />
                 Recettes du Jour
               </span>
-              <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center shrink-0 border border-white/20">
-                <TrendingUp size={16} />
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-white/10 text-white flex items-center justify-center shrink-0 border border-white/20">
+                <TrendingUp size={15} />
               </div>
             </div>
 
             <div className="relative z-10">
               <div className="flex items-baseline justify-between gap-1.5 flex-nowrap min-w-0" title={todayCollectionHTG.toLocaleString()}>
                 {loading ? (
-                  <RefreshCcw className="animate-spin text-white" size={20} />
+                  <RefreshCcw className="animate-spin text-white" size={18} />
                 ) : (
                   <>
-                    <span className="text-xl sm:text-2xl xl:text-[1.65rem] font-black text-white font-mono tracking-tight leading-none truncate">
+                    <span className="text-xl sm:text-2xl xl:text-[1.5rem] font-black text-white font-mono tracking-tight leading-none truncate">
                       {todayCollectionHTG.toLocaleString()}
                     </span>
-                    <span className="text-[10px] sm:text-[11px] font-sans font-bold text-emerald-200 tracking-normal shrink-0 whitespace-nowrap bg-white/10 px-1.5 py-0.5 rounded-md border border-white/20">
+                    <span className="text-[10px] font-sans font-bold text-emerald-200 tracking-normal shrink-0 whitespace-nowrap bg-white/10 px-1.5 py-0.5 rounded-md border border-white/20">
                       HTG
                     </span>
                   </>
@@ -1193,9 +1062,9 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {!loading && (
-                <div className="mt-2.5 pt-2.5 border-t border-white/20 text-[10px] sm:text-[11px] font-bold text-emerald-100">
+                <div className="mt-2 pt-2 border-t border-white/20 text-[10px] font-bold text-emerald-100">
                   <span className="px-2 py-0.5 bg-white/15 rounded-md border border-white/20 inline-block font-mono whitespace-nowrap truncate max-w-full">
-                    + {todayCollectionUSD.toLocaleString()} USD (Encaissement Jour)
+                    + {todayCollectionUSD.toLocaleString()} USD (Jour)
                   </span>
                 </div>
               )}
@@ -1205,7 +1074,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* QUICK ACTION GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3">
         {quickActions.map((action, idx) => (
           <button
             key={idx}
@@ -1218,17 +1087,17 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 navigate(action.path);
               }
             }}
-            className="group p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-white border border-gray-100 text-left shadow-xs hover:shadow-md hover:border-slate-200 transition-all active:scale-[0.98] flex items-center gap-3.5"
+            className="group p-3 sm:p-3.5 rounded-xl bg-white border border-slate-200/80 text-left shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all active:scale-[0.98] flex items-center gap-3 cursor-pointer"
           >
-            <div className={`w-10 h-10 rounded-xl ${action.color} text-white flex items-center justify-center shrink-0 shadow-sm ${action.shadow} group-hover:scale-105 transition-transform`}>
-              <action.icon size={18} />
+            <div className={`w-9 h-9 rounded-xl ${action.color} text-white flex items-center justify-center shrink-0 shadow-2xs ${action.shadow} group-hover:scale-105 transition-transform`}>
+              <action.icon size={17} />
             </div>
             <div className="flex-1 min-w-0">
               <h3 className="text-xs sm:text-sm font-bold text-gray-900 mb-0.5 truncate">{action.title}</h3>
-              <p className="text-[11px] sm:text-xs font-medium text-gray-500 truncate">{action.desc}</p>
+              <p className="text-[11px] font-medium text-gray-500 truncate">{action.desc}</p>
             </div>
             <div className="text-gray-300 group-hover:text-gray-600 transition-colors shrink-0">
-              <ArrowUpRight size={16} />
+              <ArrowUpRight size={15} />
             </div>
           </button>
         ))}
@@ -1236,33 +1105,33 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* BILAN NET & LIQUIDITÉ RÉELLE */}
       {canViewSensitiveStats && (
-        <div className="bg-white p-5 sm:p-6 lg:p-7 rounded-2xl shadow-xs border border-gray-200">
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] tracking-[0.2em] mb-4 sm:mb-5">
+        <div className="bg-white p-4 sm:p-5 lg:p-5.5 rounded-2xl shadow-2xs border border-gray-200/90">
+          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] tracking-[0.2em] mb-3 sm:mb-4">
             <TrendingUp size={14} />
             ANALYSE DU FLUX DE TRÉSORERIE (BILAN NET)
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 items-center">
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-              <div className="space-y-1.5 min-w-0">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center">
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
+              <div className="space-y-1 min-w-0">
                 <p className="text-[10px] font-bold text-gray-500 tracking-wider">RECETTES TOTALES</p>
-                <p className="text-lg sm:text-xl xl:text-2xl font-bold text-emerald-600 font-mono" title={`+${netBalance.income.toLocaleString()} HTG`}>+{netBalance.income.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
+                <p className="text-base sm:text-xl font-bold text-emerald-600 font-mono" title={`+${netBalance.income.toLocaleString()} HTG`}>+{netBalance.income.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
                 <div className="h-1 w-full bg-emerald-100 rounded-full overflow-hidden">
                   <div className="h-full bg-emerald-500 w-full"></div>
                 </div>
               </div>
               
-              <div className="space-y-1.5 min-w-0">
+              <div className="space-y-1 min-w-0">
                 <p className="text-[10px] font-bold text-gray-500 tracking-wider">DÉPENSES</p>
-                <p className="text-lg sm:text-xl xl:text-2xl font-bold text-rose-600 font-mono" title={`-${netBalance.expenses.toLocaleString()} HTG`}>-{netBalance.expenses.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
+                <p className="text-base sm:text-xl font-bold text-rose-600 font-mono" title={`-${netBalance.expenses.toLocaleString()} HTG`}>-{netBalance.expenses.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
                 <div className="h-1 w-full bg-rose-100 rounded-full overflow-hidden">
                   <div className="h-full bg-rose-500 w-full"></div>
                 </div>
               </div>
               
-              <div className="space-y-1.5 min-w-0">
+              <div className="space-y-1 min-w-0">
                 <p className="text-[10px] font-bold text-gray-500 tracking-wider">SALAIRES PAYÉS</p>
-                <p className="text-lg sm:text-xl xl:text-2xl font-bold text-amber-600 font-mono" title={`-${netBalance.salaries.toLocaleString()} HTG`}>-{netBalance.salaries.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
+                <p className="text-base sm:text-xl font-bold text-amber-600 font-mono" title={`-${netBalance.salaries.toLocaleString()} HTG`}>-{netBalance.salaries.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
                 <div className="h-1 w-full bg-amber-100 rounded-full overflow-hidden">
                   <div className="h-full bg-amber-500 w-full"></div>
                 </div>
@@ -1270,24 +1139,24 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div className="lg:col-span-4 min-w-0">
-              <div className={`p-4 sm:p-5 rounded-2xl border-2 ${netBalance.net >= 0 ? 'bg-emerald-50/80 border-emerald-200' : 'bg-amber-50/80 border-amber-200'} flex flex-col justify-center min-w-0 h-full shadow-2xs`}>
-                <div className="flex items-center justify-between gap-1 mb-1.5">
+              <div className={`p-3.5 sm:p-4 rounded-xl border-2 ${netBalance.net >= 0 ? 'bg-emerald-50/80 border-emerald-200' : 'bg-amber-50/80 border-amber-200'} flex flex-col justify-center min-w-0 h-full shadow-2xs`}>
+                <div className="flex items-center justify-between gap-1 mb-1">
                   <p className="text-[10px] font-extrabold text-slate-600 tracking-wider uppercase">LIQUIDITÉ RÉELLE NETTE</p>
                   <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${netBalance.net >= 0 ? 'bg-emerald-200/60 text-emerald-800' : 'bg-amber-200/70 text-amber-900'}`}>
                     {netBalance.net >= 0 ? 'BÉNÉFICIAIRE' : 'DÉFICIT CASH'}
                   </span>
                 </div>
                 
-                <div className="flex flex-col gap-1">
-                   <p className={`text-xl sm:text-2xl font-black font-mono tracking-tighter ${netBalance.netHTG >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} title={`Solde Gourdes: ${netBalance.netHTG.toLocaleString()} HTG`}>
+                <div className="flex flex-col gap-0.5">
+                   <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter ${netBalance.netHTG >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} title={`Solde Gourdes: ${netBalance.netHTG.toLocaleString()} HTG`}>
                      {netBalance.netHTG.toLocaleString()} <span className="text-xs font-sans tracking-normal">HTG</span>
                    </p>
-                   <p className={`text-sm sm:text-base font-bold font-mono tracking-tighter ${netBalance.netUSD >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} title={`Solde Dollars: $${netBalance.netUSD.toLocaleString()} USD`}>
-                     {netBalance.netUSD > 0 ? '+' : ''}{netBalance.netUSD.toLocaleString()} <span className="text-[10px] sm:text-xs font-sans tracking-normal">USD</span>
+                   <p className={`text-xs sm:text-sm font-bold font-mono tracking-tighter ${netBalance.netUSD >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} title={`Solde Dollars: $${netBalance.netUSD.toLocaleString()} USD`}>
+                     {netBalance.netUSD > 0 ? '+' : ''}{netBalance.netUSD.toLocaleString()} <span className="text-[10px] font-sans tracking-normal">USD</span>
                    </p>
                 </div>
 
-                <div className="mt-2.5 pt-2 border-t border-slate-200/80 flex items-center justify-between text-[10px] font-semibold text-slate-600">
+                <div className="mt-2 pt-1.5 border-t border-slate-200/80 flex items-center justify-between text-[10px] font-semibold text-slate-600">
                   <span>Solde Consolidé eq. :</span>
                   <span className={`font-mono font-bold ${netBalance.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
                     {netBalance.net > 0 ? '+' : ''}{Math.round(netBalance.net).toLocaleString()} HTG
@@ -1300,29 +1169,29 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* DASHBOARD PREVIEW */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
-        <div className={`bg-white p-4 sm:p-6 rounded-2xl shadow-2xs border border-gray-100 space-y-5 sm:space-y-6 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 items-start">
+        <div className={`bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-gray-100 space-y-4 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
           {canViewSensitiveStats && (
             <>
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="text-xl font-black text-gray-900 flex items-center gap-3">
-                  <TrendingUp size={24} className="text-indigo-600" />
+                <h3 className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-2.5">
+                  <TrendingUp size={20} className="text-indigo-600" />
                   Recouvrement Institutionnel
                 </h3>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setIsReevaluationModalOpen(true)}
-                    className="flex items-center gap-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 transition-all active:scale-95 shadow-2xs"
+                    className="flex items-center gap-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 transition-all active:scale-95 shadow-2xs cursor-pointer"
                   >
-                    <Calculator size={15} />
-                    <span>Réévaluer l'Objectif</span>
+                    <Calculator size={14} />
+                    <span>Réévaluer Objectif</span>
                   </button>
-                  <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-full border border-emerald-100">Live</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100">Live</span>
                 </div>
               </div>
 
-          <div className="grid grid-cols-1 gap-8">
-            <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-4">
               <div className="flex justify-between items-end gap-2 flex-wrap">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
@@ -1333,11 +1202,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Corrigé par bourses</span>
                     )}
                   </div>
-                  <p className="text-lg sm:text-xl md:text-2xl lg:text-xl xl:text-2xl font-black text-gray-900 mt-0.5 sm:mt-1" title={(isTargetReevaluated ? totalExpected : totalGrossExpected).toLocaleString()}>
-                    {loading ? <RefreshCcw className="animate-spin inline-block mt-1" size={20} /> : (isTargetReevaluated ? totalExpected : totalGrossExpected).toLocaleString()} <span className="text-[10px] sm:text-xs font-sans text-gray-600">HTG{(totalExpectedUSD > 0 || totalGrossExpectedUSD > 0) ? " eq." : ""}</span>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 mt-0.5" title={(isTargetReevaluated ? totalExpected : totalGrossExpected).toLocaleString()}>
+                    {loading ? <RefreshCcw className="animate-spin inline-block mt-1" size={18} /> : (isTargetReevaluated ? totalExpected : totalGrossExpected).toLocaleString()} <span className="text-[10px] sm:text-xs font-sans text-gray-600">HTG{(totalExpectedUSD > 0 || totalGrossExpectedUSD > 0) ? " eq." : ""}</span>
                   </p>
                   {!loading && (
-                    <div className="flex flex-col gap-0.5 mt-1.5">
+                    <div className="flex flex-col gap-0.5 mt-1">
                       <span className="text-[9px] font-black uppercase tracking-wider text-gray-600">
                         {(isTargetReevaluated ? totalExpectedHTG : totalGrossExpectedHTG).toLocaleString()} HTG
                       </span>
@@ -1354,21 +1223,21 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
                 <div className="text-right min-w-0 shrink-0">
                   <p className="text-[9px] sm:text-[10px] font-bold text-indigo-500 tracking-wider uppercase" title="Taux de Pénétration">Taux de Pénétration</p>
-                  <p className="text-lg sm:text-xl md:text-2xl lg:text-xl xl:text-2xl font-black text-indigo-700 mt-0.5 sm:mt-1" title={`${collectionRate.toFixed(1)}%`}>{collectionRate.toFixed(1)}%</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-indigo-700 mt-0.5" title={`${collectionRate.toFixed(1)}%`}>{collectionRate.toFixed(1)}%</p>
                   
                   {/* Economat penetration addition */}
-                  <div className="flex items-center justify-end gap-1 mt-1">
+                  <div className="flex items-center justify-end gap-1 mt-0.5">
                     <span className="text-[8px] sm:text-[9px] font-bold text-amber-500 tracking-wider uppercase">Économat:</span>
                     <span className="text-[10px] sm:text-xs font-black text-amber-600">{economatPenetration.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
 
-              <div className="relative pt-2 pb-4">
-                <div className="flex justify-between items-start text-[9px] sm:text-[11px] font-bold mb-3 gap-2 flex-wrap">
-                  <span className="text-indigo-600 bg-indigo-50 px-2 sm:px-3 py-1 rounded-full border border-indigo-100" title={`Encaissement ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${totalCollectedTuition.toLocaleString()} HTG`}>Encaissement {(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: <span className="whitespace-nowrap">{totalCollectedTuition.toLocaleString()} HTG</span></span>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className="text-gray-600 bg-gray-100 px-2 sm:px-3 py-1 rounded-full border border-gray-200" title={`Reste ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${Math.max(0, totalExpected - totalCollectedTuition).toLocaleString()} HTG`}>Reste {(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: <span className="whitespace-nowrap">{Math.max(0, totalExpected - totalCollectedTuition).toLocaleString()} HTG</span></span>
+              <div className="relative pt-1 pb-2">
+                <div className="flex justify-between items-start text-[9px] sm:text-[11px] font-bold mb-2 gap-2 flex-wrap">
+                  <span className="text-indigo-600 bg-indigo-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-indigo-100" title={`Encaissement ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${totalCollectedTuition.toLocaleString()} HTG`}>Encaissement: <span className="whitespace-nowrap">{totalCollectedTuition.toLocaleString()} HTG</span></span>
+                  <div className="flex flex-col items-end gap-0.5">
+                    <span className="text-gray-600 bg-gray-100 px-2 sm:px-2.5 py-0.5 rounded-full border border-gray-200" title={`Reste ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${Math.max(0, totalExpected - totalCollectedTuition).toLocaleString()} HTG`}>Reste: <span className="whitespace-nowrap">{Math.max(0, totalExpected - totalCollectedTuition).toLocaleString()} HTG</span></span>
                     {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
                       <div className="flex gap-2 text-gray-600 px-1 opacity-90">
                         <span className="text-[9px] uppercase">{Math.max(0, totalExpectedHTG - totalCollectedTuitionHTG).toLocaleString()} HTG</span>
@@ -1377,7 +1246,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                     )}
                   </div>
                 </div>
-                <div className="h-4 sm:h-5 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-0.5">
+                <div className="h-3.5 sm:h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-0.5">
                   <div 
                     className="h-full bg-indigo-600 rounded-full transition-all duration-1000 relative" 
                     style={{ width: `${totalExpected > 0 ? Math.min(100, (totalCollectedTuition / totalExpected) * 100) : 0}%` }}
@@ -1387,26 +1256,26 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:gap-4 mt-6 sm:mt-8">
-                  <div className="bg-emerald-50 rounded-xl p-3 sm:p-4 border border-emerald-100 overflow-hidden min-w-0 flex flex-col justify-center">
-                    <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-1 sm:gap-1.5 text-emerald-600 mb-1 sm:mb-2">
-                      <CheckCircle size={14} className="shrink-0 hidden 2xl:block" />
-                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider sm:tracking-widest leading-tight sm:leading-none" title={`${terminology.tuition} Récoltée`}>{terminology.tuition} Récoltée</p>
+              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mt-4 sm:mt-5">
+                  <div className="bg-emerald-50 rounded-xl p-2.5 sm:p-3 border border-emerald-100 overflow-hidden min-w-0 flex flex-col justify-center">
+                    <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-1 text-emerald-600 mb-1">
+                      <CheckCircle size={13} className="shrink-0 hidden 2xl:block" />
+                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider leading-tight" title={`${terminology.tuition} Récoltée`}>{terminology.tuition} Récoltée</p>
                     </div>
-                    <p className="text-sm sm:text-base lg:text-xl xl:text-lg 2xl:text-2xl font-bold text-emerald-700 tracking-tight" title={totalCollectedTuition.toLocaleString()}>{totalCollectedTuition.toLocaleString()} <span className="text-[9px] sm:text-xs font-medium">HTG{(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}</span></p>
+                    <p className="text-sm sm:text-base lg:text-lg font-bold text-emerald-700 tracking-tight" title={totalCollectedTuition.toLocaleString()}>{totalCollectedTuition.toLocaleString()} <span className="text-[9px] sm:text-xs font-medium">HTG{(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}</span></p>
                     {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
-                      <div className="flex flex-col gap-0.5 mt-1.5">
+                      <div className="flex flex-col gap-0.5 mt-1">
                         <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600/70">{totalCollectedTuitionHTG.toLocaleString()} HTG</span>
                         <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600/70">{totalCollectedTuitionUSD.toLocaleString()} USD</span>
                       </div>
                     )}
                   </div>
-                  <div className="bg-rose-50 rounded-xl p-3 sm:p-4 border border-rose-100 overflow-hidden min-w-0 flex flex-col justify-center">
-                    <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-1 sm:gap-1.5 text-rose-600 mb-1 sm:mb-2">
-                       <AlertCircle size={14} className="shrink-0 hidden 2xl:block" />
-                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider sm:tracking-widest leading-tight sm:leading-none" title="Reste à recouvrer">Reste à recouvrer</p>
+                  <div className="bg-rose-50 rounded-xl p-2.5 sm:p-3 border border-rose-100 overflow-hidden min-w-0 flex flex-col justify-center">
+                    <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-1 text-rose-600 mb-1">
+                       <AlertCircle size={13} className="shrink-0 hidden 2xl:block" />
+                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider leading-tight" title="Reste à recouvrer">Reste à recouvrer</p>
                     </div>
-                    <p className="text-sm sm:text-base lg:text-xl xl:text-lg 2xl:text-2xl font-bold text-rose-700 tracking-tight" title={totalArrears.toLocaleString()}>{totalArrears.toLocaleString()} <span className="text-[9px] sm:text-xs font-medium">HTG</span></p>
+                    <p className="text-sm sm:text-base lg:text-lg font-bold text-rose-700 tracking-tight" title={totalArrears.toLocaleString()}>{totalArrears.toLocaleString()} <span className="text-[9px] sm:text-xs font-medium">HTG</span></p>
                   </div>
               </div>
             </div>
@@ -1415,48 +1284,48 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
 
           {/* RECENT TRANSACTIONS LIST */}
-          <div className={canViewSensitiveStats ? "pt-6 border-t border-gray-100" : ""}>
-            <div className="flex items-center justify-between mb-6">
-              <h4 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <ClipboardList size={16} className="text-gray-500" />
+          <div className={canViewSensitiveStats ? "pt-4 sm:pt-5 border-t border-gray-100" : ""}>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-xs sm:text-sm font-semibold text-gray-900 flex items-center gap-2">
+                <ClipboardList size={15} className="text-gray-500" />
                 Dernières Opérations (Aujourd'hui)
               </h4>
               {canViewSensitiveStats && (
-                <button onClick={() => navigate('/economat/liste')} className="text-xs font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700">
+                <button onClick={() => navigate('/economat/liste')} className="text-[11px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 cursor-pointer">
                   Tout le registre
                 </button>
               )}
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-2">
               {loading ? (
-                <div className="text-center py-8 text-gray-500">
-                  <RefreshCcw className="animate-spin inline-block mb-2" size={24} />
-                  <p className="text-sm font-medium">Chargement...</p>
+                <div className="text-center py-6 text-gray-500">
+                  <RefreshCcw className="animate-spin inline-block mb-1.5" size={20} />
+                  <p className="text-xs font-medium">Chargement...</p>
                 </div>
               ) : recentTransactions.length > 0 ? (
                 recentTransactions.map((tx, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${tx.bg} ${tx.color}`}>
-                        <tx.icon size={18} />
+                  <div key={i} className="flex items-center justify-between p-2.5 sm:p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.bg} ${tx.color} shrink-0`}>
+                        <tx.icon size={16} />
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-gray-900">{tx.type}</p>
-                        <p className="text-xs font-medium text-gray-500">{tx.date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})} • {tx.method}</p>
+                      <div className="min-w-0">
+                        <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{tx.type}</p>
+                        <p className="text-[11px] font-medium text-gray-500">{tx.date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})} • {tx.method}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-sm font-bold text-gray-900 font-mono">+{tx.currencyAmount ? tx.currencyAmount.toLocaleString() : tx.amount.toLocaleString()} {tx.currency || 'HTG'}</p>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs sm:text-sm font-bold text-gray-900 font-mono">+{tx.currencyAmount ? tx.currencyAmount.toLocaleString() : tx.amount.toLocaleString()} {tx.currency || 'HTG'}</p>
                       {tx.currency === 'USD' && (
-                        <p className="text-[10px] text-gray-500 font-medium">({tx.amount.toLocaleString()} HTG eq.)</p>
+                        <p className="text-[9px] text-gray-500 font-medium">({tx.amount.toLocaleString()} HTG eq.)</p>
                       )}
                     </div>
                   </div>
                 ))
               ) : (
-                <div className="text-center py-8 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                  <p className="text-sm font-medium text-gray-500">Aucune transaction aujourd'hui</p>
+                <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
+                  <p className="text-xs font-medium text-gray-500">Aucune transaction aujourd'hui</p>
                 </div>
               )}
             </div>
@@ -1464,13 +1333,13 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {canViewSensitiveStats && (
-        <div className="lg:col-span-4 bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/90 space-y-3.5 sm:space-y-4 relative overflow-hidden">
+        <div className="lg:col-span-4 bg-white p-3.5 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/90 space-y-3 relative overflow-hidden">
           <div className="absolute top-0 right-0 w-28 h-28 bg-slate-50 rounded-full -mr-12 -mt-12 opacity-40 pointer-events-none" />
           
           <div className="flex items-center justify-between relative z-10">
-            <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold border border-indigo-100/80 shrink-0">
-                <Target size={16} />
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold border border-indigo-100/80 shrink-0">
+                <Target size={15} />
               </div>
               <div className="min-w-0">
                 <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight truncate">
@@ -1479,8 +1348,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <p className="text-[10px] text-slate-500 font-medium truncate">Pilotage Direction</p>
               </div>
             </div>
-            <div className="w-7 h-7 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center shrink-0">
-              <ClipboardList size={14} />
+            <div className="w-6 h-6 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center shrink-0">
+              <ClipboardList size={13} />
             </div>
           </div>
 

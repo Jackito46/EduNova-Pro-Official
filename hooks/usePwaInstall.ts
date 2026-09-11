@@ -159,7 +159,16 @@ export function isPwaInstalled(): boolean {
     document.referrer.includes('android-app://')
   );
 
-  return isStandalone;
+  if (isStandalone) return true;
+
+  // Verify persistent storage if installed previously on this machine
+  try {
+    if (localStorage.getItem('edunova_pwa_installed') === 'true') {
+      return true;
+    }
+  } catch (e) {}
+
+  return false;
 }
 
 // Alias for backwards compatibility

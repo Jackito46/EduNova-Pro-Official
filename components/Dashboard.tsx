@@ -62,7 +62,9 @@ import { geminiService } from '../services/geminiService';
 import { RetryableError } from './RetryableError';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatStudentName } from '../utils/formatters';
+import { displayIdentifier, normalizeIdentifier } from '../utils/authHelpers';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
+import { ParentDashboardView } from './ParentDashboardView';
 import { ModernDashboardSkeleton } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import Logo from './Logo';
@@ -174,7 +176,8 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     childrenCount: 0,
     totalPaid: 0,
     totalDue: 0,
-    children: [] as any[]
+    children: [] as any[],
+    payments: [] as any[]
   });
 
   const [currentStudent, setCurrentStudent] = useState<any | null>(null);
@@ -1042,43 +1045,148 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           });
         }
       } else if (user.role === UserRole.PARENT) {
-        const { data: children } = await supabase
+        const userSchoolId = user.school_id || school?.id;
+        const userEmail = (user.email || '').trim().toLowerCase();
+        const usernameOnly = displayIdentifier(userEmail).toLowerCase();
+        const edunovaEmail = normalizeIdentifier(userEmail).toLowerCase();
+        const studentIdFromUser = (user as any)?.student_id;
+        
+        let childrenQuery = supabase
           .from('students')
-          .select('*, class:classes(id, name)')
-          .eq('parent_email', user.email);
+          .select('*, class:classes(id, name)');
+
+        if (userSchoolId) {
+          childrenQuery = childrenQuery.eq('school_id', userSchoolId);
+        }
+
+        const orConditions = [
+          `parent_email.ilike.${userEmail}`,
+          `parent_email.ilike.${usernameOnly}`,
+          `parent_email.ilike.${edunovaEmail}`,
+          `email.ilike.${userEmail}`,
+          `email.ilike.${edunovaEmail}`
+        ];
+
+        if (studentIdFromUser) {
+          orConditions.push(`id.eq.${studentIdFromUser}`);
+        }
+
+        const { data: childrenRaw } = await childrenQuery.or(orConditions.join(','));
+        let children = childrenRaw || [];
+
+        // Fallback: If no children found by exact OR filter, inspect students of the school
+        if (children.length === 0 && userSchoolId) {
+          const { data: schoolStudents } = await supabase
+            .from('students')
+            .select('*, class:classes(id, name)')
+            .eq('school_id', userSchoolId);
+
+          if (schoolStudents && schoolStudents.length > 0) {
+            children = schoolStudents.filter(s => {
+              const pEmail = (s.parent_email || '').trim().toLowerCase();
+              const sEmail = (s.email || '').trim().toLowerCase();
+              return (
+                pEmail === userEmail ||
+                pEmail === usernameOnly ||
+                pEmail === edunovaEmail ||
+                displayIdentifier(pEmail).toLowerCase() === usernameOnly ||
+                sEmail === userEmail ||
+                sEmail === edunovaEmail
+              );
+            });
+          }
+        }
 
         if (children && children.length > 0) {
           const childrenIds = children.map(c => c.id);
+          
+          // Fetch all payments for all children of this parent (unrestricted so all receipts are accessible)
           const { data: allChildrenPayments } = await supabase
             .from('payments')
-            .select('student_id, amount_htg_equivalent, amount')
+            .select(`
+              id,
+              receipt_number,
+              amount,
+              amount_htg_equivalent,
+              currency,
+              exchange_rate_applied,
+              payment_method,
+              payment_date,
+              created_at,
+              fee_type,
+              nature,
+              type,
+              description,
+              status,
+              student_id,
+              notes,
+              academic_year_id
+            `)
             .in('student_id', childrenIds)
-            .eq('academic_year_id', activeYear.id);
-          
+            .neq('status', 'ANNULE')
+            .order('payment_date', { ascending: false });
+
+          const validPayments = allChildrenPayments || [];
+
+          // Enrich payments with child info
+          const enrichedPayments = validPayments.map(p => {
+            const child = children.find(c => c.id === p.student_id);
+            return {
+              ...p,
+              student: child
+            };
+          });
+
           let totalPaid = 0;
           let totalDue = 0;
 
-          children.forEach(child => {
-            const childPaid = allChildrenPayments?.filter(p => p.student_id === child.id)
-              .reduce((acc, p) => acc + Number(p.amount_htg_equivalent || p.amount || 0), 0) || 0;
-            
+          const enrichedChildren = children.map(child => {
+            const childPayments = validPayments.filter(p => p.student_id === child.id);
+            const activeYearPayments = activeYear?.id 
+              ? childPayments.filter(p => p.academic_year_id === activeYear.id)
+              : childPayments;
+
+            const childPaid = activeYearPayments.reduce((acc, p) => 
+              acc + Number(p.amount_htg_equivalent || p.amount || 0), 0
+            );
+
             const plan = plansMap.get(child.class_id);
+            let expected = 0;
             if (plan) {
               const enrollments = studentEnrollments.get(child.id) || [];
-              const isReturning = enrollments.some(yearId => yearId !== activeYear.id);
+              const isReturning = enrollments.some(yearId => yearId !== activeYear?.id);
               const applicableFee = isReturning ? Number(plan.reenrollment_fee || 0) : Number(plan.inscription_fee || 0);
 
-              const expected = (applicableFee + Number(plan.tuition_fee || 0)) - Number(child.discount_amount || 0);
-              totalPaid += childPaid;
-              totalDue += Math.max(0, expected - childPaid);
+              expected = (applicableFee + Number(plan.tuition_fee || 0)) - Number(child.discount_amount || 0);
             }
+
+            const due = Math.max(0, expected - childPaid);
+            totalPaid += childPaid;
+            totalDue += due;
+
+            return {
+              ...child,
+              paidAmount: childPaid,
+              expectedAmount: expected,
+              dueAmount: due,
+              payments: childPayments
+            };
           });
 
           setParentStats({
-            childrenCount: children.length,
+            childrenCount: enrichedChildren.length,
             totalPaid,
             totalDue,
-            children: children
+            children: enrichedChildren,
+            payments: enrichedPayments
+          });
+        } else {
+          setParentStats({
+            childrenCount: 0,
+            totalPaid: 0,
+            totalDue: 0,
+            children: [],
+            payments: []
           });
         }
       }
@@ -2666,160 +2774,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
       ) : user.role === UserRole.PARENT ? (
-        <div className="space-y-8 animate-in fade-in duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-blue-100 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Mes Enfants</span>
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl shadow-xs border border-blue-100/50">
-                  <Baby size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">{parentStats.childrenCount}</p>
-                <p className="mt-2 text-xs font-semibold text-slate-400">{terminology.students} inscrits</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-emerald-100 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Total Payé</span>
-                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl shadow-xs border border-emerald-100/50">
-                  <Coins size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">{parentStats.totalPaid.toLocaleString()} G</p>
-                <p className="mt-2 text-xs font-semibold text-slate-400">Année académique en cours</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-rose-100 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Solde Restant</span>
-                <div className="p-2.5 bg-rose-50 text-rose-600 rounded-2xl shadow-xs border border-rose-100/50">
-                  <TrendingDown size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl lg:text-4xl font-black text-rose-600 tracking-tight">{parentStats.totalDue.toLocaleString()} G</p>
-                <p className="mt-2 text-xs font-semibold text-slate-400">À régulariser</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-amber-100 transition-all duration-300 cursor-pointer" onClick={() => navigate('/economat/factures')}>
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Dernier Reçu</span>
-                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl shadow-xs border border-amber-100/50">
-                  <Receipt size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-black text-slate-900 tracking-tight">Consulter Historique</p>
-                <p className="mt-1 text-xs text-indigo-600 font-bold flex items-center gap-1">Voir mes reçus <ChevronRight size={12} /></p>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="lg:col-span-2 bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">Suivi Scolaire des Enfants</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Progression académique et situation financière par élève</p>
-                </div>
-              </div>
-              <div className="space-y-3">
-                {parentStats.children.map((child, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-4 rounded-2xl bg-slate-50/60 border border-slate-100 hover:bg-slate-50 transition-colors">
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      <div className="w-10 h-10 bg-indigo-50 text-indigo-700 rounded-xl flex items-center justify-center font-black text-sm border border-indigo-100/60 shadow-xs shrink-0">
-                        {child.first_name[0]}{child.last_name[0]}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-black text-slate-900 truncate">{formatStudentName(child.last_name, child.first_name).fullName}</p>
-                        <div className="flex items-center gap-2">
-                          <p className="text-xs text-slate-400 font-medium">{child.class?.name || 'Non assigné'}</p>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
-                            👛 {(child.wallet_balance_htg || 0).toLocaleString()} HTG
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2 shrink-0 ml-3">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSelectedWalletStudent(child);
-                          setShowStudentWalletTopUp(true);
-                        }}
-                        className="px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
-                        title="Recharger le portefeuille de l'élève par MonCash"
-                      >
-                        <Smartphone size={13} />
-                        <span>Recharger MonCash</span>
-                      </button>
-                      <button 
-                        onClick={() => navigate('/economat/suivi', { state: { studentId: child.id } })}
-                        className="px-3 py-1.5 bg-white border border-slate-200/80 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-xs transition-all"
-                      >
-                        Paiements
-                      </button>
-                      <button 
-                        onClick={() => navigate(`/eleves/modifier/${child.id}`)}
-                        className="px-3 py-1.5 bg-indigo-50 border border-indigo-100 rounded-xl text-xs font-bold text-indigo-700 hover:bg-indigo-100 shadow-xs transition-all"
-                      >
-                        Détails
-                      </button>
-                    </div>
-                  </div>
-                ))}
-                {parentStats.children.length === 0 && (
-                  <div className="py-12 text-center">
-                    <Users className="mx-auto text-slate-300 mb-2" size={28} />
-                    <p className="text-xs font-bold text-slate-500">Aucun enfant trouvé associé à votre compte.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8">
-              <h3 className="text-base font-black text-slate-900 mb-6">Espace Parent</h3>
-              <div className="space-y-3">
-                <Link to="/economat/factures" className="flex items-center p-3.5 rounded-2xl hover:bg-amber-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 group-hover:scale-105 transition-transform">
-                    <Receipt size={18} />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-xs font-bold text-slate-900">Mes Factures & Reçus</p>
-                    <p className="text-[10px] text-slate-400">Historique des versements</p>
-                  </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-amber-500 transition-colors" />
-                </Link>
-                <Link to="/horaire" className="flex items-center p-3.5 rounded-2xl hover:bg-blue-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600 group-hover:scale-105 transition-transform">
-                    <Calendar size={18} />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-xs font-bold text-slate-900">Horaires des Cours</p>
-                    <p className="text-[10px] text-slate-400">Emploi du temps des classes</p>
-                  </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-blue-500 transition-colors" />
-                </Link>
-                <Link to="/messages" className="flex items-center p-3.5 rounded-2xl hover:bg-purple-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600 group-hover:scale-105 transition-transform">
-                    <Info size={18} />
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-xs font-bold text-slate-900">Contacter l'École</p>
-                    <p className="text-[10px] text-slate-400">Secrétariat & Direction</p>
-                  </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-purple-500 transition-colors" />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
+        <ParentDashboardView 
+          user={user}
+          school={school}
+          terminology={terminology}
+          parentStats={parentStats}
+          activeAcademicYear={academicYears.find(y => y.id === selectedYearId) || activeAcademicYear}
+          onTopUpStudentWallet={(child) => {
+            setSelectedWalletStudent(child);
+            setShowStudentWalletTopUp(true);
+          }}
+          onRefresh={fetchDashboardStats}
+        />
       ) : user.role === UserRole.SECRETARY ? (
         <SecretaryDashboardView 
           user={user}

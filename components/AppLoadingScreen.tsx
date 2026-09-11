@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShieldCheck, 
@@ -12,9 +12,11 @@ import {
   WifiOff, 
   UserCheck, 
   Zap,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 import Logo from './Logo';
+import { checkSupabaseConnection } from '../supabase';
 
 export interface AppLoadingScreenProps {
   onSkipToLogin?: () => void;
@@ -73,7 +75,51 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
   const [showRecoveryActions, setShowRecoveryActions] = useState(false);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
+  // Pre-flight network connectivity status
+  const [netStatus, setNetStatus] = useState<'checking' | 'online' | 'offline'>(
+    !navigator.onLine || isOffline ? 'offline' : 'checking'
+  );
+  const [netLatency, setNetLatency] = useState<number | null>(null);
+  const [isCheckingNet, setIsCheckingNet] = useState(false);
+
   const activeStep = currentStage || internalStep;
+
+  // Active network preflight check
+  const runNetworkPreflight = useCallback(async () => {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      setNetStatus('offline');
+      setShowRecoveryActions(true);
+      return;
+    }
+
+    setIsCheckingNet(true);
+    setNetStatus('checking');
+    const start = Date.now();
+    try {
+      const isReachable = await Promise.race([
+        checkSupabaseConnection(),
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2800))
+      ]);
+      const duration = Date.now() - start;
+
+      if (isReachable) {
+        setNetStatus('online');
+        setNetLatency(duration);
+      } else {
+        setNetStatus('offline');
+        setShowRecoveryActions(true);
+      }
+    } catch {
+      setNetStatus('offline');
+      setShowRecoveryActions(true);
+    } finally {
+      setIsCheckingNet(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    runNetworkPreflight();
+  }, [runNetworkPreflight]);
 
   // Animation séquentielle par défaut
   useEffect(() => {
@@ -114,6 +160,20 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
     else if (currentStage === 2) setProgress((prev) => Math.max(prev, 70));
     else if (currentStage === 3) setProgress((prev) => Math.max(prev, 98));
   }, [currentStage]);
+
+  const dynamicSteps = [
+    { 
+      id: 1, 
+      label: "Contrôle réseau & Tunnel sécurisé", 
+      desc: netStatus === 'checking'
+        ? "Vérification de la connectivité réseau au serveur..."
+        : netStatus === 'online'
+        ? `Liaison réseau active • Réponse ${netLatency !== null ? netLatency + 'ms' : 'OK'}`
+        : "Connexion réseau indisponible • Mode hors-ligne"
+    },
+    { id: 2, label: "Contrôle de session & accréditations", desc: "Vérification des droits et intégrité du compte" },
+    { id: 3, label: "Initialisation de l'espace académique", desc: "Chargement des modules et configurations scolaires" }
+  ];
 
   const ActiveMemoIcon = MEMOS[memoIndex].icon;
 
@@ -230,7 +290,7 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
 
           {/* Sequential Step Indications */}
           <div className="space-y-2 pt-1">
-            {STEPS.map((step) => {
+            {dynamicSteps.map((step) => {
               const isDone = activeStep > step.id;
               const isCurrent = activeStep === step.id;
 
@@ -270,6 +330,32 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
             })}
           </div>
 
+          {/* Network Offline Alert Banner if pre-flight check fails */}
+          {netStatus === 'offline' && (
+            <motion.div 
+              initial={{ opacity: 0, y: -4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-2xl flex items-start gap-3 text-xs text-amber-200"
+            >
+              <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
+                <WifiOff size={16} />
+              </div>
+              <div className="space-y-1 min-w-0 flex-1">
+                <div className="flex items-center justify-between">
+                  <p className="font-bold text-amber-300">Réseau distant inaccessible</p>
+                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 rounded font-mono text-amber-300">
+                    Hors-ligne
+                  </span>
+                </div>
+                <p className="text-[11px] text-amber-200/85 leading-relaxed">
+                  {cachedUserName 
+                    ? "Aucune liaison réseau active détectée. Vous pouvez poursuivre l'activité en Mode Hors-ligne sécurisé grâce à vos données en cache."
+                    : "Une connexion réseau est nécessaire pour la première authentification. Veuillez vérifier votre accès Wi-Fi ou réseau mobile."}
+                </p>
+              </div>
+            </motion.div>
+          )}
+
           {/* Dynamic Informative Memo Card */}
           <div className="pt-2 border-t border-slate-800/80">
             <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
@@ -277,13 +363,17 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                 <span>💡 Information Système</span>
               </span>
               <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
-                {isOffline ? (
+                {netStatus === 'offline' || isOffline ? (
                   <span className="flex items-center gap-1 text-amber-400 font-medium">
                     <WifiOff size={11} /> Hors-ligne
                   </span>
+                ) : netStatus === 'checking' ? (
+                  <span className="flex items-center gap-1 text-blue-400 font-medium">
+                    <div className="w-2 h-2 rounded-full border border-blue-400 border-t-transparent animate-spin" /> Test réseau...
+                  </span>
                 ) : (
                   <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <Wifi size={11} /> En ligne ({elapsedSeconds}s)
+                    <Wifi size={11} /> Connecté {netLatency !== null ? `(${netLatency}ms)` : `(${elapsedSeconds}s)`}
                   </span>
                 )}
               </span>
@@ -341,6 +431,19 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                   >
                     <span>Page de Connexion</span>
                     <ArrowRight size={14} />
+                  </button>
+                )}
+
+                {netStatus === 'offline' && (
+                  <button
+                    type="button"
+                    onClick={runNetworkPreflight}
+                    disabled={isCheckingNet}
+                    className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-900/30"
+                    title="Vérifier la connectivité réseau"
+                  >
+                    <RefreshCw size={13} className={isCheckingNet ? "animate-spin" : ""} />
+                    <span>{isCheckingNet ? "Test..." : "Tester la connexion"}</span>
                   </button>
                 )}
 
