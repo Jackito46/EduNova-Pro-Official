@@ -3456,116 +3456,84 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         )}
 
         {activeTab === 'security' && (
-          <div className="space-y-4 animate-in slide-in-from-right duration-500">
-            {/* Exporter vers GitHub (Super Admin Uniquement sur poste de développement) */}
-            {isSuperAdmin && isDevWorkstation && (
-              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-900 text-white">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-white/10 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-white/10">
-                      <GitBranch size={20} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-base sm:text-lg font-bold tracking-tight text-white">Synchronisation & Export GitHub</h3>
-                        <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-bold">
-                          Super Admin / Développeur
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-300 font-medium">
-                        Sauvegarder et publier directement les codes sources du projet sur votre dépôt GitHub officiel
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <button 
-                    type="button"
-                    id="btn-github-export-security-tab"
-                    onClick={() => setIsGitHubModalOpen(true)}
-                    disabled={isExportingGitHub}
-                    className="px-4 py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 shrink-0 whitespace-nowrap cursor-pointer disabled:opacity-85"
-                  >
-                    {isExportingGitHub ? (
-                      <>
-                        <Loader2 size={15} className="animate-spin text-indigo-600 shrink-0" />
-                        <span>Envoi en cours ({githubExportProgress?.percent || 0}%)...</span>
-                      </>
-                    ) : (
-                      <>
-                        <GitPullRequest size={15} />
-                        <span>Exporter vers GitHub</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-                
-                <div className="p-4 sm:p-5 bg-slate-50/70 border-t border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-slate-600">
-                  <div className="flex items-center gap-2 font-medium">
-                    <Code2 size={14} className="text-slate-400" />
-                    <span>Dépôt cible configuré : <strong className="font-mono text-slate-900">{githubOwner}/{githubRepo}</strong> (branche <span className="font-mono text-indigo-600 font-bold">{githubBranch}</span>)</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setIsGitHubModalOpen(true)}
-                    className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 self-start sm:self-auto cursor-pointer"
-                  >
-                    <span>Ouvrir l'assistant d'export</span>
-                    <ExternalLink size={12} />
-                  </button>
-                </div>
-              </div>
-            )}
-
+          <div className="space-y-3 sm:space-y-3.5 animate-in slide-in-from-right duration-500">
             {!canManageAllCampuses && (
-              <div className="bg-amber-50 border border-amber-200/80 p-3.5 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-800">
-                <div className="flex items-center gap-2.5">
-                  <Lock size={16} className="text-amber-700 shrink-0" />
-                  <p className="font-medium">
-                    <strong className="font-bold">Accès Partiel :</strong> Vous pouvez modifier votre mot de passe. Les politiques globales du système sont gérées par le Siège Social.
+              <div className="bg-amber-50/90 border border-amber-200/80 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-900 shadow-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Lock size={15} className="text-amber-700 shrink-0" />
+                  <p className="font-medium text-[11px] sm:text-xs leading-tight truncate sm:whitespace-normal">
+                    <strong className="font-bold">Droits limités (Annexe) :</strong> Vous pouvez modifier votre mot de passe. Les règles globales d'établissement sont administrées par le Siège.
                   </p>
                 </div>
-                <span className="px-2 py-0.5 bg-amber-100/80 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
-                  Partiel
+                <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
+                  Annexe
                 </span>
               </div>
             )}
 
-            {/* Account Security (Password) */}
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-rose-600 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
-                    <Key size={18} />
+            {/* Sécurité du Compte (Accès & Authentification École Connectée) */}
+            <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+              <div className="p-3 sm:p-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+                <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-900 text-emerald-400 rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-slate-800">
+                    <Key size={16} />
                   </div>
-                  <div>
-                    <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Sécurité du Compte</h3>
-                    <p className="text-xs text-slate-500 font-medium">Modification de votre mot de passe personnel</p>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
+                        Sécurité du Compte & Authentification
+                      </h3>
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        École Connectée
+                      </span>
+                    </div>
+                    <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
+                      Compte connecté : <strong className="text-slate-700 font-semibold">{user.email}</strong> • Modification des identifiants d'accès
+                    </p>
                   </div>
                 </div>
                 
                 <button 
+                  type="button"
                   onClick={handleUpdatePassword} 
                   disabled={saving || !securityData.newPassword || !securityData.confirmPassword} 
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                  className="px-3.5 py-1.5 sm:py-2 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end sm:self-center cursor-pointer"
+                  title="Valider la mise à jour du mot de passe"
                 >
-                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                  Changer le mot de passe
+                  {saving ? (
+                    <>
+                      <Loader2 size={13} className="animate-spin text-emerald-400" />
+                      <span>Mise à jour...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={13} className="text-emerald-400" />
+                      <span className="hidden sm:inline">Changer le mot de passe</span>
+                      <span className="sm:hidden">Enregistrer</span>
+                    </>
+                  )}
                 </button>
               </div>
 
-              <div className="p-4 sm:p-6 space-y-3.5">
-                <div className="flex items-center gap-2 text-rose-700 bg-rose-50/80 border border-rose-100 px-3 py-2 rounded-lg text-xs font-medium">
-                  <AlertCircle size={15} className="shrink-0 text-rose-600" />
-                  <span>Le changement de mot de passe déconnectera vos autres sessions actives sur d'autres appareils.</span>
+              <div className="p-3.5 sm:p-4 space-y-3">
+                <div className="flex items-center gap-2 text-slate-600 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-medium">
+                  <Shield size={14} className="shrink-0 text-indigo-600" />
+                  <span>La mise à jour de vos identifiants révoquera automatiquement les sessions ouvertes sur vos autres terminaux connectés.</span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 ml-0.5">Nouveau mot de passe</label>
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 ml-0.5">
+                      <span>Nouveau mot de passe</span>
+                      <span className={`text-[10px] font-medium ${securityData.newPassword.length >= 6 ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                        {securityData.newPassword.length >= 6 ? '✓ 6 car. min' : '6 car. min'}
+                      </span>
+                    </div>
                     <div className="relative">
                       <input 
                         type={showPassword ? "text" : "password"}
-                        className="w-full pl-3 pr-9 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-rose-600 focus:ring-2 focus:ring-rose-500/10 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
+                        className="w-full pl-3 pr-9 py-2 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-xl text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-2xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
                         placeholder="Au moins 6 caractères"
                         value={securityData.newPassword}
                         onChange={e => setSecurityData({...securityData, newPassword: e.target.value})}
@@ -3573,20 +3541,33 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                       <button 
                         type="button" 
                         onClick={() => setShowPassword(!showPassword)} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
                         title={showPassword ? "Masquer" : "Afficher"}
                       >
-                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
                   </div>
 
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold text-slate-700 ml-0.5">Confirmer le mot de passe</label>
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 ml-0.5">
+                      <span>Confirmer le mot de passe</span>
+                      {securityData.confirmPassword && (
+                        <span className={`text-[10px] font-bold flex items-center gap-0.5 ${securityData.newPassword === securityData.confirmPassword ? 'text-emerald-600' : 'text-rose-600'}`}>
+                          {securityData.newPassword === securityData.confirmPassword ? (
+                            <>
+                              <Check size={11} /> Identique
+                            </>
+                          ) : (
+                            'Différent'
+                          )}
+                        </span>
+                      )}
+                    </div>
                     <div className="relative">
                       <input 
                         type={showPassword ? "text" : "password"}
-                        className="w-full pl-3 pr-9 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-rose-600 focus:ring-2 focus:ring-rose-500/10 transition-all shadow-xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
+                        className="w-full pl-3 pr-9 py-2 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-xl text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-2xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
                         placeholder="Répétez le mot de passe"
                         value={securityData.confirmPassword}
                         onChange={e => setSecurityData({...securityData, confirmPassword: e.target.value})}
@@ -3594,10 +3575,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                       <button 
                         type="button" 
                         onClick={() => setShowPassword(!showPassword)} 
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded transition-colors"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded transition-colors cursor-pointer"
                         title={showPassword ? "Masquer" : "Afficher"}
                       >
-                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                        {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
                       </button>
                     </div>
                   </div>
@@ -3605,73 +3586,108 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
             </div>
 
-            {/* General Security Policy (Inactivity) & Maintenance */}
+            {/* Politique d'Inactivité & Maintenance de Session */}
             {(user.role === 'SUPER_ADMIN' || user.role === 'SCHOOL_ADMIN' || user.role === 'DIRECTOR' || user.is_super_admin) && (
               <>
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-4 sm:p-5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
-                        <ShieldCheck size={18} />
+                <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                  <div className="p-3 sm:p-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50 text-indigo-600 rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-indigo-100">
+                        <Clock size={16} />
                       </div>
-                      <div>
-                        <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Politique d'Inactivité</h3>
-                        <p className="text-xs text-slate-500 font-medium">Déconnexion automatique en cas de poste non surveillé</p>
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
+                          Politique d'Inactivité & Verrouillage
+                        </h3>
+                        <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
+                          Déconnexion automatique de session en cas de poste non surveillé (Terminaux École Connectée)
+                        </p>
                       </div>
                     </div>
                     
                     <button 
+                      type="button"
                       onClick={handleSaveSecurityPolicy} 
                       disabled={saving || !canManageAllCampuses} 
-                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                      className="px-3.5 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end sm:self-center cursor-pointer"
                     >
-                      {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                      Enregistrer la Politique
+                      {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+                      <span className="hidden sm:inline">Enregistrer la Politique</span>
+                      <span className="sm:hidden">Enregistrer</span>
                     </button>
                   </div>
 
-                  <div className="p-4 sm:p-6 space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/80 p-3.5 rounded-xl border border-slate-200/80">
+                  <div className="p-3.5 sm:p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
                       <div className="space-y-0.5">
-                        <label className="text-xs font-bold text-slate-800">Durée d'inactivité maximale autorisée</label>
-                        <p className="text-[11px] text-slate-500">Verrouille la session après une période sans activité. Recommandé : 5 à 15 minutes.</p>
+                        <label className="text-xs font-bold text-slate-800">Délai d'inactivité avant verrouillage</label>
+                        <p className="text-[11px] text-slate-500">
+                          Verrouille la session après une période sans activité. Recommandé : 5 à 15 minutes.
+                        </p>
                       </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <input 
-                          type="number" 
-                          min={1} 
-                          max={120}
-                          className="w-24 px-3 py-1.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold text-center outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
-                          value={sessionTimeoutInput}
-                          disabled={!canManageAllCampuses}
-                          onChange={e => setSessionTimeoutInput(Math.max(1, parseInt(e.target.value) || 1))}
-                        />
-                        <span className="text-xs font-bold font-mono text-slate-600">Minutes</span>
+                      
+                      <div className="flex items-center flex-wrap gap-2 shrink-0">
+                        {canManageAllCampuses && (
+                          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                            {[5, 10, 15, 30, 60].map((preset) => (
+                              <button
+                                key={preset}
+                                type="button"
+                                onClick={() => setSessionTimeoutInput(preset)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold transition-all cursor-pointer ${
+                                  sessionTimeoutInput === preset
+                                    ? 'bg-indigo-600 text-white shadow-2xs'
+                                    : 'text-slate-600 hover:bg-slate-100'
+                                }`}
+                              >
+                                {preset}m
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                          <input 
+                            type="number" 
+                            min={1} 
+                            max={120}
+                            className="w-20 px-2.5 py-1 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold text-center outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 shadow-2xs"
+                            value={sessionTimeoutInput}
+                            disabled={!canManageAllCampuses}
+                            onChange={e => setSessionTimeoutInput(Math.max(1, parseInt(e.target.value) || 1))}
+                          />
+                          <span className="text-xs font-bold font-mono text-slate-600">min</span>
+                        </div>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Maintenance & Permissions */}
-                <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                  <div className="p-4 sm:p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/30">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-amber-600 text-white rounded-xl shadow-xs flex items-center justify-center shrink-0">
-                        <RefreshCw size={18} />
+                {/* Maintenance & Synchronisation des Permissions */}
+                <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                  <div className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+                    <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-50 text-amber-600 rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-amber-100">
+                        <RefreshCw size={16} />
                       </div>
-                      <div>
-                        <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Maintenance & Permissions</h3>
-                        <p className="text-xs text-slate-500 font-medium">Réinitialisation et resynchronisation du cache des autorisations</p>
+                      <div className="min-w-0">
+                        <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
+                          Maintenance & Droits d'Accès
+                        </h3>
+                        <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
+                          Resynchronisation des permissions et des profils de l'établissement connecté
+                        </p>
                       </div>
                     </div>
                     
                     <button 
+                      type="button"
                       onClick={handleRepairPermissions} 
                       disabled={saving || !canManageAllCampuses}
-                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold font-mono text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0 whitespace-nowrap"
+                      className="px-3.5 py-1.5 sm:py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap self-end sm:self-center cursor-pointer"
                     >
-                      {saving ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />} 
-                      Réparer Permissions
+                      {saving ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} 
+                      <span className="hidden sm:inline">Réparer Permissions</span>
+                      <span className="sm:hidden">Réparer</span>
                     </button>
                   </div>
                 </div>
