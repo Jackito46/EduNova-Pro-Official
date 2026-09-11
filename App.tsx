@@ -13,6 +13,7 @@ import { StudentCoursesView } from './components/StudentCoursesView';
 import { StudentGradesView } from './components/StudentGradesView';
 import { StudentFinanceView } from './components/StudentFinanceView';
 import { StudentScheduleView } from './components/StudentScheduleView';
+import { StudentHeader } from './components/StudentHeader';
 import ClassManagement from './components/ClassManagement';
 import ClassForm from './components/ClassForm';
 import SubjectForm from './components/SubjectForm';
@@ -200,12 +201,30 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
   return (
     <SchoolProvider user={user} schoolId={user.school_id}>
       <SessionGuard user={user}>
-        <GlobalShortcuts user={user} />
+        {Boolean(
+          user &&
+          user.role !== UserRole.PARENT &&
+          (user.role as any) !== 'PARENT' &&
+          (user.role as any) !== 'parent' &&
+          (
+            user.is_super_admin ||
+            user.role === UserRole.SUPER_ADMIN ||
+            (user.role as any) === 'SUPER_ADMIN' ||
+            user.role === UserRole.DIRECTOR ||
+            (user.role as any) === 'DIRECTOR' ||
+            user.role === UserRole.SCHOOL_ADMIN ||
+            (user.role as any) === 'SCHOOL_ADMIN' ||
+            (user.role as any) === 'admin'
+          )
+        ) && (
+          <GlobalShortcuts user={user} />
+        )}
         <div className="flex h-screen bg-[#f3f4f6] overflow-hidden font-sans">
         <ErrorBoundary>
           <Sidebar user={user} onLogout={purgeSystemState} />
         </ErrorBoundary>
         <main className="flex-1 overflow-y-auto p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
+          {user.role === UserRole.STUDENT && <StudentHeader user={user} />}
           <ConnectivityBanner />
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
           <AiQuotaAlertBanner user={user} />

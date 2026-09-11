@@ -63,15 +63,23 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         
         setFeePlan(planData);
 
-        // Fetch payments made by student
-        const { data: paymentsData } = await supabase
+        // Fetch payments made by student (order by created_at)
+        const { data: paymentsData, error: paymentsErr } = await supabase
           .from('payments')
           .select('*, campaign:ad_hoc_campaigns(id, name)')
           .eq('student_id', studentData.id)
-          .eq('academic_year_id', activeYear.id)
-          .order('date', { ascending: false });
+          .order('created_at', { ascending: false });
 
-        setPayments(paymentsData || []);
+        if (paymentsErr) {
+          console.error("Erreur chargement payments dans StudentFinanceView:", paymentsErr);
+        }
+
+        const validSessionPayments = (paymentsData || []).filter((p: any) => {
+          if (!activeYear?.id) return true;
+          return !p.academic_year_id || p.academic_year_id === activeYear.id;
+        });
+
+        setPayments(validSessionPayments);
 
         // Fetch student's assigned ad-hoc campaigns
         const { data: campaignData, error: campaignErr } = await supabase

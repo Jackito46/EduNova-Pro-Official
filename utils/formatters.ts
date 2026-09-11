@@ -32,7 +32,7 @@ export const capitalizeWordOrCompound = (str: string): string => {
     .join(' ');
 };
 
-export const formatStudentName = (lastName: string, firstName: string) => {
+export const formatStudentName = (lastName?: string | null, firstName?: string | null) => {
   const formattedLastName = (lastName || '').trim().toUpperCase();
   const formattedFirstName = capitalizeWordOrCompound(firstName || '');
   
@@ -45,24 +45,27 @@ export const formatStudentName = (lastName: string, firstName: string) => {
 
 /**
  * Formate un nom complet : NOM en majuscules, Prénom en Capital Case.
+ * Conforme aux standards des écoles classiques (NOM Prénom).
  */
-export const formatFullName = (fullName: string) => {
+export const formatFullName = (fullName?: string | null) => {
   if (!fullName) return '';
   const parts = fullName.trim().split(/\s+/);
   if (parts.length === 1) return parts[0].toUpperCase();
   
-  // Si le premier mot est déjà en majuscules (ex: "HYPPOLITE Carl-Henry")
-  if (parts[0] === parts[0].toUpperCase() && parts[0].length > 1) {
-    const lastName = parts[0].toUpperCase();
-    const firstNames = capitalizeWordOrCompound(parts.slice(1).join(' '));
-    return `${lastName} ${firstNames}`;
+  // Chercher si un mot est déjà entièrement en majuscules (>= 2 lettres, hors tirets simples)
+  const allCapsIndex = parts.findIndex(p => p === p.toUpperCase() && p.length > 1 && !p.includes('-'));
+  if (allCapsIndex !== -1) {
+    const lastName = parts[allCapsIndex].toUpperCase();
+    const otherParts = parts.filter((_, idx) => idx !== allCapsIndex);
+    const firstNames = capitalizeWordOrCompound(otherParts.join(' '));
+    return `${lastName} ${firstNames}`.trim();
   }
 
-  // Sinon convention classique : dernier mot = Nom
-  const lastName = parts[parts.length - 1].toUpperCase();
-  const firstNames = capitalizeWordOrCompound(parts.slice(0, parts.length - 1).join(' '));
+  // Convention scolaire classique : premier mot = Nom de famille, reste = Prénom(s)
+  const lastName = parts[0].toUpperCase();
+  const firstNames = capitalizeWordOrCompound(parts.slice(1).join(' '));
     
-  return `${lastName} ${firstNames}`;
+  return `${lastName} ${firstNames}`.trim();
 };
 
 /**

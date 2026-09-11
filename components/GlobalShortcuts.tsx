@@ -64,12 +64,19 @@ export const GlobalShortcuts: React.FC<GlobalShortcutsProps> = ({ user }) => {
     hasAccessToLink(link.path) && link.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const isParent = Boolean(user && (user.role === UserRole.PARENT || (user.role as any) === 'PARENT' || (user.role as any) === 'parent'));
+
   const isAuthorized = Boolean(
-    user && (
+    user && 
+    !isParent && (
       user.is_super_admin ||
       user.role === UserRole.SUPER_ADMIN ||
+      (user.role as any) === 'SUPER_ADMIN' ||
       user.role === UserRole.DIRECTOR ||
-      user.role === UserRole.SCHOOL_ADMIN
+      (user.role as any) === 'DIRECTOR' ||
+      user.role === UserRole.SCHOOL_ADMIN ||
+      (user.role as any) === 'SCHOOL_ADMIN' ||
+      (user.role as any) === 'admin'
     )
   );
 

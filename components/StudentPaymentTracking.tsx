@@ -659,8 +659,13 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         globalDebt = Math.max(globalDebt, totalBalance);
       }
 
+      const studentFormatted = formatStudentName(student.last_name, student.first_name);
+
       setSelectedStudent({
         ...student,
+        last_name: studentFormatted.lastName,
+        first_name: studentFormatted.firstName,
+        fullName: studentFormatted.fullName,
         isNotEnrolledInTargetYear: !isEnrolled,
         isEnrolled,
         otherEnrollments,
@@ -1958,7 +1963,18 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <td className="py-3 px-6 text-xs font-bold text-slate-600">{new Date(p.created_at).toLocaleDateString()}</td>
                             <td className="py-3 px-6 text-xs font-mono text-slate-400">RCP-{p.id.substring(0,8).toUpperCase()}</td>
                             <td className="py-3 px-6 text-xs font-bold text-slate-700">{p.campaign?.name ? `Campagne: ${p.campaign.name}` : p.ad_hoc_campaign_id ? 'Frais de Campagne' : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) ? 'Frais Académiques' : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") ? 'Inscription' : (p.nature || p.type || p.fee_type || 'Frais Divers'))}</td>
-                            <td className="py-3 px-6 text-right font-mono font-black text-slate-900">{(p.amount_htg_equivalent || p.amount).toLocaleString()}</td>
+                            <td className="py-3 px-6 text-right font-mono font-black text-slate-900">
+                              {p.currency === 'USD' ? (
+                                <span>
+                                  ${Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
+                                  <span className="text-[10px] text-slate-400 font-normal ml-1">
+                                    (≈ {Number(p.amount_htg_equivalent || (Number(p.amount || 0) * (p.exchange_rate_applied || 140))).toLocaleString()} HTG)
+                                  </span>
+                                </span>
+                              ) : (
+                                <span>{Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG</span>
+                              )}
+                            </td>
                           </tr>
                         ))}
                         {studentHistory.length === 0 && (

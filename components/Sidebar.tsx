@@ -150,10 +150,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const isPresencesEnabled = school?.global_settings?.modules?.presences ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isDisciplineEnabled = school?.global_settings?.modules?.discipline ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === UserRole.SUPER_ADMIN || (user?.role as any) === 'SUPER_ADMIN');
+  const isParent = Boolean(user?.role === UserRole.PARENT || (user?.role as any) === 'PARENT' || (user?.role as any) === 'parent');
   const canAccessShortcuts = Boolean(
-    isSuperAdmin || 
-    user?.role === UserRole.DIRECTOR || 
-    user?.role === UserRole.SCHOOL_ADMIN
+    !isParent && (
+      isSuperAdmin || 
+      user?.role === UserRole.DIRECTOR || 
+      (user?.role as any) === 'DIRECTOR' ||
+      user?.role === UserRole.SCHOOL_ADMIN ||
+      (user?.role as any) === 'SCHOOL_ADMIN' ||
+      (user?.role as any) === 'admin'
+    )
   );
 
   const { isInstallable, isInstalled, installPwa } = usePwaInstall();

@@ -101,12 +101,15 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       setEnrollments(enrollData || []);
 
       // 3. Fetch Payments
-      const { data: payData } = await supabase
+      const { data: payData, error: payErr } = await supabase
         .from('payments')
-        .select('*, academic_year:academic_years(*), campaign:ad_hoc_campaigns(id, name)')
+        .select('*, campaign:ad_hoc_campaigns(id, name)')
         .eq('student_id', studentId)
-        .eq('school_id', user.school_id)
         .order('created_at', { ascending: false });
+        
+      if (payErr) {
+        console.error("Erreur chargement des versements de l'élève:", payErr);
+      }
         
       // 3.5 Fetch Supply Payments (if any)
       const { data: supplyData } = await supabase

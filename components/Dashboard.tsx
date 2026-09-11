@@ -61,10 +61,11 @@ import { supabase, isValidUuid } from '../supabase';
 import { geminiService } from '../services/geminiService';
 import { RetryableError } from './RetryableError';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
-import { formatStudentName } from '../utils/formatters';
+import { formatStudentName, formatFullName } from '../utils/formatters';
 import { displayIdentifier, normalizeIdentifier } from '../utils/authHelpers';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ParentDashboardView } from './ParentDashboardView';
+import { StudentDashboardGrid } from './StudentDashboardGrid';
 import { ModernDashboardSkeleton } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import Logo from './Logo';
@@ -163,6 +164,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     tuitionExpected: 0,
     tuitionPaid: 0,
     tuitionBalance: 0,
+    miscExpected: 0,
+    miscPaid: 0,
+    miscBalance: 0,
     campaignsExpected: 0,
     campaignsPaid: 0,
     campaignsBalance: 0,
@@ -181,8 +185,20 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   });
 
   const [currentStudent, setCurrentStudent] = useState<any | null>(null);
+  const [studentCourses, setStudentCourses] = useState<any[]>([]);
+  const [studentRecentGrades, setStudentRecentGrades] = useState<any[]>([]);
   const [selectedWalletStudent, setSelectedWalletStudent] = useState<any | null>(null);
   const [showStudentWalletTopUp, setShowStudentWalletTopUp] = useState(false);
+
+  const studentFormattedFullName = useMemo(() => {
+    if (user.role !== UserRole.STUDENT) return user.full_name || '';
+    const lastName = currentStudent?.last_name || (user as any).last_name || '';
+    const firstName = currentStudent?.first_name || (user as any).first_name || '';
+    if (lastName || firstName) {
+      return formatStudentName(lastName, firstName).fullName;
+    }
+    return formatFullName(user.full_name || '');
+  }, [user, currentStudent]);
 
   const [lowStockItems, setLowStockItems] = useState<any[]>([]);
   const [dismissStockAlert, setDismissStockAlert] = useState(false);
@@ -878,15 +894,63 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         if (studentData) {
           setCurrentStudent(studentData);
-          // Fetch grades for average
-          const { data: grades } = await supabase
-            .from('grades')
-            .select('score')
-            .eq('student_id', studentData.id)
-            .eq('academic_year_id', activeYear.id);
-          
-          const avg = grades && grades.length > 0 
-            ? grades.reduce((acc, g) => acc + Number(g.score), 0) / grades.length 
+
+          // Fetch class subjects for courses card
+          let classSubjectsList: any[] = [];
+          if (studentData.class_id) {
+            try {
+              const { data: csData } = await supabase
+                .from('class_subjects')
+                .select('id, coefficient, total_hours, subject:subjects(id, name, code, coefficient)')
+                .eq('class_id', studentData.class_id);
+
+              const { data: assignData } = await supabase
+                .from('staff_assignments')
+                .select('subject_id, staff:staff(first_name, last_name)')
+                .eq('class_id', studentData.class_id)
+                .eq('academic_year_id', activeYear.id);
+
+              classSubjectsList = (csData || []).map((cs: any) => {
+                const assignment = (assignData || []).find((a: any) => a.subject_id === cs.subject?.id || a.subject_id === cs.subject_id);
+                const staffMember = assignment?.staff;
+                return {
+                  ...cs,
+                  staff: staffMember ? (Array.isArray(staffMember) ? staffMember[0] : staffMember) : null
+                };
+              });
+            } catch (courseErr) {
+              console.error("Error loading student courses:", courseErr);
+            }
+          }
+          setStudentCourses(classSubjectsList);
+
+          // Fetch detailed grades for evaluations card
+          let detailedGrades: any[] = [];
+          try {
+            const { data: dgData, error: dgError } = await supabase
+              .from('grades')
+              .select('id, score, max_score, term, evaluation_title, created_at, subject:subjects(name, code, coefficient)')
+              .eq('student_id', studentData.id)
+              .eq('academic_year_id', activeYear.id)
+              .order('created_at', { ascending: false });
+
+            if (!dgError && dgData && dgData.length > 0) {
+              detailedGrades = dgData;
+            } else {
+              const { data: fallbackGrades } = await supabase
+                .from('grades')
+                .select('id, score, max_score, term, evaluation_title, created_at, subject:subjects(name, code, coefficient)')
+                .eq('student_id', studentData.id)
+                .order('created_at', { ascending: false });
+              detailedGrades = fallbackGrades || [];
+            }
+          } catch (gradeErr) {
+            console.error("Error loading student grades:", gradeErr);
+          }
+          setStudentRecentGrades(detailedGrades);
+
+          const avg = detailedGrades && detailedGrades.length > 0 
+            ? detailedGrades.reduce((acc: number, g: any) => acc + Number(g.score), 0) / detailedGrades.length 
             : 0;
 
           // Fetch fee plan for the class
@@ -915,16 +979,26 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           }, 0);
 
           // Fetch payments in active academic year
-          const { data: activeYearPayments } = await supabase
+          const { data: allStudentPayments, error: paymentsErr } = await supabase
             .from('payments')
-            .select('amount_htg_equivalent, amount, ad_hoc_campaign_id, currency, exchange_rate_applied, fee_type, nature, type, description')
+            .select('*, campaign:ad_hoc_campaigns(id, name)')
             .eq('student_id', studentData.id)
-            .eq('academic_year_id', activeYear.id)
             .neq('status', 'ANNULE')
-            .not('payment_method', 'ilike', '%EN ATTENTE%')
-            .not('payment_method', 'ilike', '%REJETÉ%');
+            .order('created_at', { ascending: false });
 
-          const activePayments = activeYearPayments || [];
+          if (paymentsErr) {
+            console.error("Erreur chargement payments Dashboard student:", paymentsErr);
+          }
+
+          const validStudentPayments = (allStudentPayments || []).filter((p: any) => 
+            !p.payment_method?.toUpperCase().includes('EN ATTENTE') && 
+            !p.payment_method?.toUpperCase().includes('REJETÉ')
+          );
+
+          // Payments for this session (including untagged payments)
+          const activePayments = validStudentPayments.filter((p: any) => 
+            !p.academic_year_id || p.academic_year_id === activeYear.id
+          );
           
           const isAdmissionPayment = (p: any) => {
             const feeType = (p.fee_type || '').toLowerCase();
@@ -957,13 +1031,32 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             );
           };
 
-          // Separate payments into three distinct categories
+          const isMiscPayment = (p: any) => {
+            const feeType = (p.fee_type || '').toLowerCase();
+            const nature = (p.nature || '').toLowerCase();
+            const type = (p.type || '').toLowerCase();
+            const desc = (p.description || '').toLowerCase();
+            return (
+              feeType.includes('divers') ||
+              feeType.includes('misc') ||
+              nature.includes('divers') ||
+              nature.includes('misc') ||
+              type.includes('divers') ||
+              type.includes('misc') ||
+              desc.includes('divers') ||
+              desc.includes('misc')
+            );
+          };
+
+          // Separate payments into four distinct categories matching classical school economics
           const admissionPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
           const campaignPayments = activePayments.filter((p: any) => !!p.ad_hoc_campaign_id);
-          const tuitionPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && !isAdmissionPayment(p));
+          const miscPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
+          const tuitionPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
 
           const admissionPaid = admissionPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
           const campaignsPaid = campaignPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
+          const miscPaid = miscPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
           const tuitionPaid = tuitionPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
 
           // Determine if returning to calculate registration fee
@@ -1000,7 +1093,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           const adjAdmissionExpected = admissionExpected - admissionDiscountApplied;
           remainingDiscount -= admissionDiscountApplied;
 
-          const unpaidMiscNeeded = planMiscFee;
+          const unpaidMiscNeeded = Math.max(0, planMiscFee - miscPaid);
           const miscDiscountApplied = Math.min(unpaidMiscNeeded, remainingDiscount);
           const adjPlanMiscFee = planMiscFee - miscDiscountApplied;
           remainingDiscount -= miscDiscountApplied;
@@ -1010,14 +1103,14 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           const adjCampaignsExpected = campaignsExpected - campaignsDiscountApplied;
           remainingDiscount -= campaignsDiscountApplied;
 
-          // Misc paid isn't strictly separated in Dashboard currently, so we combine tuition and misc
           const admissionBalance = Math.max(adjAdmissionExpected - admissionPaid, 0);
-          const tuitionBalance = Math.max((tuitionExpected + adjPlanMiscFee) - tuitionPaid, 0); // tuitionPaid in dashboard includes misc
+          const tuitionBalance = Math.max(tuitionExpected - tuitionPaid, 0);
+          const miscBalance = Math.max(adjPlanMiscFee - miscPaid, 0);
           const campaignsBalance = Math.max(adjCampaignsExpected - campaignsPaid, 0);
 
-          const totalPaid = admissionPaid + tuitionPaid + campaignsPaid;
+          const totalPaid = admissionPaid + tuitionPaid + miscPaid + campaignsPaid;
           const totalExpected = adjAdmissionExpected + tuitionExpected + adjPlanMiscFee + adjCampaignsExpected;
-          const totalBalance = totalExpected - totalPaid;
+          const totalBalance = Math.max(0, totalExpected - totalPaid);
 
           const globalDebt = totalBalance;
 
@@ -1032,9 +1125,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             admissionExpected: adjAdmissionExpected,
             admissionPaid,
             admissionBalance,
-            tuitionExpected: tuitionExpected + adjPlanMiscFee,
+            tuitionExpected: tuitionExpected,
             tuitionPaid,
             tuitionBalance,
+            miscExpected: adjPlanMiscFee,
+            miscPaid,
+            miscBalance,
             campaignsExpected: adjCampaignsExpected,
             campaignsPaid,
             campaignsBalance,
@@ -1111,40 +1207,53 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         if (children && children.length > 0) {
           const childrenIds = children.map(c => c.id);
-          
-          // Fetch all payments for all children of this parent (unrestricted so all receipts are accessible)
-          const { data: allChildrenPayments } = await supabase
-            .from('payments')
-            .select(`
-              id,
-              receipt_number,
-              amount,
-              amount_htg_equivalent,
-              currency,
-              exchange_rate_applied,
-              payment_method,
-              payment_date,
-              created_at,
-              fee_type,
-              nature,
-              type,
-              description,
-              status,
-              student_id,
-              notes,
-              academic_year_id
-            `)
-            .in('student_id', childrenIds)
-            .order('payment_date', { ascending: false });
 
-          const validPayments = (allChildrenPayments || []).filter(p => (p.status || '').toUpperCase() !== 'ANNULE');
+          // Fetch assigned ad-hoc campaigns for children
+          const campaignsExpectedByStudent: Record<string, number> = {};
+          try {
+            const { data: campaignFees } = await supabase
+              .from('student_ad_hoc_fees')
+              .select('student_id, custom_amount, campaign:ad_hoc_campaigns!campaign_id(id, amount, academic_year_id)')
+              .in('student_id', childrenIds);
+            
+            (campaignFees || []).forEach((fee: any) => {
+              if (fee.campaign && (!activeYear?.id || fee.campaign.academic_year_id === activeYear.id)) {
+                const amt = fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign.amount || 0);
+                campaignsExpectedByStudent[fee.student_id] = (campaignsExpectedByStudent[fee.student_id] || 0) + amt;
+              }
+            });
+          } catch (cErr) {
+            console.warn("Could not load campaign fees for parent dashboard", cErr);
+          }
+          
+          // Fetch all payments for all children of this parent (order by created_at)
+          const { data: allChildrenPayments, error: paymentsErr } = await supabase
+            .from('payments')
+            .select('*, campaign:ad_hoc_campaigns(id, name)')
+            .in('student_id', childrenIds)
+            .order('created_at', { ascending: false });
+
+          if (paymentsErr) {
+            console.error("Erreur chargement paiements enfants parent:", paymentsErr);
+          }
+
+          const validPayments = (allChildrenPayments || [])
+            .filter(p => (p.status || '').toUpperCase() !== 'ANNULE')
+            .map(p => ({
+              ...p,
+              receipt_number: p.receipt_number || p.reference_number || (p.id ? `REC-${p.id.slice(0, 8).toUpperCase()}` : '')
+            }));
 
           // Enrich payments with child info
           const enrichedPayments = validPayments.map(p => {
             const child = children.find(c => c.id === p.student_id);
+            const formattedChildName = child ? formatStudentName(child.last_name, child.first_name).fullName : '';
             return {
               ...p,
-              student: child
+              student: child ? {
+                ...child,
+                fullName: formattedChildName
+              } : child
             };
           });
 
@@ -1152,9 +1261,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           let totalDue = 0;
 
           const enrichedChildren = children.map(child => {
+            const formatted = formatStudentName(child.last_name, child.first_name);
             const childPayments = validPayments.filter(p => p.student_id === child.id);
             const activeYearPayments = activeYear?.id 
-              ? childPayments.filter(p => p.academic_year_id === activeYear.id)
+              ? childPayments.filter(p => !p.academic_year_id || p.academic_year_id === activeYear.id)
               : childPayments;
 
             const childPaid = activeYearPayments.reduce((acc, p) => 
@@ -1167,8 +1277,11 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               const enrollments = studentEnrollments.get(child.id) || [];
               const isReturning = enrollments.some(yearId => yearId !== activeYear?.id);
               const applicableFee = isReturning ? Number(plan.reenrollment_fee || 0) : Number(plan.inscription_fee || 0);
+              const tuitionFee = Number(plan.tuition_fee || 0) + (Number(plan.tuition_fee_usd || 0) * currentExchangeRate);
+              const miscFee = plan.is_misc_mandatory ? (Number(plan.misc_fee_htg || 0) + (Number(plan.misc_fee_usd || 0) * currentExchangeRate)) : 0;
+              const campaignsFee = campaignsExpectedByStudent[child.id] || 0;
 
-              expected = (applicableFee + Number(plan.tuition_fee || 0)) - Number(child.discount_amount || 0);
+              expected = (applicableFee + tuitionFee + miscFee + campaignsFee) - Number(child.discount_amount || 0);
             }
 
             const due = Math.max(0, expected - childPaid);
@@ -1177,6 +1290,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             return {
               ...child,
+              last_name: formatted.lastName,
+              first_name: formatted.firstName,
+              fullName: formatted.fullName,
               paidAmount: childPaid,
               expectedAmount: expected,
               dueAmount: due,
@@ -1482,11 +1598,19 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const financeRoles = [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT];
   const canViewFinances = financeRoles.includes(user.role);
   const canAccessShortcuts = Boolean(
-    user && (
+    user && 
+    user.role !== UserRole.PARENT &&
+    (user.role as any) !== 'PARENT' &&
+    (user.role as any) !== 'parent' &&
+    (
       user.is_super_admin ||
       user.role === UserRole.SUPER_ADMIN ||
+      (user.role as any) === 'SUPER_ADMIN' ||
       user.role === UserRole.DIRECTOR ||
-      user.role === UserRole.SCHOOL_ADMIN
+      (user.role as any) === 'DIRECTOR' ||
+      user.role === UserRole.SCHOOL_ADMIN ||
+      (user.role as any) === 'SCHOOL_ADMIN' ||
+      (user.role as any) === 'admin'
     )
   );
 
@@ -1680,12 +1804,21 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
-                <span className="text-xs font-bold text-slate-800 truncate max-w-[130px] sm:max-w-[180px]">
-                  {user.full_name}
+                <span 
+                  id="dashboard-user-name-display"
+                  className="text-xs font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[260px]"
+                  title={user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
+                >
+                  {user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
                 </span> 
                 <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                   {roleLabels[user.role] || user.role.replace(/_/g, ' ')}
                 </span>
+                {user.role === UserRole.STUDENT && studentStats.className && (
+                  <span className="hidden sm:inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">
+                    {studentStats.className}
+                  </span>
+                )}
               </div>
 
               {/* Modern Academic Session Dropdown Selector */}
@@ -2578,220 +2711,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
       ) : user.role === UserRole.STUDENT ? (
-        <div className="space-y-8 animate-in fade-in duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-blue-100 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Ma {terminology.class}</span>
-                <div className="p-2.5 bg-blue-50 text-blue-600 rounded-2xl shadow-xs border border-blue-100/50">
-                  <GraduationCap size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">{studentStats.className}</p>
-                <p className="mt-2 text-xs font-semibold text-slate-400">Année académique active</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-emerald-100 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Ma Moyenne</span>
-                <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-2xl shadow-xs border border-emerald-100/50">
-                  <TrendingUp size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">{studentStats.averageGrade || '--'}</p>
-                <p className="mt-2 text-xs font-semibold text-slate-400">Dernier relevé périodique</p>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-3xl p-6 shadow-xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-amber-100 transition-all duration-300">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-[11px] font-black uppercase tracking-widest text-slate-400">Total Versé</span>
-                <div className="p-2.5 bg-amber-50 text-amber-600 rounded-2xl shadow-xs border border-amber-100/50">
-                  <Receipt size={18} />
-                </div>
-              </div>
-              <div>
-                <p className="text-2xl lg:text-3xl font-black text-amber-600 tracking-tight">{studentStats.totalPaid.toLocaleString()} HTG</p>
-                <p className={`mt-2 text-xs font-bold flex items-center gap-1.5 ${studentStats.globalDebt <= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                  <span className="h-2 w-2 rounded-full bg-current"></span>
-                  {studentStats.globalDebt <= 0 ? 'Compte scolarité en règle' : `Solde restant : ${studentStats.globalDebt.toLocaleString()} HTG`}
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 overflow-hidden mt-8">
-            <div className="p-6 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-slate-50/50">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-50 text-indigo-600 rounded-2xl shadow-xs border border-indigo-100/50">
-                  <Wallet size={20} />
-                </div>
-                <div>
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">Mon Portefeuille & Situation Économique</h3>
-                  <p className="text-xs text-slate-400 font-medium">Détails précis de mes contributions, scolarités et frais de campagnes</p>
-                </div>
-              </div>
-              <Link
-                to="/mon-economat"
-                className="text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-white hover:bg-indigo-50 border border-slate-200/80 px-4 py-2 rounded-xl transition-all shadow-xs flex items-center gap-1.5 shrink-0 self-start sm:self-auto"
-              >
-                Gérer mes reçus <ChevronRight size={14} />
-              </Link>
-            </div>
-            
-            <div className="p-6 lg:p-8 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {/* Admission / Inscription block */}
-                <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700">Frais d'Admission</h4>
-                    <span className="text-[9px] font-black uppercase bg-emerald-100/70 text-emerald-700 px-2 py-0.5 rounded-md">Obligatoire</span>
-                  </div>
-                  
-                  <div className="space-y-2.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-medium">Frais Exigés</span>
-                      <span className="font-bold text-slate-800">{studentStats.admissionExpected?.toLocaleString()} HTG</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-medium">Montant Versé</span>
-                      <span className="font-bold text-emerald-600">+{studentStats.admissionPaid?.toLocaleString()} HTG</span>
-                    </div>
-                    <div className="border-t border-slate-200/70 pt-2.5 flex justify-between items-center text-xs">
-                      <span className="text-slate-700 font-bold">Reste à payer</span>
-                      <span className={`font-black ${studentStats.admissionBalance <= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {studentStats.admissionBalance <= 0 ? 'Réglé' : `${studentStats.admissionBalance?.toLocaleString()} HTG`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Tuition Details block */}
-                <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700">Écolage (Scolarité)</h4>
-                    <span className="text-[9px] font-black uppercase bg-indigo-100/70 text-indigo-700 px-2 py-0.5 rounded-md">Scolarité</span>
-                  </div>
-                  
-                  <div className="space-y-2.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-medium">Frais Exigés</span>
-                      <span className="font-bold text-slate-800">{studentStats.tuitionExpected?.toLocaleString()} HTG</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-medium">Montant Versé</span>
-                      <span className="font-bold text-emerald-600">+{studentStats.tuitionPaid?.toLocaleString()} HTG</span>
-                    </div>
-                    {studentStats.discountAmount > 0 && (
-                      <div className="flex justify-between items-center text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
-                        <span className="font-medium">Réduction</span>
-                        <span className="font-black">-{studentStats.discountAmount.toLocaleString()} HTG</span>
-                      </div>
-                    )}
-                    <div className="border-t border-slate-200/70 pt-2.5 flex justify-between items-center text-xs">
-                      <span className="text-slate-700 font-bold">Reste à payer</span>
-                      <span className={`font-black ${studentStats.tuitionBalance <= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                        {studentStats.tuitionBalance <= 0 ? 'Réglé' : `${studentStats.tuitionBalance?.toLocaleString()} HTG`}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Campaigns Details block */}
-                <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700">Campagnes & Activités</h4>
-                    <span className="text-[9px] font-black uppercase bg-amber-100/70 text-amber-700 px-2 py-0.5 rounded-md">Occasionnel</span>
-                  </div>
-                  
-                  {studentStats.hasCampaigns ? (
-                    <div className="space-y-2.5">
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-500 font-medium">Frais Exigés</span>
-                        <span className="font-bold text-slate-800">{studentStats.campaignsExpected?.toLocaleString()} HTG</span>
-                      </div>
-                      <div className="flex justify-between items-center text-xs">
-                        <span className="text-slate-500 font-medium">Montant Versé</span>
-                        <span className="font-bold text-emerald-600">+{studentStats.campaignsPaid?.toLocaleString()} HTG</span>
-                      </div>
-                      <div className="border-t border-slate-200/70 pt-2.5 flex justify-between items-center text-xs">
-                        <span className="text-slate-700 font-bold">Reste à payer</span>
-                        <span className={`font-black ${studentStats.campaignsBalance <= 0 ? 'text-emerald-600' : 'text-rose-500'}`}>
-                          {studentStats.campaignsBalance <= 0 ? 'Réglé' : `${studentStats.campaignsBalance?.toLocaleString()} HTG`}
-                        </span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-center py-5 space-y-1.5">
-                      <Layers size={28} className="text-slate-300" />
-                      <p className="text-[11px] text-slate-400 font-medium max-w-[200px]">Aucune campagne assignée</p>
-                    </div>
-                  )}
-                </div>
-
-                {/* Wallet block */}
-                <div className="bg-slate-50/70 rounded-2xl p-5 border border-slate-100 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-200/70 pb-2.5">
-                    <h4 className="text-[11px] font-black uppercase tracking-wider text-slate-700">Portefeuille</h4>
-                    <span className="text-[9px] font-black uppercase bg-cyan-100/70 text-cyan-700 px-2 py-0.5 rounded-md">Fonds</span>
-                  </div>
-                  
-                  <div className="space-y-2.5">
-                    <div className="flex justify-between items-center text-xs">
-                      <span className="text-slate-500 font-medium">Solde HTG</span>
-                      <span className="font-black text-cyan-700">{studentStats.wallet_balance_htg?.toLocaleString()} HTG</span>
-                    </div>
-                    <div className="flex justify-between items-center text-xs pt-1 border-t border-slate-100">
-                      <span className="text-slate-500 font-medium">Solde USD</span>
-                      <span className="font-black text-cyan-700">{studentStats.wallet_balance_usd?.toLocaleString()} USD</span>
-                    </div>
-                    <p className="text-[10px] text-slate-400 font-medium pt-1">Disponible pour futurs règlements</p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedWalletStudent(currentStudent);
-                        setShowStudentWalletTopUp(true);
-                      }}
-                      className="w-full mt-2.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <Smartphone size={13} />
-                      <span>Recharger via MonCash</span>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* General Summary row */}
-              <div className="bg-slate-900 text-white rounded-3xl p-6 shadow-sm relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-6">
-                <div className="space-y-1 text-center md:text-left z-10">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-indigo-300">Bilan Financier Global</span>
-                  <p className="text-xl font-black">Récapitulatif de toutes les contributions</p>
-                  <p className="text-xs text-slate-400 font-medium">Statut global des comptes de l'étudiant</p>
-                </div>
-
-                <div className="grid grid-cols-3 gap-3 text-center shrink-0 w-full md:w-auto z-10">
-                  <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/60">
-                    <span className="block text-[9px] font-black text-slate-400 uppercase tracking-widest">Total Dû</span>
-                    <span className="text-sm md:text-base font-black">{studentStats.totalDue.toLocaleString()} G</span>
-                  </div>
-                  <div className="bg-slate-800/80 p-3 rounded-2xl border border-emerald-500/40">
-                    <span className="block text-[9px] font-black text-emerald-400 uppercase tracking-widest">Recueilli</span>
-                    <span className="text-sm md:text-base font-black text-emerald-400">+{studentStats.totalPaid.toLocaleString()} G</span>
-                  </div>
-                  <div className={`p-3 rounded-2xl border ${studentStats.globalDebt <= 0 ? 'bg-slate-800/80 border-emerald-500/40' : 'bg-rose-950/40 border-rose-500/40'}`}>
-                    <span className="block text-[9px] font-black text-slate-300 uppercase tracking-widest">Reste</span>
-                    <span className={`text-sm md:text-base font-black ${studentStats.globalDebt <= 0 ? 'text-emerald-300' : 'text-rose-300'}`}>
-                      {studentStats.globalDebt <= 0 ? 'À jour' : `${studentStats.globalDebt.toLocaleString()} G`}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <StudentDashboardGrid
+          user={user}
+          student={currentStudent}
+          studentStats={studentStats}
+          courses={studentCourses}
+          grades={studentRecentGrades}
+          onOpenWalletTopUp={() => {
+            setSelectedWalletStudent(currentStudent);
+            setShowStudentWalletTopUp(true);
+          }}
+          academicYearLabel={activeAcademicYear?.label || (activeAcademicYear as any)?.name || academicYears.find(y => y.id === selectedYearId)?.name || academicYears.find(y => y.id === selectedYearId)?.label}
+        />
       ) : user.role === UserRole.PARENT ? (
         <ParentDashboardView 
           user={user}
