@@ -150,7 +150,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   // États pour la proposition de confirmation SMS aux parents (Renforcement de confiance)
   const [autoSendSmsParent, setAutoSendSmsParent] = useState<boolean>(true);
   const [parentPhoneCustom, setParentPhoneCustom] = useState<string>('');
-  const [showSmsPreviewModal, setShowSmsPreviewModal] = useState<boolean>(false);
 
   const [activeYear, setActiveYear] = useState<any>(null);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -237,7 +236,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     const opts: SelectOption[] = activePaymentMethods.map(m => ({
       value: m.code,
       label: m.name,
-      badge: m.requires_bank ? 'Banque' : m.requires_reference ? 'Réf.' : undefined,
       icon: m.code === 'MonCash' ? Zap : m.code === 'Chèque' || m.code === 'Dépôt Bancaire' ? Building2 : CreditCard
     }));
 
@@ -245,8 +243,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       const bal = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
       opts.push({
         value: 'Portefeuille',
-        label: 'Portefeuille Électronique',
-        badge: `Solde: ${bal.toLocaleString()} ${currency}`,
+        label: 'Portefeuille',
+        badge: `${bal.toLocaleString()} ${currency}`,
         icon: Wallet
       });
     }
@@ -295,8 +293,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Options de devises disponibles pour l'encaissement
   // RÈGLE MÉTIER : 
-  // - Si le frais est en Gourdes (devise principale) : inutile et non pertinent de proposer des dollars. Seule la Gourde (HTG) est autorisée.
-  // - Si le frais est en Dollars : peut être réglé avec les 2 devises (USD ou HTG au taux de change du jour) comme planifié.
+  // - Si le frais est en Gourdes (devise principale) : seule la Gourde (HTG) est autorisée.
+  // - Si le frais est en Dollars : peut être réglé avec les 2 devises (USD ou HTG au taux de change du jour).
   const currencyOptions: SelectOption[] = useMemo(() => {
     // 1. Frais fixé en Gourdes (HTG) : restriction stricte à la Gourde
     if (!isCurrentFeeNativeUSD && feeType !== 'CREDIT_PORTEFEUILLE') {
@@ -304,7 +302,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         { 
           value: 'HTG', 
           label: 'Gourdes (HTG)', 
-          badge: 'HTG', 
           description: 'Devise Principale',
           icon: Banknote 
         }
@@ -320,7 +317,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         { 
           value: 'HTG', 
           label: 'Gourdes (HTG)', 
-          badge: 'HTG', 
           description: isCurrentFeeNativeUSD ? `Converti à ${currentExchangeRate} HTG/$` : 'Devise Principale',
           icon: Banknote 
         }
@@ -332,7 +328,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         { 
           value: 'USD', 
           label: 'Dollars (USD)', 
-          badge: 'USD', 
           description: 'Devise du tarif',
           icon: Banknote 
         }
@@ -344,14 +339,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       { 
         value: 'USD', 
         label: 'Dollars (USD)', 
-        badge: 'USD', 
         description: 'Devise d\'origine du frais',
         icon: Banknote 
       },
       { 
         value: 'HTG', 
         label: 'Gourdes (HTG)', 
-        badge: 'HTG', 
         description: `Converti à ${currentExchangeRate} HTG/$`,
         icon: Banknote 
       }
@@ -1320,7 +1313,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setFeeType('SCOLARITE');
     setPaymentMethod('Cash');
     setParentPhoneCustom('');
-    setShowSmsPreviewModal(false);
     setMoncashTransactionData(null);
   };
 
@@ -2556,7 +2548,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-20">
                   <div className="space-y-1 min-w-0">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Mode de règlement">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 h-5 flex items-center truncate" title="Mode de règlement">
                       Mode de règlement
                     </label>
                     <SelectPill
@@ -2573,7 +2565,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   <div className="space-y-1 min-w-0">
-                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title="Devise d'encaissement">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 h-5 flex items-center truncate" title="Devise d'encaissement">
                       Devise d'encaissement
                     </label>
                     <SelectPill
@@ -2593,22 +2585,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
 
-                {/* Instructions ou compte pour la méthode active */}
-                {(currentMethodConfig?.account_info || (currentMethodConfig?.instructions && paymentMethod !== 'MonCash')) && (
-                  <div className="p-2.5 sm:p-3 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 space-y-1">
-                    {currentMethodConfig.account_info && (
-                      <p className="font-bold flex items-center justify-between gap-2 flex-wrap">
-                        <span className="text-[11px] text-slate-600 font-medium">
-                          {paymentMethod === 'MonCash' ? 'N° Marchand / Compte MonCash :' : 'Compte / Destinataire :'}
-                        </span>
-                        <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-950 font-black text-xs">
-                          {currentMethodConfig.account_info}
-                        </span>
-                      </p>
-                    )}
-                    {currentMethodConfig.instructions && paymentMethod !== 'MonCash' && (
-                      <p className="text-slate-600 text-[11px] leading-relaxed">{currentMethodConfig.instructions}</p>
-                    )}
+                {/* Information de compte pour la méthode active */}
+                {currentMethodConfig?.account_info && (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-slate-600 font-medium">
+                      {paymentMethod === 'MonCash' ? 'N° Marchand / Compte :' : 'Compte / Destinataire :'}
+                    </span>
+                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-950 font-black text-xs">
+                      {currentMethodConfig.account_info}
+                    </span>
+                  </div>
+                )}
+                {currentMethodConfig?.instructions && paymentMethod !== 'MonCash' && (
+                  <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600 leading-relaxed">
+                    {currentMethodConfig.instructions}
                   </div>
                 )}
                 
@@ -2845,71 +2835,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
             
-            {/* OPTION DE CONFIRMATION SMS PARENT (RENFORCEMENT DE CONFIANCE) */}
-            {selectedStudent && (
-              <div className="bg-slate-50/90 p-3.5 sm:p-4 rounded-2xl border border-indigo-100/90 shadow-sm transition-all space-y-3">
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0 shadow-sm">
-                      <MessageSquare size={16} />
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-slate-800">Notification SMS Parent</span>
-                        <span className="px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-200">
-                          Confiance
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-500">
-                        Proposer un reçu officiel par SMS dès l'initiation de la transaction
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Switch toggle */}
-                  <label className="relative inline-flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={autoSendSmsParent}
-                      onChange={(e) => setAutoSendSmsParent(e.target.checked)}
-                      className="sr-only peer"
-                    />
-                    <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-indigo-600"></div>
-                  </label>
-                </div>
-
-                {autoSendSmsParent && (
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-2.5 border-t border-slate-200/70 text-xs">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <Phone size={13} className="text-indigo-600 shrink-0" />
-                      <span className="text-slate-500 text-[11px] shrink-0 font-medium">N° Mobile Parent :</span>
-                      <input
-                        type="tel"
-                        value={parentPhoneCustom}
-                        onChange={(e) => setParentPhoneCustom(e.target.value)}
-                        placeholder="+509 XXXX-XXXX"
-                        className="font-mono font-bold text-slate-800 bg-white px-2.5 py-1 rounded-lg border border-slate-300 text-xs outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 w-36 sm:w-44"
-                      />
-                      {selectedStudent?.parent_name && (
-                        <span className="text-[11px] text-slate-500 truncate hidden md:inline font-medium">
-                          ({selectedStudent.parent_name})
-                        </span>
-                      )}
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => setShowSmsPreviewModal(true)}
-                      className="px-2.5 py-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors flex items-center justify-center gap-1 shrink-0 cursor-pointer"
-                    >
-                      <Sparkles size={12} />
-                      <span>Aperçu SMS</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            )}
-            
             <button 
               type="submit" 
               disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError} 
@@ -3124,34 +3049,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         onClose={() => setIsClosureModalOpen(false)}
         user={user}
       />
-
-      {showSmsPreviewModal && selectedStudent && (
-        <PaymentSmsConfirmation
-          isOpen={showSmsPreviewModal}
-          onClose={() => setShowSmsPreviewModal(false)}
-          schoolId={user.school_id}
-          schoolName={schoolDetails?.name || school?.name || 'Établissement'}
-          studentId={selectedStudent.id}
-          studentName={selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim()}
-          studentClass={selectedStudent.classe || selectedStudent.class?.name}
-          parentName={selectedStudent.parent_name}
-          defaultPhone={parentPhoneCustom || selectedStudent.parent_phone || selectedStudent.phone || ''}
-          amount={parseFloat(montantReel || '0')}
-          currency={currency}
-          feeTypeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || feeType}
-          transactionRef={transactionRef || 'SIMULATION-001'}
-          remainingAmount={
-            feeType === 'CREDIT_PORTEFEUILLE'
-              ? undefined
-              : typeof selectedStudent?.totalRemaining === 'number'
-                ? selectedStudent.totalRemaining
-                : undefined
-          }
-          paymentMethod={paymentMethod}
-          autoSendEnabled={false}
-          isInline={false}
-        />
-      )}
     </div>
   );
 };

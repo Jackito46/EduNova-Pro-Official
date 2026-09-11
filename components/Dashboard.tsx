@@ -1050,6 +1050,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         const usernameOnly = displayIdentifier(userEmail).toLowerCase();
         const edunovaEmail = normalizeIdentifier(userEmail).toLowerCase();
         const studentIdFromUser = (user as any)?.student_id;
+        const userPhone = ((user as any)?.phone || '').trim().replace(/\D/g, '');
         
         let childrenQuery = supabase
           .from('students')
@@ -1066,6 +1067,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           `email.ilike.${userEmail}`,
           `email.ilike.${edunovaEmail}`
         ];
+
+        if (userPhone && userPhone.length >= 8) {
+          const shortPhone = userPhone.slice(-8);
+          orConditions.push(`parent_phone.ilike.%${shortPhone}%`);
+          orConditions.push(`phone.ilike.%${shortPhone}%`);
+        }
 
         if (studentIdFromUser) {
           orConditions.push(`id.eq.${studentIdFromUser}`);
@@ -1085,13 +1092,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             children = schoolStudents.filter(s => {
               const pEmail = (s.parent_email || '').trim().toLowerCase();
               const sEmail = (s.email || '').trim().toLowerCase();
+              const pPhone = (s.parent_phone || '').trim().replace(/\D/g, '');
+              const sPhone = (s.phone || '').trim().replace(/\D/g, '');
+              const matchesPhone = Boolean(userPhone && userPhone.length >= 8 && (pPhone.includes(userPhone.slice(-8)) || sPhone.includes(userPhone.slice(-8))));
+
               return (
                 pEmail === userEmail ||
                 pEmail === usernameOnly ||
                 pEmail === edunovaEmail ||
                 displayIdentifier(pEmail).toLowerCase() === usernameOnly ||
                 sEmail === userEmail ||
-                sEmail === edunovaEmail
+                sEmail === edunovaEmail ||
+                matchesPhone
               );
             });
           }
@@ -1123,10 +1135,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               academic_year_id
             `)
             .in('student_id', childrenIds)
-            .neq('status', 'ANNULE')
             .order('payment_date', { ascending: false });
 
-          const validPayments = allChildrenPayments || [];
+          const validPayments = (allChildrenPayments || []).filter(p => (p.status || '').toUpperCase() !== 'ANNULE');
 
           // Enrich payments with child info
           const enrichedPayments = validPayments.map(p => {

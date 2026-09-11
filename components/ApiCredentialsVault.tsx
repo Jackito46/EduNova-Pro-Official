@@ -27,7 +27,9 @@ import {
   CreditCard,
   Building,
   PhoneCall,
-  Wallet
+  Wallet,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { ApiVaultService } from '../services/apiVaultService';
@@ -61,6 +63,11 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, boolean>>({});
   const [unmaskedValues, setUnmaskedValues] = useState<Record<string, string>>({});
+  const [expandedPreview, setExpandedPreview] = useState<Record<string, boolean>>({});
+
+  const toggleExpandedPreview = (key: string) => {
+    setExpandedPreview(prev => ({ ...prev, [key]: !prev[key] }));
+  };
   
   // Vue avancée / classique MonCash
   const [showAdvancedMoncash, setShowAdvancedMoncash] = useState(false);
@@ -541,495 +548,662 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET KOBARA ===================== */}
       {activeTab === 'kobara' && (
-        <div className="space-y-3.5">
-          <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200 shadow-xs space-y-3.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-black shadow-xs">
-                  <CreditCard size={18} />
+        <div className="space-y-4 sm:space-y-5">
+          <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-5">
+            {/* 1. EN-TÊTE DU SERVICE KOBARA */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-orange-600 to-amber-500 text-white flex items-center justify-center font-black shadow-xs shrink-0">
+                  <CreditCard size={20} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-1.5">
-                    <h4 className="text-sm font-black text-slate-900">Passerelle Kobara</h4>
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-orange-100 text-orange-800 border border-orange-200">
-                      MonCash & Natcash
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h4 className="text-base font-black text-slate-900 tracking-tight">Passerelle Kobara</h4>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-orange-100 text-orange-800 border border-orange-200">
+                      MonCash & Natcash Unifiés
+                    </span>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                      Collecte & Webhook
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500">Collecte et webhooks sécurisés unifiés</p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Centralisation des paiements mobiles haïtiens avec reversement instantané
+                  </p>
                 </div>
               </div>
 
               {/* Statut de validation */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-start sm:self-center">
                 {vaultData.kobara.validation_status === 'VALID' ? (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold">
-                    <CheckCircle2 size={13} className="text-emerald-600" />
-                    <span>Connecté</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold shadow-2xs">
+                    <CheckCircle2 size={15} className="text-emerald-600" />
+                    <span>Passerelle Connectée</span>
                   </div>
                 ) : (
-                  <div className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold">
-                    <AlertCircle size={13} className="text-amber-600" />
-                    <span>À vérifier</span>
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold shadow-2xs">
+                    <AlertCircle size={15} className="text-amber-600" />
+                    <span>Configuration à vérifier</span>
                   </div>
                 )}
               </div>
             </div>
 
-            {/* Guide rapide des webhooks Kobara (Compact en 1 ligne) */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-3 py-2 rounded-xl bg-orange-50/70 border border-orange-200 text-xs">
-              <div className="flex items-center gap-2 min-w-0">
-                <Globe size={13} className="text-orange-600 shrink-0" />
-                <span className="font-bold text-orange-950 shrink-0 text-[11px]">Webhook :</span>
-                <code className="text-[11px] font-mono text-orange-900 bg-white px-2 py-0.5 rounded border border-orange-200 truncate select-all">
-                  {kobaraWebhookUrl}
-                </code>
+            {/* 2. BANNIÈRE WEBHOOK KOBARA */}
+            <div className="p-3.5 sm:p-4 rounded-xl bg-orange-50/70 border border-orange-200/90 text-xs space-y-2.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                <div className="flex items-start sm:items-center gap-2 min-w-0">
+                  <Globe size={16} className="text-orange-600 shrink-0 mt-0.5 sm:mt-0" />
+                  <div className="min-w-0">
+                    <span className="font-bold text-orange-950 text-xs block sm:inline mr-2">
+                      URL Webhook Kobara (Collecte & Notifications) :
+                    </span>
+                    <span className="text-[11px] text-orange-800/80 hidden md:inline">
+                      (À renseigner dans le portail Kobara pour confirmer les règlements en temps réel)
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => copyToClipboard(kobaraWebhookUrl, 'kobara_webhook')}
+                  className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 active:bg-orange-800 text-white rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0 self-start sm:self-auto shadow-2xs"
+                  title="Copier l'URL du webhook"
+                >
+                  {copiedKey === 'kobara_webhook' ? <Check size={13} /> : <Copy size={13} />}
+                  <span>{copiedKey === 'kobara_webhook' ? 'Copié !' : 'Copier l\'URL'}</span>
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => copyToClipboard(kobaraWebhookUrl, 'kobara_webhook')}
-                className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer shrink-0 self-end sm:self-auto"
-              >
-                {copiedKey === 'kobara_webhook' ? <Check size={12} /> : <Copy size={12} />}
-                <span>{copiedKey === 'kobara_webhook' ? 'Copié !' : 'Copier'}</span>
-              </button>
+              <div className="bg-white px-3 py-2 rounded-lg border border-orange-200 font-mono text-[11px] sm:text-xs text-orange-950 break-all select-all shadow-inner">
+                {kobaraWebhookUrl}
+              </div>
             </div>
 
-            {/* Formulaire des Clés Kobara */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {/* Clé Secrète Kobara */}
-              <div className="space-y-1 sm:col-span-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                    <Key size={11} className="text-orange-600" />
-                    <span>Clé Secrète (Secret Key) *</span>
-                  </label>
-                  <span className="text-[9px] font-mono text-slate-400">kbr_sk_live_...</span>
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type={revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? 'text' : 'password'}
-                    value={
-                      unmaskedValues['kobara_KOBARA_SECRET_KEY'] !== undefined
-                        ? unmaskedValues['kobara_KOBARA_SECRET_KEY']
-                        : vaultData.kobara.secret_key
-                    }
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setUnmaskedValues(prev => ({ ...prev, kobara_KOBARA_SECRET_KEY: val }));
-                      setVaultData(prev => ({
-                        ...prev,
-                        kobara: { ...prev.kobara, secret_key: val }
-                      }));
-                    }}
-                    placeholder="kbr_sk_live_..."
-                    className="w-full pl-3.5 pr-24 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 rounded-xl text-xs font-mono text-slate-900 outline-none transition-all"
-                  />
-                  <div className="absolute right-2 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleRevealSecret('kobara', 'KOBARA_SECRET_KEY')}
-                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
-                      title={revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? 'Masquer' : 'Révéler'}
-                    >
-                      {revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(
-                        unmaskedValues['kobara_KOBARA_SECRET_KEY'] || vaultData.kobara.secret_key,
-                        'kobara_secret'
-                      )}
-                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
-                      title="Copier"
-                    >
-                      {copiedKey === 'kobara_secret' ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Cette clé permet d'initialiser les paiements via l'API Kobara avec votre compte marchand.
-                </p>
+            {/* 3. SECTION CLÉS D'AUTHENTIFICATION & SÉCURITÉ */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <h5 className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Key size={14} className="text-orange-600" />
+                  <span>Clés Secrètes & Authentification API</span>
+                </h5>
+                <span className="text-[10px] text-slate-500 font-medium hidden sm:inline">
+                  Chiffrées avec AES-256-GCM avant stockage dans Supabase
+                </span>
               </div>
 
-              {/* Secret Webhook Kobara */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Lock size={13} className="text-orange-600" />
-                    Secret de Signature Webhook (Optionnel mais recommandé)
-                  </label>
-                  <span className="text-[10px] font-bold text-slate-500">
-                    Format: whsec_...
-                  </span>
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type={revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET'] ? 'text' : 'password'}
-                    value={
-                      unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] !== undefined
-                        ? unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET']
-                        : vaultData.kobara.webhook_secret
-                    }
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setUnmaskedValues(prev => ({ ...prev, kobara_KOBARA_WEBHOOK_SECRET: val }));
-                      setVaultData(prev => ({
-                        ...prev,
-                        kobara: { ...prev.kobara, webhook_secret: val }
-                      }));
-                    }}
-                    placeholder="whsec_..."
-                    className="w-full pl-3.5 pr-20 py-3 bg-slate-50 border border-slate-200 focus:bg-white focus:border-orange-500 rounded-xl text-xs font-mono text-slate-900 outline-none transition-all"
-                  />
-                  <div className="absolute right-2 flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleRevealSecret('kobara', 'KOBARA_WEBHOOK_SECRET')}
-                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
-                    >
-                      {revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET'] ? <EyeOff size={15} /> : <Eye size={15} />}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(
-                        unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] || vaultData.kobara.webhook_secret,
-                        'kobara_wh_secret'
-                      )}
-                      className="p-1.5 hover:bg-slate-200 rounded-lg text-slate-500 hover:text-slate-800 transition-colors"
-                    >
-                      {copiedKey === 'kobara_wh_secret' ? <Check size={15} className="text-emerald-600" /> : <Copy size={15} />}
-                    </button>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Permet de vérifier cryptographiquement la signature des webhooks entrants de Kobara.
-                </p>
-              </div>
-
-              {/* Mode Environnement */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Radio size={13} className="text-orange-600" />
-                  Environnement Kobara
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setVaultData(prev => ({
-                      ...prev,
-                      kobara: { ...prev.kobara, mode: 'live' }
-                    }))}
-                    className={`py-3 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      vaultData.kobara.mode === 'live'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-800 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span>Production (Live)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setVaultData(prev => ({
-                      ...prev,
-                      kobara: { ...prev.kobara, mode: 'test' }
-                    }))}
-                    className={`py-3 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      vaultData.kobara.mode === 'test'
-                        ? 'bg-amber-50 border-amber-500 text-amber-800 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="w-2 h-2 rounded-full bg-amber-500"></span>
-                    <span>Mode Test / Sandbox</span>
-                  </button>
-                </div>
-                <p className="text-[11px] text-slate-500">
-                  Votre clé commence par <code>kbr_sk_live_</code>, le mode Production Live est donc sélectionné.
-                </p>
-              </div>
-
-              {/* Configuration Réception : Numéro unique ou numéros séparés */}
-              <div className="space-y-3 md:col-span-2 p-3.5 bg-slate-50/80 rounded-2xl border border-slate-200">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-slate-200/80">
+              {/* Grille symétrique 2 colonnes (responsive desktop/tablette/mobile) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+                {/* CARTE 1 : CLÉ SECRÈTE (SECRET KEY) */}
+                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 flex flex-col justify-between space-y-3">
                   <div>
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                      <Smartphone size={14} className="text-orange-600" />
-                      Comptes de Réception & Reversement des Fonds
-                    </label>
-                    <p className="text-[11px] text-slate-500 font-medium">
-                      Définissez comment les fonds MonCash et Natcash encaissés vous sont reversés
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Key size={13} className="text-orange-600" />
+                        <span>Clé Secrète (Secret Key)</span>
+                        <span className="text-red-500 font-black">*</span>
+                      </label>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold shrink-0">
+                        kbr_sk_live_...
+                      </span>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type={revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? 'text' : 'password'}
+                        value={
+                          unmaskedValues['kobara_KOBARA_SECRET_KEY'] !== undefined
+                            ? unmaskedValues['kobara_KOBARA_SECRET_KEY']
+                            : vaultData.kobara.secret_key
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value.trim();
+                          setUnmaskedValues(prev => ({ ...prev, kobara_KOBARA_SECRET_KEY: val }));
+                          const detectedMode = val.startsWith('kbr_sk_test_') ? 'test' : 'live';
+                          setVaultData(prev => ({
+                            ...prev,
+                            kobara: { 
+                              ...prev.kobara, 
+                              secret_key: val,
+                              mode: val ? detectedMode : prev.kobara.mode
+                            }
+                          }));
+                        }}
+                        placeholder="kbr_sk_live_xxxxxxxxxxxxxxxxxxxxxx"
+                        className="w-full pl-3.5 pr-20 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl text-xs sm:text-[13px] font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs"
+                      />
+                      <div className="absolute right-1.5 flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleRevealSecret('kobara', 'KOBARA_SECRET_KEY')}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title={revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? 'Masquer la clé' : 'Afficher la clé en clair'}
+                        >
+                          {revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(
+                            unmaskedValues['kobara_KOBARA_SECRET_KEY'] || vaultData.kobara.secret_key,
+                            'kobara_secret'
+                          )}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title="Copier la clé secrète"
+                        >
+                          {copiedKey === 'kobara_secret' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barre d'état & aperçu complet pour tout voir */}
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                      <span className="text-slate-500 flex items-center gap-1">
+                        {(() => {
+                          const currentVal = unmaskedValues['kobara_KOBARA_SECRET_KEY'] !== undefined 
+                            ? unmaskedValues['kobara_KOBARA_SECRET_KEY'] 
+                            : vaultData.kobara.secret_key;
+                          if (!currentVal) return <span className="text-amber-600 font-medium">Aucune clé renseignée</span>;
+                          if (currentVal.startsWith('kbr_sk_live_')) {
+                            return <span className="text-emerald-700 font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Production Live ({currentVal.length} car.)</span>;
+                          }
+                          if (currentVal.startsWith('kbr_sk_test_')) {
+                            return <span className="text-amber-700 font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-500"></span>Mode Test Sandbox ({currentVal.length} car.)</span>;
+                          }
+                          return <span className="text-slate-600 font-medium">{currentVal.length} caractères</span>;
+                        })()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedPreview('kobara_secret')}
+                        className="text-[11px] font-bold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{expandedPreview['kobara_secret'] ? 'Réduire' : 'Tout voir'}</span>
+                        {expandedPreview['kobara_secret'] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                    </div>
+
+                    {expandedPreview['kobara_secret'] && (
+                      <div className="p-2.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] break-all border border-slate-800 shadow-inner select-all animate-in fade-in duration-150">
+                        <div className="text-[9px] text-slate-400 uppercase font-sans font-bold mb-1 flex items-center justify-between">
+                          <span>Valeur complète de la clé :</span>
+                          <span>{revealedSecrets['kobara_KOBARA_SECRET_KEY'] ? 'En clair' : 'Masquée'}</span>
+                        </div>
+                        {revealedSecrets['kobara_KOBARA_SECRET_KEY']
+                          ? (unmaskedValues['kobara_KOBARA_SECRET_KEY'] || vaultData.kobara.secret_key || '(Vide)')
+                          : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Cette clé initialise les transactions côté serveur et authentifie votre école.
                     </p>
                   </div>
-
-                  {/* Bascule Coïncidence ou Séparé */}
-                  <div className="inline-flex p-0.5 bg-white border border-slate-200 rounded-xl shadow-2xs self-start sm:self-auto">
-                    <button
-                      type="button"
-                      onClick={() => setVaultData(prev => ({
-                        ...prev,
-                        kobara: { ...prev.kobara, same_receiver_number: true }
-                      }))}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        vaultData.kobara.same_receiver_number
-                          ? 'bg-orange-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <Check size={11} className={vaultData.kobara.same_receiver_number ? 'opacity-100' : 'opacity-0'} />
-                      <span>Numéro Unique (Coïncident)</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setVaultData(prev => ({
-                        ...prev,
-                        kobara: { ...prev.kobara, same_receiver_number: false }
-                      }))}
-                      className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-                        !vaultData.kobara.same_receiver_number
-                          ? 'bg-orange-600 text-white shadow-2xs'
-                          : 'text-slate-600 hover:text-slate-900'
-                      }`}
-                    >
-                      <Sliders size={11} className={!vaultData.kobara.same_receiver_number ? 'opacity-100' : 'opacity-0'} />
-                      <span>Numéros Séparés</span>
-                    </button>
-                  </div>
                 </div>
 
-                {/* Cas 1 : Les 2 coïncident ensemble (Numéro Unique) */}
-                {vaultData.kobara.same_receiver_number ? (
-                  <div className="space-y-1.5 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between">
-                      <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                        <Smartphone size={13} className="text-orange-600" />
-                        Numéro Récepteur Unique (MonCash & Natcash) *
+                {/* CARTE 2 : SECRET DE SIGNATURE WEBHOOK */}
+                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Lock size={13} className="text-orange-600" />
+                        <span>Secret Signature Webhook</span>
                       </label>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
-                        ✓ Coïncident ensemble
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold shrink-0">
+                        whsec_...
                       </span>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type={revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET'] ? 'text' : 'password'}
+                        value={
+                          unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] !== undefined
+                            ? unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET']
+                            : vaultData.kobara.webhook_secret
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value.trim();
+                          setUnmaskedValues(prev => ({ ...prev, kobara_KOBARA_WEBHOOK_SECRET: val }));
+                          setVaultData(prev => ({
+                            ...prev,
+                            kobara: { ...prev.kobara, webhook_secret: val }
+                          }));
+                        }}
+                        placeholder="whsec_xxxxxxxxxxxxxxxxxxxxxx"
+                        className="w-full pl-3.5 pr-20 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl text-xs sm:text-[13px] font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs"
+                      />
+                      <div className="absolute right-1.5 flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleRevealSecret('kobara', 'KOBARA_WEBHOOK_SECRET')}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title={revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET'] ? 'Masquer le secret' : 'Afficher le secret'}
+                        >
+                          {revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET'] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(
+                            unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] || vaultData.kobara.webhook_secret,
+                            'kobara_wh_secret'
+                          )}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title="Copier le secret de signature"
+                        >
+                          {copiedKey === 'kobara_wh_secret' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barre d'état & aperçu complet */}
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                      <span className="text-slate-500 flex items-center gap-1">
+                        {(() => {
+                          const currentVal = unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] !== undefined 
+                            ? unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] 
+                            : vaultData.kobara.webhook_secret;
+                          if (!currentVal) return <span className="text-slate-400 font-medium">Optionnel (recommandé)</span>;
+                          if (currentVal.startsWith('whsec_')) {
+                            return <span className="text-emerald-700 font-bold flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Format whsec_ valide ({currentVal.length} car.)</span>;
+                          }
+                          return <span className="text-slate-600 font-medium">{currentVal.length} caractères</span>;
+                        })()}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandedPreview('kobara_wh_secret')}
+                        className="text-[11px] font-bold text-orange-600 hover:text-orange-700 transition-colors cursor-pointer flex items-center gap-1"
+                      >
+                        <span>{expandedPreview['kobara_wh_secret'] ? 'Réduire' : 'Tout voir'}</span>
+                        {expandedPreview['kobara_wh_secret'] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                      </button>
+                    </div>
+
+                    {expandedPreview['kobara_wh_secret'] && (
+                      <div className="p-2.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] break-all border border-slate-800 shadow-inner select-all animate-in fade-in duration-150">
+                        <div className="text-[9px] text-slate-400 uppercase font-sans font-bold mb-1 flex items-center justify-between">
+                          <span>Valeur complète du secret :</span>
+                          <span>{revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET'] ? 'En clair' : 'Masqué'}</span>
+                        </div>
+                        {revealedSecrets['kobara_KOBARA_WEBHOOK_SECRET']
+                          ? (unmaskedValues['kobara_KOBARA_WEBHOOK_SECRET'] || vaultData.kobara.webhook_secret || '(Vide)')
+                          : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Vérifie cryptographiquement les signatures HMAC des notifications entrantes.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* 4. SECTION ENVIRONNEMENT D'EXÉCUTION KOBARA */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Radio size={14} className="text-orange-600" />
+                  <span>Environnement Kobara</span>
+                </label>
+                <span className="text-[11px] text-slate-500 font-medium">
+                  {vaultData.kobara.mode === 'live' ? 'Mode Réel Actif' : 'Mode Test Actif'}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setVaultData(prev => ({
+                    ...prev,
+                    kobara: { ...prev.kobara, mode: 'live' }
+                  }))}
+                  className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer flex items-start gap-3 ${
+                    vaultData.kobara.mode === 'live'
+                      ? 'bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className={`w-3.5 h-3.5 rounded-full mt-0.5 shrink-0 flex items-center justify-center border ${
+                    vaultData.kobara.mode === 'live' ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-transparent'
+                  }`}>
+                    {vaultData.kobara.mode === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                      <span>Production (Live)</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                        Fonds Réels
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Encaissement et reversement réels via MonCash et Natcash.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setVaultData(prev => ({
+                    ...prev,
+                    kobara: { ...prev.kobara, mode: 'test' }
+                  }))}
+                  className={`p-3.5 rounded-xl text-left border transition-all cursor-pointer flex items-start gap-3 ${
+                    vaultData.kobara.mode === 'test'
+                      ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-500/20 text-amber-950 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <div className={`w-3.5 h-3.5 rounded-full mt-0.5 shrink-0 flex items-center justify-center border ${
+                    vaultData.kobara.mode === 'test' ? 'border-amber-600 bg-amber-500' : 'border-slate-400 bg-transparent'
+                  }`}>
+                    {vaultData.kobara.mode === 'test' && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                      <span>Mode Test / Sandbox</span>
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                        Simulation
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Validation technique sans impact financier réel.
+                    </p>
+                  </div>
+                </button>
+              </div>
+            </div>
+
+            {/* 5. SECTION COMPTES DE RÉCEPTION & REVERSEMENT DES FONDS */}
+            <div className="space-y-3.5 p-4 sm:p-5 bg-slate-50/80 rounded-2xl border border-slate-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-200/80">
+                <div>
+                  <h5 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                    <Smartphone size={15} className="text-orange-600" />
+                    <span>Comptes de Réception & Reversement des Fonds</span>
+                  </h5>
+                  <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                    Définissez les coordonnées de reversement automatique des fonds collectés
+                  </p>
+                </div>
+
+                {/* Bascule Coïncidence ou Séparé */}
+                <div className="inline-flex p-1 bg-white border border-slate-200 rounded-xl shadow-2xs self-start sm:self-auto shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setVaultData(prev => ({
+                      ...prev,
+                      kobara: { ...prev.kobara, same_receiver_number: true }
+                    }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      vaultData.kobara.same_receiver_number
+                        ? 'bg-orange-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Check size={12} className={vaultData.kobara.same_receiver_number ? 'opacity-100' : 'opacity-0'} />
+                    <span>Numéro Unique (Coïncident)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVaultData(prev => ({
+                      ...prev,
+                      kobara: { ...prev.kobara, same_receiver_number: false }
+                    }))}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      !vaultData.kobara.same_receiver_number
+                        ? 'bg-orange-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <Sliders size={12} className={!vaultData.kobara.same_receiver_number ? 'opacity-100' : 'opacity-0'} />
+                    <span>Numéros Séparés</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Cas 1 : Numéro Unique (Coïncident) */}
+              {vaultData.kobara.same_receiver_number ? (
+                <div className="space-y-2 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Smartphone size={13} className="text-orange-600" />
+                      <span>Numéro Récepteur Unique (MonCash & Natcash)</span>
+                      <span className="text-red-500 font-black">*</span>
+                    </label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      ✓ Coïncident (Même compte récepteur)
+                    </span>
+                  </div>
+                  <div className="relative flex items-center">
+                    <input
+                      type="text"
+                      value={vaultData.kobara.receiver_phone || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setVaultData(prev => ({
+                          ...prev,
+                          kobara: { 
+                            ...prev.kobara, 
+                            receiver_phone: val,
+                            receiver_phone_moncash: val,
+                            receiver_phone_natcash: val
+                          }
+                        }));
+                      }}
+                      placeholder="+509 3700 0000 ou 4600 0000"
+                      className="w-full pl-3.5 pr-10 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-all shadow-2xs"
+                    />
+                    <div className="absolute right-3 text-slate-400">
+                      <PhoneCall size={16} />
+                    </div>
+                  </div>
+                  <p className="text-[11px] text-slate-500">
+                    Ce numéro unique reçoit l'ensemble des encaissements (MonCash et Natcash reversés sur ce même compte).
+                  </p>
+                </div>
+              ) : (
+                /* Cas 2 : Numéros distincts par opérateur */
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in duration-150">
+                  {/* Numéro Récepteur MonCash */}
+                  <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
+                        <span>MonCash (Digicel)</span>
+                        <span className="text-red-500 font-black">*</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-400">3x / 4x</span>
                     </div>
                     <div className="relative flex items-center">
                       <input
                         type="text"
-                        value={vaultData.kobara.receiver_phone || ''}
+                        value={vaultData.kobara.receiver_phone_moncash || vaultData.kobara.receiver_phone || ''}
                         onChange={(e) => {
                           const val = e.target.value;
                           setVaultData(prev => ({
                             ...prev,
                             kobara: { 
                               ...prev.kobara, 
-                              receiver_phone: val,
                               receiver_phone_moncash: val,
-                              receiver_phone_natcash: val
+                              receiver_phone: val || prev.kobara.receiver_phone 
                             }
                           }));
                         }}
-                        placeholder="+509 3700 0000 ou 4600 0000"
-                        className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 focus:border-orange-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs"
+                        placeholder="+509 3700 0000"
+                        className="w-full pl-3.5 pr-10 py-2.5 sm:py-3 bg-slate-50/60 border border-slate-200 focus:bg-white focus:border-red-500 focus:ring-2 focus:ring-red-500/20 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-all"
                       />
-                      <div className="absolute right-3 text-slate-400">
-                        <PhoneCall size={15} />
+                      <div className="absolute right-3 text-red-500">
+                        <PhoneCall size={16} />
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-500">
-                      Ce numéro unique reçoit l'ensemble des encaissements (MonCash et Natcash reversés sur ce même compte).
+                      Compte Digicel dédié aux règlements reçus par MonCash.
                     </p>
                   </div>
-                ) : (
-                  /* Cas 2 : Numéros distincts par opérateur (MonCash Digicel & Natcash Natcom) */
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
-                    {/* Numéro Récepteur MonCash */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-red-500"></span>
-                          Numéro Récepteur MonCash (Digicel) *
-                        </label>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          3x / 4x
-                        </span>
-                      </div>
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          value={vaultData.kobara.receiver_phone_moncash || vaultData.kobara.receiver_phone || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setVaultData(prev => ({
-                              ...prev,
-                              kobara: { 
-                                ...prev.kobara, 
-                                receiver_phone_moncash: val,
-                                receiver_phone: val || prev.kobara.receiver_phone 
-                              }
-                            }));
-                          }}
-                          placeholder="+509 3700 0000 ou 4600 0000"
-                          className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 focus:border-red-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs"
-                        />
-                        <div className="absolute right-3 text-red-400">
-                          <PhoneCall size={15} />
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-slate-500">
-                        Compte Digicel dédié aux règlements par MonCash.
-                      </p>
-                    </div>
 
-                    {/* Numéro Récepteur Natcash */}
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                          <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                          Numéro Récepteur Natcash (Natcom) *
-                        </label>
-                        <span className="text-[10px] font-bold text-slate-400">
-                          2x
-                        </span>
-                      </div>
-                      <div className="relative flex items-center">
-                        <input
-                          type="text"
-                          value={vaultData.kobara.receiver_phone_natcash || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setVaultData(prev => ({
-                              ...prev,
-                              kobara: { ...prev.kobara, receiver_phone_natcash: val }
-                            }));
-                          }}
-                          placeholder="+509 2200 0000"
-                          className="w-full pl-3.5 pr-10 py-2.5 bg-white border border-slate-200 focus:border-blue-500 rounded-xl text-xs font-semibold text-slate-900 outline-none transition-all shadow-2xs"
-                        />
-                        <div className="absolute right-3 text-blue-400">
-                          <PhoneCall size={15} />
-                        </div>
-                      </div>
-                      <p className="text-[10px] text-slate-500">
-                        Compte Natcom dédié aux règlements par Natcash.
-                      </p>
+                  {/* Numéro Récepteur Natcash */}
+                  <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200/90 shadow-2xs">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
+                        <span>Natcash (Natcom)</span>
+                        <span className="text-red-500 font-black">*</span>
+                      </label>
+                      <span className="text-[10px] font-bold text-slate-400">2x</span>
                     </div>
-                  </div>
-                )}
-
-                {/* Titulaire & Auto-Payout */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-slate-200/60">
-                  {/* Titulaire / Nom du compte */}
-                  <div className="space-y-1">
-                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                      <Building size={13} className="text-orange-600" />
-                      Titulaire / Nom du Compte
-                    </label>
-                    <input
-                      type="text"
-                      value={vaultData.kobara.receiver_name || ''}
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setVaultData(prev => ({
-                          ...prev,
-                          kobara: { ...prev.kobara, receiver_name: val }
-                        }));
-                      }}
-                      placeholder="Ex: Direction Collège Mixte"
-                      className="w-full px-3.5 py-2.5 bg-white border border-slate-200 focus:border-orange-500 rounded-xl text-xs font-medium text-slate-900 outline-none transition-all shadow-2xs"
-                    />
-                  </div>
-
-                  {/* Auto-Payout switch */}
-                  <div className="space-y-1 flex flex-col justify-end">
-                    <div className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl shadow-2xs">
-                      <div>
-                        <span className="text-xs font-bold text-slate-900 block">Auto-Payout en temps réel</span>
-                        <span className="text-[10px] text-slate-500 font-medium">Reversement automatique immédiat</span>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={vaultData.kobara.receiver_phone_natcash || ''}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setVaultData(prev => ({
+                            ...prev,
+                            kobara: { ...prev.kobara, receiver_phone_natcash: val }
+                          }));
+                        }}
+                        placeholder="+509 2200 0000"
+                        className="w-full pl-3.5 pr-10 py-2.5 sm:py-3 bg-slate-50/60 border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-all"
+                      />
+                      <div className="absolute right-3 text-blue-500">
+                        <PhoneCall size={16} />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setVaultData(prev => ({
-                          ...prev,
-                          kobara: { ...prev.kobara, auto_payout: !prev.kobara.auto_payout }
-                        }))}
-                        className={`w-10 h-6 rounded-full transition-colors relative cursor-pointer ${
-                          vaultData.kobara.auto_payout ? 'bg-orange-600' : 'bg-slate-300'
-                        }`}
-                      >
-                        <span
-                          className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
-                            vaultData.kobara.auto_payout ? 'left-5' : 'left-1'
-                          }`}
-                        />
-                      </button>
                     </div>
+                    <p className="text-[11px] text-slate-500">
+                      Compte Natcom dédié aux règlements reçus par Natcash.
+                    </p>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Opérateur de Réception Principal */}
-              <div className="space-y-1.5 md:col-span-2">
-                <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                  <Wallet size={13} className="text-orange-600" />
-                  Opérateur de Reversement Principal
-                </label>
-                <div className="grid grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setVaultData(prev => ({
-                      ...prev,
-                      kobara: { ...prev.kobara, receiver_operator: 'moncash' }
-                    }))}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      vaultData.kobara.receiver_operator === 'moncash'
-                        ? 'bg-red-50 border-red-500 text-red-700 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-red-500"></span>
-                    <span>MonCash (Digicel)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVaultData(prev => ({
-                      ...prev,
-                      kobara: { ...prev.kobara, receiver_operator: 'natcash' }
-                    }))}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      vaultData.kobara.receiver_operator === 'natcash'
-                        ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
-                    <span>Natcash (Natcom)</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setVaultData(prev => ({
-                      ...prev,
-                      kobara: { ...prev.kobara, receiver_operator: 'bank' }
-                    }))}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      vaultData.kobara.receiver_operator === 'bank'
-                        ? 'bg-emerald-50 border-emerald-500 text-emerald-700 shadow-sm'
-                        : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
-                    }`}
-                  >
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
-                    <span>Compte Bancaire</span>
-                  </button>
+              {/* Titulaire & Auto-Payout */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-slate-200/70">
+                {/* Titulaire / Nom du compte */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Building size={13} className="text-orange-600" />
+                    <span>Titulaire / Nom du Compte</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={vaultData.kobara.receiver_name || ''}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setVaultData(prev => ({
+                        ...prev,
+                        kobara: { ...prev.kobara, receiver_name: val }
+                      }));
+                    }}
+                    placeholder="Ex: Direction Établissement Scolaire"
+                    className="w-full px-3.5 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none transition-all shadow-2xs"
+                  />
+                  <p className="text-[11px] text-slate-500">
+                    Nom légal associé au compte destinataire.
+                  </p>
+                </div>
+
+                {/* Auto-Payout switch */}
+                <div className="space-y-1.5 flex flex-col justify-between">
+                  <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                    <Zap size={13} className="text-orange-600" />
+                    <span>Auto-Payout en Temps Réel</span>
+                  </label>
+                  <div className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-xl shadow-2xs">
+                    <div className="min-w-0 pr-2">
+                      <span className="text-xs font-bold text-slate-900 block">Reversement immédiat</span>
+                      <span className="text-[10px] text-slate-500 font-medium">Les fonds sont virés dès réception</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setVaultData(prev => ({
+                        ...prev,
+                        kobara: { ...prev.kobara, auto_payout: !prev.kobara.auto_payout }
+                      }))}
+                      className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer shrink-0 ${
+                        vaultData.kobara.auto_payout ? 'bg-orange-600' : 'bg-slate-300'
+                      }`}
+                      title="Activer ou désactiver l'auto-payout"
+                    >
+                      <span
+                        className={`w-4 h-4 rounded-full bg-white absolute top-1 transition-transform ${
+                          vaultData.kobara.auto_payout ? 'left-6' : 'left-1'
+                        }`}
+                      />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Boutons d'action */}
+            {/* 6. SECTION OPÉRATEUR DE REVERSEMENT PRINCIPAL */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                  <Wallet size={14} className="text-orange-600" />
+                  <span>Opérateur de Reversement Principal</span>
+                </label>
+                <span className="text-[11px] text-slate-500">Canal prioritaire</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setVaultData(prev => ({
+                    ...prev,
+                    kobara: { ...prev.kobara, receiver_operator: 'moncash' }
+                  }))}
+                  className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-2.5 ${
+                    vaultData.kobara.receiver_operator === 'moncash'
+                      ? 'bg-red-50 border-red-500 ring-2 ring-red-500/20 text-red-900 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0"></span>
+                  <span className="truncate">MonCash (Digicel)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVaultData(prev => ({
+                    ...prev,
+                    kobara: { ...prev.kobara, receiver_operator: 'natcash' }
+                  }))}
+                  className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-2.5 ${
+                    vaultData.kobara.receiver_operator === 'natcash'
+                      ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-500/20 text-blue-900 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0"></span>
+                  <span className="truncate">Natcash (Natcom)</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVaultData(prev => ({
+                    ...prev,
+                    kobara: { ...prev.kobara, receiver_operator: 'bank' }
+                  }))}
+                  className={`p-3 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-2.5 ${
+                    vaultData.kobara.receiver_operator === 'bank'
+                      ? 'bg-emerald-50 border-emerald-500 ring-2 ring-emerald-500/20 text-emerald-900 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0"></span>
+                  <span className="truncate">Compte Bancaire</span>
+                </button>
+              </div>
+            </div>
+
+            {/* 7. BOUTONS D'ACTION KOBARA */}
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-4 border-t border-slate-100">
               <button
                 type="button"
                 onClick={() => handleTestConnection('kobara')}
                 disabled={testing}
-                className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                className="w-full sm:w-auto px-5 py-3 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 text-slate-800 rounded-xl text-xs sm:text-[13px] font-bold transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
               >
-                {testing ? <Loader2 size={14} className="animate-spin text-orange-600" /> : <Zap size={14} className="text-orange-600" />}
+                {testing ? <Loader2 size={16} className="animate-spin text-orange-600" /> : <Zap size={16} className="text-orange-600" />}
                 <span>Tester la connexion API Kobara</span>
               </button>
 
@@ -1037,9 +1211,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 type="button"
                 onClick={() => handleSaveService('kobara')}
                 disabled={saving}
-                className="w-full sm:w-auto px-6 py-2.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 active:from-orange-800 active:to-amber-800 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-orange-600/20 disabled:opacity-50"
+                className="w-full sm:w-auto px-6 py-3 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 active:from-orange-800 active:to-amber-800 text-white rounded-xl text-xs sm:text-[13px] font-bold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-orange-600/20 disabled:opacity-50"
               >
-                {saving ? <Loader2 size={14} className="animate-spin text-white" /> : <Save size={14} />}
+                {saving ? <Loader2 size={16} className="animate-spin text-white" /> : <Save size={16} />}
                 <span>Enregistrer & Chiffrer dans Supabase (AES-256)</span>
               </button>
             </div>
@@ -1181,14 +1355,20 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 </button>
               </div>
 
-              {/* FORMULAIRE DES CLÉS API */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                {/* Mode d'Environnement */}
-                <div className="md:col-span-2 space-y-1.5">
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                    <Globe size={13} className="text-indigo-600" />
-                    <span>Environnement API (Digicel MonCash)</span>
-                  </label>
+              {/* FORMULAIRE DES CLÉS API HARMONISÉ */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 pt-2">
+                {/* 1. Mode d'Environnement MonCash */}
+                <div className="lg:col-span-2 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Radio size={14} className="text-red-600" />
+                      <span>Environnement API (Digicel MonCash)</span>
+                    </label>
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      {vaultData.moncash.mode === 'live' ? 'Mode Réel Actif' : 'Mode Sandbox Actif'}
+                    </span>
+                  </div>
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <button
                       type="button"
@@ -1196,16 +1376,27 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                         ...prev,
                         moncash: { ...prev.moncash, mode: 'sandbox' }
                       }))}
-                      className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
                         vaultData.moncash.mode === 'sandbox'
-                          ? 'bg-amber-50/70 border-amber-300 ring-2 ring-amber-400/30'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                          ? 'bg-amber-50/80 border-amber-400 ring-2 ring-amber-500/20 text-amber-950 shadow-xs'
+                          : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
-                      <Radio size={18} className={vaultData.moncash.mode === 'sandbox' ? 'text-amber-600' : 'text-slate-400'} />
-                      <div>
-                        <div className="text-xs font-bold text-slate-900">Sandbox (Test / Développement)</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">https://sandbox.moncashbutton.digicelgroup.com</div>
+                      <div className={`w-3.5 h-3.5 rounded-full mt-0.5 shrink-0 flex items-center justify-center border ${
+                        vaultData.moncash.mode === 'sandbox' ? 'border-amber-600 bg-amber-500' : 'border-slate-400 bg-transparent'
+                      }`}>
+                        {vaultData.moncash.mode === 'sandbox' && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                          <span>Sandbox (Test / Développement)</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300">
+                            Simulation
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 font-mono truncate">
+                          sandbox.moncashbutton.digicelgroup.com
+                        </p>
                       </div>
                     </button>
 
@@ -1215,193 +1406,293 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                         ...prev,
                         moncash: { ...prev.moncash, mode: 'live' }
                       }))}
-                      className={`p-3.5 rounded-2xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
+                      className={`p-3.5 rounded-xl border text-left flex items-start gap-3 transition-all cursor-pointer ${
                         vaultData.moncash.mode === 'live'
-                          ? 'bg-emerald-50/70 border-emerald-300 ring-2 ring-emerald-400/30'
-                          : 'bg-white border-slate-200 hover:bg-slate-50'
+                          ? 'bg-emerald-50/80 border-emerald-400 ring-2 ring-emerald-500/20 text-emerald-950 shadow-xs'
+                          : 'bg-slate-50/70 border-slate-200 text-slate-700 hover:bg-slate-100'
                       }`}
                     >
-                      <Radio size={18} className={vaultData.moncash.mode === 'live' ? 'text-emerald-600' : 'text-slate-400'} />
-                      <div>
-                        <div className="text-xs font-bold text-slate-900">Production Live (Argent réel)</div>
-                        <div className="text-[11px] text-slate-500 mt-0.5">https://moncashbutton.digicelgroup.com</div>
+                      <div className={`w-3.5 h-3.5 rounded-full mt-0.5 shrink-0 flex items-center justify-center border ${
+                        vaultData.moncash.mode === 'live' ? 'border-emerald-600 bg-emerald-500' : 'border-slate-400 bg-transparent'
+                      }`}>
+                        {vaultData.moncash.mode === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-white"></span>}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                          <span>Production Live (Argent réel)</span>
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300">
+                            Fonds Réels
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-500 mt-0.5 font-mono truncate">
+                          moncashbutton.digicelgroup.com
+                        </p>
                       </div>
                     </button>
                   </div>
                 </div>
 
-                {/* MONCASH_CLIENT_ID */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                      <Key size={13} className="text-blue-600" />
-                      <span>MonCash Client ID</span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-mono">MONCASH_CLIENT_ID</span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={vaultData.moncash.client_id}
-                      onChange={(e) => setVaultData(prev => ({
-                        ...prev,
-                        moncash: { ...prev.moncash, client_id: e.target.value }
-                      }))}
-                      placeholder="Ex: 100000000000000000000"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                    />
-                    {vaultData.moncash.client_id && (
-                      <button
-                        type="button"
-                        onClick={() => copyToClipboard(vaultData.moncash.client_id, 'client_id')}
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-all cursor-pointer"
-                        title="Copier le Client ID"
-                      >
-                        {copiedKey === 'client_id' ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                      </button>
-                    )}
-                  </div>
-                  <p className="text-[11px] text-slate-500">Identifiant public de votre application marchande MonCash.</p>
-                </div>
-
-                {/* MONCASH_CLIENT_SECRET (CHIFfRÉ AVEC AES-256-GCM) */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                      <Lock size={13} className="text-emerald-600" />
-                      <span>MonCash Client Secret</span>
-                      <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-300">
-                        Chiffré AES-256
+                {/* 2. MONCASH_CLIENT_ID */}
+                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Key size={13} className="text-red-600" />
+                        <span>MonCash Client ID</span>
+                        <span className="text-red-500 font-black">*</span>
+                      </label>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold shrink-0">
+                        Public ID
                       </span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-mono">MONCASH_CLIENT_SECRET</span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type={revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? 'text' : 'password'}
-                      value={
-                        revealedSecrets['moncash_MONCASH_CLIENT_SECRET']
-                          ? (unmaskedValues['moncash_MONCASH_CLIENT_SECRET'] || vaultData.moncash.client_secret)
-                          : vaultData.moncash.client_secret
-                      }
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        setUnmaskedValues(prev => ({ ...prev, ['moncash_MONCASH_CLIENT_SECRET']: val }));
-                        setVaultData(prev => ({
+                    </div>
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={vaultData.moncash.client_id}
+                        onChange={(e) => setVaultData(prev => ({
                           ...prev,
-                          moncash: { ...prev.moncash, client_secret: val }
-                        }));
-                      }}
-                      placeholder="Ex: mc_sec_xxxxxxxxxxxxxxxxxxxxxx"
-                      className="w-full pl-4 pr-20 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => toggleRevealSecret('moncash', 'MONCASH_CLIENT_SECRET')}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-all cursor-pointer"
-                        title={revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? 'Masquer' : 'Afficher le secret'}
-                      >
-                        {revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? <EyeOff size={14} /> : <Eye size={14} />}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const val = unmaskedValues['moncash_MONCASH_CLIENT_SECRET'] || vaultData.moncash.client_secret;
-                          copyToClipboard(val, 'client_secret');
+                          moncash: { ...prev.moncash, client_id: e.target.value.trim() }
+                        }))}
+                        placeholder="Ex: 100000000000000000000"
+                        className="w-full pl-3.5 pr-12 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 rounded-xl text-xs sm:text-[13px] font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs"
+                      />
+                      {vaultData.moncash.client_id && (
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(vaultData.moncash.client_id, 'client_id')}
+                          className="absolute right-2 p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+                          title="Copier le Client ID"
+                        >
+                          {copiedKey === 'client_id' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Barre d'état & aperçu complet */}
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                      <span className="text-slate-500">
+                        {vaultData.moncash.client_id ? `${vaultData.moncash.client_id.length} caractères` : 'Non renseigné'}
+                      </span>
+                      {vaultData.moncash.client_id && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandedPreview('moncash_client_id')}
+                          className="text-[11px] font-bold text-red-600 hover:text-red-700 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <span>{expandedPreview['moncash_client_id'] ? 'Réduire' : 'Tout voir'}</span>
+                          {expandedPreview['moncash_client_id'] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        </button>
+                      )}
+                    </div>
+
+                    {expandedPreview['moncash_client_id'] && vaultData.moncash.client_id && (
+                      <div className="p-2.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] break-all border border-slate-800 shadow-inner select-all animate-in fade-in duration-150">
+                        {vaultData.moncash.client_id}
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Identifiant public de votre application marchande MonCash.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 3. MONCASH_CLIENT_SECRET (CHIIFRÉ AES-256) */}
+                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Lock size={13} className="text-emerald-600" />
+                        <span>MonCash Client Secret</span>
+                        <span className="text-red-500 font-black">*</span>
+                      </label>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold border border-emerald-300 shrink-0">
+                        AES-256
+                      </span>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type={revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? 'text' : 'password'}
+                        value={
+                          revealedSecrets['moncash_MONCASH_CLIENT_SECRET']
+                            ? (unmaskedValues['moncash_MONCASH_CLIENT_SECRET'] || vaultData.moncash.client_secret)
+                            : vaultData.moncash.client_secret
+                        }
+                        onChange={(e) => {
+                          const val = e.target.value.trim();
+                          setUnmaskedValues(prev => ({ ...prev, ['moncash_MONCASH_CLIENT_SECRET']: val }));
+                          setVaultData(prev => ({
+                            ...prev,
+                            moncash: { ...prev.moncash, client_secret: val }
+                          }));
                         }}
-                        className="p-1.5 text-slate-400 hover:text-slate-700 rounded-lg hover:bg-slate-200/60 transition-all cursor-pointer"
-                        title="Copier le Client Secret"
+                        placeholder="mc_sec_xxxxxxxxxxxxxxxxxxxxxx"
+                        className="w-full pl-3.5 pr-20 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-red-500 focus:ring-2 focus:ring-red-500/20 rounded-xl text-xs sm:text-[13px] font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs"
+                      />
+                      <div className="absolute right-1.5 flex items-center gap-0.5">
+                        <button
+                          type="button"
+                          onClick={() => toggleRevealSecret('moncash', 'MONCASH_CLIENT_SECRET')}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title={revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? 'Masquer' : 'Afficher le secret'}
+                        >
+                          {revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const val = unmaskedValues['moncash_MONCASH_CLIENT_SECRET'] || vaultData.moncash.client_secret;
+                            copyToClipboard(val, 'client_secret');
+                          }}
+                          className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
+                          title="Copier le Client Secret"
+                        >
+                          {copiedKey === 'client_secret' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Barre d'état & aperçu complet */}
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 text-xs">
+                    <div className="flex flex-wrap items-center justify-between gap-1.5 text-[11px]">
+                      <span className="text-slate-500">
+                        {vaultData.moncash.client_secret ? `${vaultData.moncash.client_secret.length} caractères` : 'Non renseigné'}
+                      </span>
+                      {vaultData.moncash.client_secret && (
+                        <button
+                          type="button"
+                          onClick={() => toggleExpandedPreview('moncash_client_secret')}
+                          className="text-[11px] font-bold text-red-600 hover:text-red-700 transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <span>{expandedPreview['moncash_client_secret'] ? 'Réduire' : 'Tout voir'}</span>
+                          {expandedPreview['moncash_client_secret'] ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                        </button>
+                      )}
+                    </div>
+
+                    {expandedPreview['moncash_client_secret'] && vaultData.moncash.client_secret && (
+                      <div className="p-2.5 rounded-lg bg-slate-900 text-slate-100 font-mono text-[11px] break-all border border-slate-800 shadow-inner select-all animate-in fade-in duration-150">
+                        <div className="text-[9px] text-slate-400 uppercase font-sans font-bold mb-1 flex items-center justify-between">
+                          <span>Valeur du secret :</span>
+                          <span>{revealedSecrets['moncash_MONCASH_CLIENT_SECRET'] ? 'En clair' : 'Masquée'}</span>
+                        </div>
+                        {revealedSecrets['moncash_MONCASH_CLIENT_SECRET']
+                          ? (unmaskedValues['moncash_MONCASH_CLIENT_SECRET'] || vaultData.moncash.client_secret)
+                          : '••••••••••••••••••••••••••••••••••••••••••••••••••••••••••••'}
+                      </div>
+                    )}
+
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Clé secrète hautement confidentielle, chiffrée avec AES-256-GCM.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 4. MONCASH_BUSINESS_KEY */}
+                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Key size={13} className="text-purple-600" />
+                        <span>Clé Marchande (Business Key)</span>
+                      </label>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-white border border-slate-200 text-slate-600 font-bold shrink-0">
+                        Optionnel
+                      </span>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        value={vaultData.moncash.business_key}
+                        onChange={(e) => setVaultData(prev => ({
+                          ...prev,
+                          moncash: { ...prev.moncash, business_key: e.target.value.trim() }
+                        }))}
+                        placeholder="Ex: 5093xxxxxxx ou code marchand"
+                        className="w-full pl-3.5 pr-12 py-2.5 sm:py-3 bg-white border border-slate-200 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 rounded-xl text-xs sm:text-[13px] font-mono font-medium text-slate-900 outline-none transition-all shadow-2xs"
+                      />
+                      {vaultData.moncash.business_key && (
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(vaultData.moncash.business_key, 'business_key')}
+                          className="absolute right-2 p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+                          title="Copier la clé marchande"
+                        >
+                          {copiedKey === 'business_key' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 text-xs">
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      Numéro ou code marchand pour la réception directe des versements scolaires.
+                    </p>
+                  </div>
+                </div>
+
+                {/* 5. URL DE WEBHOOK MONCASH */}
+                <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 flex flex-col justify-between space-y-3">
+                  <div>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                      <label className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
+                        <Globe size={13} className="text-emerald-600" />
+                        <span>URL Webhook MonCash</span>
+                      </label>
+                      <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHostType('render')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                            selectedHostType === 'render'
+                              ? 'bg-red-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Render
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedHostType('detected')}
+                          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                            selectedHostType === 'detected'
+                              ? 'bg-red-600 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                        >
+                          Domaine Actuel
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="relative flex items-center">
+                      <input
+                        type="text"
+                        readOnly
+                        value={webhookUrl}
+                        className="w-full pl-3.5 pr-12 py-2.5 sm:py-3 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-800 select-all cursor-pointer"
+                        onClick={(e) => (e.target as HTMLInputElement).select()}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => copyToClipboard(webhookUrl, 'webhook_url')}
+                        className="absolute right-2 p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-all cursor-pointer"
+                        title="Copier l'URL de webhook MonCash"
                       >
-                        {copiedKey === 'client_secret' ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                        {copiedKey === 'webhook_url' ? <Check size={16} className="text-emerald-600" /> : <Copy size={16} />}
                       </button>
                     </div>
                   </div>
-                  <p className="text-[11px] text-slate-500">
-                    Clé secrète hautement confidentielle. Elle est chiffrée avec AES-256-GCM avant tout stockage dans Supabase.
-                  </p>
-                </div>
 
-                {/* MONCASH_BUSINESS_KEY */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                      <Key size={13} className="text-purple-600" />
-                      <span>Clé Marchande (Business Key)</span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-mono">MONCASH_BUSINESS_KEY</span>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={vaultData.moncash.business_key}
-                      onChange={(e) => setVaultData(prev => ({
-                        ...prev,
-                        moncash: { ...prev.moncash, business_key: e.target.value }
-                      }))}
-                      placeholder="Ex: 5093xxxxxxx ou code marchant"
-                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                    />
-                  </div>
-                  <p className="text-[11px] text-slate-500">Numéro ou clé marchande pour réception des versements scolaires.</p>
-                </div>
-
-                {/* URL de Webhook Détectée */}
-                <div className="space-y-2">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <label className="text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1.5">
-                      <Globe size={13} className="text-emerald-600" />
-                      <span>URL Webhook MonCash (Notifications)</span>
-                    </label>
-                    <div className="flex items-center gap-1.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedHostType('render')}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                          selectedHostType === 'render'
-                            ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200/60'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                        title="Serveur Render en production"
-                      >
-                        Render (Production)
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSelectedHostType('detected')}
-                        className={`px-2 py-0.5 text-[10px] font-bold rounded-md transition-all cursor-pointer ${
-                          selectedHostType === 'detected'
-                            ? 'bg-white text-indigo-700 shadow-xs border border-indigo-200/60'
-                            : 'text-slate-600 hover:text-slate-900'
-                        }`}
-                        title="Domaine courant du navigateur"
-                      >
-                        Domaine Actuel
-                      </button>
-                    </div>
-                  </div>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      readOnly
-                      value={webhookUrl}
-                      className="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 select-all cursor-pointer"
-                      onClick={(e) => (e.target as HTMLInputElement).select()}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(webhookUrl, 'webhook_url')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1.5 text-slate-500 hover:text-slate-800 rounded-lg hover:bg-slate-200 transition-all cursor-pointer"
-                      title="Copier l'URL de webhook MonCash"
-                    >
-                      {copiedKey === 'webhook_url' ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
-                    </button>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[11px] text-slate-500">
-                    <span>À renseigner dans le portail Digicel pour la confirmation instantanée.</span>
-                    <span className="text-slate-400">
-                      Endpoint Kobara : <code className="text-slate-700 font-mono font-semibold select-all">{kobaraWebhookUrl}</code>
-                    </span>
+                  <div className="space-y-2 pt-1 border-t border-slate-200/60 text-xs">
+                    <p className="text-[11px] text-slate-500 leading-tight">
+                      À renseigner dans le portail Digicel pour la confirmation instantanée des paiements.
+                    </p>
                   </div>
                 </div>
               </div>
@@ -1409,7 +1700,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
               {/* BOUTONS D'ACTION MONCASH */}
               <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="text-xs text-slate-500 font-medium">
-                  Les modifications sont appliquées immédiatement au guichet et aux formulaires de scolarité.
+                  Les modifications sont chiffrées et appliquées immédiatement au guichet scolaire.
                 </div>
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
@@ -1417,17 +1708,17 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                     type="button"
                     onClick={() => handleSaveService('moncash')}
                     disabled={saving}
-                    className="w-full sm:w-auto px-6 py-2.5 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all shadow-md shadow-red-600/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    className="w-full sm:w-auto px-6 py-3 bg-red-600 hover:bg-red-700 active:bg-red-800 text-white rounded-xl text-xs sm:text-[13px] font-bold transition-all shadow-md shadow-red-600/20 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
                   >
                     {saving ? (
                       <>
-                        <Loader2 size={14} className="animate-spin" />
+                        <Loader2 size={16} className="animate-spin" />
                         <span>Chiffrement & Sauvegarde...</span>
                       </>
                     ) : (
                       <>
-                        <Save size={14} />
-                        <span>Enregistrer & Chiffrer dans Supabase</span>
+                        <Save size={16} />
+                        <span>Enregistrer & Chiffrer dans Supabase (AES-256)</span>
                       </>
                     )}
                   </button>
@@ -1440,30 +1731,30 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET NATCASH ===================== */}
       {activeTab === 'natcash' && (
-        <div className="bg-white rounded-2xl p-3.5 sm:p-5 border border-slate-200/90 shadow-xs space-y-3.5">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
-            <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-black text-sm shrink-0">
+        <div className="bg-white rounded-2xl p-4 sm:p-6 border border-slate-200 shadow-xs space-y-5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center font-black text-sm shrink-0 shadow-2xs">
                 NC
               </div>
               <div>
-                <div className="flex items-center gap-1.5">
-                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                <div className="flex items-center gap-2">
+                  <h4 className="text-base font-black text-slate-900 tracking-tight">
                     Natcom Natcash
                   </h4>
-                  <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black uppercase bg-slate-100 text-slate-600 border border-slate-300">
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-600 border border-slate-300">
                     Bientôt Disponible
                   </span>
                 </div>
-                <p className="text-[11px] text-slate-500">Paiements par portefeuille Natcom</p>
+                <p className="text-xs text-slate-500 mt-0.5">Paiements et reversements par portefeuille Natcom</p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
             {/* NATCASH_MERCHANT_ID */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+            <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-slate-700 block">
                 Natcash Merchant ID
               </label>
               <input
@@ -1471,36 +1762,40 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 value={vaultData.natcash.merchant_id}
                 onChange={(e) => setVaultData(prev => ({
                   ...prev,
-                  natcash: { ...prev.natcash, merchant_id: e.target.value }
+                  natcash: { ...prev.natcash, merchant_id: e.target.value.trim() }
                 }))}
                 placeholder="Ex: NC-MERCHANT-001"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-2xs"
               />
+              <p className="text-[11px] text-slate-500">Code marchand Natcom Natcash.</p>
             </div>
 
             {/* NATCASH_SECRET_KEY */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                <span>Secret Key</span>
-                <span className="px-1 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[8px] font-bold">
+            <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                  <span>Secret Key</span>
+                </label>
+                <span className="px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-800 text-[9px] font-bold border border-emerald-300">
                   AES-256
                 </span>
-              </label>
+              </div>
               <input
                 type="password"
                 value={vaultData.natcash.secret_key}
                 onChange={(e) => setVaultData(prev => ({
                   ...prev,
-                  natcash: { ...prev.natcash, secret_key: e.target.value }
+                  natcash: { ...prev.natcash, secret_key: e.target.value.trim() }
                 }))}
                 placeholder="Clé secrète Natcom"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-2xs"
               />
+              <p className="text-[11px] text-slate-500">Clé confidentielle Natcash.</p>
             </div>
 
             {/* NATCASH USSD */}
-            <div className="space-y-1">
-              <label className="text-[11px] font-black uppercase tracking-wider text-slate-700">
+            <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200 space-y-2">
+              <label className="text-xs font-black uppercase tracking-wider text-slate-700 block">
                 Code USSD Natcash
               </label>
               <input
@@ -1508,23 +1803,24 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 value={vaultData.natcash.ussd_number}
                 onChange={(e) => setVaultData(prev => ({
                   ...prev,
-                  natcash: { ...prev.natcash, ussd_number: e.target.value }
+                  natcash: { ...prev.natcash, ussd_number: e.target.value.trim() }
                 }))}
                 placeholder="Ex: *202*12345#"
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:bg-white focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all"
+                className="w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all shadow-2xs"
               />
+              <p className="text-[11px] text-slate-500">Code court de paiement USSD.</p>
             </div>
           </div>
 
-          <div className="pt-3 border-t border-slate-100 flex justify-end">
+          <div className="pt-4 border-t border-slate-100 flex justify-end">
             <button
               type="button"
               onClick={() => handleSaveService('natcash')}
               disabled={saving}
-              className="px-5 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              className="w-full sm:w-auto px-6 py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs sm:text-[13px] font-bold transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
             >
-              <Save size={13} />
-              <span>Enregistrer Natcash</span>
+              <Save size={16} />
+              <span>Enregistrer Natcash (AES-256)</span>
             </button>
           </div>
         </div>

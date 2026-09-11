@@ -1,15 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { 
   Smartphone, 
   X, 
   ArrowRight, 
   GraduationCap, 
   Receipt, 
-  AlertTriangle,
   Building2,
-  Phone,
-  CheckCircle2,
-  ShieldCheck
+  Phone
 } from 'lucide-react';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
@@ -75,16 +72,6 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
 
   const terminology = propTerminology || contextTerminology || getTerminology();
   const effectiveSchoolName = propSchoolName || contextSchool?.name || 'École Connectée';
-
-  // Checkbox de confirmation obligatoire pour forcer une vérification visuelle active
-  const [hasVerifiedStudent, setHasVerifiedStudent] = useState(false);
-
-  // Réinitialiser la confirmation à chaque ouverture
-  useEffect(() => {
-    if (isOpen) {
-      setHasVerifiedStudent(false);
-    }
-  }, [isOpen]);
 
   if (!isOpen || !student) return null;
 
@@ -153,14 +140,6 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
 
         {/* Corps du récapitulatif dense et optimisé */}
         <div className="p-3 sm:p-4 md:p-5 overflow-y-auto space-y-2.5 sm:space-y-3">
-          {/* Bandeau d'avertissement compact anti-erreur */}
-          <div className="py-2 px-3 bg-amber-50/90 border border-amber-200/80 rounded-xl flex items-center gap-2 text-amber-950">
-            <AlertTriangle size={15} className="text-amber-600 shrink-0" />
-            <p className="text-[11px] sm:text-xs text-amber-900 leading-tight">
-              <strong className="font-bold">Contrôle d'attribution :</strong> Vérifiez le dossier de l'{terminology.student.toLowerCase()} avant scellage bancaire.
-            </p>
-          </div>
-
           {/* Grille responsive : 1 colonne sur mobile, 2 colonnes sur tablette/desktop */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3">
             {/* 1. Carte Identité & Dossier Scolaire */}
@@ -277,32 +256,6 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
               </div>
             </div>
           </div>
-
-          {/* 3. Checkbox de certification active anti-erreur compacte */}
-          <label 
-            id="moncash-summary-confirm-checkbox-label"
-            className={`flex items-start gap-2.5 p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer select-none ${
-              hasVerifiedStudent 
-                ? 'bg-emerald-50/70 border-emerald-300 ring-1 ring-emerald-500/20' 
-                : 'bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50/50'
-            }`}
-          >
-            <input
-              id="moncash-summary-checkbox"
-              type="checkbox"
-              checked={hasVerifiedStudent}
-              onChange={(e) => setHasVerifiedStudent(e.target.checked)}
-              className="mt-0.5 w-4 h-4 rounded text-red-600 border-slate-300 focus:ring-red-500 cursor-pointer shrink-0"
-            />
-            <div className="text-xs leading-snug">
-              <span className="font-bold text-slate-900 block">
-                Je confirme l'imputation à cet(te) {terminology.student.toLowerCase()}
-              </span>
-              <span className="text-[11px] text-slate-500 mt-0.5 block leading-normal">
-                J'atteste avoir vérifié que ce règlement de <strong className="text-slate-800">{Math.round(effectiveHTG).toLocaleString()} HTG</strong> pour <strong className="text-slate-800">{feeLabel}</strong> est destiné à <strong className="text-slate-900">{formattedName.fullName}</strong> ({matricule}).
-              </span>
-            </div>
-          </label>
         </div>
 
         {/* Boutons d'Action Dockés et ergonomiques */}
@@ -321,16 +274,12 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
             id="moncash-summary-confirm-btn"
             type="button"
             onClick={() => {
-              if (hasVerifiedStudent && !isSubmitting) {
+              if (!isSubmitting) {
                 onConfirm();
               }
             }}
-            disabled={!hasVerifiedStudent || isSubmitting}
-            className={`w-full sm:flex-1 py-2.5 px-4 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99] min-h-[42px] ${
-              hasVerifiedStudent && !isSubmitting
-                ? 'bg-red-600 hover:bg-red-700 text-white shadow-red-600/20 ring-1 ring-red-600'
-                : 'bg-slate-200 text-slate-400 cursor-not-allowed shadow-none'
-            }`}
+            disabled={isSubmitting}
+            className="w-full sm:flex-1 py-2.5 px-4 rounded-xl font-bold text-xs shadow-md flex items-center justify-center gap-2 transition-all cursor-pointer active:scale-[0.99] min-h-[42px] bg-red-600 hover:bg-red-700 text-white shadow-red-600/20 ring-1 ring-red-600 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? (
               <span>Lancement du paiement MonCash...</span>
