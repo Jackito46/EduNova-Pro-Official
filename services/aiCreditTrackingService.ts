@@ -399,18 +399,37 @@ export const aiCreditTrackingService = {
   },
 
   /**
-   * Récupère la liste brute des logs d'audit stockés
+   * Nettoie et purge définitivement les données de test / virtuelles de l'historique
    */
-  getStoredAuditLogs(): AiCreditAuditAction[] {
+  cleanLegacyMockData(): AiCreditAuditAction[] {
     try {
       const raw = localStorage.getItem(LOCAL_STORAGE_AUDIT_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed.map(item => ({
-            ...item,
-            timeAgo: this.formatTimeAgo(item.timestamp)
-          }));
+          // Filtrer rigoureusement toute donnée de test virtuelle
+          const realLogs = parsed.filter((item: any) => {
+            if (!item || typeof item !== 'object') return false;
+            const id = String(item.id || '');
+            const summary = String(item.summary || '');
+            // Identifiants de seeds virtuels
+            if (id.startsWith('seed_audit_') || id.startsWith('ai_init_')) return false;
+            // Noms d'élèves fictifs injectés dans les anciens mocks
+            if (summary.includes('Jean-Marc Baptiste') || summary.includes('Marie-Claude Pierre')) return false;
+            // Textes types des anciens seeds de simulation
+            if (summary.includes('Action déclenchée manuellement pour audit')) return false;
+            if (summary.includes("Plan d'accompagnement individualisé en Mathématiques")) return false;
+            if (summary.includes("Note d'information aux parents - Calendrier des examens")) return false;
+            if (summary.includes("Création de 10 QCM de Sciences Physiques")) return false;
+            if (summary.includes("Procès-verbal synthétique et points d'attention")) return false;
+            if (summary.includes("Vérification de connectivité télémétrique")) return false;
+            if (summary.includes("Stratégie de relance des créances")) return false;
+            if (summary.includes("Traduction créole/français")) return false;
+            if (summary.includes("Analyse prévisionnelle de recouvrement et flux de trésorerie")) return false;
+            return true;
+          });
+          localStorage.setItem(LOCAL_STORAGE_AUDIT_KEY, JSON.stringify(realLogs));
+          return realLogs;
         }
       }
     } catch (e) {}
@@ -418,15 +437,24 @@ export const aiCreditTrackingService = {
   },
 
   /**
-   * Récupère les 10 dernières actions ayant consommé des crédits IA
+   * Récupère la liste brute des logs d'audit stockés (100% réels)
+   */
+  getStoredAuditLogs(): AiCreditAuditAction[] {
+    try {
+      const realLogs = this.cleanLegacyMockData();
+      return realLogs.map(item => ({
+        ...item,
+        timeAgo: this.formatTimeAgo(item.timestamp)
+      }));
+    } catch (e) {}
+    return [];
+  },
+
+  /**
+   * Récupère les dernières actions réelles ayant consommé des crédits IA (aucune donnée virtuelle)
    */
   getRecentCreditActions(limit: number = 10, onlyConsumed: boolean = true): AiCreditAuditAction[] {
     let logs = this.getStoredAuditLogs();
-
-    // Si la liste est vide, initialiser un jeu de données d'audit cohérent
-    if (logs.length === 0) {
-      logs = this.seedInitialAuditLogs();
-    }
 
     if (onlyConsumed) {
       logs = logs.filter(l => l.status === 'CONSUMED' || l.creditsUsed > 0);
@@ -436,142 +464,78 @@ export const aiCreditTrackingService = {
   },
 
   /**
-   * Initialise un jeu d'actions d'audit pour le suivi immédiat
+   * Synchronise et récupère l'ensemble des logs d'audit réels depuis le serveur et le stockage local
    */
-  seedInitialAuditLogs(): AiCreditAuditAction[] {
-    const now = Date.now();
-    const seedTemplates = [
-      {
-        featureName: "Génération Appréciation Bulletin",
-        featureCategory: 'PEDAGOGY' as const,
-        offsetMin: 2,
-        tokensConsumed: 320,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 185,
-        summary: "Synthèse trimestrielle élève Jean-Marc Baptiste (3e AF)"
-      },
-      {
-        featureName: "Audit & Diagnostic Financier",
-        featureCategory: 'FINANCE' as const,
-        offsetMin: 8,
-        tokensConsumed: 540,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 240,
-        summary: "Analyse prévisionnelle de recouvrement et flux de trésorerie"
-      },
-      {
-        featureName: "Recommandation Pédagogique",
-        featureCategory: 'PEDAGOGY' as const,
-        offsetMin: 19,
-        tokensConsumed: 410,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 215,
-        summary: "Plan d'accompagnement individualisé en Mathématiques"
-      },
-      {
-        featureName: "Assistant Rédaction Circulaire",
-        featureCategory: 'ADMIN' as const,
-        offsetMin: 34,
-        tokensConsumed: 290,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 160,
-        summary: "Note d'information aux parents - Calendrier des examens"
-      },
-      {
-        featureName: "Génération Évaluation / Quiz",
-        featureCategory: 'PEDAGOGY' as const,
-        offsetMin: 52,
-        tokensConsumed: 620,
-        model: "Gemini 3.7 Flash",
-        latencyMs: 310,
-        summary: "Création de 10 QCM de Sciences Physiques avec barème"
-      },
-      {
-        featureName: "Synthèse Conseils de Classe",
-        featureCategory: 'PEDAGOGY' as const,
-        offsetMin: 78,
-        tokensConsumed: 480,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 220,
-        summary: "Procès-verbal synthétique et points d'attention classe Terminale S"
-      },
-      {
-        featureName: "Diagnostic & Ping Quota API",
-        featureCategory: 'SYSTEM' as const,
-        offsetMin: 110,
-        tokensConsumed: 85,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 140,
-        summary: "Vérification de connectivité télémétrique Google AI Studio"
-      },
-      {
-        featureName: "Génération Appréciation Bulletin",
-        featureCategory: 'PEDAGOGY' as const,
-        offsetMin: 145,
-        tokensConsumed: 295,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 175,
-        summary: "Appréciation pédagogique élève Marie-Claude Pierre (6e)"
-      },
-      {
-        featureName: "Plan de Recouvrement Frais Scolaires",
-        featureCategory: 'FINANCE' as const,
-        offsetMin: 190,
-        tokensConsumed: 460,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 230,
-        summary: "Stratégie de relance des créances trimestrielles impayées"
-      },
-      {
-        featureName: "Assistant Traduction & Synthèse",
-        featureCategory: 'ASSISTANT' as const,
-        offsetMin: 240,
-        tokensConsumed: 310,
-        model: "Gemini 2.5 Flash",
-        latencyMs: 190,
-        summary: "Traduction créole/français du règlement intérieur"
-      }
-    ];
-
-    const initialLogs: AiCreditAuditAction[] = seedTemplates.map((item, idx) => {
-      const timestamp = now - item.offsetMin * 60 * 1000;
-      return {
-        id: `seed_audit_${idx}_${timestamp}`,
-        featureName: item.featureName,
-        featureCategory: item.featureCategory,
-        timestamp,
-        timestampFormatted: new Date(timestamp).toLocaleString('fr-FR', {
-          day: '2-digit',
-          month: '2-digit',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          second: '2-digit'
-        }),
-        timeAgo: this.formatTimeAgo(timestamp),
-        creditsUsed: 1,
-        tokensConsumed: item.tokensConsumed,
-        model: item.model,
-        latencyMs: item.latencyMs,
-        status: 'CONSUMED',
-        summary: item.summary,
-        userRole: 'SUPER_ADMIN'
-      };
-    });
+  async fetchRealAuditLogs(limit: number = 10, onlyConsumed: boolean = true): Promise<AiCreditAuditAction[]> {
+    let localLogs = this.getStoredAuditLogs();
 
     try {
-      localStorage.setItem(LOCAL_STORAGE_AUDIT_KEY, JSON.stringify(initialLogs));
-    } catch (e) {}
+      const res = await fetch('/api/ai/audit-logs');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.logs)) {
+          const serverConverted: AiCreditAuditAction[] = data.logs.map((call: any) => {
+            const time = call.timestamp || Date.now();
+            let cat: 'PEDAGOGY' | 'FINANCE' | 'ADMIN' | 'ASSISTANT' | 'SYSTEM' = 'SYSTEM';
+            const typeStr = (call.type || '').toLowerCase();
+            if (typeStr.includes('bulletin') || typeStr.includes('pédagog')) cat = 'PEDAGOGY';
+            else if (typeStr.includes('financ') || typeStr.includes('trésor')) cat = 'FINANCE';
+            else if (typeStr.includes('admin') || typeStr.includes('circulaire')) cat = 'ADMIN';
+            else if (typeStr.includes('assist') || typeStr.includes('rédac')) cat = 'ASSISTANT';
 
-    return initialLogs;
+            return {
+              id: call.id || `srv_ai_${time}`,
+              featureName: call.type || 'Appel IA Réel',
+              featureCategory: cat,
+              timestamp: time,
+              timestampFormatted: new Date(time).toLocaleString('fr-FR', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                second: '2-digit'
+              }),
+              timeAgo: this.formatTimeAgo(time),
+              creditsUsed: call.status === 'SUCCESS_API' ? 1 : 0,
+              tokensConsumed: call.tokensConsumed || 150,
+              model: call.model || 'Gemini 2.5 Flash',
+              latencyMs: call.latencyMs || 200,
+              status: call.status === 'SUCCESS_API' ? 'CONSUMED' : (call.status === 'SERVED_CACHE' ? 'CACHE_HIT' : 'FALLBACK'),
+              summary: call.preview || 'Exécution certifiée via Google AI Studio',
+              userRole: 'SUPER_ADMIN'
+            };
+          });
+
+          const idSet = new Set(localLogs.map(l => l.id));
+          for (const sLog of serverConverted) {
+            if (!idSet.has(sLog.id)) {
+              localLogs.push(sLog);
+              idSet.add(sLog.id);
+            }
+          }
+          localLogs.sort((a, b) => b.timestamp - a.timestamp);
+          localStorage.setItem(LOCAL_STORAGE_AUDIT_KEY, JSON.stringify(localLogs.slice(0, 50)));
+        }
+      }
+    } catch (err) {
+      // En cas d'indisponibilité réseau, se baser sur les logs réels locaux
+    }
+
+    if (onlyConsumed) {
+      localLogs = localLogs.filter(l => l.status === 'CONSUMED' || l.creditsUsed > 0);
+    }
+
+    return localLogs.slice(0, limit);
   },
 
   /**
-   * Efface l'historique d'audit des crédits IA
+   * Efface l'historique d'audit des crédits IA (local et serveur)
    */
-  clearAuditLogs(): void {
+  async clearAuditLogs(): Promise<void> {
     try {
       localStorage.removeItem(LOCAL_STORAGE_AUDIT_KEY);
+      await fetch('/api/ai/audit-logs', { method: 'DELETE' }).catch(() => {});
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('edunova-ai-audit-updated', { detail: null }));
       }

@@ -1481,6 +1481,14 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const financeRoles = [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT];
   const canViewFinances = financeRoles.includes(user.role);
+  const canAccessShortcuts = Boolean(
+    user && (
+      user.is_super_admin ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.DIRECTOR ||
+      user.role === UserRole.SCHOOL_ADMIN
+    )
+  );
 
   if (loading) {
     return (
@@ -2880,9 +2888,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Quick Actions & Shortcuts */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Quick Actions */}
-            <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8 flex flex-col">
+            <div className={`bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8 flex flex-col ${canAccessShortcuts ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
               <h3 className="text-base font-black text-slate-900 mb-6">Actions Rapides</h3>
-              <div className="space-y-3">
+              <div className={`space-y-3 ${!canAccessShortcuts ? 'sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:space-y-0 sm:gap-3' : ''}`}>
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY].includes(user.role) && (
                 <Link to="/eleves/ajouter" className="flex items-center p-3.5 rounded-2xl hover:bg-blue-50/40 border border-slate-100 transition-all group shadow-xs">
                   <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600 group-hover:scale-105 transition-colors shrink-0">
@@ -2963,55 +2971,57 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
             </div>
 
-            {/* Shortcuts */}
-            <div className="lg:col-span-2 bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8 flex flex-col">
-              <h3 className="text-base font-black text-slate-900 mb-6">Raccourcis Utiles</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR].includes(user.role) && (
-                <Link to="/eleves" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-blue-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                  <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform shadow-xs">
-                    <Users size={22} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">{terminology.students}</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Registre complet</p>
-                  </div>
-                </Link>
-                )}
+            {/* Shortcuts - Uniquement Super Admin, Directeurs et Admin Ecoles */}
+            {canAccessShortcuts && (
+              <div className="lg:col-span-2 bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8 flex flex-col">
+                <h3 className="text-base font-black text-slate-900 mb-6">Raccourcis Utiles</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR].includes(user.role) && (
+                  <Link to="/eleves" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-blue-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
+                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform shadow-xs">
+                      <Users size={22} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">{terminology.students}</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Registre complet</p>
+                    </div>
+                  </Link>
+                  )}
 
-                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
-                <Link to="/economat/suivi" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-indigo-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                  <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs">
-                    <Activity size={22} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Suivi Paiements</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">État des comptes</p>
-                  </div>
-                </Link>
-                )}
+                  {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
+                  <Link to="/economat/suivi" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-indigo-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
+                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs">
+                      <Activity size={22} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Suivi Paiements</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">État des comptes</p>
+                    </div>
+                  </Link>
+                  )}
 
-                <Link to="/horaire" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-amber-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                  <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform shadow-xs">
-                    <Calendar size={22} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Horaire</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Emploi du temps</p>
-                  </div>
-                </Link>
+                  <Link to="/horaire" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-amber-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
+                    <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform shadow-xs">
+                      <Calendar size={22} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Horaire</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Emploi du temps</p>
+                    </div>
+                  </Link>
 
-                <Link to="/economat/factures" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-rose-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                  <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform shadow-xs">
-                    <Receipt size={22} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Factures</p>
-                    <p className="text-[10px] text-slate-400 mt-0.5">Reçus émis</p>
-                  </div>
-                </Link>
+                  <Link to="/economat/factures" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-rose-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
+                    <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform shadow-xs">
+                      <Receipt size={22} />
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-slate-900">Factures</p>
+                      <p className="text-[10px] text-slate-400 mt-0.5">Reçus émis</p>
+                    </div>
+                  </Link>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -3019,7 +3029,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       {/* Main Content Area */}
       {canViewFinances && (
         <>
-          {(user.role === UserRole.SUPER_ADMIN || user.is_super_admin || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR) ? (
+          {canAccessShortcuts ? (
             /* Raccourcis d'Accès Rapide pour Admins & Directeurs */
             <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
@@ -3120,54 +3130,6 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Raccourcis Comptables */}
-              <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight">Raccourcis Comptables</h3>
-                    <p className="text-xs text-slate-400 mt-0.5">Actions prioritaires pour la gestion financière</p>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3.5">
-                  <Link to="/economat/frais" className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100/80 hover:bg-white hover:border-emerald-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform shadow-xs border border-emerald-50">
-                      <Coins size={22} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-900">Encaisser</span>
-                  </Link>
-                  <Link to="/economat/liste" className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100/80 hover:bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-blue-600 group-hover:scale-110 transition-transform shadow-xs border border-blue-50">
-                      <Receipt size={22} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-900">Paiements</span>
-                  </Link>
-                  <Link to="/economat/depenses" className="p-4 rounded-2xl bg-rose-50/50 border border-rose-100/80 hover:bg-white hover:border-rose-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-rose-600 group-hover:scale-110 transition-transform shadow-xs border border-rose-50">
-                      <TrendingDown size={22} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-900">Dépenses</span>
-                  </Link>
-                  <Link to="/economat/paie" className="p-4 rounded-2xl bg-violet-50/50 border border-violet-100/80 hover:bg-white hover:border-violet-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-violet-600 group-hover:scale-110 transition-transform shadow-xs border border-violet-50">
-                      <Wallet size={22} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-900">Salaires</span>
-                  </Link>
-                  <Link to="/economat/suivi" className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/80 hover:bg-white hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs border border-indigo-50">
-                      <Activity size={22} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-900">Suivi</span>
-                  </Link>
-                  <Link to="/rapports" className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100/80 hover:bg-white hover:border-amber-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-amber-600 group-hover:scale-110 transition-transform shadow-xs border border-amber-50">
-                      <BarChart3 size={22} />
-                    </div>
-                    <span className="text-xs font-bold text-slate-900">Rapports</span>
-                  </Link>
-                </div>
-              </div>
-
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {/* Derniers Encaissements */}
                 <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8">

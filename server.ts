@@ -107,32 +107,7 @@ async function startServer() {
     todayCachedRequests: 0,
     todayFallbackRequests: 0,
     rollingMinuteRequests: [] as number[],
-    recentCalls: [
-      {
-        id: 'ai_init_1',
-        timestamp: Date.now() - 120000,
-        timeFormatted: new Date(Date.now() - 120000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        type: 'Diagnostic Système',
-        model: 'Gemini 2.5 Flash',
-        status: 'SUCCESS_API' as const,
-        latencyMs: 312,
-        tokensConsumed: 185,
-        quotaImpact: '-1 Req (API)',
-        preview: 'Modules pédagogiques et financiers synchronisés avec succès.'
-      },
-      {
-        id: 'ai_init_2',
-        timestamp: Date.now() - 60000,
-        timeFormatted: new Date(Date.now() - 60000).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
-        type: 'Protection Anti-Quota',
-        model: 'Cache Dédupliqué (24h)',
-        status: 'SERVED_CACHE' as const,
-        latencyMs: 3,
-        tokensConsumed: 0,
-        quotaImpact: '0 Crédit (Économisé)',
-        preview: 'Réponse servie instantanément depuis le cache mémoire.'
-      }
-    ] as AiCallRecord[]
+    recentCalls: [] as AiCallRecord[]
   };
 
   function checkAndResetDailyAiQuota() {
@@ -2844,6 +2819,24 @@ async function startServer() {
     res.json(getAiTelemetryStats());
   });
 
+  // Endpoints d'Audit Réel des Crédits IA (100% réel, zéro données virtuelles)
+  app.get('/api/ai/audit-logs', (req, res) => {
+    checkAndResetDailyAiQuota();
+    res.json({
+      success: true,
+      logs: aiTelemetryState.recentCalls,
+      count: aiTelemetryState.recentCalls.length,
+      todayApiRequests: aiTelemetryState.todayApiRequests,
+      todayTokens: aiTelemetryState.todayTokens,
+      isRealData: true
+    });
+  });
+
+  app.delete('/api/ai/audit-logs', (req, res) => {
+    aiTelemetryState.recentCalls = [];
+    res.json({ success: true, message: "Journal d'audit IA réinitialisé sur le serveur." });
+  });
+
   app.post('/api/gemini/generate-student-report', async (req, res) => {
     const { studentName, grades } = req.body;
     try {
@@ -2851,7 +2844,7 @@ async function startServer() {
       const result = await callGeminiWithSmartFallback(
         prompt, 
         () => generateOfflineStudentReport(studentName, grades),
-        'Bulletin Scolaire'
+        'Génération Appréciation Bulletin'
       );
       res.json({ text: result.text, model: result.model, latencyMs: result.latencyMs, source: result.source, success: true });
     } catch (error: any) {
@@ -2867,7 +2860,7 @@ async function startServer() {
       const result = await callGeminiWithSmartFallback(
         prompt, 
         () => generateOfflineFinancialAudit(stats),
-        'Audit Financier'
+        'Audit & Diagnostic Financier'
       );
       res.json({ text: result.text, model: result.model, latencyMs: result.latencyMs, source: result.source, success: true });
     } catch (error: any) {

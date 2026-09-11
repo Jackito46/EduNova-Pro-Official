@@ -150,6 +150,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const isPresencesEnabled = school?.global_settings?.modules?.presences ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isDisciplineEnabled = school?.global_settings?.modules?.discipline ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
   const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === UserRole.SUPER_ADMIN || (user?.role as any) === 'SUPER_ADMIN');
+  const canAccessShortcuts = Boolean(
+    isSuperAdmin || 
+    user?.role === UserRole.DIRECTOR || 
+    user?.role === UserRole.SCHOOL_ADMIN
+  );
 
   const { isInstallable, isInstalled, installPwa } = usePwaInstall();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -478,7 +483,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         <div className={`p-3 border-t border-slate-200/80 bg-slate-50/50 ${isNarrow ? 'flex flex-col items-center gap-3 relative' : 'relative'}`}>
           <div className={`flex items-center ${isNarrow ? 'flex-col gap-2 w-full justify-center' : 'justify-between gap-1 bg-slate-100/70 p-1.5 rounded-2xl border border-slate-200/60'}`}>
             
-            {user?.role !== UserRole.STUDENT && user?.role !== UserRole.PARENT && (
+            {canAccessShortcuts && (
               <button
                 type="button"
                 onClick={() => document.dispatchEvent(new CustomEvent('openShortcutHelp'))}

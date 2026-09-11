@@ -64,8 +64,17 @@ export const GlobalShortcuts: React.FC<GlobalShortcutsProps> = ({ user }) => {
     hasAccessToLink(link.path) && link.name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const isAuthorized = Boolean(
+    user && (
+      user.is_super_admin ||
+      user.role === UserRole.SUPER_ADMIN ||
+      user.role === UserRole.DIRECTOR ||
+      user.role === UserRole.SCHOOL_ADMIN
+    )
+  );
+
   useEffect(() => {
-    if (!user || user.role === UserRole.STUDENT || user.role === UserRole.PARENT) {
+    if (!isAuthorized) {
       return;
     }
 
@@ -89,9 +98,7 @@ export const GlobalShortcuts: React.FC<GlobalShortcutsProps> = ({ user }) => {
       // Ignorer les raccourcis clavier sur smartphone/tablette (< 1024px)
       if (window.innerWidth < 1024) return;
 
-      const isExternalUser = user?.role === UserRole.STUDENT || user?.role === UserRole.PARENT;
-
-      // Escape : Close Modals is allowed for all users as a general convenience
+      // Escape : Close Modals is allowed for all authorized shortcuts users
       if (e.key === 'Escape') {
         setShowHelp(false);
         setShowSearch(false);
@@ -109,11 +116,6 @@ export const GlobalShortcuts: React.FC<GlobalShortcutsProps> = ({ user }) => {
         
         // Also dispatch custom event for component modals
         document.dispatchEvent(new CustomEvent('globalCloseModals'));
-        return;
-      }
-
-      // Restrict all other global key combinations for external portal accounts (students and parents)
-      if (isExternalUser) {
         return;
       }
 
@@ -218,7 +220,11 @@ export const GlobalShortcuts: React.FC<GlobalShortcutsProps> = ({ user }) => {
       document.removeEventListener('openShortcutHelp', handleOpenHelp);
       document.removeEventListener('openShortcutSearch', handleOpenSearch);
     };
-  }, [navigate, user]);
+  }, [navigate, user, isAuthorized]);
+
+  if (!isAuthorized) {
+    return null;
+  }
 
   return (
     <>
