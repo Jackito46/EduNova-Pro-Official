@@ -62,30 +62,56 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Navigation HTML : NetworkFirst avec fallback cache
+  // Navigation HTML : Stratégie Anti-Cold Start & 100% Hors-ligne
+  // Intercepte et bloque la page d'attente/réveil Render pour afficher instantanément EduNova
   if (event.request.mode === 'navigate') {
     event.respondWith(
-      fetch(event.request)
-        .then((networkResponse) => {
+      (async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2500);
+
+        try {
+          const networkResponse = await fetch(event.request, { signal: controller.signal });
+          clearTimeout(timeoutId);
+
           if (networkResponse && networkResponse.status === 200) {
+            const clone = networkResponse.clone();
+            const text = await clone.text();
+
+            // Si c'est la page noire de démarrage ou de réveil Render
+            const isRenderWakeup = 
+              text.includes('WELCOME TO RENDER') ||
+              text.includes('APPLICATION LOADING') ||
+              text.includes('SERVICE WAKING UP') ||
+              text.includes('START BUILDING ON RENDER') ||
+              text.includes('INCOMING HTTP REQUEST DETECTED');
+
+            if (isRenderWakeup) {
+              console.warn('[EduNova SW Fallback] 🛡️ Page Render bloquée. Restitution du Shell EduNova.');
+              const cached = (await caches.match('/index.html')) || (await caches.match(event.request));
+              if (cached) return cached;
+            }
+
             const responseToCache = networkResponse.clone();
             caches.open(CACHE_NAME).then((cache) => {
               cache.put(event.request, responseToCache);
             });
+            return networkResponse;
           }
-          return networkResponse;
-        })
-        .catch(async () => {
+          throw new Error('Bad network response');
+        } catch (err) {
+          clearTimeout(timeoutId);
           const cachedResponse = await caches.match(event.request);
           if (cachedResponse) return cachedResponse;
           const cachedIndex = await caches.match('/index.html');
           if (cachedIndex) return cachedIndex;
-          return new Response('Mode hors-ligne', {
+          return new Response('Mode hors-ligne EduNova Pro', {
             status: 503,
             statusText: 'Service Unavailable',
             headers: new Headers({ 'Content-Type': 'text/plain; charset=utf-8' })
           });
-        })
+        }
+      })()
     );
     return;
   }

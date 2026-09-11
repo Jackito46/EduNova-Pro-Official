@@ -2,6 +2,14 @@ services:
   - type: web
     name: edunova-pro
     env: docker
-    plan: free
+    plan: starter # Starter plan prevents container spin-down / cold starts (no Render waiting screen)
     dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
     autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: "3000"
+      - key: KEEP_ALIVE_ENABLED
+        value: "true"

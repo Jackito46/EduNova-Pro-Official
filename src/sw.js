@@ -60,28 +60,47 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// 3. Stratégie NetworkFirst pour les requêtes de navigation HTML
-// Garantit la fraîcheur de l'application tout en conservant le mode 100% hors-ligne
-const navigationStrategy = new NetworkFirst({
-  cacheName: CACHE_NAMES.html,
-  networkTimeoutSeconds: 3,
-  plugins: [
-    new ExpirationPlugin({
-      maxEntries: 5,
-      maxAgeSeconds: 24 * 60 * 60, // 24 heures
-      purgeOnQuotaError: true, // Libère automatiquement l'espace si l'appareil manque de stockage
-    }),
-  ],
-});
-
+// 3. Stratégie Navigation HTML anti-Cold Start & 100% Hors-ligne
+// Intercepte et bloque formellement les pages de réveil d'hébergeur (Render Cold Start)
+// pour garantir que l'utilisateur voit toujours l'interface EduNova Pro sans latence.
 registerRoute(
   new NavigationRoute(
     async (params) => {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
+
       try {
-        return await navigationStrategy.handle(params);
+        const response = await fetch(params.event.request, { signal: controller.signal });
+        clearTimeout(timeoutId);
+
+        if (response && response.status === 200) {
+          const clone = response.clone();
+          const text = await clone.text();
+
+          // Détection stricte de la page noire de démarrage / réveil de Render
+          const isRenderWakeup = 
+            text.includes('WELCOME TO RENDER') ||
+            text.includes('APPLICATION LOADING') ||
+            text.includes('SERVICE WAKING UP') ||
+            text.includes('START BUILDING ON RENDER') ||
+            text.includes('INCOMING HTTP REQUEST DETECTED');
+
+          if (isRenderWakeup) {
+            console.warn('[EduNova SW] 🛡️ Page de réveil Render interceptée et rejetée. Affichage instantané du Shell EduNova en cache.');
+            const cached = (await matchPrecache('/index.html')) || (await caches.match('/index.html'));
+            if (cached) return cached;
+          }
+
+          // Réponse légitime : mise à jour du cache HTML
+          const cache = await caches.open(CACHE_NAMES.html);
+          await cache.put(params.event.request, response.clone());
+          return response;
+        }
+        throw new Error(`HTTP status: ${response ? response.status : 'no response'}`);
       } catch (err) {
-        // Fallback ultime sur le index.html préchargé en mode 100% hors-ligne
-        const precachedHtml = await matchPrecache('/index.html');
+        clearTimeout(timeoutId);
+        // Fallback immédiat sur le App Shell préchargé
+        const precachedHtml = (await matchPrecache('/index.html')) || (await caches.match('/index.html'));
         if (precachedHtml) {
           return precachedHtml;
         }

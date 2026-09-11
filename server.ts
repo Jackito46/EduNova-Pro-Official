@@ -53,10 +53,29 @@ async function startServer() {
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+  // =========================================================================
+  // RENDER & CLOUD KEEP-ALIVE DAEMON (Anti-Cold-Start / Veille Automatique)
+  // =========================================================================
+  let appExternalUrl = (process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || process.env.KEEP_ALIVE_URL || '').trim();
+
+  // Détection automatique de l'URL publique dès la première requête
+  app.use((req, res, next) => {
+    if (!appExternalUrl && req.headers.host && !req.headers.host.includes('localhost') && !req.headers.host.includes('127.0.0.1')) {
+      const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+      appExternalUrl = `${proto}://${req.headers.host}`;
+      console.log(`[Keep-Alive] 🌐 URL publique de l'application auto-détectée : ${appExternalUrl}`);
+    }
+    next();
+  });
+
   // Health check endpoint
   app.get('/api/health', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.json({ 
       status: 'ok', 
+      app: 'EduNova Pro',
+      uptimeSeconds: Math.floor(process.uptime()),
+      keepAliveActive: true,
       supabaseConfigured: !!supabaseUrl,
       timestamp: new Date().toISOString() 
     });
@@ -3522,6 +3541,29 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${PORT}`);
+
+    // Démarrage du daemon de maintien actif (Self-Ping toutes les 9 minutes)
+    // Render met le service en veille après 15 minutes d'inactivité sur le plan gratuit.
+    // Ce ping vers l'URL externe réinitialise le décompte Render.
+    const PING_INTERVAL_MS = 9 * 60 * 1000; // 9 minutes
+    setInterval(async () => {
+      const target = appExternalUrl || process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
+      if (!target) return;
+
+      try {
+        const cleanUrl = target.replace(/\/$/, '');
+        const healthUrl = `${cleanUrl}/api/health?source=self-keepalive`;
+        const pingRes = await fetch(healthUrl, {
+          headers: { 'User-Agent': 'EduNova-KeepAlive-Daemon/1.0' },
+          signal: AbortSignal.timeout(8000)
+        });
+        if (pingRes.ok) {
+          console.log(`[Keep-Alive] 🟢 Auto-ping réussi vers ${cleanUrl} (${new Date().toLocaleTimeString('fr-FR')}) - Veille Render prévenue.`);
+        }
+      } catch (err: any) {
+        // En cas d'indisponibilité momentanée, on réessaie au tour suivant
+      }
+    }, PING_INTERVAL_MS);
   });
 }
 

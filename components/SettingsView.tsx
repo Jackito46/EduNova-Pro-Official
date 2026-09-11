@@ -1719,13 +1719,62 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   }
 
   const tabs = [
-    { id: 'school', label: 'Profil Établissement', icon: School },
-    ...((school?.has_multi_campus) ? [{ id: 'campuses', label: 'Filières / Annexes', icon: MapPin }] : []),
-    { id: 'academic', label: terminology.academicYears, icon: Calendar },
-    { id: 'finance', label: 'Finance & Taux', icon: CircleDollarSign },
-    { id: 'payment_methods', label: 'Modes de Règlement & Banques', icon: Wallet },
-    { id: 'gateways', label: 'Passerelles de Paiement & Clés API', icon: Key },
-    { id: 'security', label: 'Sécurité', icon: Shield }
+    { 
+      id: 'school', 
+      label: 'Profil Établissement', 
+      labelDesktopCompact: 'Profil Établissement',
+      labelTablet: 'Profil',
+      labelMobile: 'Profil',
+      icon: School 
+    },
+    ...((school?.has_multi_campus) ? [{ 
+      id: 'campuses', 
+      label: 'Filières / Annexes', 
+      labelDesktopCompact: 'Filières & Annexes',
+      labelTablet: 'Annexes',
+      labelMobile: 'Annexes',
+      icon: MapPin 
+    }] : []),
+    { 
+      id: 'academic', 
+      label: terminology.academicYears, 
+      labelDesktopCompact: terminology.academicYears,
+      labelTablet: 'Années Scolaires',
+      labelMobile: 'Années',
+      icon: Calendar 
+    },
+    { 
+      id: 'finance', 
+      label: 'Finance & Taux', 
+      labelDesktopCompact: 'Finance & Taux',
+      labelTablet: 'Finance & Taux',
+      labelMobile: 'Finance',
+      icon: CircleDollarSign 
+    },
+    { 
+      id: 'payment_methods', 
+      label: 'Modes de Règlement & Banques', 
+      labelDesktopCompact: 'Modes de Règlement',
+      labelTablet: 'Modes de Règlement',
+      labelMobile: 'Règlements',
+      icon: Wallet 
+    },
+    { 
+      id: 'gateways', 
+      label: 'Passerelles de Paiement & Clés API', 
+      labelDesktopCompact: 'Passerelles & Clés API',
+      labelTablet: 'Passerelles & API',
+      labelMobile: 'Passerelles API',
+      icon: Key 
+    },
+    { 
+      id: 'security', 
+      label: 'Sécurité', 
+      labelDesktopCompact: 'Sécurité',
+      labelTablet: 'Sécurité',
+      labelMobile: 'Sécurité',
+      icon: Shield 
+    }
   ];
 
   return (
@@ -1761,21 +1810,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
      </div>
 
      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-       <div className="lg:col-span-4 xl:col-span-3 space-y-6">
+       <div className="lg:col-span-4 xl:col-span-4 2xl:col-span-3 space-y-6">
         <div className="bg-white p-2 sm:p-2.5 lg:p-3 rounded-2xl shadow-xs border border-slate-200/80 flex flex-row lg:flex-col gap-1.5 sm:gap-2 overflow-x-auto lg:overflow-visible no-scrollbar">
          {tabs.map(item => (
           <button 
            key={item.id} 
            onClick={() => setActiveTab(item.id as SettingsTab)}
            title={item.label}
-           className={`shrink-0 lg:shrink w-auto lg:w-full flex items-center gap-3 px-3.5 sm:px-4 py-3 rounded-xl text-xs xl:text-[13px] font-bold tracking-tight transition-all whitespace-nowrap cursor-pointer ${
+           className={`shrink-0 lg:shrink w-auto lg:w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-3.5 xl:px-4 py-2.5 sm:py-3 rounded-xl text-xs xl:text-[13px] font-bold tracking-tight transition-all cursor-pointer text-left ${
              activeTab === item.id 
                ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10' 
                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
            }`}
           >
            <item.icon size={18} className={`shrink-0 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
-           <span className="whitespace-nowrap">{item.label}</span>
+           <span className="min-w-0 flex-1 truncate">
+             {/* Écrans 2XL et ultra-larges (≥ 1536px) : Libellé exhaustif */}
+             <span className="hidden 2xl:inline">{item.label}</span>
+             {/* PC Portables 14" et desktop compact (1024px à 1535px) : Libellé optimisé anti-débordement */}
+             <span className="hidden lg:inline 2xl:hidden">{item.labelDesktopCompact}</span>
+             {/* Tablettes (640px à 1023px) : Libellé fluide */}
+             <span className="hidden sm:inline lg:hidden">{item.labelTablet}</span>
+             {/* Mobiles (< 640px) : Libellé compact pour navigation tactile */}
+             <span className="sm:hidden">{item.labelMobile}</span>
+           </span>
           </button>
          ))}
         </div>
@@ -1823,7 +1881,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        )}
       </div>
 
-      <div className="lg:col-span-8 xl:col-span-9">
+      <div className="lg:col-span-8 xl:col-span-8 2xl:col-span-9">
        {activeTab === 'school' && (
          <div className="space-y-3 sm:space-y-3.5 animate-in slide-in-from-right duration-500">
            {!canManageAllCampuses && (

@@ -407,7 +407,8 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
-                  Modes de Règlement & Banques
+                  <span className="hidden sm:inline">Modes de Règlement & Banques</span>
+                  <span className="sm:hidden">Modes de Règlement</span>
                 </h3>
                 <span className="hidden xs:inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Trésorerie
