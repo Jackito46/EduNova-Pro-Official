@@ -1266,7 +1266,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                         {(telemetry?.apiLimits?.liveUsage?.todayRequestsRemaining ?? 1500).toLocaleString('fr-FR')}
                       </span>
                       <span className="text-xs font-bold text-slate-500 ml-1">
-                        / {(telemetry?.apiLimits?.liveUsage?.todayRequestsLimit ?? 1500).toLocaleString('fr-FR')} dispo
+                        restantes / {(telemetry?.apiLimits?.liveUsage?.todayRequestsLimit ?? 1500).toLocaleString('fr-FR')} max
                       </span>
                     </div>
                     <span className={`text-xs font-mono font-black px-2 py-0.5 rounded ${
@@ -1319,7 +1319,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                         {telemetry?.apiLimits?.liveUsage?.rpmRemaining ?? 15}
                       </span>
                       <span className="text-xs font-bold text-slate-500 ml-1">
-                        / {telemetry?.apiLimits?.liveUsage?.rpmLimit ?? 15} RPM dispo
+                        dispo / {telemetry?.apiLimits?.liveUsage?.rpmLimit ?? 15} RPM max
                       </span>
                     </div>
                     <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-indigo-100 text-indigo-700">
@@ -1360,7 +1360,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                         {(telemetry?.apiLimits?.liveUsage?.todayTokensRemaining ?? 1000000).toLocaleString('fr-FR')}
                       </span>
                       <span className="text-xs font-bold text-slate-500 ml-1">
-                        / 1 000 000 TPM
+                        restants / 1 000 000 TPM
                       </span>
                     </div>
                     <span className="text-xs font-mono font-black px-2 py-0.5 rounded bg-blue-100 text-blue-700">
