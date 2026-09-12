@@ -29,7 +29,10 @@ import {
   Sparkles,
   Wallet,
   Trash2,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Layers,
+  FileText,
+  Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
@@ -977,70 +980,135 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
     : 0;
   const recoveryRate = selectedStudent ? Math.min(100, (selectedStudent.paid / selectedStudent.totalDue) * 100) : 0;
 
+  // Calcul mathématique et ergonomique de la pagination du Relevé de Compte
+  // Rythme visuel compact : Page 1 accueille les en-têtes, identités, engagements et jusqu'à 6 versements
+  const MAX_PAYMENTS_PAGE_1 = 6;
+  const MAX_PAYMENTS_SUBSEQUENT_PAGE = 12;
+
+  const validPayments = useMemo(() => {
+    return studentHistory.filter(
+      p => p.status !== 'ANNULE' && !p.payment_method?.includes('REJETÉ')
+    );
+  }, [studentHistory]);
+
+  const relevePages = useMemo(() => {
+    if (!selectedStudent) return [];
+
+    if (validPayments.length <= MAX_PAYMENTS_PAGE_1) {
+      return [{
+        pageNumber: 1,
+        totalPages: 1,
+        isFirstPage: true,
+        isLastPage: true,
+        showCommitments: true,
+        showFinalBalance: true,
+        payments: validPayments,
+      }];
+    }
+
+    const pages: Array<{
+      pageNumber: number;
+      isFirstPage: boolean;
+      isLastPage: boolean;
+      showCommitments: boolean;
+      showFinalBalance: boolean;
+      payments: any[];
+    }> = [];
+
+    // Page 1
+    pages.push({
+      pageNumber: 1,
+      isFirstPage: true,
+      isLastPage: false,
+      showCommitments: true,
+      showFinalBalance: false,
+      payments: validPayments.slice(0, MAX_PAYMENTS_PAGE_1),
+    });
+
+    let remaining = validPayments.slice(MAX_PAYMENTS_PAGE_1);
+    let currentPageNum = 2;
+
+    while (remaining.length > 0) {
+      const canFitWithBalance = remaining.length <= 8;
+      const chunkSize = canFitWithBalance ? remaining.length : MAX_PAYMENTS_SUBSEQUENT_PAGE;
+      const currentChunk = remaining.slice(0, chunkSize);
+      remaining = remaining.slice(chunkSize);
+      const isLast = remaining.length === 0;
+
+      pages.push({
+        pageNumber: currentPageNum,
+        isFirstPage: false,
+        isLastPage: isLast,
+        showCommitments: false,
+        showFinalBalance: isLast,
+        payments: currentChunk,
+      });
+      currentPageNum++;
+    }
+
+    const total = pages.length;
+    return pages.map(p => ({ ...p, totalPages: total }));
+  }, [validPayments, selectedStudent]);
+
   const exportToPDF = async () => {
     if (!selectedStudent) return;
     setIsExporting(true);
     try {
-      const element = document.getElementById('releve-compte-print');
-      if (!element) return;
-
-      // Set a fixed width for consistent A4 aspect ratio (approx 800px)
-      const originalWidth = element.style.width;
-      element.style.width = '800px';
-
-      // Wait a bit for layout to settle
-      await new Promise(resolve => setTimeout(resolve, 300));
-
-      const canvas = await html2canvas(element, {
-        scale: 2, // Scale 2 is usually enough and more stable
-        useCORS: true,
-        logging: true,
-        backgroundColor: '#ffffff',
-        windowWidth: 800,
-        imageTimeout: 30000,
-        onclone: (clonedDoc) => {
-          fixOklchForCanvas(clonedDoc);
-        }
-      });
-
-      // Restore original width
-      element.style.width = originalWidth;
-
-      const imgData = canvas.toDataURL('image/png');
+      const pageElements = document.querySelectorAll<HTMLElement>('.releve-page-sheet');
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
       });
 
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = pdf.internal.pageSize.getHeight();
-      
-      // Calculate dimensions to fit A4 with 10mm margins
-      const margin = 10;
-      const contentWidth = pdfWidth - (2 * margin);
-      const imgProps = pdf.getImageProperties(imgData);
-      const contentHeight = (imgProps.height * contentWidth) / imgProps.width;
+      if (pageElements && pageElements.length > 0) {
+        for (let i = 0; i < pageElements.length; i++) {
+          const el = pageElements[i];
+          if (i > 0) pdf.addPage();
 
-      let heightLeft = contentHeight;
-      let position = margin;
+          const originalWidth = el.style.width;
+          el.style.width = '800px';
 
-      // Add the first page
-      pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
-      heightLeft -= (pdfHeight - (2 * margin));
+          await new Promise(resolve => setTimeout(resolve, 150));
 
-      // Add subsequent pages if needed
-      while (heightLeft > 0) {
-        pdf.addPage();
-        position = heightLeft - contentHeight + margin;
-        pdf.addImage(imgData, 'PNG', margin, position, contentWidth, contentHeight);
-        heightLeft -= (pdfHeight - (2 * margin));
+          const canvas = await html2canvas(el, {
+            scale: 2,
+            useCORS: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            windowWidth: 800,
+            imageTimeout: 30000,
+            onclone: (clonedDoc) => {
+              fixOklchForCanvas(clonedDoc);
+            }
+          });
+
+          el.style.width = originalWidth;
+          const imgData = canvas.toDataURL('image/png');
+          pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+        }
+      } else {
+        const element = document.getElementById('releve-compte-print');
+        if (!element) return;
+        const canvas = await html2canvas(element, {
+          scale: 2,
+          useCORS: true,
+          logging: false,
+          backgroundColor: '#ffffff',
+          windowWidth: 800,
+          onclone: (clonedDoc) => fixOklchForCanvas(clonedDoc)
+        });
+        const imgData = canvas.toDataURL('image/png');
+        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
       }
 
       addSecurityWatermark(pdf, { user, ipAddress });
-      pdf.save(`Releve_Compte_${formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName.replace(/\s+/g, '_')}.pdf`);
+      const studentName = formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName.replace(/\s+/g, '_');
+      pdf.save(`Releve_Compte_${studentName}.pdf`);
+      toast.success("Relevé de compte exporté en PDF avec succès");
     } catch (error) {
       console.error("Erreur export PDF:", error);
+      toast.error("Erreur lors de l'exportation du PDF");
     } finally {
       setIsExporting(false);
     }
@@ -1986,315 +2054,529 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-      {/* Relevé de Compte Modal */}
+      {/* Relevé de Compte Modal - Format Moderne, Fluide, Compact & Multi-Pages (École Connectée) */}
       {printPreview && selectedStudent && (
-        <div className="fixed inset-0 z-[1000] bg-slate-950/95 backdrop-blur-2xl flex items-center justify-center p-0 md:p-4 print:hidden animate-in fade-in duration-300 overflow-y-auto">
-          <div className="w-full max-w-4xl bg-white shadow-2xl rounded-none md:rounded-[2rem] overflow-hidden flex flex-col my-auto border border-white/10">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-white sticky top-0 z-10">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-blue-600 shadow-inner">
-                  <Printer size={24} />
+        <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-3 md:p-6 print:static print:inset-auto print:bg-white print:backdrop-blur-none animate-in fade-in duration-200 overflow-hidden print:overflow-visible print:p-0 print:m-0">
+          <div className="w-full h-full max-w-5xl flex flex-col bg-slate-100 sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200/80 print:max-w-none print:w-full print:h-auto print:block print:shadow-none print:bg-white print:rounded-none">
+            
+            {/* Header Toolbar Moderne & Compact */}
+            <div className="px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-200/90 flex items-center justify-between bg-white shrink-0 shadow-xs z-20">
+              <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-br from-indigo-50 to-indigo-100/80 text-indigo-600 flex items-center justify-center border border-indigo-200/60 shadow-xs shrink-0">
+                  <Printer size={19} className="stroke-[2.2]" />
                 </div>
-                <div>
-                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Aperçu du Relevé de Compte</h3>
-                  <p className="text-xs text-slate-400 font-medium mt-0.5">Format standard professionnel {schoolDetails?.name || 'École'}</p>
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight leading-tight truncate">
+                    Aperçu du Relevé de Compte
+                  </h3>
+                  <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">
+                    Format officiel certifié • {schoolDetails?.name || 'École Connectée'}
+                  </p>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+
+              {/* Navigation de Pagination (si multi-pages) */}
+              {relevePages.length > 1 && (
+                <div className="hidden lg:flex items-center gap-1.5 px-3 py-1 bg-slate-100/90 rounded-lg border border-slate-200 text-xs font-semibold text-slate-700">
+                  <Layers size={13} className="text-indigo-600 shrink-0" />
+                  <span>Document {relevePages.length} Pages</span>
+                  <span className="text-slate-300">|</span>
+                  <div className="flex items-center gap-1">
+                    {relevePages.map(page => (
+                      <button 
+                        key={page.pageNumber} 
+                        onClick={() => document.getElementById(`releve-page-${page.pageNumber}`)?.scrollIntoView({ behavior: 'smooth' })} 
+                        className="px-2 py-0.5 rounded text-[10px] font-bold bg-white hover:bg-indigo-50 hover:text-indigo-600 text-slate-700 border border-slate-200 transition-all cursor-pointer"
+                      >
+                        Page {page.pageNumber}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Actions d'Export et Impression */}
+              <div className="flex items-center gap-2 sm:gap-3 shrink-0">
                 <button 
                   onClick={exportToPDF}
                   disabled={isExporting}
-                  className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-lg shadow-emerald-200 transition-all active:scale-95"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm shadow-emerald-600/20 transition-all cursor-pointer"
                 >
-                  {isExporting ? <RefreshCcw size={18} className="animate-spin" /> : <FileDown size={18} />}
-                  EXPORTER PDF
+                  {isExporting ? <RefreshCcw size={15} className="animate-spin" /> : <FileDown size={15} />}
+                  <span className="hidden xs:inline">EXPORTER </span>PDF
                 </button>
                 <button 
                   onClick={() => window.print()}
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-black flex items-center gap-2 shadow-lg shadow-blue-200 transition-all active:scale-95"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-all cursor-pointer"
                 >
-                  <Printer size={18} /> IMPRIMER
+                  <Printer size={15} />
+                  <span>IMPRIMER</span>
                 </button>
                 <button 
                   onClick={() => setPrintPreview(false)}
-                  className="w-10 h-10 flex items-center justify-center hover:bg-slate-100 rounded-xl text-slate-400 transition-colors"
+                  className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center hover:bg-slate-100 rounded-xl text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                  title="Fermer l'aperçu"
                 >
-                  <X size={24} />
+                  <X size={20} />
                 </button>
               </div>
             </div>
 
-            <div className="flex-1 p-8 md:p-12 overflow-y-auto bg-slate-50/50">
-              <div id="releve-compte-print" className="max-w-3xl mx-auto shadow-2xl print:shadow-none print:m-0 print:w-full p-10 border-0 rounded-[2rem] bg-white relative overflow-hidden">
-                {/* Watermark/Decoration */}
-                <div className="absolute top-0 right-0 w-64 h-64 bg-slate-50 rounded-full -mr-32 -mt-32 pointer-events-none opacity-50"></div>
-                
-                {/* Header */}
-                <div className="relative flex justify-between items-start mb-12">
-                  <div className="flex gap-6 items-center">
-                    {schoolDetails?.logo_url ? (
-                      <div className="w-24 h-24 bg-white rounded-2xl shadow-sm border border-slate-100 p-2 flex items-center justify-center overflow-hidden">
-                        <img 
-                          src={schoolDetails.logo_url} 
-                          alt="Logo" 
-                          className="max-w-full max-h-full object-contain"
-                          referrerPolicy="no-referrer"
-                        />
-                      </div>
-                    ) : (
-                      <div className="w-24 h-24 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-3xl font-black shadow-lg">
-                        {schoolDetails?.name?.substring(0, 1) || 'E'}
-                      </div>
-                    )}
-                    <div>
-                      <h1 className="text-2xl font-black text-slate-900 uppercase tracking-tighter leading-none mb-2">{schoolDetails?.name}</h1>
-                      <div className="space-y-1">
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                          <Target size={10} className="text-slate-300" /> {schoolDetails?.address}
-                        </p>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                          <RefreshCcw size={10} className="text-slate-300" /> {schoolDetails?.phone} {schoolDetails?.email && `| ${schoolDetails.email}`}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <div className="inline-block px-4 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-[0.2em] mb-4 shadow-lg shadow-slate-200">
-                      RELEVÉ DE COMPTE
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date d'émission</p>
-                      <p className="text-sm font-black text-slate-900">{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
-                    </div>
-                  </div>
-                </div>
+            {/* Corps Déroulant avec Rendu Multi-Pages A4 */}
+            <div className="flex-1 p-2 sm:p-5 md:p-6 overflow-y-auto bg-slate-200/60 flex flex-col items-center">
+              <div id="releve-compte-print" className="w-full flex flex-col items-center gap-5 sm:gap-6">
+                {relevePages.map((pageData) => (
+                  <React.Fragment key={pageData.pageNumber}>
+                    <div
+                      id={`releve-page-${pageData.pageNumber}`}
+                      className="releve-page-sheet w-full max-w-[800px] min-h-[1050px] bg-white rounded-xl sm:rounded-2xl shadow-xl border border-slate-200/80 p-5 sm:p-7 md:p-8 flex flex-col justify-between relative print:shadow-none print:border-none print:m-0 print:p-0 print:w-full print:min-h-0 print:rounded-none"
+                    >
+                      {/* Filigrane décoratif d'arrière-plan */}
+                      <div className="absolute top-0 right-0 w-48 h-48 bg-slate-50/70 rounded-full -mr-24 -mt-24 pointer-events-none opacity-40"></div>
 
-                {/* Student Info Card */}
-                <div className="grid grid-cols-2 gap-8 mb-10">
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                      <User size={64} />
-                    </div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Informations {terminology.student}</p>
-                    <div className="relative z-10">
-                      <p className="text-2xl font-black text-slate-900 uppercase tracking-tight leading-tight">{selectedStudent.fullName}</p>
-                      <div className="flex items-center gap-2 mt-2">
-                        <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[10px] font-black text-slate-500 uppercase tracking-widest">MATRICULE</span>
-                        <p className="text-xs font-bold text-slate-600 font-mono">{selectedStudent.id.substring(0, 8).toUpperCase()}</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="p-6 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                      <BadgeCheck size={64} />
-                    </div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-4">Détails {terminology.tuition.includes('Académique') ? 'Académiques' : 'Scolaires'}</p>
-                    <div className="grid grid-cols-2 gap-4 relative z-10">
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{terminology.option} / Niveau</p>
-                        <p className="text-base font-black text-slate-900">{selectedStudent.classe}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Année {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</p>
-                        <p className="text-base font-black text-slate-900">{selectedStudent.academicYear}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Financial Summary Table */}
-                <div className="mb-10 overflow-hidden rounded-2xl border border-slate-100 shadow-sm">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr className="bg-slate-50">
-                        <th className="py-4 px-6 text-left text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">Désignation des Frais</th>
-                        <th className="py-4 px-6 text-right text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100">Montant (HTG)</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-50">
-                      <tr>
-                        <td className="py-4 px-6 text-sm font-bold text-slate-700">Frais d'Inscription / Réinscription</td>
-                        <td className="py-4 px-6 text-right font-mono font-black text-slate-900">{selectedStudent.inscriptionFee.toLocaleString()}</td>
-                      </tr>
-                      <tr>
-                        <td className="py-4 px-6 text-sm font-bold text-slate-700">{terminology.tuition}</td>
-                        <td className="py-4 px-6 text-right font-mono font-black text-slate-900">{selectedStudent.tuitionFee.toLocaleString()}</td>
-                      </tr>
-                      {selectedStudent.miscFee > 0 && (
-                        <tr>
-                          <td className="py-4 px-6 text-sm font-bold text-slate-700">Frais Divers Obligatoires</td>
-                          <td className="py-4 px-6 text-right font-mono font-black text-slate-900">{selectedStudent.miscFee.toLocaleString()}</td>
-                        </tr>
-                      )}
-                      {selectedStudent.campaignsFee > 0 && (
-                        <tr>
-                          <td className="py-4 px-6 text-sm font-bold text-slate-700">Frais d'Événements / Campagnes (Ad-Hoc)</td>
-                          <td className="py-4 px-6 text-right font-mono font-black text-slate-900">{selectedStudent.campaignsFee.toLocaleString()}</td>
-                        </tr>
-                      )}
-                      {selectedStudent.tuitionAddition > 0 && (
-                        <tr>
-                          <td className="py-4 px-6 text-sm font-bold text-slate-700">Ajustements (Ajouts)</td>
-                          <td className="py-4 px-6 text-right font-mono font-black text-indigo-600">+{selectedStudent.tuitionAddition.toLocaleString()}</td>
-                        </tr>
-                      )}
-                      {selectedStudent.totalDiscount > 0 && (
-                        <tr className="bg-rose-50/30">
-                          <td className="py-4 px-6 text-sm font-bold italic text-rose-600">Réductions / Bourses Accordées</td>
-                          <td className="py-4 px-6 text-right font-mono font-black text-rose-600">-{selectedStudent.totalDiscount.toLocaleString()}</td>
-                        </tr>
-                      )}
-                    </tbody>
-                    <tfoot>
-                      <tr className="bg-slate-900 text-white">
-                        <td className="py-5 px-6 text-xs font-black uppercase tracking-[0.2em]">Total Engagement Session</td>
-                        <td className="py-5 px-6 text-right font-mono text-2xl font-black tracking-tighter">{selectedStudent.totalDue.toLocaleString()}</td>
-                      </tr>
-                    </tfoot>
-                  </table>
-                </div>
-
-                {/* Payments History */}
-                <div className="mb-10">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-8 h-8 bg-emerald-50 rounded-lg flex items-center justify-center text-emerald-600">
-                      <History size={16} />
-                    </div>
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Historique des Versements Effectués</p>
-                  </div>
-                  <div className="rounded-2xl border border-slate-100 overflow-hidden">
-                    <table className="w-full border-collapse">
-                      <thead>
-                        <tr className="bg-slate-50/50">
-                          <th className="py-3 px-6 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Date</th>
-                          <th className="py-3 px-6 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Référence</th>
-                          <th className="py-3 px-6 text-left text-[10px] font-bold text-slate-400 uppercase tracking-widest">Nature</th>
-                          <th className="py-3 px-6 text-right text-[10px] font-bold text-slate-400 uppercase tracking-widest">Montant</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-50">
-                        {studentHistory.filter(p => p.status !== 'ANNULE' && !p.payment_method?.includes('REJETÉ')).map((p) => (
-                          <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
-                            <td className="py-3 px-6 text-xs font-bold text-slate-600">{new Date(p.created_at).toLocaleDateString()}</td>
-                            <td className="py-3 px-6 text-xs font-mono text-slate-400">RCP-{p.id.substring(0,8).toUpperCase()}</td>
-                            <td className="py-3 px-6 text-xs font-bold text-slate-700">{p.campaign?.name ? `Campagne: ${p.campaign.name}` : p.ad_hoc_campaign_id ? 'Frais de Campagne' : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) ? 'Frais Académiques' : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") ? 'Inscription' : (p.nature || p.type || p.fee_type || 'Frais Divers'))}</td>
-                            <td className="py-3 px-6 text-right font-mono font-black text-slate-900">
-                              {p.currency === 'USD' ? (
-                                <span>
-                                  ${Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
-                                  <span className="text-[10px] text-slate-400 font-normal ml-1">
-                                    (≈ {Number(p.amount_htg_equivalent || (Number(p.amount || 0) * (p.exchange_rate_applied || 140))).toLocaleString()} HTG)
-                                  </span>
-                                </span>
-                              ) : (
-                                <span>{Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                        {studentHistory.length === 0 && (
-                          <tr>
-                            <td colSpan={4} className="py-10 text-center text-xs italic text-slate-400">Aucun versement enregistré pour cette période.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Final Balance Card */}
-                <div className="grid grid-cols-2 gap-10 pt-10 border-t-2 border-slate-900">
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center px-4">
-                      <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Payé à ce jour</p>
-                      <p className="text-base font-black text-emerald-600">
-                        {selectedStudent.totalPaidUSD > 0 && selectedStudent.totalPaidHTG > 0
-                          ? `${selectedStudent.totalPaidHTG.toLocaleString()} HTG + $${selectedStudent.totalPaidUSD.toFixed(2)} USD`
-                          : selectedStudent.totalPaidUSD > 0
-                          ? `$${selectedStudent.totalPaidUSD.toFixed(2)} USD (≈ ${selectedStudent.paid.toLocaleString()} HTG)`
-                          : `${selectedStudent.paid.toLocaleString()} HTG`}
-                      </p>
-                    </div>
-                    <div className="p-6 rounded-3xl bg-slate-900 shadow-xl shadow-slate-200 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
-                        <DollarSign size={48} className="text-white" />
-                      </div>
-                      <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-2">Solde Restant Dû</p>
-                      {selectedStudent.isFullySettled ? (
-                        <div className="flex items-baseline gap-2 relative z-10">
-                          <p className="text-3xl font-black font-mono tracking-tighter text-emerald-400">
-                            0
-                          </p>
-                          <span className="text-xs font-bold text-emerald-400/70 uppercase tracking-widest">Compte Soldé</span>
-                        </div>
-                      ) : (
-                        <div className="relative z-10">
-                          {selectedStudent.remainingUSD > 0 && selectedStudent.remainingHTG > 0 ? (
-                            <div className="space-y-1">
-                              <p className="text-2xl font-black font-mono tracking-tighter text-white">
-                                {selectedStudent.remainingHTG.toLocaleString()} <span className="text-xs text-white/50">HTG</span>
-                              </p>
-                              <p className="text-xl font-black font-mono tracking-tighter text-emerald-400">
-                                + ${selectedStudent.remainingUSD.toFixed(2)} <span className="text-xs text-white/50">USD</span>
-                              </p>
-                              <p className="text-[10px] text-white/60 font-mono">
-                                (Équivalent total: ≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
-                              </p>
-                            </div>
-                          ) : selectedStudent.remainingUSD > 0 ? (
-                            <div className="space-y-1">
-                              <div className="flex items-baseline gap-2">
-                                <p className="text-3xl font-black font-mono tracking-tighter text-white">
-                                  ${selectedStudent.remainingUSD.toFixed(2)}
-                                </p>
-                                <span className="text-xs font-bold text-white/40 uppercase tracking-widest">USD</span>
+                      <div className="relative z-10 flex-1 flex flex-col">
+                        {/* En-tête : Page 1 = Grand En-tête Officiel ; Page 2+ = Sous-en-tête de suite */}
+                        {pageData.isFirstPage ? (
+                          <>
+                            {/* En-tête Institutionnel & Certification */}
+                            <div className="flex justify-between items-start mb-3 pb-3 border-b border-slate-100">
+                              <div className="flex gap-3 sm:gap-4 items-center min-w-0">
+                                {schoolDetails?.logo_url ? (
+                                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-xl shadow-2xs border border-slate-200/80 p-1.5 flex items-center justify-center overflow-hidden shrink-0">
+                                    <img 
+                                      src={schoolDetails.logo_url} 
+                                      alt="Logo" 
+                                      className="max-w-full max-h-full object-contain"
+                                      referrerPolicy="no-referrer"
+                                    />
+                                  </div>
+                                ) : (
+                                  <div className="w-14 h-14 sm:w-16 sm:h-16 bg-indigo-600 rounded-xl flex items-center justify-center text-white text-2xl font-black shadow-xs shrink-0">
+                                    {schoolDetails?.name?.substring(0, 1) || 'E'}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <h1 className="text-base sm:text-lg md:text-xl font-black text-slate-900 uppercase tracking-tight leading-tight mb-1 truncate">
+                                    {schoolDetails?.name || 'COLLÈGE DES INNOVATIONS'}
+                                  </h1>
+                                  <div className="space-y-0.5">
+                                    <p className="text-[9px] sm:text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                                      <Target size={10} className="text-slate-400 shrink-0" />
+                                      <span>{schoolDetails?.address || 'Port-au-Prince, Haïti'}</span>
+                                    </p>
+                                    <p className="text-[9px] sm:text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 truncate">
+                                      <RefreshCcw size={10} className="text-slate-400 shrink-0" />
+                                      <span>{schoolDetails?.phone} {schoolDetails?.email && `| ${schoolDetails.email}`}</span>
+                                    </p>
+                                  </div>
+                                </div>
                               </div>
-                              <p className="text-[10px] text-white/60 font-mono">
-                                (≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
+
+                              <div className="text-right shrink-0 pl-2">
+                                <div className="inline-block px-2.5 py-1 bg-slate-900 text-white rounded-md text-[9px] font-black uppercase tracking-[0.18em] mb-1.5 shadow-xs">
+                                  RELEVÉ DE COMPTE
+                                </div>
+                                <div className="space-y-0.5">
+                                  <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Date d'émission</p>
+                                  <p className="text-xs font-black text-slate-900 whitespace-nowrap">
+                                    {new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
+                                  </p>
+                                  <p className="text-[9px] font-mono font-bold text-slate-500">
+                                    Réf: #ST-{selectedStudent.id.substring(0, 8).toUpperCase()}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Cartes Informations Élève & Détails Scolaires (Compactes & Ergonomiques) */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3">
+                              {/* Carte Élève */}
+                              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/70 relative overflow-hidden flex flex-col justify-between">
+                                <div>
+                                  <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
+                                    <User size={10} className="text-slate-400" /> Informations {terminology.student}
+                                  </p>
+                                  <p className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight leading-tight truncate">
+                                    {selectedStudent.fullName}
+                                  </p>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1.5">
+                                  <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[8.5px] font-black text-slate-500 uppercase tracking-wider">
+                                    MATRICULE
+                                  </span>
+                                  <p className="text-xs font-bold text-slate-700 font-mono">
+                                    {selectedStudent.id.substring(0, 8).toUpperCase()}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* Carte Détails Scolaires */}
+                              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/70 relative overflow-hidden flex flex-col justify-between">
+                                <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
+                                  <BadgeCheck size={10} className="text-slate-400" /> Détails {terminology.tuition.includes('Académique') ? 'Académiques' : 'Scolaires'}
+                                </p>
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">{terminology.option} / Niveau</p>
+                                    <p className="text-xs sm:text-sm font-black text-slate-900 truncate">{selectedStudent.classe || 'N/A'}</p>
+                                  </div>
+                                  <div>
+                                    <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Année {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</p>
+                                    <p className="text-xs sm:text-sm font-black text-slate-900 truncate">{selectedStudent.academicYear || 'Session active'}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Tableau 1 : Désignation des Frais & Engagements Financiers */}
+                            <div className="mb-3 overflow-hidden rounded-xl border border-slate-200/80 shadow-2xs">
+                              <table className="w-full border-collapse text-left">
+                                <thead>
+                                  <tr className="bg-slate-100/90 text-slate-600">
+                                    <th className="py-2 px-3 text-[8.5px] font-black uppercase tracking-[0.15em]">Désignation des Frais</th>
+                                    <th className="py-2 px-3 text-right text-[8.5px] font-black uppercase tracking-[0.15em]">Montant Exigé (HTG)</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-slate-100 text-xs">
+                                  <tr className="hover:bg-slate-50/40">
+                                    <td className="py-1.5 px-3 font-semibold text-slate-700">Frais d'Inscription / Réinscription</td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{selectedStudent.inscriptionFee.toLocaleString()} HTG</td>
+                                  </tr>
+                                  <tr className="hover:bg-slate-50/40">
+                                    <td className="py-1.5 px-3 font-semibold text-slate-700">Frais de Scolarité ({terminology.tuition})</td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{selectedStudent.tuitionFee.toLocaleString()} HTG</td>
+                                  </tr>
+                                  {selectedStudent.miscFee > 0 && (
+                                    <tr className="hover:bg-slate-50/40">
+                                      <td className="py-1.5 px-3 font-semibold text-slate-700">Frais Divers Obligatoires</td>
+                                      <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{selectedStudent.miscFee.toLocaleString()} HTG</td>
+                                    </tr>
+                                  )}
+                                  {selectedStudent.campaignsFee > 0 && (
+                                    <tr className="hover:bg-slate-50/40">
+                                      <td className="py-1.5 px-3 font-semibold text-slate-700">Frais d'Événements / Campagnes (Ad-Hoc)</td>
+                                      <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{selectedStudent.campaignsFee.toLocaleString()} HTG</td>
+                                    </tr>
+                                  )}
+                                  {selectedStudent.tuitionAddition > 0 && (
+                                    <tr className="hover:bg-slate-50/40 bg-indigo-50/20">
+                                      <td className="py-1.5 px-3 font-semibold text-slate-700">Ajustements (Ajouts)</td>
+                                      <td className="py-1.5 px-3 text-right font-mono font-bold text-indigo-600">+{selectedStudent.tuitionAddition.toLocaleString()} HTG</td>
+                                    </tr>
+                                  )}
+                                  {selectedStudent.totalDiscount > 0 && (
+                                    <tr className="bg-rose-50/30">
+                                      <td className="py-1.5 px-3 font-semibold italic text-rose-700">Réductions / Bourses Accordées</td>
+                                      <td className="py-1.5 px-3 text-right font-mono font-bold text-rose-700">-{selectedStudent.totalDiscount.toLocaleString()} HTG</td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="bg-slate-900 text-white">
+                                    <td className="py-2 px-3 text-[9.5px] font-black uppercase tracking-[0.15em]">Total Engagement Session</td>
+                                    <td className="py-2 px-3 text-right font-mono text-sm sm:text-base font-black tracking-tight">{selectedStudent.totalDue.toLocaleString()} HTG</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </>
+                        ) : (
+                          /* Sous-en-tête de suite pour Page 2+ */
+                          <div className="flex justify-between items-center mb-3 pb-2 border-b border-slate-200">
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              {schoolDetails?.logo_url ? (
+                                <img src={schoolDetails.logo_url} alt="Logo" className="w-8 h-8 object-contain rounded-md" referrerPolicy="no-referrer" />
+                              ) : (
+                                <div className="w-8 h-8 rounded-md bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
+                                  {schoolDetails?.name?.substring(0, 1) || 'E'}
+                                </div>
+                              )}
+                              <div className="min-w-0">
+                                <p className="text-xs font-black text-slate-900 uppercase truncate leading-tight">{schoolDetails?.name}</p>
+                                <p className="text-[9.5px] font-semibold text-slate-500 truncate">
+                                  Relevé de Compte (Suite) — <strong className="text-slate-800">{selectedStudent.fullName}</strong> ({selectedStudent.id.substring(0, 8).toUpperCase()}) • {selectedStudent.classe}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-right shrink-0">
+                              <span className="text-[9px] font-mono font-bold bg-slate-100 text-slate-700 px-2 py-0.5 rounded border border-slate-200">
+                                Page {pageData.pageNumber} sur {pageData.totalPages}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Tableau 2 : Historique des Versements Effectués */}
+                        <div className="mb-3">
+                          <div className="flex items-center justify-between mb-1.5">
+                            <div className="flex items-center gap-1.5">
+                              <History size={13} className="text-emerald-600 shrink-0" />
+                              <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-[0.15em]">
+                                {pageData.isFirstPage ? 'Historique des Versements Effectués' : 'Versements Effectués (Suite)'}
                               </p>
                             </div>
-                          ) : (
-                            <div className="flex items-baseline gap-2">
-                              <p className="text-3xl font-black font-mono tracking-tighter text-white">
-                                {selectedStudent.remainingHTG.toLocaleString()}
-                              </p>
-                              <span className="text-xs font-bold text-white/40 uppercase tracking-widest">HTG</span>
+                            <span className="text-[9px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                              {validPayments.length} opération{validPayments.length > 1 ? 's' : ''} au total
+                            </span>
+                          </div>
+
+                          <div className="overflow-x-auto rounded-xl border border-slate-200/80">
+                            <table className="w-full min-w-[580px] border-collapse text-left">
+                              <thead>
+                                <tr className="bg-slate-50/90 text-slate-500">
+                                  <th className="py-2 px-2.5 text-[8px] font-bold uppercase tracking-wider whitespace-nowrap">Date</th>
+                                  <th className="py-2 px-2.5 text-[8px] font-bold uppercase tracking-wider whitespace-nowrap">Réf Quittance</th>
+                                  <th className="py-2 px-2.5 text-[8px] font-bold uppercase tracking-wider">Nature / Désignation</th>
+                                  <th className="py-2 px-2.5 text-center text-[8px] font-bold uppercase tracking-wider whitespace-nowrap">Mode</th>
+                                  <th className="py-2 px-2.5 text-center text-[8px] font-bold uppercase tracking-wider whitespace-nowrap">Taux Appliqué</th>
+                                  <th className="py-2 px-2.5 text-right text-[8px] font-bold uppercase tracking-wider whitespace-nowrap">Montant Encaissé</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-100 text-xs">
+                                {pageData.payments.map((p) => {
+                                  const isUSD = p.currency === 'USD';
+                                  const paidAmount = Number(p.amount || 0);
+                                  const appliedRate = Number(p.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
+                                  const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
+                                  const natureLabel = p.campaign?.name 
+                                    ? `Campagne: ${p.campaign.name}` 
+                                    : p.ad_hoc_campaign_id 
+                                    ? 'Frais de Campagne' 
+                                    : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
+                                    ? terminology.tuition 
+                                    : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
+                                    ? "Inscription" 
+                                    : (p.nature || p.type || p.fee_type || 'Frais Divers'));
+
+                                  return (
+                                    <tr key={p.id} className="hover:bg-slate-50/40 transition-colors">
+                                      <td className="py-1.5 px-2.5 text-[11px] font-medium text-slate-600 whitespace-nowrap">
+                                        {new Date(p.created_at || p.date).toLocaleDateString('fr-FR')}
+                                      </td>
+                                      <td className="py-1.5 px-2.5 text-[11px] font-mono text-slate-500 font-bold whitespace-nowrap">
+                                        RCP-{p.id.substring(0, 8).toUpperCase()}
+                                      </td>
+                                      <td className="py-1.5 px-2.5 text-[11px] font-bold text-slate-800">
+                                        {natureLabel}
+                                      </td>
+                                      <td className="py-1.5 px-2.5 text-center text-[10px] text-slate-600 whitespace-nowrap">
+                                        <span className="px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200 font-medium">
+                                          {p.payment_method || 'Cash'}
+                                        </span>
+                                      </td>
+                                      <td className="py-1.5 px-2.5 text-center whitespace-nowrap">
+                                        {isUSD ? (
+                                          <span className="inline-flex items-center gap-1 font-mono font-bold text-[9px] text-amber-950 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">
+                                            <ShieldCheck size={10} className="text-amber-700 shrink-0" />
+                                            1 USD = {appliedRate} G
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-1.5 py-0.5 rounded">
+                                            N/A (Frais 100% HTG)
+                                          </span>
+                                        )}
+                                      </td>
+                                      <td className="py-1.5 px-2.5 text-right font-mono whitespace-nowrap">
+                                        {isUSD ? (
+                                          <div>
+                                            <span className="font-bold text-slate-900">${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</span>
+                                            <div className="text-[9px] text-slate-400 font-mono font-normal">≈ {baseHTG.toLocaleString()} HTG</div>
+                                          </div>
+                                        ) : (
+                                          <span className="font-bold text-slate-900">{baseHTG.toLocaleString()} HTG</span>
+                                        )}
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                                {pageData.payments.length === 0 && (
+                                  <tr>
+                                    <td colSpan={6} className="py-6 text-center text-xs italic text-slate-400">
+                                      Aucun versement enregistré pour cette période.
+                                    </td>
+                                  </tr>
+                                )}
+                              </tbody>
+                            </table>
+                          </div>
+
+                          {/* Note de continuation si multi-pages */}
+                          {!pageData.isLastPage && (
+                            <div className="mt-2 text-right">
+                              <span className="inline-flex items-center gap-1 text-[9.5px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded border border-indigo-200">
+                                Suite des opérations sur la page {pageData.pageNumber + 1} ➔
+                              </span>
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex flex-col justify-end items-end text-right pr-6">
-                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-16">Signature & Sceau de la Direction</p>
-                    <div className="w-56 border-b-2 border-slate-900 mb-2"></div>
-                    <p className="text-xs font-black text-slate-900 uppercase tracking-tighter">{schoolDetails?.director_name || 'La Direction'}</p>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">EduNova Pro Verified Document</p>
-                  </div>
-                </div>
 
-                {/* Footer Note */}
-                <div className="mt-12 pt-6 border-t border-slate-100 text-center">
-                  <p className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.3em]">Ce document est généré électroniquement et ne nécessite pas de signature manuscrite pour être valide dans le cadre administratif interne.</p>
-                </div>
+                        {/* Bloc Solde Restant Dû & Signature de la Direction (Seulement sur la dernière page) */}
+                        {pageData.showFinalBalance && (
+                          <div className="mt-auto pt-3 border-t-2 border-slate-900">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 items-end">
+                              {/* Carte Solde Restant Dû */}
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center px-1">
+                                  <span className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Total Payé à ce jour</span>
+                                  <span className="text-xs font-black text-emerald-600">
+                                    {selectedStudent.totalPaidUSD > 0 && selectedStudent.totalPaidHTG > 0
+                                      ? `${selectedStudent.totalPaidHTG.toLocaleString()} HTG + $${selectedStudent.totalPaidUSD.toFixed(2)} USD`
+                                      : selectedStudent.totalPaidUSD > 0
+                                      ? `$${selectedStudent.totalPaidUSD.toFixed(2)} USD (≈ ${selectedStudent.paid.toLocaleString()} HTG)`
+                                      : `${selectedStudent.paid.toLocaleString()} HTG`}
+                                  </span>
+                                </div>
+
+                                <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900 text-white relative overflow-hidden shadow-xs">
+                                  <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
+                                    <DollarSign size={40} className="text-white" />
+                                  </div>
+                                  <p className="text-[8px] font-black text-white/50 uppercase tracking-[0.18em] mb-1">
+                                    Solde Restant Dû
+                                  </p>
+
+                                  {selectedStudent.isFullySettled ? (
+                                    <div className="flex items-center gap-2 relative z-10">
+                                      <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+                                      <div>
+                                        <span className="text-xl font-black font-mono tracking-tight text-emerald-400 leading-none block">
+                                          0 HTG
+                                        </span>
+                                        <span className="text-[9px] font-bold text-emerald-300/80 uppercase tracking-widest">
+                                          Compte Entièrement Soldé
+                                        </span>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className="relative z-10">
+                                      {selectedStudent.remainingUSD > 0 && selectedStudent.remainingHTG > 0 ? (
+                                        <div>
+                                          <div className="flex items-baseline gap-1">
+                                            <span className="text-lg font-black font-mono tracking-tight text-white leading-tight">
+                                              {selectedStudent.remainingHTG.toLocaleString()} <span className="text-xs text-white/60">HTG</span>
+                                            </span>
+                                            <span className="text-sm font-black font-mono text-emerald-400">
+                                              + ${selectedStudent.remainingUSD.toFixed(2)} <span className="text-[10px] text-emerald-400/70">USD</span>
+                                            </span>
+                                          </div>
+                                          <p className="text-[9px] text-white/60 font-mono mt-0.5">
+                                            (Contre-valeur totale estimée: ≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
+                                          </p>
+                                        </div>
+                                      ) : selectedStudent.remainingUSD > 0 ? (
+                                        <div>
+                                          <div className="flex items-baseline gap-1">
+                                            <span className="text-xl font-black font-mono tracking-tight text-white leading-tight">
+                                              ${selectedStudent.remainingUSD.toFixed(2)}
+                                            </span>
+                                            <span className="text-xs font-bold text-white/60 uppercase">USD</span>
+                                          </div>
+                                          <p className="text-[9px] text-white/60 font-mono mt-0.5">
+                                            (≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
+                                          </p>
+                                        </div>
+                                      ) : (
+                                        <div className="flex items-baseline gap-1.5">
+                                          <span className="text-xl font-black font-mono tracking-tight text-white leading-tight">
+                                            {selectedStudent.remainingHTG.toLocaleString()}
+                                          </span>
+                                          <span className="text-xs font-bold text-white/60 uppercase">HTG</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Signature & Sceau Officiel de l'École */}
+                              <div className="flex flex-col justify-end items-end text-right">
+                                <p className="text-[8.5px] font-black text-slate-500 uppercase tracking-[0.15em] mb-1">
+                                  {terminology.directionSignature || 'Signature & Sceau de la Direction'}
+                                </p>
+                                <div className="w-48 sm:w-56 h-12 border border-dashed border-slate-300 rounded-lg flex items-center justify-center bg-slate-50/50 mb-1 relative">
+                                  <span className="text-[9px] text-slate-400 italic">Emplacement réservé au timbre & sceau</span>
+                                </div>
+                                <div className="w-48 sm:w-56 border-b-2 border-slate-900 mb-1"></div>
+                                <p className="text-xs font-black text-slate-900 uppercase tracking-tight">
+                                  {schoolDetails?.director_name || 'La Direction'}
+                                </p>
+                                <p className="text-[8px] font-bold text-indigo-600 uppercase tracking-wider">
+                                  Document Officiel Vérifié • École Connectée
+                                </p>
+                              </div>
+                            </div>
+
+                            {/* Mention légale administrative */}
+                            <div className="mt-3 pt-2 border-t border-slate-100 text-center">
+                              <p className="text-[7.5px] font-bold text-slate-400 uppercase tracking-[0.2em]">
+                                Ce document est généré électroniquement par le système École Connectée et certifie l'état comptable de l'élève à la date indiquée.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Running Footer sur toutes les pages A4 */}
+                      <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-[8px] font-mono text-slate-400 select-none">
+                        <span>Système École Connectée • ID: {selectedStudent.id.substring(0, 8).toUpperCase()}</span>
+                        <span className="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
+                          Page {pageData.pageNumber} sur {pageData.totalPages}
+                        </span>
+                        <span>Émis le {new Date().toLocaleDateString('fr-FR')}</span>
+                      </div>
+                    </div>
+
+                    {/* Séparateur visuel de feuilles A4 (Visible uniquement à l'écran) */}
+                    {!pageData.isLastPage && (
+                      <div className="releve-page-divider flex items-center gap-3 w-full max-w-[800px] text-slate-400 py-1 print:hidden select-none">
+                        <div className="flex-1 border-t border-dashed border-slate-300"></div>
+                        <span className="text-[10px] font-bold uppercase tracking-wider bg-white/90 px-3 py-1 rounded-full text-slate-600 border border-slate-300 shadow-2xs">
+                          Saut de page A4 — Page {pageData.pageNumber + 1} sur {pageData.totalPages}
+                        </span>
+                        <div className="flex-1 border-t border-dashed border-slate-300"></div>
+                      </div>
+                    )}
+                  </React.Fragment>
+                ))}
               </div>
             </div>
           </div>
           
           <style dangerouslySetInnerHTML={{ __html: `
+            @page {
+              size: A4 portrait;
+              margin: 0;
+            }
             @media print {
               body * { visibility: hidden; }
               .print\\:hidden { display: none !important; }
-              .print\\:shadow-none { box-shadow: none !important; }
-              .print\\:m-0 { margin: 0 !important; }
-              .print\\:w-full { width: 100% !important; }
-              .print\\:border-0 { border: 0 !important; }
+              .releve-page-divider { display: none !important; }
               .fixed.inset-0 { position: static !important; display: block !important; background: white !important; padding: 0 !important; }
-              .max-w-4xl { max-width: none !important; width: 100% !important; margin: 0 !important; }
-              .bg-white.shadow-2xl { box-shadow: none !important; }
-              .p-8.md\\:p-12 { padding: 0 !important; }
-              #releve-compte-print { visibility: visible !important; position: absolute !important; left: 0 !important; top: 0 !important; width: 100% !important; margin: 0 !important; padding: 20mm !important; border: none !important; box-shadow: none !important; }
-              #releve-compte-print * { visibility: visible !important; }
+              #releve-compte-print, #releve-compte-print * { visibility: visible !important; }
+              #releve-compte-print {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+              }
+              .releve-page-sheet {
+                width: 210mm !important;
+                max-width: 210mm !important;
+                min-height: 297mm !important;
+                padding: 12mm 15mm !important;
+                margin: 0 auto !important;
+                box-shadow: none !important;
+                border: none !important;
+                page-break-after: always !important;
+                break-after: page !important;
+                overflow: visible !important;
+              }
+              .releve-page-sheet:last-child {
+                page-break-after: auto !important;
+                break-after: auto !important;
+              }
             }
           `}} />
         </div>
