@@ -258,6 +258,60 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const [printPreview, setPrintPreview] = useState<any | null>(null);
 
+  const [activeTooltip, setActiveTooltip] = useState<{
+    id: string;
+    isMobile: boolean;
+    top: number;
+    left: number;
+    transaction: any;
+  } | null>(null);
+
+  const openTooltip = (e: React.MouseEvent<HTMLElement>, transaction: any) => {
+    e.stopPropagation();
+    const isMobile = window.innerWidth < 640;
+    
+    if (isMobile) {
+      setActiveTooltip({
+        id: transaction.id,
+        isMobile: true,
+        top: 0,
+        left: 0,
+        transaction,
+      });
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = 380;
+    const estHeight = 400;
+    
+    let left = rect.right - width;
+    if (left < 16) left = 16;
+    if (left + width > window.innerWidth - 16) {
+      left = Math.max(16, window.innerWidth - width - 16);
+    }
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    let top = 16;
+
+    if (spaceBelow >= estHeight + 16) {
+      top = rect.bottom + 8;
+    } else if (spaceAbove >= estHeight + 16) {
+      top = Math.max(16, rect.top - estHeight - 8);
+    } else {
+      top = Math.max(16, Math.floor((window.innerHeight - estHeight) / 2));
+    }
+
+    setActiveTooltip({
+      id: transaction.id,
+      isMobile: false,
+      top,
+      left,
+      transaction,
+    });
+  };
+
   const [enrolledClassIds, setEnrolledClassIds] = useState<Set<string>>(new Set());
   const [enrolledClassIdsForGen, setEnrolledClassIdsForGen] = useState<Set<string>>(new Set());
   const [enrollmentsForGen, setEnrollmentsForGen] = useState<any[]>([]);
@@ -2422,51 +2476,26 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   {baseHTG.toLocaleString()} G
                                 </span>
 
-                                {/* Infobulle détaillée */}
-                                <div className="relative group inline-block">
-                                  <button
-                                    type="button"
-                                    className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors cursor-pointer"
-                                    title="Détail du versement multi-devise"
-                                  >
-                                    <Info size={13} />
-                                  </button>
-                                  
-                                  <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block z-50 w-72 bg-slate-900 text-white rounded-xl shadow-2xl p-3 border border-slate-700 pointer-events-none animate-in fade-in zoom-in-95 duration-150">
-                                    <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2">
-                                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                                        <ArrowRightLeft size={11} /> Décompte Financier
-                                      </span>
-                                      <span className="text-[9px] font-mono text-slate-400">
-                                        RCP-{p.id.substring(0,8).toUpperCase()}
-                                      </span>
-                                    </div>
-                                    <div className="space-y-1.5 text-xs text-left">
-                                      <div className="flex justify-between items-center text-slate-300">
-                                        <span className="text-[11px] text-slate-400">Montant payé :</span>
-                                        <span className="font-mono font-bold text-emerald-400">
-                                          {isUSD ? `$${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD` : `${paidAmount.toLocaleString()} HTG`}
-                                        </span>
-                                      </div>
-                                      <div className="flex justify-between items-center text-slate-300">
-                                        <span className="text-[11px] text-slate-400">Taux appliqué :</span>
-                                        <span className="font-mono font-bold text-amber-300">
-                                          {isUSD ? `1 USD = ${appliedRate} HTG` : `1:1 (Monnaie de base)`}
-                                        </span>
-                                      </div>
-                                      <div className="flex justify-between items-center text-slate-300 pt-1 border-t border-slate-800">
-                                        <span className="text-[11px] text-slate-400 font-bold">Valeur en monnaie de base :</span>
-                                        <span className="font-mono font-black text-white">
-                                          {baseHTG.toLocaleString()} HTG
-                                        </span>
-                                      </div>
-                                      <div className="text-[9px] text-slate-400 pt-1 border-t border-slate-800 flex justify-between">
-                                        <span>Date :</span>
-                                        <span>{new Date(p.created_at).toLocaleString('fr-FR')}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                                {/* Bouton déclencheur infobulle anti-coupure */}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    if (activeTooltip?.id === p.id) {
+                                      setActiveTooltip(null);
+                                    } else {
+                                      openTooltip(e, p);
+                                    }
+                                  }}
+                                  className={`p-1 rounded-full transition-colors cursor-pointer ${
+                                    activeTooltip?.id === p.id
+                                      ? 'text-indigo-600 bg-indigo-100 ring-2 ring-indigo-400'
+                                      : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                  }`}
+                                  aria-label="Détail du versement multi-devise"
+                                  title="Cliquer pour afficher les détails du change et statut d'acquittement"
+                                >
+                                  <Info size={14} />
+                                </button>
                               </div>
                             </td>
                           </tr>
@@ -2865,6 +2894,119 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
         )}
       </PrintPreviewModal>
+
+      {/* Infobulle Fixe Haute Précision (Anti-coupure / Immune aux overflows de tableaux) */}
+      {activeTooltip && (
+        <div 
+          className="fixed inset-0 z-[1200] flex items-center justify-center sm:block p-3 sm:p-0 bg-slate-900/30 backdrop-blur-[1px]"
+          onClick={() => setActiveTooltip(null)}
+        >
+          <div 
+            className={`bg-slate-950 text-white rounded-2xl shadow-2xl p-5 border border-slate-700 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-[88vh] text-left whitespace-normal select-text ${
+              activeTooltip.isMobile
+                ? 'w-full max-w-sm'
+                : 'w-[390px] max-w-[calc(100vw-32px)] fixed z-[1201]'
+            }`}
+            style={!activeTooltip.isMobile ? {
+              top: `${activeTooltip.top}px`,
+              left: `${activeTooltip.left}px`,
+            } : undefined}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const p = activeTooltip.transaction;
+              const isUSD = p.currency === 'USD';
+              const paidAmount = Number(p.amount || 0);
+              const appliedRate = Number(p.exchange_rate_applied || rate || 140);
+              const currentRate = Number(rate || 140);
+              const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
+              const rateDiff = currentRate - appliedRate;
+              const hasRateVariance = isUSD && Math.abs(rateDiff) > 0.01;
+
+              return (
+                <div className="space-y-3.5">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <ArrowRightLeft size={14} className="text-amber-400 shrink-0" /> Décompte & Taux Historique
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 font-bold">
+                        RCP-{p.id.substring(0,8).toUpperCase()}
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={() => setActiveTooltip(null)}
+                        className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                        title="Fermer"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Montant versé :</span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        {isUSD ? `$${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD` : `${paidAmount.toLocaleString()} HTG`}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Taux appliqué (historique scellé) :</span>
+                      <span className="font-mono font-bold text-amber-300">
+                        {isUSD ? `1 USD = ${appliedRate} HTG` : `1:1 (Monnaie HTG)`}
+                      </span>
+                    </div>
+
+                    {isUSD && (
+                      <div className="flex justify-between items-center text-slate-300 text-[11px]">
+                        <span className="text-slate-400">Taux système actuel :</span>
+                        <span className="font-mono text-slate-200">
+                          1 USD = {currentRate} HTG
+                        </span>
+                      </div>
+                    )}
+
+                    {hasRateVariance && (
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Évolution du taux :</span>
+                          <span className={`font-mono font-bold ${rateDiff > 0 ? 'text-amber-400' : 'text-cyan-400'}`}>
+                            {rateDiff > 0 ? `+${rateDiff.toFixed(2)}` : rateDiff.toFixed(2)} HTG/USD
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 italic">
+                          Le calcul reste assis sur la base historique scellée, protégeant le solde contre toute dérive comptable.
+                        </p>
+                      </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-slate-300 pt-1.5 border-t border-slate-800">
+                      <span className="text-slate-400 font-bold">Valeur en monnaie de référence :</span>
+                      <span className="font-mono font-black text-white">
+                        {baseHTG.toLocaleString()} HTG
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Mode de paiement :</span>
+                      <span className="font-semibold text-slate-200">
+                        {p.status === 'ANNULE' ? 'Annulé' : (p.payment_method || 'Cash')}
+                      </span>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-800 flex justify-between items-center">
+                      <span>Date & Heure :</span>
+                      <span className="font-mono text-slate-300">{new Date(p.created_at).toLocaleString('fr-FR')}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      )}
 
       {/* STYLES D'IMPRESSION */}
       <style>{`

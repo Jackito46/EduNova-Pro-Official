@@ -16,7 +16,8 @@ import {
   HelpCircle,
   Clock,
   CheckCircle2,
-  Wallet
+  Wallet,
+  ShieldCheck
 } from 'lucide-react';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 
@@ -232,6 +233,17 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     (hasMiscFee ? miscDetails.remainingHTG : 0) + 
     campaignsRemainingHTG;
 
+  const campaignsRemainingUSD = campaignBreakdowns.reduce((acc, c) => acc + (c.details.isPaid ? 0 : c.details.remainingUSD), 0);
+  const grandTotalRemainingUSD = (admissionDetails.isPaid ? 0 : admissionDetails.remainingUSD) +
+    (tuitionDetails.isPaid ? 0 : tuitionDetails.remainingUSD) +
+    (hasMiscFee && !miscDetails.isPaid ? miscDetails.remainingUSD : 0) +
+    campaignsRemainingUSD;
+
+  const grandTotalRemainingHTG = (admissionDetails.isPaid ? 0 : admissionDetails.remainingHTG) +
+    (tuitionDetails.isPaid ? 0 : tuitionDetails.remainingHTG) +
+    (hasMiscFee && !miscDetails.isPaid ? miscDetails.remainingHTG : 0) +
+    campaignsRemainingHTG;
+
   // Filtrage selon onglet
   const displayedExpected = activeSection === 'all' 
     ? grandTotalExpected 
@@ -255,6 +267,22 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     ? (tuitionDetails.remainingHTG + admissionDetails.remainingHTG) 
     : activeSection === 'misc'
     ? miscDetails.remainingHTG
+    : campaignsRemainingHTG;
+
+  const displayedRemainingUSD = activeSection === 'all'
+    ? grandTotalRemainingUSD
+    : activeSection === 'tuition'
+    ? ((tuitionDetails.isPaid ? 0 : tuitionDetails.remainingUSD) + (admissionDetails.isPaid ? 0 : admissionDetails.remainingUSD))
+    : activeSection === 'misc'
+    ? (miscDetails.isPaid ? 0 : miscDetails.remainingUSD)
+    : campaignsRemainingUSD;
+
+  const displayedRemainingHTG = activeSection === 'all'
+    ? grandTotalRemainingHTG
+    : activeSection === 'tuition'
+    ? ((tuitionDetails.isPaid ? 0 : tuitionDetails.remainingHTG) + (admissionDetails.isPaid ? 0 : admissionDetails.remainingHTG))
+    : activeSection === 'misc'
+    ? (miscDetails.isPaid ? 0 : miscDetails.remainingHTG)
     : campaignsRemainingHTG;
 
   const displayedPayments = payments.filter(p => {
@@ -367,9 +395,31 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
         <div className={`bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-center border-b-4 ${displayedBalance <= 0 ? 'border-b-blue-500' : 'border-b-rose-500'}`}>
           <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Solde Restant</span>
-          <span className={`text-2xl sm:text-3xl font-black font-mono ${displayedBalance <= 0 ? 'text-blue-600' : 'text-rose-600'}`}>
-            {displayedBalance <= 0 ? 'Réglé (À Jour)' : `${Math.round(displayedBalance).toLocaleString()} HTG`}
-          </span>
+          {displayedBalance <= 0 ? (
+            <span className="text-2xl sm:text-3xl font-black font-mono text-blue-600">Réglé (À Jour)</span>
+          ) : displayedRemainingUSD > 0 && displayedRemainingHTG > 0 ? (
+            <div className="space-y-0.5">
+              <span className="text-lg sm:text-xl font-black font-mono text-rose-600 block">
+                {Math.round(displayedRemainingHTG).toLocaleString()} HTG + ${displayedRemainingUSD.toFixed(2)} USD
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono block">
+                (≈ {Math.round(displayedBalance).toLocaleString()} HTG)
+              </span>
+            </div>
+          ) : displayedRemainingUSD > 0 ? (
+            <div className="space-y-0.5">
+              <span className="text-2xl sm:text-3xl font-black font-mono text-rose-600 block">
+                ${displayedRemainingUSD.toFixed(2)} USD
+              </span>
+              <span className="text-[11px] text-slate-400 font-mono block">
+                (≈ {Math.round(displayedBalance).toLocaleString()} HTG)
+              </span>
+            </div>
+          ) : (
+            <span className="text-2xl sm:text-3xl font-black font-mono text-rose-600">
+              {Math.round(displayedBalance).toLocaleString()} HTG
+            </span>
+          )}
         </div>
       </div>
 
@@ -633,6 +683,18 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   const appliedRate = Number(payment.exchange_rate_applied || (isUSD && payment.amount_htg_equivalent ? (payment.amount_htg_equivalent / rawAmount) : exchangeRate));
                   const baseHTG = Number(payment.amount_htg_equivalent || (isUSD ? rawAmount * appliedRate : rawAmount));
 
+                  const isTuitionFee = payment.fee_type === 'SCOLARITE' || (!payment.fee_type && (!payment.nature || payment.nature === 'SCOLARITE' || payment.nature === 'Scolarité'));
+                  const isAdmissionFee = payment.fee_type === 'INSCRIPTION' || payment.nature === 'INSCRIPTION' || payment.nature === "Frais d'inscription";
+                  const isMiscFee = isMiscPayment(payment);
+                  const matchedCampaign = payment.ad_hoc_campaign_id ? campaignBreakdowns.find(c => c.camp.id === payment.ad_hoc_campaign_id) : null;
+                  const isFeePlannedInUSD = Boolean(
+                    (isTuitionFee && tuitionNativeUSD > 0) ||
+                    (isAdmissionFee && admissionNativeUSD > 0) ||
+                    (isMiscFee && miscNativeUSD > 0) ||
+                    (matchedCampaign && matchedCampaign.camp.currency === 'USD') ||
+                    (payment.campaign?.currency === 'USD')
+                  );
+
                   return (
                     <tr key={payment.id} className="hover:bg-slate-50/70 transition-colors">
                       <td className="py-3.5 px-4 whitespace-nowrap">
@@ -665,9 +727,14 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
                       <td className="py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap">
                         {isUSD ? (
-                          <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs inline-block">
-                            ${rawAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
-                          </span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded text-xs inline-block font-mono font-bold shadow-2xs">
+                              ${rawAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
+                            </span>
+                            <span className="text-[10px] text-amber-700 font-mono font-medium mt-0.5 flex items-center gap-1">
+                              × {appliedRate} G
+                            </span>
+                          </div>
                         ) : (
                           <span className="text-slate-900 text-xs inline-block">
                             {rawAmount.toLocaleString()} HTG
@@ -677,24 +744,56 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {isUSD ? (
-                          <span 
-                            className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold whitespace-nowrap"
-                            title={`Taux de change fixé lors de cette transaction : 1 USD = ${appliedRate} HTG`}
-                          >
-                            <ArrowRightLeft size={11} className="text-amber-600 shrink-0" />
-                            1$ = {appliedRate} G
-                          </span>
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            <span 
+                              className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100/70 text-amber-900 border border-amber-300 px-2.5 py-1 rounded text-[11px] font-mono font-bold whitespace-nowrap shadow-xs hover:border-amber-400 transition-colors"
+                              title={`Audit Financier : Taux historique scellé lors de cette transaction : 1 USD = ${appliedRate} HTG\nValeur certifiée : ${rawAmount} USD × ${appliedRate} = ${baseHTG.toLocaleString()} HTG`}
+                            >
+                              <ShieldCheck size={12} className="text-amber-700 shrink-0" />
+                              <span>1 USD = {appliedRate} HTG</span>
+                            </span>
+                            <span className="text-[9px] font-extrabold text-amber-700 tracking-tight flex items-center gap-1">
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+                              Taux scellé (Audit)
+                            </span>
+                          </div>
+                        ) : isFeePlannedInUSD ? (
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            <span 
+                              className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-1 rounded text-[11px] font-mono font-bold whitespace-nowrap shadow-xs"
+                              title={`Frais planifié en USD, réglé en HTG selon le barème : 1 USD = ${appliedRate} HTG`}
+                            >
+                              <ArrowRightLeft size={11} className="text-blue-700 shrink-0" />
+                              <span>1 USD = {appliedRate} HTG</span>
+                            </span>
+                            <span className="text-[9px] font-semibold text-blue-700 tracking-tight">
+                              Barème USD amorti
+                            </span>
+                          </div>
                         ) : (
-                          <span className="text-slate-400 text-xs font-mono">—</span>
+                          <span 
+                            className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded border border-slate-200 whitespace-nowrap inline-flex items-center gap-1.5"
+                            title="Paiement direct en monnaie locale (Gourdes) - Aucune conversion de devise requise"
+                          >
+                            <span className="text-slate-400 font-bold">—</span>
+                            <span className="text-slate-600 font-medium">(HTG direct)</span>
+                          </span>
                         )}
                       </td>
 
                       <td className="py-3.5 px-4 text-right font-black font-mono whitespace-nowrap">
-                        {payment.status === 'ANNULE' ? (
-                          <span className="text-slate-400 line-through">{Math.round(baseHTG).toLocaleString()} HTG</span>
-                        ) : (
-                          <span className="text-slate-900">{Math.round(baseHTG).toLocaleString()} HTG</span>
-                        )}
+                        <div className="flex flex-col items-end">
+                          {payment.status === 'ANNULE' ? (
+                            <span className="text-slate-400 line-through">{Math.round(baseHTG).toLocaleString()} HTG</span>
+                          ) : (
+                            <span className="text-slate-900">{Math.round(baseHTG).toLocaleString()} HTG</span>
+                          )}
+                          {isUSD && payment.status !== 'ANNULE' && (
+                            <span className="text-[10px] text-emerald-700 font-mono font-semibold" title="Conversion certifiée">
+                              ${rawAmount} × {appliedRate}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

@@ -839,26 +839,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           currentExchangeRate
         );
 
-        const grossInscriptionPaid = admissionBreakdown.paidHTGEquiv;
-        const grossMiscPaid = miscBreakdown.paidHTGEquiv;
-        const grossTuitionPaid = tuitionPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || (p.currency === 'USD' ? p.amount * (p.exchange_rate_applied || currentExchangeRate) : p.amount) || 0), 0);
-        const grossCampaignsPaid = campaignPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || (p.currency === 'USD' ? p.amount * (p.exchange_rate_applied || currentExchangeRate) : p.amount) || 0), 0);
-        
-        const currentPaid = grossInscriptionPaid + grossMiscPaid + grossTuitionPaid + grossCampaignsPaid;
-
-        const inscriptionDue = admissionBreakdown.isPaid 
-          ? grossInscriptionPaid 
-          : admissionBreakdown.effectiveDueHTG;
-        const miscDue = miscBreakdown.isPaid 
-          ? grossMiscPaid 
-          : miscBreakdown.effectiveDueHTG;
-          
         const studentDiscount = Number(data.discount_amount || 0);
         const tuitionDiscount = Number(enrollment?.tuition_discount || 0);
         const tuitionAddition = Number(enrollment?.tuition_addition || 0);
         const totalDiscount = studentDiscount + tuitionDiscount;
         
-        const scolariteBase = baseDue + tuitionAddition;
+        const tuitionHTG_val = plan ? (data.is_foreign && plan.foreign_tuition_fee ? Number(plan.foreign_tuition_fee) : Number(plan.tuition_fee || 0)) : 0;
+        const tuitionUSD_val = plan ? Number(plan.tuition_fee_usd || 0) : 0;
+        const scolariteBase = tuitionHTG_val + tuitionAddition + (tuitionUSD_val * currentExchangeRate);
         
         // Distinction entre Option Standard (Scolarité Pure) et Option Complète / Sociale (Scolarité + Frais Divers)
         const isCompleteScholarship = Boolean(
@@ -873,17 +861,39 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         let miscDiscountApplied = 0;
 
         if (isCompleteScholarship) {
-          // Bourse Complète : exonère la scolarité en priorité, puis les frais divers obligatoires s'il reste une portion
           tuitionDiscountApplied = Math.min(scolariteBase, totalDiscount);
           const remainingDiscount = Math.max(0, totalDiscount - tuitionDiscountApplied);
-          miscDiscountApplied = Math.min(miscDue, remainingDiscount);
+          miscDiscountApplied = Math.min(miscBreakdown.effectiveDueHTG, remainingDiscount);
         } else {
-          // Option Standard : Bourse ciblée strictement sur les frais de scolarité
           tuitionDiscountApplied = Math.min(scolariteBase, totalDiscount);
           miscDiscountApplied = 0;
         }
 
-        const scolariteDue = Math.max(0, scolariteBase - tuitionDiscountApplied);
+        const tuitionBreakdown = computeFeeCategoryBalance(
+          tuitionHTG_val + tuitionAddition,
+          tuitionUSD_val,
+          tuitionPayments,
+          currentExchangeRate,
+          tuitionDiscountApplied
+        );
+
+        const grossInscriptionPaid = admissionBreakdown.paidHTGEquiv;
+        const grossMiscPaid = miscBreakdown.paidHTGEquiv;
+        const grossTuitionPaid = tuitionBreakdown.paidHTGEquiv;
+        const grossCampaignsPaid = campaignPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || (p.currency === 'USD' ? p.amount * (p.exchange_rate_applied || currentExchangeRate) : p.amount) || 0), 0);
+        
+        const currentPaid = grossInscriptionPaid + grossMiscPaid + grossTuitionPaid + grossCampaignsPaid;
+
+        const inscriptionDue = admissionBreakdown.isPaid 
+          ? grossInscriptionPaid 
+          : admissionBreakdown.effectiveDueHTG;
+        const miscDue = miscBreakdown.isPaid 
+          ? grossMiscPaid 
+          : miscBreakdown.effectiveDueHTG;
+        const scolariteDue = tuitionBreakdown.isPaid
+          ? grossTuitionPaid
+          : tuitionBreakdown.effectiveDueHTG;
+          
         const effectiveMiscDue = Math.max(0, miscDue - miscDiscountApplied);
         const effectiveInscriptionDue = inscriptionDue;
         const remainingDiscountAfterCore = 0;
@@ -1043,7 +1053,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           scolariteDue: scolariteDue,
           scolariteGross: baseDue,
           scolaritePaid: scolaritePaid,
-          scolariteRemaining: Math.max(0, scolariteDue - scolaritePaid),
+          scolariteRemaining: tuitionBreakdown.isPaid ? 0 : tuitionBreakdown.remainingHTGEquiv,
+          scolariteRemainingUSD: tuitionBreakdown.isPaid ? 0 : tuitionBreakdown.remainingUSD,
+          scolariteRemainingHTG: tuitionBreakdown.isPaid ? 0 : tuitionBreakdown.remainingHTG,
+          scolariteIsPaid: tuitionBreakdown.isPaid,
           scolariteUSD: plan ? Number(plan.tuition_fee_usd || 0) : 0,
           classe: effectiveClassName,
           campus_id: effectiveCampusId,
@@ -1239,7 +1252,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     // SCOLARITE
     const isUSDPlan = (selectedStudent.scolariteUSD || 0) > 0 && Number(selectedStudent.plan?.tuition_fee || 0) === 0;
-    const resteScolariteHTG = Math.max(0, selectedStudent.scolariteDue - selectedStudent.scolaritePaid);
+    const isFullyPaid = selectedStudent.scolariteIsPaid || (selectedStudent.scolariteRemaining !== undefined && selectedStudent.scolariteRemaining <= 0);
+    const resteScolariteHTG = isFullyPaid ? 0 : (selectedStudent.scolariteRemainingHTG ?? selectedStudent.scolariteRemaining ?? Math.max(0, selectedStudent.scolariteDue - selectedStudent.scolaritePaid));
+    const resteScolariteUSD = isFullyPaid ? 0 : (selectedStudent.scolariteRemainingUSD ?? (Math.round((resteScolariteHTG / rate) * 100) / 100));
     let suggestionHTG = resteScolariteHTG;
 
     const structure = selectedStudent.plan?.payment_structure;
@@ -1248,7 +1263,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     let totalSteps = 0;
     let stepDueDate: string | null = null;
     let stepTargetAmount = 0;
-    let isFullyPaid = resteScolariteHTG <= 0;
 
     if (structure && structure.length > 0) {
       totalSteps = structure.length;
@@ -1260,7 +1274,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         return (accumulated - 5) > paid; // Margin for rounding
       });
 
-      if (foundIdx !== -1) {
+      if (!isFullyPaid && foundIdx !== -1) {
         currentStepIndex = foundIdx + 1;
         const activeStep = structure[foundIdx];
         currentStepLabel = activeStep.label || `Étape ${currentStepIndex}`;
@@ -1270,19 +1284,21 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         // Exact remaining amount needed for this specific stage
         suggestionHTG = Math.min(resteScolariteHTG, accumulated - paid);
       } else if (isFullyPaid) {
-        currentStepLabel = "Scolarité Réglée en Totalité";
+        currentStepLabel = "Scolarité Réglée en Totalité (Acquittée)";
         currentStepIndex = totalSteps;
         suggestionHTG = 0;
       }
     } else {
-      currentStepLabel = "Versement Unique / Solde";
-      suggestionHTG = resteScolariteHTG;
+      currentStepLabel = isFullyPaid ? "Scolarité Réglée en Totalité (Acquittée)" : "Versement Unique / Solde";
+      suggestionHTG = isFullyPaid ? 0 : resteScolariteHTG;
     }
 
-    const suggestion = isUSD ? (Math.round((suggestionHTG / rate) * 100) / 100) : suggestionHTG;
+    const suggestion = isUSD 
+      ? (isUSDPlan ? resteScolariteUSD : (Math.round((suggestionHTG / rate) * 100) / 100))
+      : suggestionHTG;
     return { 
       resteTotal: resteScolariteHTG, 
-      resteUSD: Math.round((resteScolariteHTG / rate) * 100) / 100,
+      resteUSD: resteScolariteUSD,
       isUSDPlan,
       suggestion, 
       structure,
@@ -1426,8 +1442,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         
         // Validation: Ne pas autoriser un paiement supérieur ou égal lorsque la dette restante est déjà nulle
         if (paymentLogic && feeType !== 'CREDIT_PORTEFEUILLE') {
-          if (paymentLogic.resteTotal <= 0 && (!paymentLogic.resteUSD || paymentLogic.resteUSD <= 0)) {
-            toast.error(`Ce frais a déjà été entièrement réglé. Aucun versement supplémentaire n'est requis.`);
+          if (paymentLogic.isFullyPaid || (paymentLogic.resteTotal <= 0 && (!paymentLogic.resteUSD || paymentLogic.resteUSD <= 0))) {
+            toast.error(`Ce frais a déjà été entièrement acquitté (réglé). Aucun versement supplémentaire n'est requis.`);
             setIsSubmitting(false);
             return;
           }
@@ -1441,15 +1457,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           if (currency === 'USD' && paymentLogic.isUSDPlan) {
             const maxUSD = (paymentLogic.resteUSD !== undefined ? paymentLogic.resteUSD : paymentLogic.resteTotal / currentExchangeRate);
-            if (amount > maxUSD + 0.1) {
+            // Tolérance de 0.50 USD pour absorber les reliquats de conversion de devises
+            if (amount > maxUSD + 0.50) {
               toast.error(`Le montant saisi (${amount} USD) dépasse la balance restante due de ce frais ($${maxUSD.toFixed(2)} USD).`);
               setIsSubmitting(false);
               return;
             }
           } else {
             const amountHTG = currency === 'USD' ? Math.round((amount * currentExchangeRate) * 100) / 100 : amount;
-            // Tolérance de 15 HTG pour les erreurs d'arrondi de devises
-            if (amountHTG > paymentLogic.resteTotal + 15) {
+            // Tolérance de 50 HTG pour absorber automatiquement les reliquats de conversion
+            if (amountHTG > paymentLogic.resteTotal + 50) {
               const maxAllowed = currency === 'USD' ? (paymentLogic.resteTotal / currentExchangeRate).toFixed(2) : paymentLogic.resteTotal.toFixed(2);
               toast.error(`Le montant saisi (${amount} ${currency}) dépasse la balance restante due de ce frais (${maxAllowed} ${currency}).`);
               setIsSubmitting(false);

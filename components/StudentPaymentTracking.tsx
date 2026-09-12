@@ -136,6 +136,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<{
     id: string;
+    isMobile: boolean;
     top: number;
     left: number;
     transaction: any;
@@ -143,29 +144,47 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const openTooltip = (e: React.MouseEvent<HTMLElement>, transaction: any) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const width = Math.min(360, window.innerWidth - 32);
-    const estHeight = 310;
+    const isMobile = window.innerWidth < 640;
     
-    // Position horizontale : alignée sur la droite du bouton, bornée à l'écran
+    if (isMobile) {
+      setActiveTooltip({
+        id: transaction.id,
+        isMobile: true,
+        top: 0,
+        left: 0,
+        transaction,
+      });
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = 380;
+    const estHeight = 440;
+    
+    // Position horizontale bornée dans l'écran
     let left = rect.right - width;
     if (left < 16) left = 16;
     if (left + width > window.innerWidth - 16) {
       left = Math.max(16, window.innerWidth - width - 16);
     }
 
-    // Position verticale : au-dessus si l'espace le permet, sinon en dessous
-    let top = rect.top - estHeight - 10;
-    if (top < 16) {
-      top = rect.bottom + 10;
-    }
-    // Empêcher de déborder hors de l'écran en bas
-    if (top + estHeight > window.innerHeight - 16) {
-      top = Math.max(16, window.innerHeight - estHeight - 16);
+    // Position verticale intelligente : choisit l'orientation qui évite tout débordement
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    let top = 16;
+
+    if (spaceBelow >= estHeight + 16) {
+      top = rect.bottom + 8;
+    } else if (spaceAbove >= estHeight + 16) {
+      top = Math.max(16, rect.top - estHeight - 8);
+    } else {
+      // Si l'espace au-dessus et en-dessous est serré, centrer verticalement avec marge sûre
+      top = Math.max(16, Math.floor((window.innerHeight - estHeight) / 2));
     }
 
     setActiveTooltip({
       id: transaction.id,
+      isMobile: false,
       top,
       left,
       transaction,
@@ -537,16 +556,68 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
       const adjAdmissionExpected = admissionExpected;
       const adjCampaignsExpected = campaignsExpected;
 
-      const admissionBalance = Math.max(0, adjAdmissionExpected - admissionPaid);
-      const tuitionBalance = Math.max(0, tuitionExpected - tuitionPaid);
-      const campaignsBalance = Math.max(0, adjCampaignsExpected - campaignsPaid);
-      const miscBalance = Math.max(0, adjPlanMiscFee - miscPaid);
+      const tuitionEffectiveHTG = isEnrolled && student.is_foreign && plan?.foreign_tuition_fee 
+        ? plan.foreign_tuition_fee 
+        : tuitionHTG;
+
+      const tuitionBreakdown = computeFeeCategoryBalance(
+        tuitionEffectiveHTG + tuitionAddition,
+        tuitionUSD,
+        tuitionPayments,
+        currentExchangeRate,
+        tuitionDiscountApplied
+      );
+
+      const campaignsBreakdown = computeFeeCategoryBalance(
+        campaignsNativeHTG,
+        campaignsNativeUSD,
+        campaignPayments,
+        currentExchangeRate,
+        0
+      );
+
+      // Séparation comptable stricte des dettes résiduelles par devise (HTG vs USD)
+      const remainingHTG = 
+        (admissionBreakdown.isPaid ? 0 : admissionBreakdown.remainingHTG) +
+        (tuitionBreakdown.isPaid ? 0 : tuitionBreakdown.remainingHTG) +
+        (miscBreakdown.isPaid ? 0 : miscBreakdown.remainingHTG) +
+        (campaignsBreakdown.isPaid ? 0 : campaignsBreakdown.remainingHTG);
+
+      const remainingUSD = 
+        (admissionBreakdown.isPaid ? 0 : admissionBreakdown.remainingUSD) +
+        (tuitionBreakdown.isPaid ? 0 : tuitionBreakdown.remainingUSD) +
+        (miscBreakdown.isPaid ? 0 : miscBreakdown.remainingUSD) +
+        (campaignsBreakdown.isPaid ? 0 : campaignsBreakdown.remainingUSD);
+
+      const remainingHTGEquiv = remainingHTG + Math.round(remainingUSD * currentExchangeRate);
+      const isFullySettled = (remainingHTG <= 0 && remainingUSD <= 0) || (remainingHTGEquiv <= 50);
+
+      // Décomposition précise des montants exigés et payés directement par devise
+      const totalDueHTG = admissionHTG + tuitionEffectiveHTG + tuitionAddition + miscHTG + campaignsNativeHTG;
+      const totalDueUSD = admissionUSD + tuitionUSD + miscUSD + campaignsNativeUSD;
+
+      let paidDirectHTG = 0;
+      let paidDirectUSD = 0;
+      validPayments.forEach((p: any) => {
+        if (p.currency === 'USD') {
+          paidDirectUSD += Number(p.amount || 0);
+        } else {
+          paidDirectHTG += Number(p.amount || 0);
+        }
+      });
+
+      const admissionBalance = admissionBreakdown.isPaid ? 0 : admissionBreakdown.remainingHTGEquiv;
+      const tuitionBalance = tuitionBreakdown.isPaid ? 0 : tuitionBreakdown.remainingHTGEquiv;
+      const campaignsBalance = campaignsBreakdown.isPaid ? 0 : campaignsBreakdown.remainingHTGEquiv;
+      const miscBalance = miscBreakdown.isPaid ? 0 : miscBreakdown.remainingHTGEquiv;
 
       const totalExpected = adjAdmissionExpected + tuitionExpected + adjCampaignsExpected + adjPlanMiscFee;
-      const totalBalance = Math.max(0, totalExpected - totalPaid);
+      const totalBalance = isFullySettled ? 0 : remainingHTGEquiv;
 
       // Fetch the true global debt across all active and past years (Portefeuille)
       let globalDebt = 0;
+      let globalDebtHTG = 0;
+      let globalDebtUSD = 0;
       const yearStatus = academicYears.find(y => y.id === targetYear)?.status;
 
       if (yearStatus !== 'FUTURE') {
@@ -560,13 +631,13 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           const { data: allPayments } = await supabase
             .from('payments')
-            .select('amount, currency, amount_htg_equivalent, fee_type, academic_year_id')
+            .select('amount, currency, amount_htg_equivalent, fee_type, academic_year_id, exchange_rate_applied')
             .eq('school_id', user.school_id)
             .eq('student_id', student.id);
 
           const { data: allAdHocFees } = await supabase
             .from('student_ad_hoc_fees')
-            .select('custom_amount, campaign:ad_hoc_campaigns(id, amount, academic_year_id)')
+            .select('custom_amount, campaign:ad_hoc_campaigns(id, amount, currency, academic_year_id)')
             .eq('school_id', user.school_id)
             .eq('student_id', student.id);
 
@@ -586,6 +657,8 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
 
           let calculatedGlobalDebt = 0;
+          let calculatedGlobalDebtHTG = 0;
+          let calculatedGlobalDebtUSD = 0;
 
           for (const enroll of enrolls) {
             const enrollYearStatus = Array.isArray(enroll.academic_year) 
@@ -603,8 +676,6 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
               // 1. Admission / Inscription Fee
               const enrollYearPayments = (allPayments || []).filter((p: any) => p.academic_year_id === yrId);
               const enrollAdmissionPayments = enrollYearPayments.filter((p: any) => p.fee_type === 'INSCRIPTION');
-              const admissionPaid = enrollAdmissionPayments
-                .reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
 
               // Check if student had previous enrollments before this year
               const { data: prevEn } = await supabase
@@ -624,19 +695,10 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                 enrollAdmissionPayments,
                 currentExchangeRate
               );
-              const admissionExpected = yrAdmissionBreakdown.isPaid ? admissionPaid : yrAdmissionBreakdown.effectiveDueHTG;
-
-              const admissionBalance = Math.max(0, admissionExpected - admissionPaid);
 
               // 2. Tuition Fee & 3. Mandatory Misc Fee
               const enrollTuitionPayments = enrollYearPayments.filter((p: any) => p.fee_type === 'SCOLARITE' || !p.fee_type);
               const enrollMiscPayments = enrollYearPayments.filter((p: any) => p.fee_type === 'DIVERS');
-
-              const rawTuitionPaid = enrollTuitionPayments
-                .reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-
-              const rawMiscPaid = enrollMiscPayments
-                .reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
 
               const planMiscHTG = planForYr.is_misc_mandatory ? Number(planForYr.misc_fee_htg || 0) : 0;
               const planMiscUSD = planForYr.is_misc_mandatory ? Number(planForYr.misc_fee_usd || 0) : 0;
@@ -646,56 +708,72 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                 enrollMiscPayments,
                 currentExchangeRate
               );
-              const planMiscFee = yrMiscBreakdown.isPaid ? rawMiscPaid : yrMiscBreakdown.effectiveDueHTG;
 
-              const neededMisc = Math.max(0, planMiscFee - rawMiscPaid);
-              const miscCoverFromTuition = Math.min(neededMisc, rawTuitionPaid);
-              const miscPaid = rawMiscPaid + miscCoverFromTuition;
-              const tuitionPaid = rawTuitionPaid - miscCoverFromTuition;
-
-              const baseFee = Number(planForYr.tuition_fee || 0) + Number(planForYr.tuition_fee_usd || 0) * currentExchangeRate;
-              const rawTuitionExpected = (student.is_foreign && planForYr.foreign_tuition_fee ? planForYr.foreign_tuition_fee : baseFee) + Number(enroll.tuition_addition || 0);
-              
-              const campaignsPaid = enrollYearPayments
-                .filter((p: any) => p.fee_type === 'AD_HOC')
-                .reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-
-              const campaignsExpected = (allAdHocFees || [])
-                .filter((fee: any) => fee.campaign && fee.campaign.academic_year_id === yrId)
-                .reduce((sum: number, fee: any) => {
-                  const required = fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign.amount);
-                  const rate = fee.campaign?.currency === 'USD' ? currentExchangeRate : 1;
-                  return sum + (required * rate);
-                }, 0);
-
-              // Méthode B : Bourse ciblée strictement sur la scolarité
               const totalYearDiscount = Number(enroll.tuition_discount || 0) + Number(student.discount_amount || 0);
-              const tuitionDiscountApplied = Math.min(rawTuitionExpected, totalYearDiscount);
-              const tuitionExpected = Math.max(0, rawTuitionExpected - tuitionDiscountApplied);
+              const yrTuitionHTG = (student.is_foreign && planForYr.foreign_tuition_fee ? planForYr.foreign_tuition_fee : Number(planForYr.tuition_fee || 0)) + Number(enroll.tuition_addition || 0);
+              const yrTuitionUSD = Number(planForYr.tuition_fee_usd || 0);
+              const yrTuitionBreakdown = computeFeeCategoryBalance(
+                yrTuitionHTG,
+                yrTuitionUSD,
+                enrollTuitionPayments,
+                currentExchangeRate,
+                totalYearDiscount
+              );
 
-              const tuitionBalance = Math.max(0, tuitionExpected - tuitionPaid);
-              const admissionBalanceWithDiscount = Math.max(0, admissionExpected - admissionPaid);
-              const miscBalance = Math.max(0, planMiscFee - miscPaid);
-              const campaignsBalance = Math.max(0, campaignsExpected - campaignsPaid);
+              const yrCampaignPayments = enrollYearPayments.filter((p: any) => p.fee_type === 'AD_HOC');
+              const yrCampHTG = (allAdHocFees || [])
+                .filter((fee: any) => fee.campaign && fee.campaign.academic_year_id === yrId && fee.campaign.currency !== 'USD')
+                .reduce((sum: number, fee: any) => sum + (fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign?.amount || 0)), 0);
 
-              const yearBalance = admissionBalanceWithDiscount + tuitionBalance + miscBalance + campaignsBalance;
-              calculatedGlobalDebt += yearBalance;
+              const yrCampUSD = (allAdHocFees || [])
+                .filter((fee: any) => fee.campaign && fee.campaign.academic_year_id === yrId && fee.campaign.currency === 'USD')
+                .reduce((sum: number, fee: any) => sum + (fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign?.amount || 0)), 0);
+
+              const yrCampaignsBreakdown = computeFeeCategoryBalance(
+                yrCampHTG,
+                yrCampUSD,
+                yrCampaignPayments,
+                currentExchangeRate,
+                0
+              );
+
+              const yrRemHTG = (yrAdmissionBreakdown.isPaid ? 0 : yrAdmissionBreakdown.remainingHTG) +
+                (yrTuitionBreakdown.isPaid ? 0 : yrTuitionBreakdown.remainingHTG) +
+                (yrMiscBreakdown.isPaid ? 0 : yrMiscBreakdown.remainingHTG) +
+                (yrCampaignsBreakdown.isPaid ? 0 : yrCampaignsBreakdown.remainingHTG);
+
+              const yrRemUSD = (yrAdmissionBreakdown.isPaid ? 0 : yrAdmissionBreakdown.remainingUSD) +
+                (yrTuitionBreakdown.isPaid ? 0 : yrTuitionBreakdown.remainingUSD) +
+                (yrMiscBreakdown.isPaid ? 0 : yrMiscBreakdown.remainingUSD) +
+                (yrCampaignsBreakdown.isPaid ? 0 : yrCampaignsBreakdown.remainingUSD);
+
+              calculatedGlobalDebtHTG += yrRemHTG;
+              calculatedGlobalDebtUSD += yrRemUSD;
+              calculatedGlobalDebt += (yrRemHTG + Math.round(yrRemUSD * currentExchangeRate));
             }
           }
 
           globalDebt = calculatedGlobalDebt;
+          globalDebtHTG = calculatedGlobalDebtHTG;
+          globalDebtUSD = calculatedGlobalDebtUSD;
         } catch (err) {
           console.warn("Failed to calculate frontend global debt:", err);
           globalDebt = totalBalance;
+          globalDebtHTG = remainingHTG;
+          globalDebtUSD = remainingUSD;
         }
       } else {
         // For FUTURE status years, global debt is reset to 0 (Compte Soldé) as requested by the user
         globalDebt = 0;
+        globalDebtHTG = 0;
+        globalDebtUSD = 0;
       }
 
       // Ensure global debt is at least the current selected year's balance to remain consistent (unless it's a FUTURE year)
       if (yearStatus !== 'FUTURE') {
-        globalDebt = Math.max(globalDebt, totalBalance);
+        globalDebt = Math.max(globalDebt, remainingHTGEquiv);
+        if (remainingHTG > globalDebtHTG) globalDebtHTG = remainingHTG;
+        if (remainingUSD > globalDebtUSD) globalDebtUSD = remainingUSD;
       }
 
       const studentFormatted = formatStudentName(student.last_name, student.first_name);
@@ -728,8 +806,18 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         studentDiscount,
         totalDiscount,
         totalDue: totalExpected,
+        totalDueHTG,
+        totalDueUSD,
+        totalPaidHTG: paidDirectHTG,
+        totalPaidUSD: paidDirectUSD,
         globalDebt,
+        globalDebtHTG,
+        globalDebtUSD,
         paid: totalPaid,
+        remainingHTG,
+        remainingUSD,
+        remainingHTGEquiv,
+        isFullySettled,
         scolaritePaid: tuitionPaid,
         inscriptionPaid: admissionPaid,
         miscPaid: miscPaid,
@@ -746,6 +834,10 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         tuitionPayments,
         miscPayments,
         campaignPayments,
+        admissionBreakdown,
+        tuitionBreakdown,
+        miscBreakdown,
+        campaignsBreakdown,
         hasCampaigns: activeCampaigns.length > 0,
         classe: effectiveClassName,
         academicYear: academicYears.find(y => y.id === targetYear)?.label || enrollment?.academic_year?.label || 'Session en cours',
@@ -880,7 +972,9 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
   }, [user?.school_id, selectedStudent?.id, loadDetails]);
 
-  const balance = selectedStudent ? Math.max(0, selectedStudent.totalDue - selectedStudent.paid) : 0;
+  const balance = selectedStudent 
+    ? (selectedStudent.isFullySettled ? 0 : (selectedStudent.remainingHTGEquiv ?? Math.max(0, selectedStudent.totalDue - selectedStudent.paid)))
+    : 0;
   const recoveryRate = selectedStudent ? Math.min(100, (selectedStudent.paid / selectedStudent.totalDue) * 100) : 0;
 
   const exportToPDF = async () => {
@@ -1115,9 +1209,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <p className="text-xs text-slate-500 mt-0.5">Situation économique globale (Session courante & Campagnes)</p>
                   </div>
                 </div>
-                <div className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${selectedStudent.globalDebt > 0 ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
+                <div className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 ${!selectedStudent.isFullySettled ? 'bg-rose-50 text-rose-600' : 'bg-emerald-50 text-emerald-600'}`}>
                   <span className="h-2 w-2 rounded-full bg-current"></span>
-                  {selectedStudent.globalDebt > 0 ? `Solde Débiteur Global: ${selectedStudent.globalDebt.toLocaleString()} G` : 'Compte Soldé'}
+                  {selectedStudent.isFullySettled ? 'Compte Soldé' : (
+                    selectedStudent.remainingUSD > 0 && selectedStudent.remainingHTG > 0
+                      ? `Solde Débiteur: ${selectedStudent.remainingHTG.toLocaleString()} G + $${selectedStudent.remainingUSD.toFixed(2)} USD`
+                      : selectedStudent.remainingUSD > 0
+                      ? `Solde Débiteur: $${selectedStudent.remainingUSD.toFixed(2)} USD (≈ ${selectedStudent.remainingHTGEquiv.toLocaleString()} G)`
+                      : `Solde Débiteur: ${selectedStudent.remainingHTG.toLocaleString()} G`
+                  )}
                 </div>
               </div>
 
@@ -1447,6 +1547,14 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                   const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
                   const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
+                  // Vérifier si le frais sous-jacent a été expressément planifié en devises (USD)
+                  const isTuitionFee = t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'));
+                  const isMiscFee = t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers');
+                  const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedStudent?.scolariteUSD || 0) > 0 || (selectedStudent?.plan?.tuition_fee_usd || 0) > 0));
+                  const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedStudent?.miscNativeUSD || 0) > 0);
+                  const isCampaignPlannedInUSD = Boolean(t.campaign?.currency === 'USD');
+                  const isFeePlannedInUSD = isTuitionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
+
                   return (
                     <div key={t.id} className="p-4 space-y-2.5 hover:bg-slate-50/60 transition-colors">
                       <div className="flex items-center justify-between gap-2">
@@ -1477,7 +1585,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Montant Payé</div>
                           <div className="font-mono font-bold text-xs mt-0.5">
                             {isUSD ? (
-                              <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded inline-block">
+                              <span className="text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded inline-block shadow-2xs">
                                 ${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
                               </span>
                             ) : (
@@ -1486,10 +1594,24 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                               </span>
                             )}
                           </div>
-                          {isUSD && (
-                            <div className="text-[10px] text-amber-800 font-mono mt-1 flex items-center gap-1 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded w-fit">
-                              <ArrowRightLeft size={10} className="text-amber-600" />
-                              1 USD = {appliedRate} HTG
+                          {isUSD ? (
+                            <div className="mt-1 space-y-0.5">
+                              <div className="text-[10px] text-amber-900 font-mono font-bold flex items-center gap-1 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded w-fit shadow-2xs">
+                                <ShieldCheck size={11} className="text-amber-700 shrink-0" />
+                                <span>1 USD = {appliedRate} HTG</span>
+                              </div>
+                              <div className="text-[9px] text-amber-700 font-semibold tracking-tight">
+                                Audit : ${paidAmount} × {appliedRate}
+                              </div>
+                            </div>
+                          ) : isFeePlannedInUSD ? (
+                            <div className="text-[10px] text-blue-800 font-mono mt-1 flex items-center gap-1 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded w-fit">
+                              <ArrowRightLeft size={10} className="text-blue-600 shrink-0" />
+                              <span>1 USD = {appliedRate} HTG</span>
+                            </div>
+                          ) : (
+                            <div className="text-[10px] text-slate-400 font-medium mt-0.5">
+                              Monnaie locale direct (HTG)
                             </div>
                           )}
                         </div>
@@ -1563,6 +1685,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                       const paidAmount = Number(t.amount || 0);
                       const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
                       const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
+
+                      // Vérifier si le frais sous-jacent a été expressément planifié en devises (USD)
+                      const isTuitionFee = t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'));
+                      const isMiscFee = t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers');
+                      const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedStudent?.scolariteUSD || 0) > 0 || (selectedStudent?.plan?.tuition_fee_usd || 0) > 0));
+                      const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedStudent?.miscNativeUSD || 0) > 0);
+                      const isCampaignPlannedInUSD = Boolean(t.campaign?.currency === 'USD');
+                      const isFeePlannedInUSD = isTuitionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
+
                       return (
                         <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3.5 whitespace-nowrap">
@@ -1590,9 +1721,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </td>
                           <td className="px-4 py-3.5 text-right font-mono font-bold whitespace-nowrap">
                             {isUSD ? (
-                              <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs whitespace-nowrap inline-block">
-                                ${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
-                              </span>
+                              <div className="flex flex-col items-end">
+                                <span className="text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded text-xs whitespace-nowrap inline-block font-mono font-bold shadow-2xs">
+                                  ${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
+                                </span>
+                                <span className="text-[10px] text-amber-700 font-mono font-medium mt-0.5 flex items-center gap-1">
+                                  <Coins size={10} className="text-amber-600 shrink-0" />
+                                  × {appliedRate} G
+                                </span>
+                              </div>
                             ) : (
                               <span className="text-slate-800 text-xs whitespace-nowrap inline-block">
                                 {paidAmount.toLocaleString()} HTG
@@ -1601,26 +1738,54 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </td>
                           <td className="px-4 py-3.5 text-center whitespace-nowrap">
                             {isUSD ? (
-                              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold whitespace-nowrap" title={`Taux historique appliqué : 1 USD = ${appliedRate} HTG`}>
-                                <ArrowRightLeft size={11} className="text-amber-600 shrink-0" />
-                                <span>1 USD = {appliedRate} HTG</span>
-                              </span>
-                            ) : (appliedRate > 1 || (selectedStudent.miscNativeUSD > 0 && (t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers')))) ? (
-                              <span className="inline-flex items-center gap-1 bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded text-[11px] font-mono font-bold whitespace-nowrap" title={`Taux de conversion vers barème USD : 1 USD = ${appliedRate > 1 ? appliedRate : (selectedStudent.exchangeRate || 140)} HTG`}>
-                                <ArrowRightLeft size={11} className="text-blue-600 shrink-0" />
-                                <span>1 USD = {appliedRate > 1 ? appliedRate : (selectedStudent.exchangeRate || 140)} HTG</span>
-                              </span>
+                              <div className="inline-flex flex-col items-center gap-0.5">
+                                <span 
+                                  className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100/70 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold whitespace-nowrap shadow-xs hover:border-amber-400 transition-colors" 
+                                  title={`Audit Financier : Taux historique scellé lors de la transaction : 1 USD = ${appliedRate} HTG\nFormule certifiée : ${paidAmount} USD × ${appliedRate} = ${baseHTG.toLocaleString()} HTG`}
+                                >
+                                  <ShieldCheck size={13} className="text-amber-700 shrink-0" />
+                                  <span>1 USD = {appliedRate} HTG</span>
+                                </span>
+                                <span className="text-[9px] font-extrabold text-amber-700 tracking-tight flex items-center gap-1">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
+                                  Taux scellé (Audit)
+                                </span>
+                              </div>
+                            ) : isFeePlannedInUSD ? (
+                              <div className="inline-flex flex-col items-center gap-0.5">
+                                <span 
+                                  className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold whitespace-nowrap shadow-xs" 
+                                  title={`Frais planifié en USD, réglé en HTG selon le taux de conversion : 1 USD = ${appliedRate} HTG`}
+                                >
+                                  <ArrowRightLeft size={12} className="text-blue-700 shrink-0" />
+                                  <span>1 USD = {appliedRate} HTG</span>
+                                </span>
+                                <span className="text-[9px] font-semibold text-blue-700 tracking-tight">
+                                  Barème USD amorti
+                                </span>
+                              </div>
                             ) : (
-                              <span className="text-[11px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap inline-block">
-                                1:1 (HTG)
+                              <span 
+                                className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-md border border-slate-200 whitespace-nowrap inline-flex items-center gap-1.5"
+                                title="Paiement direct en monnaie locale (Gourdes) - Aucune conversion de devise requise"
+                              >
+                                <span className="text-slate-400 font-bold">—</span>
+                                <span className="text-slate-600 font-medium">(HTG direct)</span>
                               </span>
                             )}
                           </td>
                           <td className="px-4 py-3.5 text-right font-semibold font-mono text-gray-900 whitespace-nowrap">
-                            <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                              <span className="text-sm font-black text-slate-900 whitespace-nowrap">
-                                {baseHTG.toLocaleString()} G
-                              </span>
+                            <div className="flex items-center justify-end gap-2 whitespace-nowrap">
+                              <div className="text-right">
+                                <span className="text-sm font-black text-slate-900 whitespace-nowrap">
+                                  {baseHTG.toLocaleString()} G
+                                </span>
+                                {isUSD && (
+                                  <div className="text-[10px] text-emerald-700 font-mono font-semibold" title="Conversion certifiée">
+                                    ${paidAmount} × {appliedRate}
+                                  </div>
+                                )}
+                              </div>
                               
                               {/* Bouton déclencheur de l'infobulle financière sans coupure */}
                               <button
@@ -1632,13 +1797,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                     openTooltip(e, t);
                                   }
                                 }}
-                                onMouseEnter={(e) => openTooltip(e, t)}
-                                className={`p-1 rounded-full transition-colors cursor-pointer ${
+                                className={`p-1.5 rounded-full transition-colors cursor-pointer ${
                                   activeTooltip?.id === t.id
                                     ? 'text-indigo-600 bg-indigo-100 ring-2 ring-indigo-400'
+                                    : isUSD
+                                    ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 ring-1 ring-amber-200'
                                     : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
                                 }`}
-                                aria-label="Consulter le décompte financier détaillé"
+                                aria-label="Consulter le décompte financier détaillé et le statut d'acquittement"
+                                title="Cliquer pour afficher le décompte des devises et statut d'acquittement"
                               >
                                 <Info size={15} />
                               </button>
@@ -1683,7 +1850,12 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                 {balance > 0 && (
                   <button 
                     onClick={() => {
-                      const msg = `${schoolDetails?.name || 'École'}: Rappel de paiement pour ${selectedStudent.first_name}. Solde dû: ${balance.toLocaleString()} HTG. Merci de régulariser au plus vite.`;
+                      const soldeMsg = selectedStudent?.remainingUSD > 0 && selectedStudent?.remainingHTG > 0
+                        ? `${selectedStudent.remainingHTG.toLocaleString()} HTG + $${selectedStudent.remainingUSD.toFixed(2)} USD`
+                        : selectedStudent?.remainingUSD > 0
+                        ? `$${selectedStudent.remainingUSD.toFixed(2)} USD (≈ ${selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)`
+                        : `${balance.toLocaleString()} HTG`;
+                      const msg = `${schoolDetails?.name || 'École'}: Rappel de paiement pour ${selectedStudent.first_name}. Solde dû: ${soldeMsg}. Merci de régulariser au plus vite.`;
                       setReminderMessage(msg);
                       setShowReminderModal(true);
                     }}
@@ -2025,19 +2197,62 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <div className="space-y-4">
                     <div className="flex justify-between items-center px-4">
                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Total Payé à ce jour</p>
-                      <p className="text-base font-black text-emerald-600">{selectedStudent.paid.toLocaleString()} HTG</p>
+                      <p className="text-base font-black text-emerald-600">
+                        {selectedStudent.totalPaidUSD > 0 && selectedStudent.totalPaidHTG > 0
+                          ? `${selectedStudent.totalPaidHTG.toLocaleString()} HTG + $${selectedStudent.totalPaidUSD.toFixed(2)} USD`
+                          : selectedStudent.totalPaidUSD > 0
+                          ? `$${selectedStudent.totalPaidUSD.toFixed(2)} USD (≈ ${selectedStudent.paid.toLocaleString()} HTG)`
+                          : `${selectedStudent.paid.toLocaleString()} HTG`}
+                      </p>
                     </div>
                     <div className="p-6 rounded-3xl bg-slate-900 shadow-xl shadow-slate-200 relative overflow-hidden group">
                       <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:scale-110 transition-transform">
                         <DollarSign size={48} className="text-white" />
                       </div>
                       <p className="text-[10px] font-black text-white/50 uppercase tracking-[0.2em] mb-2">Solde Restant Dû</p>
-                      <div className="flex items-baseline gap-2 relative z-10">
-                        <p className={`text-3xl font-black font-mono tracking-tighter ${selectedStudent.totalDue - selectedStudent.paid > 0 ? 'text-white' : 'text-emerald-400'}`}>
-                          {Math.max(0, selectedStudent.totalDue - selectedStudent.paid).toLocaleString()}
-                        </p>
-                        <span className="text-xs font-bold text-white/40 uppercase tracking-widest">HTG</span>
-                      </div>
+                      {selectedStudent.isFullySettled ? (
+                        <div className="flex items-baseline gap-2 relative z-10">
+                          <p className="text-3xl font-black font-mono tracking-tighter text-emerald-400">
+                            0
+                          </p>
+                          <span className="text-xs font-bold text-emerald-400/70 uppercase tracking-widest">Compte Soldé</span>
+                        </div>
+                      ) : (
+                        <div className="relative z-10">
+                          {selectedStudent.remainingUSD > 0 && selectedStudent.remainingHTG > 0 ? (
+                            <div className="space-y-1">
+                              <p className="text-2xl font-black font-mono tracking-tighter text-white">
+                                {selectedStudent.remainingHTG.toLocaleString()} <span className="text-xs text-white/50">HTG</span>
+                              </p>
+                              <p className="text-xl font-black font-mono tracking-tighter text-emerald-400">
+                                + ${selectedStudent.remainingUSD.toFixed(2)} <span className="text-xs text-white/50">USD</span>
+                              </p>
+                              <p className="text-[10px] text-white/60 font-mono">
+                                (Équivalent total: ≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
+                              </p>
+                            </div>
+                          ) : selectedStudent.remainingUSD > 0 ? (
+                            <div className="space-y-1">
+                              <div className="flex items-baseline gap-2">
+                                <p className="text-3xl font-black font-mono tracking-tighter text-white">
+                                  ${selectedStudent.remainingUSD.toFixed(2)}
+                                </p>
+                                <span className="text-xs font-bold text-white/40 uppercase tracking-widest">USD</span>
+                              </div>
+                              <p className="text-[10px] text-white/60 font-mono">
+                                (≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
+                              </p>
+                            </div>
+                          ) : (
+                            <div className="flex items-baseline gap-2">
+                              <p className="text-3xl font-black font-mono tracking-tighter text-white">
+                                {selectedStudent.remainingHTG.toLocaleString()}
+                              </p>
+                              <span className="text-xs font-bold text-white/40 uppercase tracking-widest">HTG</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-col justify-end items-end text-right pr-6">
@@ -2077,19 +2292,20 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Infobulle Fixe Haute Précision (Anti-coupure / Immune aux overflows de tableaux) */}
       {activeTooltip && (
-        <>
-          {/* Overlay pour fermer en cliquant n'importe où */}
+        <div 
+          className="fixed inset-0 z-[1200] flex items-center justify-center sm:block p-3 sm:p-0 bg-slate-900/30 backdrop-blur-[1px]"
+          onClick={() => setActiveTooltip(null)}
+        >
           <div 
-            className="fixed inset-0 z-[1200] bg-slate-900/20 backdrop-blur-[0.5px] cursor-default"
-            onClick={() => setActiveTooltip(null)}
-          />
-          
-          <div 
-            className="fixed z-[1201] w-[360px] max-w-[calc(100vw-32px)] bg-slate-950 text-white rounded-2xl shadow-2xl p-4 border border-slate-700 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-[calc(100vh-32px)] text-left whitespace-normal select-text"
-            style={{
+            className={`bg-slate-950 text-white rounded-2xl shadow-2xl p-5 border border-slate-700 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-[88vh] text-left whitespace-normal select-text ${
+              activeTooltip.isMobile
+                ? 'w-full max-w-sm'
+                : 'w-[390px] max-w-[calc(100vw-32px)] fixed z-[1201]'
+            }`}
+            style={!activeTooltip.isMobile ? {
               top: `${activeTooltip.top}px`,
               left: `${activeTooltip.left}px`,
-            }}
+            } : undefined}
             onClick={(e) => e.stopPropagation()}
           >
             {(() => {
@@ -2097,7 +2313,9 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
               const isUSD = t.currency === 'USD';
               const paidAmount = Number(t.amount || 0);
               const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
+              const currentRate = Number(selectedStudent?.exchangeRate || 140);
               const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
+              
               const natureName = t.campaign?.name 
                 ? `Campagne: ${t.campaign.name}` 
                 : t.ad_hoc_campaign_id 
@@ -2110,11 +2328,38 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                 ? 'Frais Divers Obligatoires' 
                 : (t.nature || t.type || t.fee_type || 'Frais Divers');
 
+              // Identify associated fee category breakdown
+              const isAdmission = t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription";
+              const isMisc = t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers');
+              const isCampaign = t.ad_hoc_campaign_id || t.fee_type === 'AD_HOC';
+              const isTuitionFee = t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'));
+
+              const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedStudent?.scolariteUSD || 0) > 0 || (selectedStudent?.plan?.tuition_fee_usd || 0) > 0));
+              const isMiscPlannedInUSD = Boolean(isMisc && (selectedStudent?.miscNativeUSD || 0) > 0);
+              const isCampaignPlannedInUSD = Boolean(t.campaign?.currency === 'USD');
+              const isFeePlannedInUSD = isTuitionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
+
+              const associatedBreakdown = isCampaign
+                ? selectedStudent?.campaignsBreakdown
+                : isAdmission
+                ? selectedStudent?.admissionBreakdown
+                : isMisc
+                ? selectedStudent?.miscBreakdown
+                : selectedStudent?.tuitionBreakdown;
+
+              const isFeeAcquitted = associatedBreakdown ? associatedBreakdown.isPaid : false;
+              const remUSD = associatedBreakdown?.remainingUSD || 0;
+              const remHTG = associatedBreakdown?.remainingHTG || 0;
+              const remHTGEquiv = associatedBreakdown?.remainingHTGEquiv || 0;
+
+              const rateDiff = currentRate - appliedRate;
+              const hasRateVariance = isUSD && Math.abs(rateDiff) > 0.01;
+
               return (
-                <div className="space-y-3">
+                <div className="space-y-3.5">
                   <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
                     <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
-                      <ArrowRightLeft size={14} className="text-amber-400 shrink-0" /> Décompte Multi-Devises
+                      <ArrowRightLeft size={14} className="text-amber-400 shrink-0" /> Décompte & Statut d'Acquittement
                     </span>
                     <div className="flex items-center gap-2">
                       <span className="text-[10px] font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 font-bold">
@@ -2131,9 +2376,36 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
 
+                  {/* Statut d'acquittement immédiat du frais lié */}
+                  <div className={`p-2.5 rounded-xl border flex items-start gap-2.5 ${
+                    isFeeAcquitted
+                      ? 'bg-emerald-950/60 border-emerald-500/40 text-emerald-200'
+                      : 'bg-amber-950/50 border-amber-500/40 text-amber-200'
+                  }`}>
+                    {isFeeAcquitted ? (
+                      <CheckCircle2 size={16} className="text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                    )}
+                    <div className="text-xs leading-relaxed">
+                      <div className="font-bold flex items-center gap-1.5">
+                        <span>{isFeeAcquitted ? 'Frais Entièrement Acquitté (Soldé)' : 'Frais Non Soldé (Paiement Partiel)'}</span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 mt-0.5">
+                        {isFeeAcquitted ? (
+                          'Ce frais est intégralement réglé. Les reliquats d\'écart de conversion en devises sont automatiquement absorbés sans dette résiduelle.'
+                        ) : (
+                          <>
+                            Solde restant dû : <strong className="text-white font-mono">{remUSD > 0 && remHTG > 0 ? `${remHTG.toLocaleString()} HTG + $${remUSD.toFixed(2)} USD` : remUSD > 0 ? `$${remUSD.toFixed(2)} USD (≈ ${remHTGEquiv.toLocaleString()} HTG)` : `${remHTG.toLocaleString()} HTG`}</strong>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
                   <div className="space-y-2 text-xs">
                     <div className="flex justify-between items-center text-slate-300">
-                      <span className="text-slate-400">Nature du versement :</span>
+                      <span className="text-slate-400">Rubrique de frais :</span>
                       <span className="font-semibold text-slate-100 text-right">{natureName}</span>
                     </div>
 
@@ -2145,39 +2417,75 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
 
                     <div className="flex justify-between items-center text-slate-300">
-                      <span className="text-slate-400">Taux appliqué :</span>
+                      <span className="text-slate-400">{isUSD ? 'Taux appliqué (historique scellé) :' : 'Taux de conversion :'}</span>
                       <span className="font-mono font-bold text-amber-300">
-                        {isUSD ? `1 USD = ${appliedRate} HTG` : (appliedRate > 1 ? `1 USD = ${appliedRate} HTG` : `1:1 (Monnaie HTG)`)}
+                        {isUSD ? (
+                          `1 USD = ${appliedRate} HTG`
+                        ) : isFeePlannedInUSD ? (
+                          `1 USD = ${appliedRate} HTG (Barème USD)`
+                        ) : (
+                          <span className="text-slate-400 font-sans text-xs">Sans objet (Monnaie locale Gourdes)</span>
+                        )}
                       </span>
                     </div>
 
+                    {isUSD && (
+                      <>
+                        <div className="flex justify-between items-center text-slate-300 text-[11px]">
+                          <span className="text-slate-400">Taux système actuel :</span>
+                          <span className="font-mono text-slate-200">
+                            1 USD = {currentRate} HTG
+                          </span>
+                        </div>
+
+                        {/* Bloc Traçabilité & Audit Financier */}
+                        <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-200/90 space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                            <ShieldCheck size={14} className="text-amber-400" />
+                            <span>Audit Financier : Taux Scellé Garanti</span>
+                          </div>
+                          <div className="font-mono text-xs text-white">
+                            {paidAmount.toFixed(2)} USD × {appliedRate} HTG = <strong className="text-amber-300">{baseHTG.toLocaleString()} HTG</strong>
+                          </div>
+                          <p className="text-[10px] text-slate-300">
+                            Conversion scellée historiquement lors de la transaction pour garantir une transparence totale lors de l'audit financier.
+                          </p>
+                        </div>
+                      </>
+                    )}
+
+                    {hasRateVariance && (
+                      <div className="p-2 rounded-lg bg-slate-900 border border-slate-800 text-[11px] text-slate-300 space-y-1">
+                        <div className="flex justify-between text-slate-400">
+                          <span>Évolution du taux :</span>
+                          <span className={`font-mono font-bold ${rateDiff > 0 ? 'text-amber-400' : 'text-cyan-400'}`}>
+                            {rateDiff > 0 ? `+${rateDiff.toFixed(2)}` : rateDiff.toFixed(2)} HTG/USD
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-slate-400 italic">
+                          Grâce au journal des taux historiques, le solde dû reste stable et immunisé contre les fluctuations de taux.
+                        </p>
+                      </div>
+                    )}
+
                     <div className="flex justify-between items-center text-slate-300 pt-1.5 border-t border-slate-800">
-                      <span className="text-slate-400 font-bold">Valeur convertie :</span>
+                      <span className="text-slate-400 font-bold">Valeur comptabilisée :</span>
                       <span className="font-mono font-black text-white">
                         {isUSD 
                           ? `${baseHTG.toLocaleString()} HTG` 
-                          : (appliedRate > 1 ? `$${(paidAmount / appliedRate).toFixed(2)} USD (≈ ${baseHTG.toLocaleString()} G)` : `${baseHTG.toLocaleString()} G`)}
+                          : `${baseHTG.toLocaleString()} HTG`}
                       </span>
                     </div>
 
                     <div className="flex justify-between items-center text-slate-300">
-                      <span className="text-slate-400">Méthode de règlement :</span>
+                      <span className="text-slate-400">Mode de paiement :</span>
                       <span className="font-semibold text-slate-200">
                         {t.status === 'ANNULE' ? 'Annulé' : (t.payment_method || 'Cash')}
                       </span>
                     </div>
 
-                    <div className="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-2 mt-1.5">
-                      <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
-                      <span className="leading-relaxed">
-                        {isUSD 
-                          ? `Versement scellé en devises. Portée financière garantie sans dette fantôme.`
-                          : `Versement ayant amorti la quote-part équivalente en devises. Reliquats de change absorbés.`}
-                      </span>
-                    </div>
-
                     <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-800 flex justify-between items-center">
-                      <span>Date & Heure :</span>
+                      <span>Date de transaction :</span>
                       <span className="font-mono text-slate-300">{new Date(t.created_at).toLocaleString('fr-FR')}</span>
                     </div>
                   </div>
@@ -2185,7 +2493,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
               );
             })()}
           </div>
-        </>
+        </div>
       )}
     </div>
   );
