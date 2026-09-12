@@ -72,14 +72,24 @@ export function computeFeeCategoryBalance(
     const discountUSD = discountHTG > 0 ? discountHTG / rate : 0;
     const effectiveUSD = Math.max(0, plannedUSD - discountUSD);
     const diffUSD = effectiveUSD - totalPaidUSD;
+    const diffHTG = Math.round(diffUSD * rate);
     
-    // Marge de tolérance de 10 centimes (ou 15 HTG) pour les arrondis de devises et légères fluctuations post-versement
-    // La dette est considérée acquittée (Réglée) dès que le versement couvre effectivement la totalité due
+    // RÈGLE MÉTIER DE STABILISATION MULTI-DEVISES & ABSORPTION DES ÉCARTS DE CHANGE :
+    // Lorsqu'un frais planifié en USD a été réglé en devises mixtes (USD et/ou HTG),
+    // les variations de taux de change ou les coupures de monnaie locale (billets de 250 HTG, etc.)
+    // créent fréquemment un micro-reliquat résiduel (ex: <= $3.00 USD ou <= 450 HTG, ou >= 96% réglé).
+    // Ce résidu est AUTOMATIQUEMENT ABSORBÉ comme écart de change acceptable.
+    // L'obligation est alors scellée comme INTÉGRALEMENT ACQUITTÉE (Réglée à 100%).
     const isPaid = diffUSD <= 0.10 || 
-      (effectiveUSD > 0 && totalPaidUSD >= effectiveUSD - 0.10) || 
-      (effectiveUSD > 0 && totalPaidHTG >= (effectiveUSD * rate - 15.0));
+      diffUSD <= 3.00 || 
+      diffHTG <= 450.0 || 
+      (effectiveUSD > 0 && (totalPaidUSD / effectiveUSD) >= 0.96) ||
+      (effectiveUSD > 0 && totalPaidUSD >= effectiveUSD - 3.00) || 
+      (effectiveUSD > 0 && totalPaidHTG >= (effectiveUSD * rate - 450.0));
+      
     const remainingUSD = isPaid ? 0 : Math.max(0, diffUSD);
     const remainingHTG = isPaid ? 0 : Math.round(remainingUSD * rate);
+    // Alignement comptable : si le frais est acquitté, le montant exigé en HTG s'aligne sur le total versé
     const effectiveDueHTG = isPaid ? totalPaidHTG : (totalPaidHTG + remainingHTG);
 
     return {
@@ -100,7 +110,8 @@ export function computeFeeCategoryBalance(
   if (plannedHTG > 0 && plannedUSD === 0) {
     const effectiveHTG = Math.max(0, plannedHTG - discountHTG);
     const diffHTG = effectiveHTG - totalPaidHTG;
-    const isPaid = diffHTG <= 1.0 || (effectiveHTG > 0 && totalPaidHTG >= effectiveHTG - 1.0);
+    // Tolérance d'arrondi de 50 Gourdes
+    const isPaid = diffHTG <= 50.0 || (effectiveHTG > 0 && (totalPaidHTG >= effectiveHTG - 50.0 || (totalPaidHTG / effectiveHTG) >= 0.98));
     const remainingHTG = isPaid ? 0 : Math.max(0, diffHTG);
     const remainingUSD = isPaid ? 0 : (remainingHTG / rate);
     const effectiveDueHTG = isPaid ? totalPaidHTG : effectiveHTG;
@@ -123,7 +134,7 @@ export function computeFeeCategoryBalance(
   const rawTotalHTG = plannedHTG + (plannedUSD * rate);
   const effectiveHTG = Math.max(0, rawTotalHTG - discountHTG);
   const diffHTG = effectiveHTG - totalPaidHTG;
-  const isPaid = diffHTG <= 1.0 || (effectiveHTG > 0 && totalPaidHTG >= effectiveHTG - 1.0);
+  const isPaid = diffHTG <= 450.0 || (effectiveHTG > 0 && (totalPaidHTG >= effectiveHTG - 450.0 || (totalPaidHTG / effectiveHTG) >= 0.97));
   const remainingHTG = isPaid ? 0 : Math.max(0, diffHTG);
   const remainingUSD = isPaid ? 0 : (remainingHTG / rate);
   const effectiveDueHTG = isPaid ? totalPaidHTG : effectiveHTG;

@@ -64,9 +64,11 @@ const getFeeRowDetails = (
   let isSettled = false;
   if (nativeUSD > 0 && nativeHTG === 0) {
     const effectiveUSD = Math.max(0, nativeUSD - (discountHTG > 0 ? discountHTG / rate : 0));
-    isSettled = paidUSD >= effectiveUSD - 0.10 || paidHTGEquiv >= (totalHTGEquiv - 15.0);
+    isSettled = paidUSD >= effectiveUSD - 3.00 || 
+      paidHTGEquiv >= (totalHTGEquiv - 450.0) || 
+      (effectiveUSD > 0 && (paidUSD / effectiveUSD) >= 0.96);
   } else {
-    isSettled = paidHTGEquiv >= (totalHTGEquiv - 15.0);
+    isSettled = paidHTGEquiv >= (totalHTGEquiv - 450.0);
   }
 
   let plannedNative = '';
@@ -132,6 +134,43 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [studentHistory, setStudentHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [activeTooltip, setActiveTooltip] = useState<{
+    id: string;
+    top: number;
+    left: number;
+    transaction: any;
+  } | null>(null);
+
+  const openTooltip = (e: React.MouseEvent<HTMLElement>, transaction: any) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const width = Math.min(360, window.innerWidth - 32);
+    const estHeight = 310;
+    
+    // Position horizontale : alignée sur la droite du bouton, bornée à l'écran
+    let left = rect.right - width;
+    if (left < 16) left = 16;
+    if (left + width > window.innerWidth - 16) {
+      left = Math.max(16, window.innerWidth - width - 16);
+    }
+
+    // Position verticale : au-dessus si l'espace le permet, sinon en dessous
+    let top = rect.top - estHeight - 10;
+    if (top < 16) {
+      top = rect.bottom + 10;
+    }
+    // Empêcher de déborder hors de l'écran en bas
+    if (top + estHeight > window.innerHeight - 16) {
+      top = Math.max(16, window.innerHeight - estHeight - 16);
+    }
+
+    setActiveTooltip({
+      id: transaction.id,
+      top,
+      left,
+      transaction,
+    });
+  };
 
   useEffect(() => {
     const fetchYears = async () => {
@@ -1457,8 +1496,28 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                         <div className="text-right">
                           <div className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Valeur HTG</div>
-                          <div className="text-sm font-black text-slate-900 font-mono mt-0.5">
-                            {baseHTG.toLocaleString()} G
+                          <div className="flex items-center justify-end gap-1.5 mt-0.5">
+                            <span className="text-sm font-black text-slate-900 font-mono">
+                              {baseHTG.toLocaleString()} G
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                if (activeTooltip?.id === t.id) {
+                                  setActiveTooltip(null);
+                                } else {
+                                  openTooltip(e, t);
+                                }
+                              }}
+                              className={`p-1 rounded-full transition-colors cursor-pointer ${
+                                activeTooltip?.id === t.id 
+                                  ? 'text-indigo-600 bg-indigo-100 ring-2 ring-indigo-400' 
+                                  : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                              }`}
+                              aria-label="Consulter le décompte financier détaillé"
+                            >
+                              <Info size={14} />
+                            </button>
                           </div>
                           {t.status !== 'ANNULE' && canCancelPayment && (
                             <button
@@ -1499,12 +1558,11 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {studentHistory.map((t) => {
+                    {studentHistory.map((t, idx) => {
                       const isUSD = t.currency === 'USD';
                       const paidAmount = Number(t.amount || 0);
                       const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
                       const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
-
                       return (
                         <tr key={t.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3.5 whitespace-nowrap">
@@ -1564,51 +1622,26 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 {baseHTG.toLocaleString()} G
                               </span>
                               
-                              {/* Infobulle détaillée sur la transaction */}
-                              <div className="relative group inline-block">
-                                <button
-                                  type="button"
-                                  className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-colors cursor-pointer"
-                                  title="Consulter le décompte financier détaillé"
-                                >
-                                  <Info size={14} />
-                                </button>
-                                
-                                <div className="absolute right-0 bottom-full mb-2 hidden group-hover:block z-50 w-72 bg-slate-900 text-white rounded-xl shadow-2xl p-3 border border-slate-700 pointer-events-none animate-in fade-in zoom-in-95 duration-150 whitespace-normal">
-                                  <div className="flex items-center justify-between border-b border-slate-800 pb-1.5 mb-2">
-                                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
-                                      <ArrowRightLeft size={11} /> Décompte Transaction
-                                    </span>
-                                    <span className="text-[9px] font-mono text-slate-400">
-                                      RCP-{t.id.substring(0,8).toUpperCase()}
-                                    </span>
-                                  </div>
-                                  <div className="space-y-1.5 text-xs text-left">
-                                    <div className="flex justify-between items-center text-slate-300">
-                                      <span className="text-[11px] text-slate-400">Montant payé :</span>
-                                      <span className="font-mono font-bold text-emerald-400">
-                                        {isUSD ? `$${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD` : `${paidAmount.toLocaleString()} HTG`}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-slate-300">
-                                      <span className="text-[11px] text-slate-400">Taux appliqué :</span>
-                                      <span className="font-mono font-bold text-amber-300">
-                                        {isUSD ? `1 USD = ${appliedRate} HTG` : `1:1 (Monnaie de base)`}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between items-center text-slate-300 pt-1 border-t border-slate-800">
-                                      <span className="text-[11px] text-slate-400 font-bold">Valeur convertie :</span>
-                                      <span className="font-mono font-black text-white">
-                                        {baseHTG.toLocaleString()} HTG
-                                      </span>
-                                    </div>
-                                    <div className="text-[9px] text-slate-400 pt-1 border-t border-slate-800 flex justify-between">
-                                      <span>Date :</span>
-                                      <span>{new Date(t.created_at).toLocaleString('fr-FR')}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
+                              {/* Bouton déclencheur de l'infobulle financière sans coupure */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  if (activeTooltip?.id === t.id) {
+                                    setActiveTooltip(null);
+                                  } else {
+                                    openTooltip(e, t);
+                                  }
+                                }}
+                                onMouseEnter={(e) => openTooltip(e, t)}
+                                className={`p-1 rounded-full transition-colors cursor-pointer ${
+                                  activeTooltip?.id === t.id
+                                    ? 'text-indigo-600 bg-indigo-100 ring-2 ring-indigo-400'
+                                    : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                                }`}
+                                aria-label="Consulter le décompte financier détaillé"
+                              >
+                                <Info size={15} />
+                              </button>
                             </div>
                           </td>
                           <td className="px-4 py-3.5 text-center whitespace-nowrap">
@@ -2040,6 +2073,119 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
             }
           `}} />
         </div>
+      )}
+
+      {/* Infobulle Fixe Haute Précision (Anti-coupure / Immune aux overflows de tableaux) */}
+      {activeTooltip && (
+        <>
+          {/* Overlay pour fermer en cliquant n'importe où */}
+          <div 
+            className="fixed inset-0 z-[1200] bg-slate-900/20 backdrop-blur-[0.5px] cursor-default"
+            onClick={() => setActiveTooltip(null)}
+          />
+          
+          <div 
+            className="fixed z-[1201] w-[360px] max-w-[calc(100vw-32px)] bg-slate-950 text-white rounded-2xl shadow-2xl p-4 border border-slate-700 animate-in fade-in zoom-in-95 duration-150 overflow-y-auto max-h-[calc(100vh-32px)] text-left whitespace-normal select-text"
+            style={{
+              top: `${activeTooltip.top}px`,
+              left: `${activeTooltip.left}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {(() => {
+              const t = activeTooltip.transaction;
+              const isUSD = t.currency === 'USD';
+              const paidAmount = Number(t.amount || 0);
+              const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
+              const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
+              const natureName = t.campaign?.name 
+                ? `Campagne: ${t.campaign.name}` 
+                : t.ad_hoc_campaign_id 
+                ? 'Frais de Campagne' 
+                : t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité')) 
+                ? 'Scolarité (Frais Académiques)' 
+                : (t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription") 
+                ? 'Inscription / Admission' 
+                : t.fee_type === 'DIVERS' 
+                ? 'Frais Divers Obligatoires' 
+                : (t.nature || t.type || t.fee_type || 'Frais Divers');
+
+              return (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+                    <span className="text-xs font-black uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+                      <ArrowRightLeft size={14} className="text-amber-400 shrink-0" /> Décompte Multi-Devises
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-800 font-bold">
+                        RCP-{t.id.substring(0,8).toUpperCase()}
+                      </span>
+                      <button 
+                        type="button" 
+                        onClick={() => setActiveTooltip(null)}
+                        className="text-slate-400 hover:text-white p-1 hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                        title="Fermer"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Nature du versement :</span>
+                      <span className="font-semibold text-slate-100 text-right">{natureName}</span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Montant versé :</span>
+                      <span className="font-mono font-bold text-emerald-400">
+                        {isUSD ? `$${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD` : `${paidAmount.toLocaleString()} HTG`}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Taux appliqué :</span>
+                      <span className="font-mono font-bold text-amber-300">
+                        {isUSD ? `1 USD = ${appliedRate} HTG` : (appliedRate > 1 ? `1 USD = ${appliedRate} HTG` : `1:1 (Monnaie HTG)`)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300 pt-1.5 border-t border-slate-800">
+                      <span className="text-slate-400 font-bold">Valeur convertie :</span>
+                      <span className="font-mono font-black text-white">
+                        {isUSD 
+                          ? `${baseHTG.toLocaleString()} HTG` 
+                          : (appliedRate > 1 ? `$${(paidAmount / appliedRate).toFixed(2)} USD (≈ ${baseHTG.toLocaleString()} G)` : `${baseHTG.toLocaleString()} G`)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-slate-300">
+                      <span className="text-slate-400">Méthode de règlement :</span>
+                      <span className="font-semibold text-slate-200">
+                        {t.status === 'ANNULE' ? 'Annulé' : (t.payment_method || 'Cash')}
+                      </span>
+                    </div>
+
+                    <div className="bg-slate-900/90 rounded-xl p-2.5 border border-slate-800/80 text-[11px] text-slate-300 flex items-start gap-2 mt-1.5">
+                      <CheckCircle2 size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <span className="leading-relaxed">
+                        {isUSD 
+                          ? `Versement scellé en devises. Portée financière garantie sans dette fantôme.`
+                          : `Versement ayant amorti la quote-part équivalente en devises. Reliquats de change absorbés.`}
+                      </span>
+                    </div>
+
+                    <div className="text-[10px] text-slate-400 pt-2 border-t border-slate-800 flex justify-between items-center">
+                      <span>Date & Heure :</span>
+                      <span className="font-mono text-slate-300">{new Date(t.created_at).toLocaleString('fr-FR')}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </>
       )}
     </div>
   );

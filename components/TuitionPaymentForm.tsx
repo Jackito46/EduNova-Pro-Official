@@ -990,14 +990,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const calculatedTotalDue = scolariteDue + effectiveInscriptionDue + effectiveMiscDue + campaignsTotalDue;
         const totalDue = Math.max(currentPaid, calculatedTotalDue);
 
-        // Auto-sélection du type de frais en fonction des priorités (Règles strictes)
+        // Auto-sélection du type de frais en fonction des priorités (Règles strictes avec tolérance résiduelle)
         let autoFeeType = 'SCOLARITE';
         let autoCurrency: 'HTG' | 'USD' = 'HTG';
 
-        if (effectiveInscriptionDue > inscriptionPaid) {
+        if (effectiveInscriptionDue > inscriptionPaid + 450 && !admissionBreakdown.isPaid) {
           autoFeeType = 'INSCRIPTION';
           autoCurrency = (inscriptionUSD_val > 0 && inscriptionHTG_val === 0) ? 'USD' : 'HTG';
-        } else if (effectiveMiscDue > miscPaid && plan?.is_misc_mandatory) {
+        } else if (effectiveMiscDue > miscPaid + 450 && plan?.is_misc_mandatory && !miscBreakdown.isPaid) {
           autoFeeType = 'DIVERS';
           autoCurrency = (miscUSD_val > 0 && miscHTG === 0) ? 'USD' : 'HTG';
         } else {
@@ -1162,12 +1162,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     if (feeType === 'INSCRIPTION') {
       const isUSDPlan = (selectedStudent.inscriptionUSD || 0) > 0 && (selectedStudent.inscriptionNativeHTG || 0) === 0;
-      const remUSD = selectedStudent.inscriptionRemainingUSD !== undefined
+      const rawRemUSD = selectedStudent.inscriptionRemainingUSD !== undefined
         ? selectedStudent.inscriptionRemainingUSD
         : (selectedStudent.inscriptionUSD ? Math.max(0, selectedStudent.inscriptionUSD - (selectedStudent.inscriptionPaidUSD || 0)) : 0);
-      const remHTG = selectedStudent.inscriptionRemainingHTG !== undefined
+      const rawRemHTG = selectedStudent.inscriptionRemainingHTG !== undefined
         ? selectedStudent.inscriptionRemainingHTG
         : Math.max(0, selectedStudent.inscriptionDue - selectedStudent.inscriptionPaid);
+      
+      const isEffectivelySettled = (rawRemUSD <= 3.00 && isUSDPlan) || rawRemHTG <= 450;
+      const remUSD = isEffectivelySettled ? 0 : rawRemUSD;
+      const remHTG = isEffectivelySettled ? 0 : rawRemHTG;
       
       const suggestion = isUSD 
         ? (isUSDPlan ? remUSD : (Math.round((remHTG / rate) * 100) / 100))
@@ -1183,12 +1187,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     if (feeType === 'DIVERS') {
       const isUSDPlan = (selectedStudent.miscUSD || 0) > 0 && (selectedStudent.miscNativeHTG || 0) === 0;
-      const remUSD = selectedStudent.miscRemainingUSD !== undefined
+      const rawRemUSD = selectedStudent.miscRemainingUSD !== undefined
         ? selectedStudent.miscRemainingUSD
         : (selectedStudent.miscUSD ? Math.max(0, selectedStudent.miscUSD - (selectedStudent.miscPaidUSD || 0)) : 0);
-      const remHTG = selectedStudent.miscRemainingHTG !== undefined
+      const rawRemHTG = selectedStudent.miscRemainingHTG !== undefined
         ? selectedStudent.miscRemainingHTG
         : Math.max(0, selectedStudent.miscDue - selectedStudent.miscPaid);
+      
+      const isEffectivelySettled = (rawRemUSD <= 3.00 && isUSDPlan) || rawRemHTG <= 450;
+      const remUSD = isEffectivelySettled ? 0 : rawRemUSD;
+      const remHTG = isEffectivelySettled ? 0 : rawRemHTG;
       
       const suggestion = isUSD 
         ? (isUSDPlan ? remUSD : (Math.round((remHTG / rate) * 100) / 100))
@@ -2014,8 +2022,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
   }
 
-  const isInscriptionForced = selectedStudent && ((selectedStudent.inscriptionDue || 0) > (selectedStudent.inscriptionPaid || 0) + 1);
-  const isMiscForced = selectedStudent && !isInscriptionForced && selectedStudent.plan?.is_misc_mandatory && ((selectedStudent.miscDue || 0) > (selectedStudent.miscPaid || 0) + 1);
+  const isInscriptionForced = selectedStudent && ((selectedStudent.inscriptionDue || 0) > (selectedStudent.inscriptionPaid || 0) + 450);
+  const miscRemainingDueHTG = Math.max(0, (selectedStudent?.miscDue || 0) - (selectedStudent?.miscPaid || 0));
+  const miscRemainingDueUSD = selectedStudent?.miscRemainingUSD !== undefined
+    ? Number(selectedStudent.miscRemainingUSD || 0)
+    : (selectedStudent?.miscUSD ? Math.max(0, selectedStudent.miscUSD - (selectedStudent?.miscPaidUSD || 0)) : 0);
+  const isMiscSubstantial = (miscRemainingDueHTG > 450) && (miscRemainingDueUSD > 3.00 || (selectedStudent?.miscUSD || 0) === 0);
+  const isMiscForced = selectedStudent && !isInscriptionForced && selectedStudent.plan?.is_misc_mandatory && isMiscSubstantial;
   const isFeeTypeLocked = isInscriptionForced || isMiscForced;
 
   if (apiError && !selectedStudent) {
