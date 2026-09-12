@@ -17,7 +17,8 @@ import {
   Clock,
   CheckCircle2,
   Wallet,
-  ShieldCheck
+  ShieldCheck,
+  Coins
 } from 'lucide-react';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 
@@ -728,10 +729,12 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                       <td className="py-3.5 px-4 text-right font-mono font-bold whitespace-nowrap">
                         {isUSD ? (
                           <div className="flex flex-col items-end">
-                            <span className="text-emerald-800 bg-emerald-50 border border-emerald-300 px-2 py-0.5 rounded text-xs inline-block font-mono font-bold shadow-2xs">
-                              ${rawAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
+                            <span className="text-emerald-900 bg-emerald-50 border border-emerald-300 px-2.5 py-1 rounded-md text-xs inline-flex items-center gap-1 font-mono font-bold shadow-2xs">
+                              <span className="text-emerald-700 font-bold">$</span>
+                              {rawAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
                             </span>
-                            <span className="text-[10px] text-amber-700 font-mono font-medium mt-0.5 flex items-center gap-1">
+                            <span className="text-[10px] text-amber-800 font-mono font-medium mt-1 flex items-center gap-1 bg-amber-50/90 border border-amber-200 px-1.5 py-0.5 rounded">
+                              <Coins size={10} className="text-amber-600 shrink-0" />
                               × {appliedRate} G
                             </span>
                           </div>
@@ -744,40 +747,42 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
                         {isUSD ? (
-                          <div className="inline-flex flex-col items-center gap-0.5">
-                            <span 
-                              className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100/70 text-amber-900 border border-amber-300 px-2.5 py-1 rounded text-[11px] font-mono font-bold whitespace-nowrap shadow-xs hover:border-amber-400 transition-colors"
-                              title={`Audit Financier : Taux historique scellé lors de cette transaction : 1 USD = ${appliedRate} HTG\nValeur certifiée : ${rawAmount} USD × ${appliedRate} = ${baseHTG.toLocaleString()} HTG`}
+                          <div className="inline-flex flex-col items-center gap-1 py-0.5">
+                            <div 
+                              className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 via-amber-100/90 to-amber-50 text-amber-950 border border-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-mono font-black whitespace-nowrap shadow-xs hover:border-amber-400 hover:shadow-sm transition-all cursor-help"
+                              title={`🏛️ AUDIT FINANCIER & CONVERSION LÉGALE :\n• Devise d'encaissement : USD (Devise étrangère)\n• Montant brut encaissé : $${rawAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD\n• Taux de change légal scellé : 1 USD = ${appliedRate} HTG\n• Contrevaleur comptable créditée : ${baseHTG.toLocaleString()} HTG\n• Statut : Taux historique figé et certifié, irréversible pour l'audit financier`}
                             >
-                              <ShieldCheck size={12} className="text-amber-700 shrink-0" />
-                              <span>1 USD = {appliedRate} HTG</span>
-                            </span>
-                            <span className="text-[9px] font-extrabold text-amber-700 tracking-tight flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-500 inline-block animate-pulse"></span>
-                              Taux scellé (Audit)
-                            </span>
+                              <ShieldCheck size={14} className="text-amber-700 shrink-0" />
+                              <span className="text-amber-900 font-bold">1 USD =</span>
+                              <span className="text-amber-950 font-black px-1.5 py-0.2 bg-amber-200/80 rounded border border-amber-300 text-[11.5px]">{appliedRate} HTG</span>
+                            </div>
+                            <div className="inline-flex items-center gap-1 text-[9px] font-black text-amber-800 bg-amber-100/70 border border-amber-200/80 px-2 py-0.5 rounded-full tracking-tight">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+                              <span>Taux scellé • Audit certifié</span>
+                            </div>
                           </div>
                         ) : isFeePlannedInUSD ? (
                           <div className="inline-flex flex-col items-center gap-0.5">
                             <span 
-                              className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-1 rounded text-[11px] font-mono font-bold whitespace-nowrap shadow-xs"
-                              title={`Frais planifié en USD, réglé en HTG selon le barème : 1 USD = ${appliedRate} HTG`}
+                              className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold whitespace-nowrap shadow-xs"
+                              title={`Frais sous-jacent planifié en devises (USD), acquitté en Gourdes au barème : 1 USD = ${appliedRate} HTG`}
                             >
-                              <ArrowRightLeft size={11} className="text-blue-700 shrink-0" />
+                              <ArrowRightLeft size={12} className="text-blue-700 shrink-0" />
                               <span>1 USD = {appliedRate} HTG</span>
                             </span>
-                            <span className="text-[9px] font-semibold text-blue-700 tracking-tight">
-                              Barème USD amorti
+                            <span className="text-[9px] font-bold text-blue-700 tracking-tight">
+                              Amortissement barème USD
                             </span>
                           </div>
                         ) : (
-                          <span 
-                            className="text-[11px] font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded border border-slate-200 whitespace-nowrap inline-flex items-center gap-1.5"
-                            title="Paiement direct en monnaie locale (Gourdes) - Aucune conversion de devise requise"
+                          <div 
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium whitespace-nowrap shadow-2xs"
+                            title="Frais planifié en Gourdes et payé directement en Gourdes. Aucune conversion de devises requise."
                           >
-                            <span className="text-slate-400 font-bold">—</span>
-                            <span className="text-slate-600 font-medium">(HTG direct)</span>
-                          </span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
+                            <span className="font-bold text-slate-700">N/A</span>
+                            <span className="text-slate-400 text-[10px]">(Frais 100% HTG)</span>
+                          </div>
                         )}
                       </td>
 
@@ -789,9 +794,10 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                             <span className="text-slate-900">{Math.round(baseHTG).toLocaleString()} HTG</span>
                           )}
                           {isUSD && payment.status !== 'ANNULE' && (
-                            <span className="text-[10px] text-emerald-700 font-mono font-semibold" title="Conversion certifiée">
-                              ${rawAmount} × {appliedRate}
-                            </span>
+                            <div className="text-[10px] text-emerald-800 font-mono font-bold flex items-center justify-end gap-1 mt-0.5" title="Détail du calcul certifié pour l'audit">
+                              <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />
+                              <span>${rawAmount} × {appliedRate}</span>
+                            </div>
                           )}
                         </div>
                       </td>

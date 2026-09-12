@@ -607,13 +607,19 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                       </td>
                       <td className="py-2.5 px-3 text-right font-black text-slate-900 whitespace-nowrap text-[11px] sm:text-xs">
                         {p.currency === 'USD' ? (
-                          <div>
+                          <div className="flex flex-col items-end">
                             <span className="font-bold text-emerald-700 font-mono">
                               ${Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
                             </span>
                             <div className="text-[10px] text-slate-500 font-medium font-mono">
                               ≈ {Number(p.amount_htg_equivalent || (Number(p.amount || 0) * (p.exchange_rate_applied || 140))).toLocaleString()} HTG
                             </div>
+                            {p.exchange_rate_applied && (
+                              <div className="mt-0.5 inline-flex items-center gap-1 text-[9.5px] font-mono font-bold text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.2 rounded" title={`Taux scellé à l'encaissement : 1 USD = ${p.exchange_rate_applied} HTG`}>
+                                <ShieldCheck size={10} className="text-amber-700 shrink-0" />
+                                <span>1 USD = {p.exchange_rate_applied} HTG</span>
+                              </div>
+                            )}
                           </div>
                         ) : (
                           <span className="font-bold text-slate-900 font-mono">

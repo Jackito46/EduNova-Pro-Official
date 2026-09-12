@@ -33,7 +33,8 @@ import {
   Sparkles,
   PieChart,
   Wallet,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Coins
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { toast } from 'sonner';
@@ -2449,9 +2450,16 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </td>
                             <td className="px-4 py-3.5 text-right font-mono font-bold whitespace-nowrap">
                               {isUSD ? (
-                                <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded text-xs whitespace-nowrap inline-block">
-                                  ${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
-                                </span>
+                                <div className="flex flex-col items-end">
+                                  <span className="text-emerald-900 bg-emerald-50 border border-emerald-300 px-2.5 py-1 rounded-md text-xs whitespace-nowrap inline-flex items-center gap-1 font-mono font-bold shadow-2xs">
+                                    <span className="text-emerald-700 font-bold">$</span>
+                                    {paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
+                                  </span>
+                                  <span className="text-[10px] text-amber-800 font-mono font-medium mt-1 flex items-center gap-1 bg-amber-50/90 border border-amber-200 px-1.5 py-0.5 rounded">
+                                    <Coins size={10} className="text-amber-600 shrink-0" />
+                                    × {appliedRate} G
+                                  </span>
+                                </div>
                               ) : (
                                 <span className="text-slate-800 text-xs whitespace-nowrap inline-block">
                                   {paidAmount.toLocaleString()} HTG
@@ -2460,14 +2468,29 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </td>
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
                               {isUSD ? (
-                                <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-800 border border-amber-200 px-2 py-0.5 rounded text-[10px] font-mono font-bold whitespace-nowrap" title={`Taux appliqué : 1 USD = ${appliedRate} HTG`}>
-                                  <ArrowRightLeft size={10} className="text-amber-600 shrink-0" />
-                                  <span>1 USD = {appliedRate} HTG</span>
-                                </span>
+                                <div className="inline-flex flex-col items-center gap-1 py-0.5">
+                                  <div 
+                                    className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 via-amber-100/90 to-amber-50 text-amber-950 border border-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-mono font-black whitespace-nowrap shadow-xs hover:border-amber-400 hover:shadow-sm transition-all cursor-help" 
+                                    title={`🏛️ AUDIT FINANCIER & CONVERSION LÉGALE :\n• Devise d'encaissement : USD (Devise étrangère)\n• Montant brut encaissé : $${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD\n• Taux de change légal scellé : 1 USD = ${appliedRate} HTG\n• Contrevaleur comptable créditée : ${baseHTG.toLocaleString()} HTG\n• Statut : Taux historique figé et certifié, irréversible pour l'audit financier`}
+                                  >
+                                    <ShieldCheck size={14} className="text-amber-700 shrink-0" />
+                                    <span className="text-amber-900 font-bold">1 USD =</span>
+                                    <span className="text-amber-950 font-black px-1.5 py-0.2 bg-amber-200/80 rounded border border-amber-300 text-[11.5px]">{appliedRate} HTG</span>
+                                  </div>
+                                  <div className="inline-flex items-center gap-1 text-[9px] font-black text-amber-800 bg-amber-100/70 border border-amber-200/80 px-2 py-0.5 rounded-full tracking-tight">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0 animate-pulse"></span>
+                                    <span>Taux scellé • Audit certifié</span>
+                                  </div>
+                                </div>
                               ) : (
-                                <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-2 py-0.5 rounded whitespace-nowrap inline-block">
-                                  1:1 (HTG)
-                                </span>
+                                <div 
+                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium whitespace-nowrap shadow-2xs"
+                                  title="Frais planifié en Gourdes et payé directement en Gourdes. Aucune conversion de devises requise."
+                                >
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
+                                  <span className="font-bold text-slate-700">N/A</span>
+                                  <span className="text-slate-400 text-[10px]">(Frais 100% HTG)</span>
+                                </div>
                               )}
                             </td>
                             <td className="px-4 py-3.5 text-right font-semibold font-mono text-slate-900 whitespace-nowrap">
@@ -2833,10 +2856,26 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   : (p.nature || p.type || p.fee_type || 'Frais Divers'))}
                               </td>
                               <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                                {isUSD ? `$${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD` : `${paidAmount.toLocaleString()} HTG`}
+                                {isUSD ? (
+                                  <div>
+                                    <span>${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</span>
+                                    <div className="text-[9px] text-amber-800 font-normal">× {appliedRate} G</div>
+                                  </div>
+                                ) : (
+                                  <span>{paidAmount.toLocaleString()} HTG</span>
+                                )}
                               </td>
-                              <td className="py-2 px-3 text-center font-mono text-[10px] text-slate-600 whitespace-nowrap">
-                                {isUSD ? `1 USD = ${appliedRate} HTG` : '1:1 (HTG)'}
+                              <td className="py-2 px-3 text-center whitespace-nowrap">
+                                {isUSD ? (
+                                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] text-amber-950 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
+                                    <ShieldCheck size={11} className="text-amber-700 shrink-0" />
+                                    1 USD = {appliedRate} HTG
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
+                                    N/A (Frais 100% HTG)
+                                  </span>
+                                )}
                               </td>
                               <td className="py-2 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap">
                                 {baseHTG.toLocaleString()} HTG
@@ -2917,8 +2956,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               const p = activeTooltip.transaction;
               const isUSD = p.currency === 'USD';
               const paidAmount = Number(p.amount || 0);
-              const appliedRate = Number(p.exchange_rate_applied || rate || 140);
-              const currentRate = Number(rate || 140);
+              const appliedRate = Number(p.exchange_rate_applied || auditDiagnosticInfo.exchangeRateApplied || schoolDetails?.exchange_rate || 140);
+              const currentRate = Number(auditDiagnosticInfo.exchangeRateApplied || schoolDetails?.exchange_rate || 140);
               const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
               const rateDiff = currentRate - appliedRate;
               const hasRateVariance = isUSD && Math.abs(rateDiff) > 0.01;
@@ -2953,19 +2992,36 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
 
                     <div className="flex justify-between items-center text-slate-300">
-                      <span className="text-slate-400">Taux appliqué (historique scellé) :</span>
+                      <span className="text-slate-400">{isUSD ? 'Taux appliqué (historique scellé) :' : 'Taux de conversion :'}</span>
                       <span className="font-mono font-bold text-amber-300">
-                        {isUSD ? `1 USD = ${appliedRate} HTG` : `1:1 (Monnaie HTG)`}
+                        {isUSD ? (
+                          `1 USD = ${appliedRate} HTG`
+                        ) : (
+                          <span className="text-slate-400 font-sans text-xs">Sans objet (Monnaie locale Gourdes)</span>
+                        )}
                       </span>
                     </div>
 
                     {isUSD && (
-                      <div className="flex justify-between items-center text-slate-300 text-[11px]">
-                        <span className="text-slate-400">Taux système actuel :</span>
-                        <span className="font-mono text-slate-200">
-                          1 USD = {currentRate} HTG
-                        </span>
-                      </div>
+                      <>
+                        <div className="flex justify-between items-center text-slate-300 text-[11px]">
+                          <span className="text-slate-400">Taux système actuel :</span>
+                          <span className="font-mono text-slate-200">
+                            1 USD = {currentRate} HTG
+                          </span>
+                        </div>
+
+                        {/* Bloc Traçabilité & Audit Financier */}
+                        <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 text-[11px] text-amber-200/90 space-y-1">
+                          <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                            <ShieldCheck size={14} className="text-amber-400" />
+                            <span>Audit Financier : Taux Scellé Garanti</span>
+                          </div>
+                          <p className="text-[10px] text-slate-300">
+                            Transaction originale encaissée en devise étrangère (${paidAmount} USD). Le taux de change de 1 USD = {appliedRate} HTG a été irréversiblement scellé le jour du paiement. Contre-valeur garantie : {baseHTG.toLocaleString()} HTG.
+                          </p>
+                        </div>
+                      </>
                     )}
 
                     {hasRateVariance && (

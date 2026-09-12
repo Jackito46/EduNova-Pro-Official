@@ -135,14 +135,20 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             id: p.id,
             date: p.date || p.created_at,
             label: tLabel,
-            amount: p.amount_htg_equivalent || p.amount
+            amount: p.amount_htg_equivalent || p.amount,
+            rawAmount: Number(p.amount || 0),
+            currency: p.currency || 'HTG',
+            exchange_rate_applied: Number(p.exchange_rate_applied || 0)
           };
         }),
         ...(supplyData || []).map((s: any) => ({
           id: s.id,
           date: s.sale_date || s.created_at,
           label: `Achat Fourniture: ${s.item?.name || s.description || 'Article'}`,
-          amount: s.amount_htg_equivalent || s.paid_amount
+          amount: s.amount_htg_equivalent || s.paid_amount,
+          rawAmount: Number(s.paid_amount || 0),
+          currency: 'HTG',
+          exchange_rate_applied: 0
         }))
       ];
       
@@ -1115,13 +1121,26 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="space-y-3 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
                 {payments.map(p => {
                   const displayDate = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : 'Date inconnue';
+                  const isUSD = p.currency === 'USD';
+                  const appliedRate = p.exchange_rate_applied;
                   return (
                     <div key={p.id} className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
                       <div>
                         <p className="text-xs font-bold whitespace-nowrap text-white">{p.label}</p>
                         <p className="text-[10px] text-gray-400">{displayDate}</p>
+                        {isUSD && appliedRate > 0 && (
+                          <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-300 font-mono font-bold bg-amber-950/50 border border-amber-500/40 px-2 py-0.5 rounded w-fit" title={`Paiement en devise : $${p.rawAmount} USD au taux scellé de 1 USD = ${appliedRate} HTG`}>
+                            <ShieldCheck size={11} className="text-amber-400 shrink-0" />
+                            <span>1 USD = {appliedRate} HTG</span>
+                          </div>
+                        )}
                       </div>
-                      <p className="text-sm font-black text-emerald-400">+{p.amount.toLocaleString()} G</p>
+                      <div className="text-right">
+                        <p className="text-sm font-black text-emerald-400">+{p.amount.toLocaleString()} G</p>
+                        {isUSD && (
+                          <p className="text-[10px] font-mono text-emerald-300/80 font-semibold">${p.rawAmount} USD</p>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
