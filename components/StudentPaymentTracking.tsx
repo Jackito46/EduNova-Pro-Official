@@ -634,7 +634,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           const { data: allPayments } = await supabase
             .from('payments')
-            .select('amount, currency, amount_htg_equivalent, fee_type, academic_year_id, exchange_rate_applied')
+            .select('amount, currency, amount_htg_equivalent, amount_usd_equivalent, fee_type, academic_year_id, exchange_rate_applied')
             .eq('school_id', user.school_id)
             .eq('student_id', student.id);
 
@@ -1698,14 +1698,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                               </div>
                             </div>
                           ) : isFeePlannedInUSD ? (
-                            <div className="text-[10px] text-blue-800 font-mono mt-1 flex items-center gap-1 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded w-fit">
+                            <div className="text-[10px] text-blue-800 font-mono mt-1 flex items-center gap-1 bg-blue-50 border border-blue-200 px-1.5 py-0.5 rounded w-fit" title={`Frais planifié en USD, payé en Gourdes au barème de 1 USD = ${appliedRate} HTG`}>
                               <ArrowRightLeft size={10} className="text-blue-600 shrink-0" />
-                              <span>1 USD = {appliedRate} HTG (Barème)</span>
+                              <span>1 USD = {appliedRate} HTG (≈ ${(paidAmount / (appliedRate || 1)).toFixed(2)} USD amortis)</span>
                             </div>
                           ) : (
-                            <div className="text-[10px] text-slate-500 font-medium mt-1 flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
-                              <span>N/A (Frais 100% HTG direct)</span>
+                            <div className="text-[10px] text-emerald-800 font-medium mt-1 flex items-center gap-1 bg-emerald-50/80 border border-emerald-200/80 px-1.5 py-0.5 rounded w-fit" title="Paiement direct en monnaie locale (Gourdes) sans opération de change.">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                              <span className="font-bold">Paiement Direct HTG</span>
+                              <span className="text-emerald-600 text-[9px]">(Sans conversion)</span>
                             </div>
                           )}
                         </div>
@@ -1858,18 +1859,22 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   <ArrowRightLeft size={12} className="text-blue-700 shrink-0" />
                                   <span>1 USD = {appliedRate} HTG</span>
                                 </span>
-                                <span className="text-[9px] font-bold text-blue-700 tracking-tight">
-                                  Amortissement barème USD
+                                <span className="text-[9px] font-bold text-blue-700 tracking-tight" title={`Montant en Gourdes (${paidAmount.toLocaleString()} HTG) amortissant environ $${(paidAmount / (appliedRate || 1)).toFixed(2)} USD sur le barème exigé`}>
+                                  Amortissement barème : ≈ ${(paidAmount / (appliedRate || 1)).toFixed(2)} USD
                                 </span>
                               </div>
                             ) : (
                               <div 
-                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium whitespace-nowrap shadow-2xs"
-                                title="Frais planifié en Gourdes et payé directement en Gourdes. Aucune conversion de devises requise."
+                                className="inline-flex flex-col items-center gap-0.5"
+                                title="Frais planifié en Gourdes et réglé directement en monnaie locale (Gourdes). Aucune opération de change appliquée (parité 1:1)."
                               >
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
-                                <span className="font-bold text-slate-700">N/A</span>
-                                <span className="text-slate-400 text-[10px]">(Frais 100% HTG)</span>
+                                <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap shadow-2xs">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                  <span className="font-mono">Paiement Direct HTG</span>
+                                </span>
+                                <span className="text-[9px] font-semibold text-emerald-700 tracking-tight">
+                                  Sans conversion (Monnaie locale)
+                                </span>
                               </div>
                             )}
                           </td>

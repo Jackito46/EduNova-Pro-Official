@@ -2419,6 +2419,15 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
                         const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
+                        const isTuitionFee = p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'));
+                        const isAdmissionFee = p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription";
+                        const isMiscFee = p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers');
+                        const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
+                        const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
+                        const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
+                        const isCampaignPlannedInUSD = Boolean(p.campaign?.currency === 'USD');
+                        const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
+
                         return (
                           <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
                             <td className="px-4 py-3.5 whitespace-nowrap">
@@ -2482,14 +2491,31 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                     <span>Taux scellé • Audit certifié</span>
                                   </div>
                                 </div>
+                              ) : isFeePlannedInUSD ? (
+                                <div className="inline-flex flex-col items-center gap-0.5">
+                                  <span 
+                                    className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold whitespace-nowrap shadow-xs" 
+                                    title={`Frais sous-jacent planifié en devises (USD), acquitté en Gourdes au barème : 1 USD = ${appliedRate} HTG`}
+                                  >
+                                    <ArrowRightLeft size={12} className="text-blue-700 shrink-0" />
+                                    <span>1 USD = {appliedRate} HTG</span>
+                                  </span>
+                                  <span className="text-[9px] font-bold text-blue-700 tracking-tight" title={`Amortissement de ≈ $${(paidAmount / (appliedRate || 1)).toFixed(2)} USD sur le barème USD`}>
+                                    Amortissement barème : ≈ ${(paidAmount / (appliedRate || 1)).toFixed(2)} USD
+                                  </span>
+                                </div>
                               ) : (
                                 <div 
-                                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium whitespace-nowrap shadow-2xs"
-                                  title="Frais planifié en Gourdes et payé directement en Gourdes. Aucune conversion de devises requise."
+                                  className="inline-flex flex-col items-center gap-0.5"
+                                  title="Frais planifié en Gourdes et réglé directement en monnaie locale (Gourdes). Aucune opération de change appliquée (parité 1:1)."
                                 >
-                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
-                                  <span className="font-bold text-slate-700">N/A</span>
-                                  <span className="text-slate-400 text-[10px]">(Frais 100% HTG)</span>
+                                  <span className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-900 border border-emerald-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap shadow-2xs">
+                                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
+                                    <span className="font-mono">Paiement Direct HTG</span>
+                                  </span>
+                                  <span className="text-[9px] font-semibold text-emerald-700 tracking-tight">
+                                    Sans conversion (Monnaie locale)
+                                  </span>
                                 </div>
                               )}
                             </td>
@@ -2840,6 +2866,15 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
                           const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
+                          const isTuitionFee = p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'));
+                          const isAdmissionFee = p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription";
+                          const isMiscFee = p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers');
+                          const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
+                          const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
+                          const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
+                          const isCampaignPlannedInUSD = Boolean(p.campaign?.currency === 'USD');
+                          const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
+
                           return (
                             <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
                               <td className="py-2 px-3 font-bold text-slate-600 whitespace-nowrap">{new Date(p.created_at).toLocaleDateString()}</td>
@@ -2871,9 +2906,13 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                     <ShieldCheck size={11} className="text-amber-700 shrink-0" />
                                     1 USD = {appliedRate} HTG
                                   </span>
+                                ) : isFeePlannedInUSD ? (
+                                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap">
+                                    1 USD = {appliedRate} HTG (Barème)
+                                  </span>
                                 ) : (
-                                  <span className="text-[10px] font-medium text-slate-500 bg-slate-50 border border-slate-200 px-2 py-0.5 rounded">
-                                    N/A (Frais 100% HTG)
+                                  <span className="text-[10px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded whitespace-nowrap">
+                                    Direct HTG (Sans conversion)
                                   </span>
                                 )}
                               </td>

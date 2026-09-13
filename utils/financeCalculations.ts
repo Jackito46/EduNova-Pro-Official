@@ -63,14 +63,29 @@ export function computeFeeCategoryBalance(
     }
 
     if (isUSD) {
+      const usdVal = Number(p.amount_usd_equivalent) || amount;
       paidUSDDirect += amount;
-      totalPaidUSD += amount;
+      totalPaidUSD += usdVal;
       totalPaidHTG += Number(p.amount_htg_equivalent) || (amount * pRate);
     } else {
       const htgAmount = Number(p.amount_htg_equivalent) || amount;
       paidHTGDirect += amount;
       totalPaidHTG += htgAmount;
-      totalPaidUSD += (pRate > 0 ? htgAmount / pRate : htgAmount / rate);
+      
+      // Valeur amortie en USD : priorité à la valeur scellée de la transaction
+      if (p.amount_usd_equivalent && Number(p.amount_usd_equivalent) > 0) {
+        totalPaidUSD += Number(p.amount_usd_equivalent);
+      } else if (plannedUSD > 0 && amount > 0) {
+        // Si le versement en Gourdes correspondait au barème USD à un taux historique plausible (ex: 27 000 G @ 135 = 200 USD)
+        const impliedRate = amount / plannedUSD;
+        if (impliedRate >= 50 && impliedRate <= 300 && Math.abs((amount / pRate) - plannedUSD) > 0.5) {
+          totalPaidUSD += plannedUSD;
+        } else {
+          totalPaidUSD += (pRate > 0 ? htgAmount / pRate : htgAmount / rate);
+        }
+      } else {
+        totalPaidUSD += (pRate > 0 ? htgAmount / pRate : htgAmount / rate);
+      }
     }
   }
 

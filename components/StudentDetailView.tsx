@@ -30,6 +30,7 @@ import { getStudentAgeStatus } from '../utils/academicPath';
 import { useSchool } from '../contexts/SchoolContext';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
+import StudentSolvencySummary from './StudentSolvencySummary';
 import { 
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments,
@@ -1072,36 +1073,52 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         {/* Right Column: Financial & Disciplinary */}
         <div className="lg:col-span-4 space-y-6">
-          {/* Financial Summary */}
-          <div className="bg-slate-900 rounded-2xl shadow-xl p-5 sm:p-6 text-white space-y-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <CreditCard className="text-blue-400" size={20} />
-                <h3 className="font-bold text-sm uppercase tracking-wider">État Financier</h3>
-              </div>
-              <Link to={`/economat/releves?studentId=${student.id}`} className="text-[10px] font-black text-blue-400 uppercase hover:text-blue-300 transition-colors">Détails</Link>
-            </div>
-            
-            <div className="space-y-1">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Balance Actuelle</p>
-              <h4 className={`text-3xl font-black tracking-tighter ${studentDebt > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
-                {studentDebt > 0 ? `${studentDebt.toLocaleString()} G (DUE)` : 'En Règle'}
-              </h4>
-            </div>
+          {/* Composant de résumé financier 'Solvabilité' temps réel */}
+          <StudentSolvencySummary
+            studentId={student.id}
+            schoolId={user.school_id}
+            classId={student.class_id || student.class?.id}
+            studentName={fullName}
+            academicYearId={enrollments[0]?.academic_year_id}
+          />
 
+          {/* Wallet & Historique des Versements */}
+          <div className="bg-white rounded-2xl shadow-xs p-5 sm:p-6 border border-slate-200 space-y-5">
             {/* Wallet / Portefeuille credits */}
-            <div className="pt-5 border-t border-white/10 space-y-2">
-              <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest">
-                👛 Portefeuille {terminology.student} (Crédits)
-              </p>
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-bold">Solde HTG</p>
-                  <p className="text-sm font-black text-emerald-400">{(student.wallet_balance_htg || 0).toLocaleString()} G</p>
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                    <Wallet size={16} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                      Portefeuille {terminology.student}
+                    </h4>
+                    <p className="text-[10px] text-slate-400 font-medium">Crédits électroniques</p>
+                  </div>
                 </div>
-                <div className="bg-white/5 rounded-xl p-2.5 border border-white/10 text-center">
-                  <p className="text-[9px] text-gray-400 uppercase font-bold">Solde USD</p>
-                  <p className="text-sm font-black text-indigo-400">{(student.wallet_balance_usd || 0).toLocaleString()} $</p>
+
+                <Link 
+                  to={`/economat/releves?studentId=${student.id}`} 
+                  className="text-[10px] font-black text-indigo-600 uppercase hover:text-indigo-800 transition-colors"
+                >
+                  Relevé complet
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
+                  <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde HTG</p>
+                  <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">
+                    {(student.wallet_balance_htg || 0).toLocaleString()} <span className="text-[10px] font-normal">G</span>
+                  </p>
+                </div>
+                <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
+                  <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde USD</p>
+                  <p className="text-sm font-black text-indigo-700 font-mono mt-0.5">
+                    {(student.wallet_balance_usd || 0).toLocaleString()} <span className="text-[10px] font-normal">$</span>
+                  </p>
                 </div>
               </div>
 
@@ -1109,42 +1126,54 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setIsWalletTopUpOpen(true)}
-                className="w-full mt-2 flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-md shadow-red-950/30 transition-all cursor-pointer"
+                className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
               >
                 <Smartphone size={13} />
                 <span>Recharger via MonCash</span>
               </button>
             </div>
 
-            <div className="pt-6 border-t border-white/10 space-y-4">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Historique des Versements</p>
-              <div className="space-y-3 max-h-60 overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-white/20 scrollbar-track-transparent">
+            {/* Historique des Versements */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
+                  <History size={12} className="text-slate-400" />
+                  <span>Derniers Versements</span>
+                </p>
+                <span className="text-[10px] font-mono text-slate-400 font-bold">
+                  {payments.length} enregistré(s)
+                </span>
+              </div>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1 custom-scrollbar">
                 {payments.map(p => {
                   const displayDate = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : 'Date inconnue';
                   const isUSD = p.currency === 'USD';
                   const appliedRate = p.exchange_rate_applied;
                   return (
-                    <div key={p.id} className="flex items-center justify-between bg-white/5 p-3 rounded-xl border border-white/10">
-                      <div>
-                        <p className="text-xs font-bold whitespace-nowrap text-white">{p.label}</p>
-                        <p className="text-[10px] text-gray-400">{displayDate}</p>
+                    <div key={p.id} className="flex items-center justify-between bg-slate-50/70 hover:bg-slate-50 p-2.5 rounded-xl border border-slate-100 transition-colors">
+                      <div className="min-w-0 pr-2">
+                        <p className="text-xs font-bold text-slate-800 truncate">{p.label}</p>
+                        <p className="text-[10px] text-slate-400">{displayDate}</p>
                         {isUSD && appliedRate > 0 && (
-                          <div className="mt-1 flex items-center gap-1 text-[10px] text-amber-300 font-mono font-bold bg-amber-950/50 border border-amber-500/40 px-2 py-0.5 rounded w-fit" title={`Paiement en devise : $${p.rawAmount} USD au taux scellé de 1 USD = ${appliedRate} HTG`}>
-                            <ShieldCheck size={11} className="text-amber-400 shrink-0" />
+                          <div className="mt-1 flex items-center gap-1 text-[9.5px] text-amber-800 font-mono font-bold bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded w-fit" title={`Paiement en devise : $${p.rawAmount} USD au taux scellé de 1 USD = ${appliedRate} HTG`}>
+                            <ShieldCheck size={10} className="text-amber-700 shrink-0" />
                             <span>1 USD = {appliedRate} HTG</span>
                           </div>
                         )}
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-black text-emerald-400">+{p.amount.toLocaleString()} G</p>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs font-black font-mono text-emerald-700">+{p.amount.toLocaleString()} G</p>
                         {isUSD && (
-                          <p className="text-[10px] font-mono text-emerald-300/80 font-semibold">${p.rawAmount} USD</p>
+                          <p className="text-[9.5px] font-mono text-slate-500 font-semibold">${p.rawAmount} USD</p>
                         )}
                       </div>
                     </div>
                   );
                 })}
-                {payments.length === 0 && <p className="text-xs text-gray-500 italic text-center py-4">Aucun versement enregistré</p>}
+                {payments.length === 0 && (
+                  <p className="text-xs text-slate-400 italic text-center py-4">Aucun versement enregistré</p>
+                )}
               </div>
             </div>
           </div>

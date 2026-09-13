@@ -302,6 +302,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
               {/* Finance Routes */}
               <Route path="/economat" element={<RoleGuard user={user} allowedRoles={financeRoles}><FinanceHub user={user} /></RoleGuard>} />
               <Route path="/economat/frais" element={<RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard>} />
+              <Route path="/economat/paiement" element={<RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard>} />
               <Route path="/economat/factures" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
               <Route path="/economat/releves" element={<RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard>} />
               <Route path="/economat/releve-compte" element={<RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard>} />

@@ -1038,6 +1038,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           inscriptionNativeUSD: inscriptionUSD_val,
           inscriptionRemainingUSD: admissionBreakdown.remainingUSD,
           inscriptionRemainingHTG: admissionBreakdown.remainingHTG,
+          inscriptionRemainingHTGEquiv: admissionBreakdown.remainingHTGEquiv,
+          inscriptionIsPaid: admissionBreakdown.isPaid,
           inscriptionPaidUSD: admissionBreakdown.paidUSDVal,
           inscriptionPaidHTG: admissionBreakdown.paidHTGEquiv,
           miscDue: effectiveMiscDue,
@@ -1048,6 +1050,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           miscNativeUSD: miscUSD_val,
           miscRemainingUSD: miscBreakdown.remainingUSD,
           miscRemainingHTG: miscBreakdown.remainingHTG,
+          miscRemainingHTGEquiv: miscBreakdown.remainingHTGEquiv,
+          miscIsPaid: miscBreakdown.isPaid,
           miscPaidUSD: miscBreakdown.paidUSDVal,
           miscPaidHTG: miscBreakdown.paidHTGEquiv,
           scolariteDue: scolariteDue,
@@ -1080,16 +1084,22 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [auditGlobalSolvency, currentExchangeRate]);
 
   useEffect(() => {
-    if (location.state?.studentId) {
-      const initialYear = location.state?.academicYearId || targetYearId;
-      if (location.state?.academicYearId && location.state.academicYearId !== targetYearId) {
-        setTargetYearId(location.state.academicYearId);
+    const searchParams = new URLSearchParams(location.search);
+    const queryStudentId = searchParams.get('studentId');
+    const queryYearId = searchParams.get('academicYearId') || searchParams.get('yearId');
+
+    const effectiveStudentId = location.state?.studentId || queryStudentId;
+    const effectiveYearId = location.state?.academicYearId || queryYearId || targetYearId;
+
+    if (effectiveStudentId) {
+      if (effectiveYearId && effectiveYearId !== targetYearId) {
+        setTargetYearId(effectiveYearId);
       }
-      if (initialYear) {
-        loadStudentDetails(location.state.studentId, initialYear);
+      if (effectiveYearId) {
+        loadStudentDetails(effectiveStudentId, effectiveYearId);
       }
     }
-  }, [location.state, loadStudentDetails]);
+  }, [location.state, location.search, loadStudentDetails]);
 
   // Recharger les détails si l'année cible change et qu'un étudiant est déjà sélectionné
   useEffect(() => {
@@ -1175,14 +1185,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     if (feeType === 'INSCRIPTION') {
       const isUSDPlan = (selectedStudent.inscriptionUSD || 0) > 0 && (selectedStudent.inscriptionNativeHTG || 0) === 0;
+      const isPaid = Boolean(selectedStudent.inscriptionIsPaid);
       const rawRemUSD = selectedStudent.inscriptionRemainingUSD !== undefined
-        ? selectedStudent.inscriptionRemainingUSD
+        ? Number(selectedStudent.inscriptionRemainingUSD || 0)
         : (selectedStudent.inscriptionUSD ? Math.max(0, selectedStudent.inscriptionUSD - (selectedStudent.inscriptionPaidUSD || 0)) : 0);
-      const rawRemHTG = selectedStudent.inscriptionRemainingHTG !== undefined
-        ? selectedStudent.inscriptionRemainingHTG
-        : Math.max(0, selectedStudent.inscriptionDue - selectedStudent.inscriptionPaid);
+      const rawRemHTG = isUSDPlan
+        ? (selectedStudent.inscriptionRemainingHTGEquiv !== undefined
+            ? Number(selectedStudent.inscriptionRemainingHTGEquiv || 0)
+            : Math.round(rawRemUSD * rate))
+        : (selectedStudent.inscriptionRemainingHTG !== undefined
+            ? Number(selectedStudent.inscriptionRemainingHTG || 0)
+            : Math.max(0, (selectedStudent.inscriptionDue || 0) - (selectedStudent.inscriptionPaid || 0)));
       
-      const isEffectivelySettled = (rawRemUSD <= 3.00 && isUSDPlan) || rawRemHTG <= 450;
+      const isEffectivelySettled = isPaid || (isUSDPlan ? (rawRemUSD <= 0.10 || (rawRemUSD <= 3.00 && (selectedStudent.inscriptionPaidUSD || 0) > 0)) : (rawRemHTG <= 50));
       const remUSD = isEffectivelySettled ? 0 : rawRemUSD;
       const remHTG = isEffectivelySettled ? 0 : rawRemHTG;
       
@@ -1200,14 +1215,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     if (feeType === 'DIVERS') {
       const isUSDPlan = (selectedStudent.miscUSD || 0) > 0 && (selectedStudent.miscNativeHTG || 0) === 0;
+      const isPaid = Boolean(selectedStudent.miscIsPaid);
       const rawRemUSD = selectedStudent.miscRemainingUSD !== undefined
-        ? selectedStudent.miscRemainingUSD
+        ? Number(selectedStudent.miscRemainingUSD || 0)
         : (selectedStudent.miscUSD ? Math.max(0, selectedStudent.miscUSD - (selectedStudent.miscPaidUSD || 0)) : 0);
-      const rawRemHTG = selectedStudent.miscRemainingHTG !== undefined
-        ? selectedStudent.miscRemainingHTG
-        : Math.max(0, selectedStudent.miscDue - selectedStudent.miscPaid);
+      const rawRemHTG = isUSDPlan
+        ? (selectedStudent.miscRemainingHTGEquiv !== undefined
+            ? Number(selectedStudent.miscRemainingHTGEquiv || 0)
+            : Math.round(rawRemUSD * rate))
+        : (selectedStudent.miscRemainingHTG !== undefined
+            ? Number(selectedStudent.miscRemainingHTG || 0)
+            : Math.max(0, (selectedStudent.miscDue || 0) - (selectedStudent.miscPaid || 0)));
       
-      const isEffectivelySettled = (rawRemUSD <= 3.00 && isUSDPlan) || rawRemHTG <= 450;
+      const isEffectivelySettled = isPaid || (isUSDPlan ? (rawRemUSD <= 0.10 || (rawRemUSD <= 3.00 && (selectedStudent.miscPaidUSD || 0) > 0)) : (rawRemHTG <= 50));
       const remUSD = isEffectivelySettled ? 0 : rawRemUSD;
       const remHTG = isEffectivelySettled ? 0 : rawRemHTG;
       
@@ -2039,12 +2059,17 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
   }
 
-  const isInscriptionForced = selectedStudent && ((selectedStudent.inscriptionDue || 0) > (selectedStudent.inscriptionPaid || 0) + 450);
-  const miscRemainingDueHTG = Math.max(0, (selectedStudent?.miscDue || 0) - (selectedStudent?.miscPaid || 0));
+  const isInscriptionForced = selectedStudent && !selectedStudent.inscriptionIsPaid && (
+    ((selectedStudent.inscriptionDue || 0) > (selectedStudent.inscriptionPaid || 0) + 450) || 
+    ((selectedStudent.inscriptionRemainingUSD || 0) > 3.00)
+  );
+  const miscRemainingDueHTG = selectedStudent?.miscRemainingHTGEquiv !== undefined
+    ? Number(selectedStudent.miscRemainingHTGEquiv || 0)
+    : Math.max(0, (selectedStudent?.miscDue || 0) - (selectedStudent?.miscPaid || 0));
   const miscRemainingDueUSD = selectedStudent?.miscRemainingUSD !== undefined
     ? Number(selectedStudent.miscRemainingUSD || 0)
     : (selectedStudent?.miscUSD ? Math.max(0, selectedStudent.miscUSD - (selectedStudent?.miscPaidUSD || 0)) : 0);
-  const isMiscSubstantial = (miscRemainingDueHTG > 450) && (miscRemainingDueUSD > 3.00 || (selectedStudent?.miscUSD || 0) === 0);
+  const isMiscSubstantial = !selectedStudent?.miscIsPaid && ((miscRemainingDueHTG > 450) || (miscRemainingDueUSD > 3.00));
   const isMiscForced = selectedStudent && !isInscriptionForced && selectedStudent.plan?.is_misc_mandatory && isMiscSubstantial;
   const isFeeTypeLocked = isInscriptionForced || isMiscForced;
 
@@ -2499,7 +2524,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           const remUSD = selectedStudent.miscRemainingUSD !== undefined
                             ? selectedStudent.miscRemainingUSD
                             : (selectedStudent.miscUSD ? Math.max(0, selectedStudent.miscUSD - (selectedStudent.miscPaidUSD || 0)) : 0);
-                          const remHTG = Math.max(0, (selectedStudent.miscDue || 0) - (selectedStudent.miscPaid || 0));
+                          const remHTG = selectedStudent.miscRemainingHTGEquiv !== undefined
+                            ? selectedStudent.miscRemainingHTGEquiv
+                            : Math.max(0, (selectedStudent.miscDue || 0) - (selectedStudent.miscPaid || 0));
 
                           if (isUSDMode && remUSD > 0) {
                             return `Reste : $${remUSD.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD (${remHTG.toLocaleString()} HTG)`;
