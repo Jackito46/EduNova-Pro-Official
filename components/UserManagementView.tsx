@@ -324,11 +324,6 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
         setErrorMsg("La limite de 2 administrateurs par école est atteinte. Veuillez choisir un autre rôle ou désactiver un administrateur existant.");
         return;
       }
-    } else {
-      if (!formData.staff_id) {
-        setErrorMsg("Veuillez sélectionner un membre du personnel pour ce rôle.");
-        return;
-      }
     }
 
     setIsSubmitting(true);
@@ -1306,17 +1301,30 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                   )}
 
                   <div className="space-y-2">
-                    <label htmlFor="staff_id" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                      <User size={14} className="text-blue-600" />
-                      1. Liaison RH / Personnel
-                      <InfoTooltip content="Sélectionner un membre inscrit au registre du personnel auto-remplit son nom et son email." />
-                    </label>
+                    <div className="flex items-center justify-between">
+                      <label htmlFor="staff_id" className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                        <User size={14} className="text-blue-600" />
+                        1. Mode de Création & Liaison RH
+                        <InfoTooltip content="Un compte autonome permet un accès direct sans fiche RH préalable. Utile pour démarrer rapidement, tester ou déléguer un accès." />
+                      </label>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        formData.staff_id ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      }`}>
+                        {formData.staff_id ? 'Lié au registre RH' : 'Mode Autonome Actif'}
+                      </span>
+                    </div>
+
                     <select 
                       id="staff_id" 
-                      className="w-full px-4 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-blue-600 transition-all cursor-pointer" 
+                      className={`w-full px-4 py-3.5 border-2 rounded-xl text-xs font-bold outline-none transition-all cursor-pointer ${
+                        !formData.staff_id 
+                          ? 'bg-emerald-50/50 border-emerald-300 text-emerald-950 focus:border-emerald-600 focus:bg-white' 
+                          : 'bg-slate-50 border-slate-200 text-slate-900 focus:border-blue-600 focus:bg-white'
+                      }`}
                       value={formData.staff_id} 
                       onChange={e => {
-                        const staff = staffList.find(s => s.id === e.target.value);
+                        const selectedVal = e.target.value;
+                        const staff = staffList.find(s => s.id === selectedVal);
                         let matchedRole = formData.role;
                         if (staff && staff.role) {
                           const r = staff.role.toLowerCase();
@@ -1330,20 +1338,26 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                         }
                         setFormData({
                           ...formData, 
-                          staff_id: e.target.value,
-                          full_name: staff ? formatStudentName(staff.last_name, staff.first_name).fullName : '',
-                          email: staff?.email || formData.email,
+                          staff_id: selectedVal,
+                          full_name: staff ? formatStudentName(staff.last_name, staff.first_name).fullName : (selectedVal ? '' : formData.full_name),
+                          email: staff?.email || (selectedVal ? '' : formData.email),
                           role: matchedRole
                         });
                       }}
                     >
-                      <option value="">-- Créer un compte autonome sans lien RH --</option>
+                      <option value="">⚡ Compte autonome direct (Sans fiche RH obligatoire)</option>
                       {getAvailableStaff().map(staff => (
                         <option key={staff.id} value={staff.id}>
-                          {formatStudentName(staff.last_name, staff.first_name).fullName} ({staff.role})
+                          👤 Lier à : {formatStudentName(staff.last_name, staff.first_name).fullName} ({staff.role})
                         </option>
                       ))}
                     </select>
+                    {!formData.staff_id && (
+                      <p className="text-[11px] font-medium text-emerald-800 bg-emerald-50/80 px-3 py-1.5 rounded-lg border border-emerald-100 flex items-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                        <span>Création autonome active : vous pouvez saisir librement le nom, le rôle et les accès de ce compte.</span>
+                      </p>
+                    )}
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
