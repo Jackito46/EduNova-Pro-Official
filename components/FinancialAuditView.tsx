@@ -582,177 +582,276 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
   };
 
+  const ACTION_OPTIONS: SelectOption[] = [
+    { value: 'ALL', label: 'Toutes Actions', icon: Filter },
+    { value: 'CREATE', label: 'Créations (CREATE)' },
+    { value: 'UPDATE', label: 'Modifications (UPDATE)' },
+    { value: 'DELETE', label: 'Suppressions (DELETE)' }
+  ];
+
+  const ENTITY_OPTIONS: SelectOption[] = [
+    { value: 'ALL', label: 'Toutes Entités', icon: Layers },
+    { value: 'payment', label: 'Paiements Élèves' },
+    { value: 'expense', label: "Dépenses d'Exploitation" },
+    { value: 'scholarship', label: 'Bourses & Allègements' },
+    { value: 'salary', label: 'Salaires & Paie' },
+    { value: 'cash_closure', label: 'Clôtures de Caisse' }
+  ];
+
+  const PER_PAGE_OPTIONS: SelectOption[] = [
+    { value: '10', label: '10 / page' },
+    { value: '15', label: '15 / page' },
+    { value: '25', label: '25 / page' },
+    { value: '50', label: '50 / page' }
+  ];
+
+  const setDateShortcut = (type: 'today' | '7days' | 'month' | 'clear') => {
+    const today = new Date();
+    const formatYMD = (d: Date) => {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
+    if (type === 'today') {
+      const todayStr = formatYMD(today);
+      setStartDate(todayStr);
+      setEndDate(todayStr);
+    } else if (type === '7days') {
+      const past = new Date(today);
+      past.setDate(today.getDate() - 7);
+      setStartDate(formatYMD(past));
+      setEndDate(formatYMD(today));
+    } else if (type === 'month') {
+      const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setStartDate(formatYMD(startOfMonth));
+      setEndDate(formatYMD(endOfMonth));
+    } else if (type === 'clear') {
+      setStartDate('');
+      setEndDate('');
+    }
+  };
+
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* Header */}
-      <div className="bg-white p-6 sm:p-8 rounded-3xl shadow-xs border border-slate-200/90 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6 relative overflow-hidden">
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="p-4 sm:p-5 bg-slate-900 text-white rounded-2xl shadow-md shrink-0">
-            <ShieldCheck size={28} className="sm:w-8 sm:h-8" />
+    <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-300">
+      {/* Header Compact et Harmonisé */}
+      <div className="bg-white p-3 sm:p-4 rounded-xl sm:rounded-2xl shadow-xs border border-slate-200/90 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 relative overflow-hidden">
+        <div className="flex items-center gap-3">
+          <div className="p-2 sm:p-2.5 bg-slate-900 text-white rounded-xl shadow-xs shrink-0">
+            <ShieldCheck size={20} className="sm:size-5" />
           </div>
           <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">Audit des Flux Financiers</h2>
-            <p className="text-slate-600 text-xs sm:text-sm mt-0.5 font-medium">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Audit des Flux Financiers</h2>
+            <p className="text-slate-500 text-xs mt-0.5 font-medium">
               Traçabilité certifiée, ventilation claire des écritures et pièces justificatives.
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 self-end md:self-center">
+        <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
           <button 
             onClick={fetchLogs}
-            className="p-3 bg-white border border-slate-300 text-slate-800 rounded-xl hover:bg-slate-50 transition-all shadow-2xs active:scale-95 cursor-pointer"
+            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition-all border border-slate-200 shadow-2xs active:scale-95 cursor-pointer"
             title="Actualiser le journal"
           >
-            <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
           <button 
             onClick={exportToCSV}
-            className="flex items-center gap-2 px-5 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-sm font-bold text-xs tracking-wider uppercase active:scale-95 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-xs font-bold text-xs tracking-wider uppercase active:scale-95 cursor-pointer"
           >
-            <FileSpreadsheet size={16} /> Exporter CSV
+            <FileSpreadsheet size={14} /> <span>Exporter CSV</span>
           </button>
         </div>
       </div>
 
-      {/* Filters Bar */}
-      <div className="bg-white p-5 rounded-2xl shadow-xs border border-slate-200/90 space-y-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex-1 min-w-[240px] relative group">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
+      {/* Filters Bar Compacte avec Sélecteurs Pilules & DateTime Harmonisé Feuille de Présence */}
+      <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl shadow-xs border border-slate-200/90 space-y-2.5">
+        {/* Ligne 1 : Recherche + Pilules d'Actions, Entités et Pagination */}
+        <div className="flex flex-col lg:flex-row lg:items-center gap-2.5">
+          {/* Champ Recherche Instantanée */}
+          <div className="flex-1 min-w-0 relative group">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors pointer-events-none" size={14} />
             <input 
               type="text"
-              placeholder="Rechercher par signataire, élève, rubrique, référence ou montant..."
-              className="w-full pl-10 pr-4 py-2.5 bg-white border border-slate-300 rounded-xl text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all shadow-2xs"
+              placeholder="Rechercher signataire, élève, rubrique, référence, montant..."
+              className="w-full pl-8.5 pr-7 py-2 bg-slate-50 hover:bg-slate-100/70 focus:bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-2xs"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
             {searchTerm && (
               <button 
+                type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
               >
-                ✕
+                <X size={13} />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5">
-              <Filter size={15} className="text-slate-500" />
-              <select 
-                className="bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold py-2.5 px-3 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
+          {/* Grille Sélecteurs Pilules (Harmonisé Feuille de Présence) */}
+          <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2">
+            <div className="col-span-1 min-w-[140px] sm:w-auto">
+              <SelectPill
+                options={ACTION_OPTIONS}
                 value={filterAction}
-                onChange={(e) => setFilterAction(e.target.value)}
-              >
-                <option value="ALL" className="text-slate-900 font-bold">Toutes Actions</option>
-                <option value="CREATE" className="text-slate-900 font-bold">Créations (CREATE)</option>
-                <option value="UPDATE" className="text-slate-900 font-bold">Modifications (UPDATE)</option>
-                <option value="DELETE" className="text-slate-900 font-bold">Suppressions (DELETE)</option>
-              </select>
+                onChange={(val) => setFilterAction(val)}
+                icon={Filter}
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                className="w-full"
+              />
             </div>
 
-            <select 
-              className="bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold py-2.5 px-3 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
-              value={filterEntity}
-              onChange={(e) => setFilterEntity(e.target.value)}
-            >
-              <option value="ALL" className="text-slate-900 font-bold">Toutes Entités</option>
-              <option value="payment" className="text-slate-900 font-bold">Paiements Élèves</option>
-              <option value="expense" className="text-slate-900 font-bold">Dépenses d'Exploitation</option>
-              <option value="scholarship" className="text-slate-900 font-bold">Bourses & Allègements</option>
-              <option value="salary" className="text-slate-900 font-bold">Salaires & Paie</option>
-              <option value="cash_closure" className="text-slate-900 font-bold">Clôtures de Caisse</option>
-            </select>
+            <div className="col-span-1 min-w-[155px] sm:w-auto">
+              <SelectPill
+                options={ENTITY_OPTIONS}
+                value={filterEntity}
+                onChange={(val) => setFilterEntity(val)}
+                icon={Layers}
+                variant="field"
+                size="sm"
+                colorScheme="indigo"
+                className="w-full"
+              />
+            </div>
 
-            <select
-              className="bg-white border border-slate-300 text-slate-900 rounded-xl text-xs font-bold py-2.5 px-3 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all cursor-pointer shadow-2xs"
-              value={itemsPerPage}
-              onChange={(e) => setItemsPerPage(Number(e.target.value))}
-            >
-              <option value={10}>10 / page</option>
-              <option value={15}>15 / page</option>
-              <option value={25}>25 / page</option>
-              <option value={50}>50 / page</option>
-            </select>
+            <div className="col-span-2 sm:col-span-1 sm:w-auto min-w-[110px]">
+              <SelectPill
+                options={PER_PAGE_OPTIONS}
+                value={String(itemsPerPage)}
+                onChange={(val) => setItemsPerPage(Number(val))}
+                variant="field"
+                size="sm"
+                colorScheme="slate"
+                className="w-full"
+              />
+            </div>
           </div>
         </div>
 
-        {/* Date Filter Bar */}
-        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 text-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="font-bold text-slate-600 flex items-center gap-1.5 text-[11px]">
+        {/* Ligne 2 : Période DateTime Pilule Harmonisé + Raccourcis + Compteur d'écritures */}
+        <div className="pt-2 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-2 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold text-slate-500 flex items-center gap-1.5 text-[11px] uppercase tracking-wider shrink-0">
               <Calendar size={13} className="text-indigo-600" /> Période :
             </span>
-            <div className="flex items-center gap-1.5">
-              <input 
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 shadow-2xs"
-                title="Date Début"
-              />
-              <span className="text-slate-400 font-bold">à</span>
-              <input 
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 shadow-2xs"
-                title="Date Fin"
-              />
+
+            {/* Sélecteurs DateTime Pilule (Du ... Au ...) */}
+            <div className="flex items-center gap-1.5 flex-1 sm:flex-initial">
+              <div className="w-36 sm:w-40 min-w-0">
+                <DatePickerPill
+                  selectedDate={startDate}
+                  onSelectDate={(newDate) => setStartDate(newDate)}
+                  labelPrefix="Du "
+                  placeholder="Date début"
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  clearable={true}
+                  className="w-full"
+                />
+              </div>
+              <span className="text-slate-400 font-bold text-xs shrink-0">à</span>
+              <div className="w-36 sm:w-40 min-w-0">
+                <DatePickerPill
+                  selectedDate={endDate}
+                  onSelectDate={(newDate) => setEndDate(newDate)}
+                  labelPrefix="Au "
+                  placeholder="Date fin"
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  clearable={true}
+                  className="w-full"
+                />
+              </div>
             </div>
-            {(startDate || endDate) && (
+
+            {/* Pilules de raccourcis rapides */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-0.5 sm:pb-0">
               <button
-                onClick={() => { setStartDate(''); setEndDate(''); }}
-                className="px-2 py-1 text-[11px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                type="button"
+                onClick={() => setDateShortcut('today')}
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer"
               >
-                Effacer dates
+                Aujourd'hui
               </button>
-            )}
+              <button
+                type="button"
+                onClick={() => setDateShortcut('7days')}
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer"
+              >
+                7 jours
+              </button>
+              <button
+                type="button"
+                onClick={() => setDateShortcut('month')}
+                className="px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all shrink-0 cursor-pointer"
+              >
+                Ce mois
+              </button>
+              {(startDate || endDate) && (
+                <button
+                  type="button"
+                  onClick={() => setDateShortcut('clear')}
+                  className="px-2 py-1 text-[11px] font-bold text-rose-600 hover:text-rose-800 hover:bg-rose-50 rounded-lg transition-all shrink-0 cursor-pointer flex items-center gap-1"
+                >
+                  <X size={11} /> Effacer
+                </button>
+              )}
+            </div>
           </div>
 
-          <span className="text-[11px] font-bold text-slate-500">
-            {filteredLogs.length} écriture{filteredLogs.length > 1 ? 's' : ''} certifiée{filteredLogs.length > 1 ? 's' : ''}
-          </span>
+          <div className="flex items-center gap-1.5 self-end md:self-auto">
+            <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-bold border border-slate-200">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+              <span>{filteredLogs.length} écriture{filteredLogs.length > 1 ? 's' : ''} certifiée{filteredLogs.length > 1 ? 's' : ''}</span>
+            </span>
+          </div>
         </div>
       </div>
 
-      {/* Audit Table with Responsive Self-Contained Horizontal Scroll */}
-      <div className="bg-white rounded-3xl shadow-xs border border-slate-200/90 overflow-hidden">
+      {/* Audit Table Compacte et Dense avec Scroll Horizontal fluide */}
+      <div className="bg-white rounded-xl sm:rounded-2xl shadow-xs border border-slate-200/90 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+          <table className="w-full text-left border-collapse min-w-[780px]">
             <thead>
               <tr className="bg-slate-900 text-slate-100 border-b border-slate-800">
-                <th className="px-5 py-4 text-[10px] font-black text-slate-200 uppercase tracking-wider w-40">Certifié le</th>
-                <th className="px-5 py-4 text-[10px] font-black text-slate-200 uppercase tracking-wider w-48">Signataire</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-200 uppercase tracking-wider w-32">Type d'Acte</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-200 uppercase tracking-wider w-32">Périmètre</th>
-                <th className="px-5 py-4 text-[10px] font-black text-slate-200 uppercase tracking-wider">Détails de l'Opération</th>
-                <th className="px-4 py-4 text-[10px] font-black text-slate-200 uppercase tracking-wider text-right w-20">Action</th>
+                <th className="px-3.5 py-2.5 sm:px-4 sm:py-2.5 text-[10px] font-black text-slate-200 uppercase tracking-wider w-36 sm:w-40">Certifié le</th>
+                <th className="px-3.5 py-2.5 sm:px-4 sm:py-2.5 text-[10px] font-black text-slate-200 uppercase tracking-wider w-40 sm:w-44">Signataire</th>
+                <th className="px-3 py-2.5 sm:px-3.5 sm:py-2.5 text-[10px] font-black text-slate-200 uppercase tracking-wider w-28 sm:w-32">Type d'Acte</th>
+                <th className="px-3 py-2.5 sm:px-3.5 sm:py-2.5 text-[10px] font-black text-slate-200 uppercase tracking-wider w-28 sm:w-32">Périmètre</th>
+                <th className="px-3.5 py-2.5 sm:px-4 sm:py-2.5 text-[10px] font-black text-slate-200 uppercase tracking-wider">Détails de l'Opération</th>
+                <th className="px-3 py-2.5 sm:px-3.5 sm:py-2.5 text-[10px] font-black text-slate-200 uppercase tracking-wider text-right w-16 sm:w-20">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600 mx-auto" />
-                    <p className="text-slate-600 text-xs font-bold mt-4">Analyse du journal d'audit en cours...</p>
+                  <td colSpan={6} className="px-6 py-8 text-center">
+                    <Loader2 className="w-6 h-6 animate-spin text-indigo-600 mx-auto" />
+                    <p className="text-slate-600 text-xs font-bold mt-2">Analyse du journal d'audit en cours...</p>
                   </td>
                 </tr>
               ) : filteredLogs.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center">
-                    <AlertCircle className="w-8 h-8 text-slate-400 mx-auto" />
-                    <p className="text-slate-500 text-xs font-bold mt-4">Aucune trace financière trouvée pour ces critères</p>
+                  <td colSpan={6} className="px-6 py-8 text-center">
+                    <AlertCircle className="w-6 h-6 text-slate-400 mx-auto" />
+                    <p className="text-slate-500 text-xs font-bold mt-2">Aucune trace financière trouvée pour ces critères</p>
                   </td>
                 </tr>
               ) : (
                 paginatedLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/80 transition-colors group">
                     {/* Timestamp */}
-                    <td className="px-5 py-4 whitespace-nowrap align-top">
+                    <td className="px-3.5 py-2 sm:px-4 sm:py-2.5 whitespace-nowrap align-middle">
                       <div className="flex items-center gap-1.5 text-slate-600">
-                        <Clock size={13} className="text-slate-400 shrink-0" />
+                        <Clock size={12} className="text-slate-400 shrink-0" />
                         <span className="text-[11px] font-bold text-slate-900">
                           {new Date(log.created_at).toLocaleString('fr-FR', { 
                             day: '2-digit', 
@@ -766,20 +865,20 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </td>
 
                     {/* Signer */}
-                    <td className="px-5 py-4 whitespace-nowrap align-top">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0">
+                    <td className="px-3.5 py-2 sm:px-4 sm:py-2.5 whitespace-nowrap align-middle">
+                      <div className="flex items-center gap-1.5">
+                        <div className="w-5 h-5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-md flex items-center justify-center text-[9px] font-black shrink-0">
                           {log.profiles?.full_name?.charAt(0) || 'U'}
                         </div>
-                        <span className="text-xs font-bold text-slate-900 truncate max-w-[140px]" title={log.profiles?.full_name || 'Utilisateur Inconnu'}>
+                        <span className="text-xs font-bold text-slate-900 truncate max-w-[120px] sm:max-w-[140px]" title={log.profiles?.full_name || 'Utilisateur Inconnu'}>
                           {log.profiles?.full_name || 'Utilisateur Inconnu'}
                         </span>
                       </div>
                     </td>
 
                     {/* Action Type */}
-                    <td className="px-4 py-4 whitespace-nowrap align-top">
-                      <div className="flex items-center gap-1.5">
+                    <td className="px-3 py-2 sm:px-3.5 sm:py-2.5 whitespace-nowrap align-middle">
+                      <div className="flex items-center gap-1">
                         {getActionIcon(log.action)}
                         <span className={`text-[10px] font-black uppercase tracking-wider ${
                           log.action === 'CREATE' ? 'text-emerald-700 font-extrabold' : 
@@ -791,30 +890,30 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </td>
 
                     {/* Entity */}
-                    <td className="px-4 py-4 whitespace-nowrap align-top">
-                      <span className="px-2.5 py-1 bg-slate-100 text-slate-800 rounded-lg text-[10px] font-bold uppercase border border-slate-200 inline-block">
+                    <td className="px-3 py-2 sm:px-3.5 sm:py-2.5 whitespace-nowrap align-middle">
+                      <span className="px-2 py-0.5 bg-slate-100 text-slate-800 rounded-md text-[10px] font-bold uppercase border border-slate-200 inline-block">
                         {getEntityLabel(log.entity_type)}
                       </span>
                     </td>
 
                     {/* Details column (Formatted preview) */}
-                    <td className="px-5 py-4 align-top">
+                    <td className="px-3.5 py-2 sm:px-4 sm:py-2.5 align-middle">
                       <div className="text-[11px] text-slate-700 max-w-lg font-medium">
                         {renderCertifiedDetailsColumn(log)}
                       </div>
                     </td>
 
                     {/* Quick view button */}
-                    <td className="px-4 py-4 text-right whitespace-nowrap align-top">
+                    <td className="px-3 py-2 sm:px-3.5 sm:py-2.5 text-right whitespace-nowrap align-middle">
                       <button
                         onClick={() => {
                           setSelectedLogForDetail(log);
                           setDetailModalTab('METIER');
                         }}
-                        className="p-2 bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-xl border border-slate-200 transition-all cursor-pointer shadow-2xs"
+                        className="p-1.5 bg-slate-100 hover:bg-indigo-50 text-slate-600 hover:text-indigo-700 rounded-lg border border-slate-200 transition-all cursor-pointer shadow-2xs"
                         title="Consulter le dossier d'audit complet"
                       >
-                        <Eye size={15} />
+                        <Eye size={14} />
                       </button>
                     </td>
                   </tr>
@@ -824,9 +923,9 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </table>
         </div>
 
-        {/* Bottom Pagination */}
+        {/* Bottom Pagination Compacte */}
         {totalPages > 1 && (
-          <div className="p-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3 bg-slate-50/80">
+          <div className="p-2.5 sm:p-3 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 bg-slate-50/80">
             <span className="text-xs text-slate-700 font-bold">
               Page {currentPage} sur {totalPages} ({filteredLogs.length} éléments au total)
             </span>
@@ -834,7 +933,7 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 onClick={() => setCurrentPage(1)}
                 disabled={currentPage === 1}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs transition-colors"
                 title="Première page"
               >
                 ««
@@ -842,27 +941,27 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
                 disabled={currentPage === 1}
-                className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs transition-colors"
               >
                 Précédent
               </button>
               
               {/* Visible page pill */}
-              <span className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-xs font-black shadow-2xs">
+              <span className="px-2.5 py-1 bg-indigo-600 text-white rounded-lg text-xs font-black shadow-2xs">
                 {currentPage}
               </span>
 
               <button
                 onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
                 disabled={currentPage === totalPages}
-                className="px-3 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs transition-colors"
               >
                 Suivant
               </button>
               <button
                 onClick={() => setCurrentPage(totalPages)}
                 disabled={currentPage === totalPages}
-                className="px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs"
+                className="px-2.5 py-1 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-700 hover:bg-slate-100 disabled:opacity-40 cursor-pointer shadow-2xs transition-colors"
                 title="Dernière page"
               >
                 »»
