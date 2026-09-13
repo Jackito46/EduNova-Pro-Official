@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { supabase, isValidUuid } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { 
@@ -162,24 +162,32 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [balanceFilter, setBalanceFilter] = useState<'ALL' | 'DEBTORS' | 'PAID'>('ALL');
   
   const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const studentIdParam = searchParams.get('studentId') || (location.state as any)?.studentId;
   const tabParam = searchParams.get('tab');
+  const yearParam = searchParams.get('academicYearId') || searchParams.get('yearId') || (location.state as any)?.academicYearId;
   
-  // Detection du paramètre d'URL pour ouvrir directement l'audit de données ou un onglet spécifique
+  // Detection du paramètre d'URL pour ouvrir directement le relevé d'un élève ou un onglet spécifique
   const [activeView, setActiveView] = useState<'balances' | 'generator' | 'audit_data'>(() => {
+    if (studentIdParam) return 'generator';
     if (tabParam === 'audit_data') return 'audit_data';
     if (tabParam === 'generator') return 'generator';
     return 'balances';
   });
 
   useEffect(() => {
-    if (tabParam === 'audit_data') {
+    if (studentIdParam) {
+      setActiveView('generator');
+    } else if (tabParam === 'audit_data') {
       setActiveView('audit_data');
     } else if (tabParam === 'generator') {
       setActiveView('generator');
     } else if (tabParam === 'balances') {
       setActiveView('balances');
     }
-  }, [tabParam]);
+  }, [tabParam, studentIdParam]);
   
   // Diagnostics de Débogage
   const [auditDiagnosticInfo, setAuditDiagnosticInfo] = useState<{
@@ -748,13 +756,25 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [students, enrollmentsForGen, genClass]);
 
   const genStudentOptions: SelectOption[] = useMemo(() => {
-    return availableStudentsForGen.map(s => ({
+    const list = availableStudentsForGen.map(s => ({
       value: s.id,
       label: s.name,
       badge: s.id.substring(0, 6).toUpperCase(),
       description: `ID: ${s.id.substring(0, 8)}`
     }));
-  }, [availableStudentsForGen]);
+
+    if (selectedGenStudent && !list.some(item => item.value === selectedGenStudent.id)) {
+      const formatted = formatStudentName(selectedGenStudent.last_name, selectedGenStudent.first_name);
+      list.unshift({
+        value: selectedGenStudent.id,
+        label: formatted.fullName,
+        badge: selectedGenStudent.id.substring(0, 6).toUpperCase(),
+        description: `ID: ${selectedGenStudent.id.substring(0, 8)}`
+      });
+    }
+
+    return list;
+  }, [availableStudentsForGen, selectedGenStudent]);
 
   // Index de l'élève actuellement sélectionné dans le générateur
   const currentGenStudentIndex = useMemo(() => {
@@ -762,8 +782,9 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return availableStudentsForGen.findIndex(s => s.id === selectedGenStudent.id);
   }, [selectedGenStudent, availableStudentsForGen]);
 
-  const loadStudentAudit = async (student: any) => {
-    if (!genYear) return;
+  const loadStudentAudit = async (student: any, yearOverride?: string) => {
+    const activeYearId = yearOverride || genYear || selectedYear;
+    if (!activeYearId || !user?.school_id) return;
     setLoading(true);
     try {
       const { data: enrollment } = await supabase
@@ -771,7 +792,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         .select('*, class:classes(id, name)')
         .eq('school_id', user.school_id)
         .eq('student_id', student.id)
-        .eq('academic_year_id', genYear)
+        .eq('academic_year_id', activeYearId)
         .maybeSingle();
 
       const { data: plan } = await supabase
@@ -779,7 +800,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         .select('*')
         .eq('school_id', user.school_id)
         .eq('class_id', enrollment?.class_id || student.class_id)
-        .eq('academic_year_id', genYear)
+        .eq('academic_year_id', activeYearId)
         .maybeSingle();
 
       const { data: rawPayments } = await supabase
@@ -789,7 +810,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
 
-      const payments = rawPayments?.filter(p => !p.academic_year_id || p.academic_year_id === genYear) || [];
+      const payments = rawPayments?.filter(p => !p.academic_year_id || p.academic_year_id === activeYearId) || [];
 
       const { data: rateRes } = await supabase
         .from('exchange_rates')
@@ -826,7 +847,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             fee_id: fee.id
           };
         })
-        .filter((c: any) => c !== null && c.academic_year_id === genYear);
+        .filter((c: any) => c !== null && c.academic_year_id === activeYearId);
 
       const campaignsExpected = activeCampaigns.reduce((sum, camp) => {
         const required = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
@@ -838,7 +859,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         .select('id')
         .eq('school_id', user.school_id)
         .eq('student_id', student.id)
-        .neq('academic_year_id', genYear)
+        .neq('academic_year_id', activeYearId)
         .limit(1);
       const isReenroll = prevEnrollments && prevEnrollments.length > 0;
 
@@ -954,6 +975,11 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       const totalDue = Math.max(paid, originalDue - totalDiscount);
 
+      if (enrollment?.class_id) {
+        setGenClass(enrollment.class_id);
+      }
+      setGenYear(activeYearId);
+
       setSelectedGenStudent({
         ...student,
         inscriptionFee: admissionExpected,
@@ -988,7 +1014,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         paid,
         balance: Math.max(0, totalDue - paid),
         className: enrollment?.class?.name || classes.find(c => c.id === student.class_id)?.name || 'N/A',
-        academicYear: academicYears.find(y => y.id === genYear)?.label
+        academicYear: academicYears.find(y => y.id === activeYearId)?.label || activeYearId
       });
       setStudentHistory(payments || []);
     } catch (e) {
@@ -997,6 +1023,84 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       setLoading(false);
     }
   };
+
+  // Synchronisation directe lorsqu'un élève est ciblé par URL (?studentId=... ou navigation state)
+  const directStudentProcessedRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!studentIdParam || !user?.school_id) return;
+    const cacheKey = `${studentIdParam}-${yearParam || 'auto'}`;
+    if (directStudentProcessedRef.current === cacheKey) return;
+
+    const loadTargetStudentDirectly = async () => {
+      try {
+        setLoading(true);
+        setActiveView('generator');
+
+        // Récupération de la fiche élève
+        const { data: studentRecord, error: sErr } = await supabase
+          .from('students')
+          .select('id, first_name, last_name, class_id, discount_amount, discount_label, campus_id')
+          .eq('id', studentIdParam)
+          .maybeSingle();
+
+        if (sErr || !studentRecord) {
+          console.error("Élève introuvable pour relevé direct:", sErr);
+          toast.error("Impossible de charger le relevé de cet élève.");
+          return;
+        }
+
+        // Détection de la classe et de l'année académique ciblée
+        let targetYear = yearParam;
+        let targetClass = studentRecord.class_id;
+
+        const { data: enrollments } = await supabase
+          .from('enrollments')
+          .select('*, class:classes(id, name)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', studentIdParam)
+          .order('created_at', { ascending: false });
+
+        if (enrollments && enrollments.length > 0) {
+          const match = yearParam ? enrollments.find(e => e.academic_year_id === yearParam) : enrollments[0];
+          const chosen = match || enrollments[0];
+          targetYear = chosen.academic_year_id;
+          if (chosen.class_id) targetClass = chosen.class_id;
+        }
+
+        if (!targetYear) {
+          targetYear = academicYears.find(y => y.status === 'ACTIVE')?.id || academicYears[0]?.id || selectedYear || genYear;
+        }
+
+        if (targetYear) {
+          setGenYear(targetYear);
+          setSelectedYear(targetYear);
+        }
+        if (targetClass) {
+          setGenClass(targetClass);
+        }
+
+        directStudentProcessedRef.current = cacheKey;
+        await loadStudentAudit(studentRecord, targetYear);
+      } catch (err) {
+        console.error("Erreur lors du chargement direct du relevé:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadTargetStudentDirectly();
+  }, [studentIdParam, yearParam, user?.school_id]);
+
+  // Défilement fluide vers le relevé dès qu'il est chargé
+  const statementCardRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (selectedGenStudent && studentIdParam) {
+      setTimeout(() => {
+        statementCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 150);
+    }
+  }, [selectedGenStudent?.id, studentIdParam]);
 
   const navigateAuditStudent = (direction: 'prev' | 'next') => {
     if (currentGenStudentIndex === -1 || availableStudentsForGen.length === 0) return;
@@ -2068,7 +2172,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
               
               {/* Entête Fiche Élève */}
-              <div className="bg-white p-6 rounded-[2rem] border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div ref={statementCardRef} className="bg-white p-6 rounded-[2rem] border border-slate-200/80 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shadow-md shadow-indigo-500/20">
                     {selectedGenStudent.last_name.charAt(0).toUpperCase()}
@@ -2088,6 +2192,15 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 <div className="flex items-center gap-2 w-full md:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/eleves/detail/${selectedGenStudent.id}`)}
+                    className="flex-1 md:flex-none px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs tracking-tight transition-all border border-slate-200 flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                    title="Retourner au dossier complet de l'élève"
+                  >
+                    <ArrowLeft size={16} />
+                    Dossier {terminology.student}
+                  </button>
                   <button 
                     onClick={exportToPDF}
                     disabled={isExporting}

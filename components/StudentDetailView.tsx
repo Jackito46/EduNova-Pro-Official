@@ -547,6 +547,21 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <Printer size={14} className="text-slate-500 shrink-0" />
               <span>Imprimer</span>
             </button>
+            {/* Bouton direct d'accès instantané au Relevé de Compte & Audit Financier */}
+            <button 
+              type="button"
+              onClick={() => navigate(`/economat/releves?studentId=${student.id}&tab=generator`, {
+                state: {
+                  studentId: student.id,
+                  academicYearId: enrollments[0]?.academic_year_id || student.academic_year_id
+                }
+              })}
+              className="px-3 py-1.5 sm:px-3.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl transition-all flex items-center gap-1.5 h-8 sm:h-9 cursor-pointer shadow-xs font-bold text-[11px] sm:text-xs active:scale-[0.98] shrink-0" 
+              title="Ouvrir instantanément le Relevé de Compte & Audit Financier officiel"
+            >
+              <FileText size={14} className="text-white shrink-0" />
+              <span>Relevé de Compte</span>
+            </button>
             {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.SECRETARY) && (
               <>
                 <button 
@@ -1099,12 +1114,20 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
 
-                <Link 
-                  to={`/economat/releves?studentId=${student.id}`} 
-                  className="text-[10px] font-black text-indigo-600 uppercase hover:text-indigo-800 transition-colors"
+                <button 
+                  type="button"
+                  onClick={() => navigate(`/economat/releves?studentId=${student.id}&tab=generator`, {
+                    state: {
+                      studentId: student.id,
+                      academicYearId: enrollments[0]?.academic_year_id || student.academic_year_id
+                    }
+                  })}
+                  className="text-[10px] font-black text-indigo-600 uppercase hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
+                  title="Consulter le Relevé de Compte & Audit Financier certifié"
                 >
-                  Relevé complet
-                </Link>
+                  <span>Relevé de Compte</span>
+                  <ChevronRight size={12} />
+                </button>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

@@ -36,6 +36,7 @@ import {
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { SelectPill } from './SelectPill';
+import { DatePickerPill } from './DatePickerPill';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
 import { MonCashService } from '../services/moncashService';
 
@@ -77,10 +78,10 @@ const InfoTooltip = ({ content, title }: { content: string; title?: string }) =>
 const FormField = ({ label, name, type = 'text', placeholder = '', required = false, value, onChange, disabled = false, icon: Icon, error, autoComplete, tooltip }: any) => {
   const [showTooltip, setShowTooltip] = useState(false);
   return (
-    <div className="flex flex-col gap-1.5 group">
+    <div className="flex flex-col gap-1 group">
       <div className="flex items-center justify-between">
-        <label htmlFor={name} className="text-xs font-bold text-slate-600 tracking-tight flex items-center gap-1.5 group-focus-within:text-indigo-600 transition-colors">
-          {Icon && <Icon size={14} className="text-slate-400 group-focus-within:text-indigo-600 transition-colors" />}
+        <label htmlFor={name} className="text-[11px] sm:text-xs font-bold text-slate-600 tracking-tight flex items-center gap-1.5 group-focus-within:text-indigo-600 transition-colors">
+          {Icon && <Icon size={13} className="text-slate-400 group-focus-within:text-indigo-600 transition-colors" />}
           <span>{label}</span>
           {required && <span className="text-rose-500 font-bold ml-0.5">*</span>}
         </label>
@@ -96,7 +97,7 @@ const FormField = ({ label, name, type = 'text', placeholder = '', required = fa
               className="text-slate-400 hover:text-indigo-600 focus:text-indigo-600 focus:outline-none transition-colors p-0.5 rounded-full hover:bg-indigo-50"
               aria-label={`Information sur ${label}`}
             >
-              <Info size={13} />
+              <Info size={12} />
             </button>
             <AnimatePresence>
               {showTooltip && (
@@ -126,7 +127,7 @@ const FormField = ({ label, name, type = 'text', placeholder = '', required = fa
         autoComplete={autoComplete}
         aria-invalid={!!error}
         aria-describedby={error ? `${name}-error` : undefined}
-        className={`w-full px-3.5 py-2.5 min-h-[44px] border rounded-xl text-sm font-medium outline-none transition-all ${
+        className={`w-full px-3 py-2 min-h-[38px] sm:min-h-[40px] border rounded-xl text-xs sm:text-sm font-medium outline-none transition-all ${
           disabled 
             ? 'bg-slate-50 text-slate-400 border-slate-200 cursor-not-allowed' 
             : error 
@@ -251,6 +252,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       parentName: '', parentRelation: isAdultLevel ? 'Conjoint(e)' : 'Père', parentPhone: '', parentEmail: '', parentJob: '',
       selectedClassId: ''
     });
+    setRegistrationDate(new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]);
     setActiveStep(1);
     setApiError(null);
     clearDraft();
@@ -260,6 +262,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   useUnsavedChanges(hasUnsavedChanges);
 
   const [savedStudentId, setSavedStudentId] = useState<string | null>(null);
+  const [registrationDate, setRegistrationDate] = useState<string>(() => 
+    new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+  );
   const [payInscriptionNow, setPayInscriptionNow] = useState(true);
   const [inscriptionPaymentMethod, setInscriptionPaymentMethod] = useState('Cash');
   const [inscriptionCurrency, setInscriptionCurrency] = useState('USD');
@@ -643,11 +648,11 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [formData.selectedClassId, dbFees, isReenroll]);
 
   const stepsConfig = useMemo(() => [
-    { number: 1, title: isAdultLevel ? "Identité Étudiant" : "Identité de l'Élève", subtitle: "État civil & profil", icon: User },
+    { number: 1, title: isAdultLevel ? "Identité Étudiant" : `Identité ${terminology.student}`, subtitle: "État civil & profil", icon: User },
     { number: 2, title: isAdultLevel ? "Contact d'Urgence" : "Responsable Légal", subtitle: "Filiation & coordonnées", icon: Users },
-    { number: 3, title: isUniversity ? "Faculté & Session" : isProfessional ? "Filière & Annexe" : "Classe & Annexe", subtitle: "Affectation académique", icon: GraduationCap },
+    { number: 3, title: isUniversity ? "Faculté & Session" : isProfessional ? "Filière & Annexe" : `${terminology.class} & Annexe`, subtitle: "Affectation académique", icon: GraduationCap },
     { number: 4, title: "Pièces & Validation", subtitle: "Dossier & finalisation", icon: ShieldCheck },
-  ], [isAdultLevel, isUniversity, isProfessional]);
+  ], [isAdultLevel, isUniversity, isProfessional, terminology.student, terminology.class]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -855,7 +860,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             campus_id: resolvedCampusId,
             student_id: targetStudentId,
             academic_year_id: targetYearId,
-            date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+            date: registrationDate || new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
             amount: amountToSave,
             amount_htg_equivalent: equivalentHtgToSave,
             exchange_rate_applied: actualExchangeRate || 140,
@@ -927,7 +932,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           campus_id: resolvedCampusId,
           student_id: targetStudentId,
           academic_year_id: targetYearId,
-          date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+          date: registrationDate || new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
           amount: amountToSave,
           amount_htg_equivalent: equivalentHtgToSave,
           exchange_rate_applied: actualExchangeRate || 140,
@@ -1097,15 +1102,15 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const activeCampusObj = campuses.find(c => c.id === selectedCampusId) || campuses.find(c => c.id === currentCampusId);
 
   return (
-    <div className="max-w-5xl mx-auto space-y-6 pb-20 px-2 sm:px-4">
-      {/* Modern Header Banner */}
+    <div className="max-w-5xl mx-auto space-y-3.5 sm:space-y-4 pb-12 px-2 sm:px-4 lg:px-6">
+      {/* Modern Compact Header Banner */}
       <motion.div 
-        initial={{ opacity: 0, y: -12 }}
+        initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-5"
+        className="bg-white p-3 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/90 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3"
       >
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border transition-all ${
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
             isFinanciallyLocked 
               ? 'bg-rose-50 text-rose-600 border-rose-200' 
               : isReenroll && dispensation.enabled
@@ -1114,15 +1119,15 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   ? 'bg-indigo-50 text-indigo-600 border-indigo-100' 
                   : 'bg-blue-50 text-blue-600 border-blue-100'
           }`}>
-            {isFinanciallyLocked ? <Ban size={24} /> : isReenroll ? <ArrowUpCircle size={24} /> : <Fingerprint size={24} />}
+            {isFinanciallyLocked ? <Ban size={20} /> : isReenroll ? <ArrowUpCircle size={20} /> : <Fingerprint size={20} />}
           </div>
-          <div>
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate">
                 {isReenroll ? `Promotion & Réinscription de l'${terminology.student}` : isEdit ? `Édition Dossier ${terminology.student}` : `${terminology.enrollment} Administrative`}
               </h2>
               {/* Type Badge */}
-              <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider border ${
+              <span className={`px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-extrabold uppercase tracking-wider border ${
                 isUniversity ? 'bg-purple-50 text-purple-700 border-purple-200' :
                 isProfessional ? 'bg-amber-50 text-amber-700 border-amber-200' :
                 'bg-blue-50 text-blue-700 border-blue-200'
@@ -1131,7 +1136,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               </span>
 
               {isReenroll && (
-                <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                <span className={`px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider border ${
                   dispensation.enabled
                     ? 'bg-amber-100 text-amber-900 border-amber-300'
                     : isFinanciallyLocked
@@ -1151,7 +1156,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
             
-            <div className="flex flex-wrap items-center gap-3 mt-1.5">
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               {/* Academic Year Selector */}
               <AcademicSessionPill
                 academicYears={academicYears}
@@ -1163,50 +1168,48 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* Multi-Campus / Annexe Badge if exists */}
               {campuses && campuses.length > 1 && (
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600">
-                  <Building2 size={13} className="text-slate-400" />
+                <div className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 border border-slate-200 rounded-lg text-[11px] font-semibold text-slate-600">
+                  <Building2 size={12} className="text-slate-400" />
                   <span>{activeCampusObj?.name || 'Multi-Annexes'}</span>
                 </div>
               )}
 
               {studentDebt > 0 && (
-                <span className="text-xs font-bold px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
-                  <Coins size={13} /> Arriérés : {studentDebt.toLocaleString()} G
+                <span className="text-[11px] font-bold px-2 py-0.5 rounded-lg bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
+                  <Coins size={12} /> Arriérés : {studentDebt.toLocaleString()} G
                 </span>
               )}
             </div>
           </div>
         </div>
 
-        {/* Stepper Progress Indicator */}
-        <div className="flex items-center gap-2 self-stretch md:self-auto justify-between sm:justify-end border-t md:border-t-0 pt-3 md:pt-0 border-slate-100">
-          <div className="flex items-center gap-1.5">
-            {stepsConfig.map((s) => {
-              const isPassed = activeStep > s.number;
-              const isCurrent = activeStep === s.number;
-              return (
-                <button
-                  key={s.number}
-                  type="button"
-                  onClick={() => isPassed && setActiveStep(s.number)}
-                  disabled={!isPassed}
-                  title={`${s.number}. ${s.title}`}
-                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                    isCurrent 
-                      ? 'bg-indigo-600 text-white shadow-xs' 
-                      : isPassed 
-                        ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60 cursor-pointer' 
-                        : 'bg-slate-50 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-70'
-                  }`}
-                >
-                  <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black">
-                    {isPassed ? <Check size={12} className="stroke-[3]" /> : s.number}
-                  </span>
-                  <span className="hidden sm:inline">{s.title.split(' ')[0]}</span>
-                </button>
-              );
-            })}
-          </div>
+        {/* Responsive Stepper Progress Indicator */}
+        <div className="flex items-center gap-1 sm:gap-1.5 self-stretch lg:self-auto justify-between border-t lg:border-t-0 pt-2.5 lg:pt-0 border-slate-100">
+          {stepsConfig.map((s) => {
+            const isPassed = activeStep > s.number;
+            const isCurrent = activeStep === s.number;
+            return (
+              <button
+                key={s.number}
+                type="button"
+                onClick={() => isPassed && setActiveStep(s.number)}
+                disabled={!isPassed}
+                title={`${s.number}. ${s.title}`}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  isCurrent 
+                    ? 'bg-indigo-600 text-white shadow-2xs' 
+                    : isPassed 
+                      ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200/60 cursor-pointer' 
+                      : 'bg-slate-50 text-slate-400 border border-slate-200/60 cursor-not-allowed opacity-75'
+                }`}
+              >
+                <span className="w-4 h-4 rounded-full flex items-center justify-center text-[10px] font-black shrink-0">
+                  {isPassed ? <Check size={11} className="stroke-[3]" /> : s.number}
+                </span>
+                <span className="hidden md:inline">{s.title.split(' ')[0]}</span>
+              </button>
+            );
+          })}
         </div>
       </motion.div>
 
@@ -1224,7 +1227,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* Main Multi-Step Form Container */}
-      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
+      <form onSubmit={handleSubmit} className="bg-white rounded-2xl shadow-2xs border border-slate-200/90 overflow-hidden">
         {/* Progress Bar */}
         <div className="w-full bg-slate-100 h-1">
           <motion.div 
@@ -1235,7 +1238,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           />
         </div>
 
-        <div className="p-5 sm:p-7 md:p-8">
+        <div className="p-3.5 sm:p-5 md:p-6">
           <AnimatePresence mode="wait">
             {/* STEP 1: IDENTITÉ & ÉTAT CIVIL */}
             {activeStep === 1 && (
@@ -1245,18 +1248,18 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -16 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-3.5 sm:space-y-4"
               >
-                <div className="flex items-center justify-between border-b border-slate-100 pb-3.5">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/80">
                       <User size={16} />
                     </div>
                     <div>
-                      <h3 className="font-black text-slate-900 text-base">
+                      <h3 className="font-black text-slate-900 text-sm sm:text-base">
                         {isAdultLevel ? `Identité & Informations de l'${terminology.student}` : `Identité de l'${terminology.student}`}
                       </h3>
-                      <p className="text-xs text-slate-500 font-medium">
+                      <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                         Renseignements légaux d'état civil pour le registre officiel
                       </p>
                     </div>
@@ -1264,15 +1267,15 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   <div className="flex items-center gap-2">
                     {calculatedAge !== null && (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100">
-                        <Baby size={13} /> {calculatedAge} ans révolus
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-extrabold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <Baby size={12} /> {calculatedAge} ans révolus
                       </span>
                     )}
                     <button
                       type="button"
                       onClick={handleResetForm}
                       title="Effacer et réinitialiser tous les champs"
-                      className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors"
+                      className="inline-flex items-center gap-1 px-2 py-1 text-xs font-semibold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 rounded-lg transition-colors"
                     >
                       <RotateCcw size={12} />
                       <span className="hidden sm:inline">Réinitialiser</span>
@@ -1280,7 +1283,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3.5">
                   <FormField 
                     label="Nom de famille" 
                     name="lastName" 
@@ -1303,31 +1306,57 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     tooltip="Prénom usuel et prénoms secondaires de l'élève séparés par un espace." 
                   />
 
-                  <FormField 
-                    label="Date de Naissance" 
-                    name="dob" 
-                    type="date" 
-                    required 
-                    value={formData.dob} 
-                    onChange={(e: any) => setFormData((prev: any) => ({ ...prev, dob: e.target.value }))} 
-                    tooltip="Date de naissance officielle pour le calcul automatique de l'âge et les listes ministérielles." 
-                  />
+                  {/* Date de Naissance Harmonisée avec DatePickerPill (Style Pilule) */}
+                  <div className="flex flex-col gap-1 group">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-600 tracking-tight flex items-center gap-1.5 group-focus-within:text-indigo-600 transition-colors">
+                        <Calendar size={13} className="text-slate-400 group-focus-within:text-indigo-600 transition-colors" />
+                        <span>Date de Naissance</span>
+                        <span className="text-rose-500 font-bold ml-0.5">*</span>
+                      </label>
+                      <div className="flex items-center gap-1">
+                        {calculatedAge !== null && (
+                          <span className="text-[10px] font-extrabold px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center gap-0.5">
+                            <Baby size={11} /> {calculatedAge} ans
+                          </span>
+                        )}
+                        <InfoTooltip content="Date de naissance officielle pour le calcul automatique de l'âge et les listes ministérielles." />
+                      </div>
+                    </div>
+                    <DatePickerPill
+                      selectedDate={formData.dob}
+                      onSelectDate={(date) => setFormData((prev: any) => ({ ...prev, dob: date }))}
+                      variant="field"
+                      size="md"
+                      colorScheme="indigo"
+                      isBirthDate={true}
+                      minYear={1940}
+                      maxYear={new Date().getFullYear()}
+                      maxDate={new Date().toISOString().split('T')[0]}
+                      showShortcuts={true}
+                      showQuickArrows={false}
+                      placeholder="Ex : 15/09/2012 ou cliquer..."
+                      title="Date de Naissance de l'Élève"
+                      clearable={true}
+                      className="w-full"
+                    />
+                  </div>
 
                   {/* Sexe / Genre Segmented selector */}
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-600 tracking-tight">
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-600 tracking-tight">
                         Genre / Sexe <span className="text-rose-500 font-bold">*</span>
                       </label>
                       <InfoTooltip content="Sexe légal inscrit sur l'acte d'état civil." />
                     </div>
-                    <div className="grid grid-cols-2 gap-2 min-h-[44px]">
+                    <div className="grid grid-cols-2 gap-2 min-h-[38px] sm:min-h-[40px]">
                       <button
                         type="button"
                         onClick={() => setFormData((prev: any) => ({ ...prev, gender: 'Masculin' }))}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
                           formData.gender === 'Masculin'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
@@ -1336,9 +1365,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <button
                         type="button"
                         onClick={() => setFormData((prev: any) => ({ ...prev, gender: 'Féminin' }))}
-                        className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all flex items-center justify-center gap-1.5 ${
                           formData.gender === 'Féminin'
-                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                            ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
                         }`}
                       >
@@ -1404,23 +1433,23 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -16 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-3.5 sm:space-y-4"
               >
-                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-3.5">
+                <div className="flex items-center gap-2.5 border-b border-slate-100 pb-2.5">
                   <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/80">
                     <Users size={16} />
                   </div>
                   <div>
-                    <h3 className="font-black text-slate-900 text-base">
+                    <h3 className="font-black text-slate-900 text-sm sm:text-base">
                       {isAdultLevel ? "Contact d'Urgence & Personne de Référence" : "Responsable Légal & Tuteurs"}
                     </h3>
-                    <p className="text-xs text-slate-500 font-medium">
+                    <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                       {isAdultLevel ? "Personne à contacter en cas d'urgence ou pour le dossier administratif" : "Parents ou tuteur légal responsable du suivi et de la scolarité"}
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-3.5">
                   <FormField 
                     label={isAdultLevel ? "Nom du Contact d'Urgence" : "Nom du Responsable"} 
                     name="parentName" 
@@ -1443,9 +1472,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     tooltip="Numéro de téléphone direct pour les communications administratives et urgences." 
                   />
 
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1">
                     <div className="flex items-center justify-between">
-                      <label className="text-xs font-bold text-slate-600 tracking-tight">
+                      <label className="text-[11px] sm:text-xs font-bold text-slate-600 tracking-tight">
                         {isAdultLevel ? "Lien avec l'Étudiant" : "Lien de Parenté"} <span className="text-rose-500 font-bold">*</span>
                       </label>
                       <InfoTooltip content="Lien relationnel avec l'élève ou étudiant." />
@@ -1516,7 +1545,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -16 }}
                 transition={{ duration: 0.2 }}
-                className="space-y-6"
+                className="space-y-3.5 sm:space-y-4"
               >
                 {/* Module d'évaluation multi-critères et Dérogation Administrative pour la réinscription */}
                 {isReenroll && (
@@ -1528,40 +1557,40 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   />
                 )}
 
-                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4">
                   {/* Left Column: Academic Year Session + Campus selector + Cycles + Classes grid */}
-                  <div className="lg:col-span-7 space-y-5">
+                  <div className="lg:col-span-7 space-y-3 sm:space-y-3.5">
                     {/* Session Académique Cible (Active ou En préparation) */}
-                    <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2.5">
+                    <div className="bg-slate-50 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 space-y-2">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                          <Calendar size={14} className="text-indigo-600" />
+                        <label className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Calendar size={13} className="text-indigo-600" />
                           <span>Session Académique Cible</span>
                         </label>
                         {academicYears.length > 0 ? (
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
+                          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">
                             {academicYears.find(y => y.id === targetYearId)?.status === 'ACTIVE' || academicYears.find(y => y.id === targetYearId)?.is_active
                               ? 'Session Active'
                               : 'Session en Préparation / Future'}
                           </span>
                         ) : (
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+                          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
                             Non configurée
                           </span>
                         )}
                       </div>
 
                       {academicYears.length === 0 ? (
-                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-2.5 text-amber-900">
-                          <AlertTriangle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+                        <div className="p-2.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2 text-amber-900">
+                          <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
                           <p className="text-xs font-medium leading-relaxed">
                             <strong>Aucune session académique active ou en préparation</strong> n'est enregistrée pour cet établissement. Veuillez vous rendre dans <em>Paramètres &gt; Années Académiques</em> pour en créer ou activer une.
                           </p>
                         </div>
                       ) : academicYears.length === 1 ? (
-                        <div className="p-2.5 bg-white rounded-xl border border-slate-200 flex items-center justify-between">
+                        <div className="p-2 bg-white rounded-lg border border-slate-200 flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <GraduationCap size={15} className="text-slate-500" />
+                            <GraduationCap size={14} className="text-slate-500" />
                             <span className="text-xs font-bold text-slate-800 font-mono">{academicYears[0].label}</span>
                           </div>
                           <span className="text-[11px] font-semibold text-slate-500">
@@ -1569,7 +1598,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </span>
                         </div>
                       ) : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                           {academicYears.map(year => {
                             const isSelected = targetYearId === year.id;
                             const isActive = year.status === 'ACTIVE' || year.is_active;
@@ -1578,9 +1607,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 key={year.id}
                                 type="button"
                                 onClick={() => setTargetYearId(year.id)}
-                                className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between ${
+                                className={`p-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-between ${
                                   isSelected 
-                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' 
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
                                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/70'
                                 }`}
                               >
@@ -1603,29 +1632,29 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Multi-Tenant / Multi-Campus Selection if multiple campuses exist */}
                     {campuses && campuses.length > 1 && (
-                      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-2">
+                      <div className="bg-slate-50 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 space-y-1.5">
                         <div className="flex items-center justify-between">
-                          <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                            <Building2 size={14} className="text-indigo-600" />
+                          <label className="text-[11px] sm:text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                            <Building2 size={13} className="text-indigo-600" />
                             <span>Annexe / Campus d'Affectation</span>
                           </label>
-                          <span className="text-[11px] font-semibold text-slate-400">Multi-Établissement</span>
+                          <span className="text-[10px] font-semibold text-slate-400">Multi-Établissement</span>
                         </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => {
                               setSelectedCampusId(null);
                               setFormData((prev: any) => ({ ...prev, selectedClassId: '' }));
                             }}
-                            className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between ${
+                            className={`p-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-between ${
                               !selectedCampusId 
-                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' 
+                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
                                 : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/70'
                             }`}
                           >
                             <span>Tous les Campus / Siège</span>
-                            {!selectedCampusId && <Check size={14} />}
+                            {!selectedCampusId && <Check size={13} />}
                           </button>
                           {campuses.map(campus => (
                             <button
@@ -1635,14 +1664,14 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 setSelectedCampusId(campus.id);
                                 setFormData((prev: any) => ({ ...prev, selectedClassId: '' }));
                               }}
-                              className={`p-2.5 rounded-xl border text-xs font-bold transition-all flex items-center justify-between truncate ${
+                              className={`p-2 rounded-lg border text-xs font-bold transition-all flex items-center justify-between truncate ${
                                 selectedCampusId === campus.id 
-                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs' 
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs' 
                                   : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100/70'
                               }`}
                             >
                               <span className="truncate">{campus.name}</span>
-                              {selectedCampusId === campus.id && <Check size={14} className="shrink-0 ml-1" />}
+                              {selectedCampusId === campus.id && <Check size={13} className="shrink-0 ml-1" />}
                             </button>
                           ))}
                         </div>
@@ -1650,15 +1679,15 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     )}
 
                     {/* Sélection Directe de Classe / Promotion en Style 'Pillule' (Harmonisé avec Feuille de Présence) */}
-                    <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white p-3.5 rounded-2xl border border-blue-200/90 shadow-2xs space-y-2">
+                    <div className="bg-gradient-to-r from-blue-50/70 via-indigo-50/40 to-white p-3 rounded-xl border border-blue-200/90 shadow-2xs space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-black text-slate-800 flex items-center gap-1.5">
-                          <GraduationCap size={15} className="text-blue-600" />
+                        <label className="text-[11px] sm:text-xs font-black text-slate-800 flex items-center gap-1.5">
+                          <GraduationCap size={14} className="text-blue-600" />
                           <span>{terminology.class} de Destination (Sélecteur Pillule)</span>
                         </label>
                         {formData.selectedClassId ? (
-                          <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
-                            <Check size={11} />
+                          <span className="text-[9px] sm:text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                            <Check size={10} />
                             {dbClasses.find(c => c.id === formData.selectedClassId)?.name || 'Sélectionnée'}
                           </span>
                         ) : (
@@ -1697,16 +1726,16 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
 
                     {/* Cycle Selection Pills */}
-                    <div className="space-y-2">
+                    <div className="space-y-1.5">
                       <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-slate-700">
+                        <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                           1. {terminology.cycle} / Niveau Académique
                         </label>
-                        <span className="text-[11px] font-medium text-slate-400">
+                        <span className="text-[10px] sm:text-[11px] font-medium text-slate-400">
                           {classesForStep.length} {terminology.classes.toLowerCase()} disponibles
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                         {getCyclesList().map(cycle => (
                           <button 
                             key={cycle} 
@@ -1715,9 +1744,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                               setSelectedCycle(cycle); 
                               setFormData((prev: any) => ({ ...prev, selectedClassId: '' })); 
                             }} 
-                            className={`py-2 px-3 rounded-xl border text-xs font-bold tracking-tight transition-all text-center ${
+                            className={`py-1.5 px-2 rounded-xl border text-xs font-bold tracking-tight transition-all text-center ${
                               selectedCycle === cycle 
-                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-xs' 
+                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-2xs' 
                                 : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                             }`}
                           >
@@ -1728,9 +1757,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
 
                     {/* Class Selection Grid */}
-                    <div className="space-y-3">
+                    <div className="space-y-2">
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <label className="text-xs font-bold text-slate-700">
+                        <label className="text-[11px] sm:text-xs font-bold text-slate-700">
                           2. {terminology.class} / Filière ({selectedCycle}) <span className="text-rose-500 font-bold">*</span>
                         </label>
                         
@@ -1750,20 +1779,20 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
 
                       {Object.keys(groupedClassesForStep).length === 0 ? (
-                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-2xl p-8 text-center space-y-1.5">
-                          <SchoolIcon size={24} className="mx-auto text-slate-400" />
+                        <div className="bg-slate-50 border border-dashed border-slate-200 rounded-xl p-6 text-center space-y-1.5">
+                          <SchoolIcon size={22} className="mx-auto text-slate-400" />
                           <p className="text-xs font-bold text-slate-700">Aucune classe trouvée pour ce niveau</p>
                           <p className="text-[11px] text-slate-500 font-medium">Vérifiez vos filtres ou créez des classes dans la section Configuration.</p>
                         </div>
                       ) : (
-                        <div className="space-y-4 max-h-[380px] overflow-y-auto pr-1">
+                        <div className="space-y-3 max-h-[340px] overflow-y-auto pr-1">
                           {Object.entries(groupedClassesForStep).map(([discipline, classes]) => (
-                            <div key={discipline} className="bg-slate-50/60 border border-slate-200/80 rounded-2xl p-3.5 space-y-2.5">
-                              <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
-                                <Layers size={13} className="text-indigo-600" />
+                            <div key={discipline} className="bg-slate-50/60 border border-slate-200/80 rounded-xl p-2.5 sm:p-3 space-y-2">
+                              <h4 className="text-[11px] font-black text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                                <Layers size={12} className="text-indigo-600" />
                                 <span>{discipline}</span>
                               </h4>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                                 {classes.sort((a, b) => a.name.localeCompare(b.name)).map(cls => {
                                   const isSelected = formData.selectedClassId === cls.id;
                                   const range = getClassAgeRange(cls.name, selectedCycle);
@@ -1774,9 +1803,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                       key={cls.id} 
                                       type="button" 
                                       onClick={() => setFormData((prev: any) => ({ ...prev, selectedClassId: cls.id }))} 
-                                      className={`p-3 rounded-xl border text-left transition-all flex flex-col justify-between gap-1.5 relative ${
+                                      className={`p-2.5 rounded-lg border text-left transition-all flex flex-col justify-between gap-1 relative ${
                                         isSelected 
-                                          ? 'bg-indigo-50/90 border-indigo-500 text-indigo-950 shadow-xs ring-2 ring-indigo-500/20' 
+                                          ? 'bg-indigo-50/90 border-indigo-500 text-indigo-950 shadow-2xs ring-2 ring-indigo-500/20' 
                                           : 'bg-white border-slate-200/80 text-slate-700 hover:border-slate-300 hover:bg-slate-50/50'
                                       }`}
                                     >
@@ -1816,20 +1845,20 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   {/* Right Column: Dynamic Pricing Card */}
                   <div className="lg:col-span-5">
-                    <div className="bg-slate-50/80 rounded-2xl p-5 border border-slate-200/80 h-full flex flex-col justify-between space-y-4">
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/70">
+                    <div className="bg-slate-50/80 rounded-xl p-3.5 sm:p-4 border border-slate-200/80 h-full flex flex-col justify-between space-y-3">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between pb-2 border-b border-slate-200/70">
                           <div className="flex items-center gap-2">
-                            <div className="p-1.5 bg-indigo-100 text-indigo-600 rounded-lg">
-                              <Wallet size={16} />
+                            <div className="p-1 bg-indigo-100 text-indigo-600 rounded-lg">
+                              <Wallet size={15} />
                             </div>
-                            <h4 className="text-sm font-black text-slate-900">Bilan Financier Prévisionnel</h4>
+                            <h4 className="text-xs sm:text-sm font-black text-slate-900">Bilan Financier Prévisionnel</h4>
                           </div>
                           <InfoTooltip content="Tarifs officiels définis pour cette classe à l'économat." />
                         </div>
 
                         {currentPricing.exists ? (
-                          <div className="space-y-3">
+                          <div className="space-y-2">
                             <div className="flex justify-between items-center text-xs py-1 border-b border-slate-200/60">
                               <span className="text-slate-600 font-medium">{terminology.tuition} Annuelle :</span>
                               <span className="font-bold text-slate-900 font-mono">
@@ -1857,8 +1886,8 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                             )}
 
                             {/* Total Net Card */}
-                            <div className="p-3.5 bg-white rounded-xl border border-slate-200/80 text-center space-y-1 mt-2">
-                              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+                            <div className="p-2.5 sm:p-3 bg-white rounded-xl border border-slate-200/80 text-center space-y-0.5 mt-1.5">
+                              <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
                                 Total Annuel Prévu
                               </span>
                               {(() => {
@@ -1870,14 +1899,14 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                                  (currentPricing.isMiscMandatory && currentPricing.miscFee.currency === 'USD' ? currentPricing.miscFee.amount : 0);
                                 
                                 return (
-                                  <div className="flex flex-col items-center gap-1">
+                                  <div className="flex flex-col items-center gap-0.5">
                                     {htgTotal > 0 && (
-                                      <p className="text-2xl font-black text-slate-900 font-mono">
+                                      <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
                                         {htgTotal.toLocaleString()} <span className="text-xs font-bold text-indigo-600">HTG</span>
                                       </p>
                                     )}
                                     {usdTotal > 0 && (
-                                      <p className="text-2xl font-black text-slate-900 font-mono">
+                                      <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
                                         {usdTotal.toLocaleString()} <span className="text-xs font-bold text-emerald-600">USD</span>
                                       </p>
                                     )}
@@ -1887,8 +1916,8 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </div>
                           </div>
                         ) : (
-                          <div className="py-8 text-center space-y-1 text-slate-400">
-                            <Clock size={20} className="mx-auto text-slate-300" />
+                          <div className="py-6 text-center space-y-1 text-slate-400">
+                            <Clock size={18} className="mx-auto text-slate-300" />
                             <p className="text-xs font-medium">Sélectionnez une classe pour calculer le bilan tarifaire</p>
                           </div>
                         )}
@@ -1896,8 +1925,8 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       {/* Selected Class info badge */}
                       {selectedClass && (
-                        <div className="p-2.5 bg-indigo-50/60 rounded-xl border border-indigo-100 flex items-center gap-2 text-xs">
-                          <CheckCircle2 size={15} className="text-indigo-600 shrink-0" />
+                        <div className="p-2 bg-indigo-50/60 rounded-lg border border-indigo-100 flex items-center gap-2 text-xs">
+                          <CheckCircle2 size={14} className="text-indigo-600 shrink-0" />
                           <span className="text-indigo-950 font-bold truncate">Affecté à : {selectedClass.name}</span>
                         </div>
                       )}
@@ -1956,30 +1985,30 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -12 }}
                   transition={{ duration: 0.2 }}
-                  className="space-y-6"
+                  className="space-y-3.5 sm:space-y-4"
                 >
                   {/* Summary Header Card */}
-                  <div className="bg-slate-50/70 rounded-2xl p-4 sm:p-5 border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
+                  <div className="bg-slate-50/80 rounded-xl p-3 sm:p-3.5 border border-slate-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white font-black text-xs flex items-center justify-center shrink-0 shadow-xs">
                         {initials}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <h4 className="text-base font-black text-slate-900 tracking-tight">
+                          <h4 className="text-sm font-black text-slate-900 tracking-tight">
                             {formData.lastName.toUpperCase()} {formData.firstName}
                           </h4>
-                          <span className="text-xs font-bold px-2 py-0.5 rounded bg-white text-slate-700 border border-slate-200">
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white text-slate-700 border border-slate-200">
                             {formData.gender}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-0.5">
+                        <p className="text-[11px] text-slate-500 font-medium">
                           {selectedClassObj?.name || 'Classe non sélectionnée'} • {campusLabel} • Session {academicYears.find(y => y.id === targetYearId)?.label || '2025-2026'}
                         </p>
                       </div>
                     </div>
 
-                    <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${
                       completeness.isComplete ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
                       completeness.hasRejection ? 'bg-rose-50 text-rose-700 border-rose-200' :
                       'bg-amber-50 text-amber-700 border-amber-200'
@@ -1992,39 +2021,39 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   {/* Document Review Section */}
-                  <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-4">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+                  <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/80 space-y-3">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-100">
                       <div className="flex items-center gap-2">
-                        <FileCheck2 size={18} className="text-indigo-600" />
+                        <FileCheck2 size={16} className="text-indigo-600 shrink-0" />
                         <div>
-                          <h4 className="text-sm font-black text-slate-900">
+                          <h4 className="text-xs font-black text-slate-900">
                             Contrôle des Pièces Justificatives Exigées
                           </h4>
-                          <p className="text-xs text-slate-500 font-medium">
+                          <p className="text-[11px] text-slate-500 font-medium">
                             Conformité réglementaire ({isUniversity ? 'Universitaire' : isProfessional ? 'Professionnel' : 'Scolaire'})
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => handleSetAllStatus('VALIDE')}
-                          className="px-2.5 py-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg border border-emerald-200 transition-colors"
+                          className="px-2 py-0.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-md border border-emerald-200 transition-colors"
                         >
                           Tout Valider
                         </button>
                         <button
                           type="button"
                           onClick={() => handleSetAllStatus('EN_ATTENTE')}
-                          className="px-2.5 py-1 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg border border-amber-200 transition-colors"
+                          className="px-2 py-0.5 text-[11px] font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-md border border-amber-200 transition-colors"
                         >
                           Tout En Attente
                         </button>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                       {docDefs.map(def => {
                         const item = normalized[def.id] || { status: 'EN_ATTENTE', notes: '' };
                         const status = item.status || 'EN_ATTENTE';
@@ -2032,7 +2061,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         return (
                           <div
                             key={def.id}
-                            className={`p-3.5 rounded-xl border transition-all space-y-2.5 ${
+                            className={`p-2.5 sm:p-3 rounded-lg border transition-all space-y-2 ${
                               status === 'VALIDE' ? 'bg-emerald-50/20 border-emerald-200/70' :
                               status === 'REJETE' ? 'bg-rose-50/20 border-rose-200/70' :
                               'bg-slate-50/50 border-slate-200/70'
@@ -2040,7 +2069,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           >
                             <div>
                               <div className="text-xs font-bold text-slate-900 leading-snug">{def.name}</div>
-                              <div className="text-[11px] text-slate-500 font-medium leading-relaxed">{def.description}</div>
+                              <div className="text-[10.5px] text-slate-500 font-medium leading-tight">{def.description}</div>
                             </div>
 
                             {/* 3-state Segmented Selector */}
@@ -2048,7 +2077,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <button
                                 type="button"
                                 onClick={() => handleDocStatusChange(def.id, 'VALIDE')}
-                                className={`flex-1 py-1 px-1.5 rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                                className={`flex-1 py-1 px-1.5 rounded-md text-[11px] font-bold transition-all flex items-center justify-center gap-1 ${
                                   status === 'VALIDE'
                                     ? 'bg-emerald-600 text-white shadow-xs'
                                     : 'text-slate-600 hover:text-emerald-700 hover:bg-white/60'
@@ -2104,10 +2133,10 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   {/* Immediate Payment Option */}
                   {!isEdit && currentPricing.inscription.amount > 0 && (
-                    <div className="bg-white rounded-2xl p-5 border border-slate-200/80 space-y-3">
+                    <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/80 space-y-3 shadow-2xs">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                         <div className="flex items-start gap-2.5">
-                          <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                          <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
                             <Receipt size={16} />
                           </div>
                           <div>
@@ -2115,11 +2144,11 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <h4 className="text-xs font-black text-slate-900">
                                 {isReenroll ? 'Règlement Immédiat des Frais de Réinscription' : "Règlement Immédiat des Frais d'Inscription"}
                               </h4>
-                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                                 {currentPricing.inscription.amount.toLocaleString()} {currentPricing.inscription.currency}
                               </span>
                             </div>
-                            <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                               Encaisser dès maintenant à l'économat et générer le reçu officiel.
                             </p>
                           </div>
@@ -2140,12 +2169,29 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <motion.div 
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
-                          className="pt-3 border-t border-slate-100 space-y-3.5"
+                          className="pt-3 border-t border-slate-100 space-y-3"
                         >
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                             <div>
                               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                                Mode de Règlement (Pillule)
+                                Date de Règlement
+                              </label>
+                              <DatePickerPill
+                                selectedDate={registrationDate}
+                                onSelectDate={(d) => setRegistrationDate(d)}
+                                variant="field"
+                                size="md"
+                                colorScheme="indigo"
+                                placeholder="Date du versement"
+                                title="Date d'encaissement et de délivrance du reçu"
+                                clearable={false}
+                                className="w-full"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                                Mode de Règlement
                               </label>
                               <SelectPill
                                 options={activePaymentMethods.map(m => {
@@ -2177,7 +2223,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                             <div>
                               <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                                Devise Encaissée (Pillule)
+                                Devise Encaissée
                               </label>
                               <SelectPill
                                 options={(currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash') ? [
@@ -2194,13 +2240,35 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 colorScheme="slate"
                                 className="w-full"
                               />
-                              {currentPricing.inscription.currency === 'USD' && (
-                                <p className="text-[10px] text-slate-600 font-medium mt-1">
-                                  Montant équivalent : <span className="font-bold text-slate-900">{inscriptionCurrency === 'HTG' ? `${((currentPricing.inscription.amount * (exchangeRate || 132.50))).toLocaleString()} HTG` : `${currentPricing.inscription.amount.toLocaleString()} USD`}</span>
-                                </p>
-                              )}
                             </div>
                           </div>
+
+                          {/* Indicateur de Transparence Financière & Taux de Change */}
+                          {currentPricing.inscription.currency === 'USD' ? (
+                            <div className="p-2.5 bg-amber-50/90 rounded-xl border border-amber-200/80 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
+                              <div className="flex items-center gap-1.5 font-bold text-amber-900">
+                                <ShieldCheck size={14} className="text-amber-700 shrink-0" />
+                                <span>Taux de change appliqué :</span>
+                                <span className="font-mono bg-white px-2 py-0.5 rounded-md border border-amber-300 text-amber-950 font-black">
+                                  1 USD = {exchangeRate || 132.50} HTG
+                                </span>
+                              </div>
+                              <span className="text-[11px] text-amber-800 font-mono font-medium">
+                                Contrevaleur certifiée : <strong className="text-slate-900">{inscriptionCurrency === 'HTG' ? `${((currentPricing.inscription.amount * (exchangeRate || 132.50))).toLocaleString()} HTG` : `${currentPricing.inscription.amount.toLocaleString()} USD`}</strong>
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-slate-50 rounded-lg border border-slate-200/70 flex items-center justify-between text-xs text-slate-600">
+                              <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                                <span className="font-bold text-slate-700">Paiement Direct HTG</span>
+                                <span className="text-[10px] text-slate-500">(Sans opération de change)</span>
+                              </div>
+                              <span className="font-mono font-bold text-slate-800">
+                                {currentPricing.inscription.amount.toLocaleString()} HTG
+                              </span>
+                            </div>
+                          )}
 
                           {/* MODULE SPÉCIFIQUE MONCASH : CONTRÔLE DE DÉBIT RÉEL / ANTI-RÉINSCRIPTION SANS PAIEMENT */}
                           {inscriptionPaymentMethod === 'MonCash' && (

@@ -5,7 +5,7 @@ import {
   Search as SearchIcon, Printer, ChevronLeft, ChevronRight,
   X, Loader2, RefreshCw, AlertCircle, UserPlus, GraduationCap,
   Layers, CheckCircle2, Eye, Ban, Info, FileCheck, FileCheck2,
-  Clock, XCircle, FileWarning, Filter
+  Clock, XCircle, FileWarning, Filter, FileText
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
@@ -844,6 +844,14 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
                       >
                         <Eye size={16} />
                       </button>
+                      <button 
+                        onClick={() => navigate(`/economat/releves?studentId=${student.id}&tab=generator`)}
+                        className="p-2 text-indigo-600 hover:bg-indigo-50 rounded-xl transition-colors cursor-pointer"
+                        title="Relevé de Compte & Audit Financier"
+                        aria-label={`Relevé de Compte de ${formatStudentName(student.last_name, student.first_name).fullName}`}
+                      >
+                        <FileText size={16} />
+                      </button>
                       {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR) && (
                         <>
                           <button 
@@ -1098,6 +1106,17 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
                     className="flex-grow py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-lg shadow-indigo-500/10 flex items-center justify-center gap-2 cursor-pointer active:scale-[0.98]"
                   >
                     <Eye size={14} /> Voir Dossier Complet
+                  </button>
+
+                  <button 
+                    onClick={() => {
+                      setQuickViewStudent(null);
+                      navigate(`/economat/releves?studentId=${quickViewStudent.id}&tab=generator`);
+                    }}
+                    className="py-3 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
+                    title="Relevé de Compte & Audit Financier"
+                  >
+                    <FileText size={14} /> Relevé
                   </button>
                   
                   {(user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR) && quickViewStudent.status !== 'Inactif' && (

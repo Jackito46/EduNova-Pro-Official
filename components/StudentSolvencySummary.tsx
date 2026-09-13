@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CreditCard, ShieldCheck, CheckCircle2, AlertCircle, Clock, 
-  RefreshCw, ArrowRight, TrendingUp, Receipt, Award, ChevronRight
+  RefreshCw, ArrowRight, TrendingUp, Receipt, Award, ChevronRight, FileText
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
@@ -525,10 +525,11 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
 
           <button
             type="button"
-            onClick={() => navigate(`/economat/releves?studentId=${studentId}`, { state: { studentId, academicYearId: resolvedYearId || academicYearId } })}
-            className="py-2 px-3 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border border-slate-200/60"
-            title="Consulter le relevé de compte certifié"
+            onClick={() => navigate(`/economat/releves?studentId=${studentId}&tab=generator`, { state: { studentId, academicYearId: resolvedYearId || academicYearId } })}
+            className="py-2 px-3 bg-slate-100 hover:bg-slate-200 active:scale-[0.98] text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border border-slate-200/60"
+            title="Consulter le Relevé de Compte & Audit Financier certifié"
           >
+            <FileText size={13} className="text-slate-600" />
             <span>Relevé</span>
             <ChevronRight size={13} className="text-slate-400" />
           </button>
