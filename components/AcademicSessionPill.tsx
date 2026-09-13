@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Calendar, ChevronDown, Check, Sparkles } from 'lucide-react';
 
 export interface AcademicSessionItem {
@@ -27,6 +28,7 @@ export interface AcademicSessionPillProps {
   disabled?: boolean;
   colorScheme?: 'indigo' | 'slate' | 'emerald' | 'blue' | 'purple' | 'rose';
   title?: string;
+  portal?: boolean;
 }
 
 export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
@@ -40,21 +42,112 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
   variant = 'pill',
   size = 'sm',
   className = '',
-  dropdownAlign = 'left',
+  dropdownAlign,
   disabled = false,
   colorScheme = 'indigo',
-  title = 'Sélectionner la session académique'
+  title = 'Sélectionner la session académique',
+  portal = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
+
+  // Auto-detect optimal horizontal alignment (smart edge detection)
+  useEffect(() => {
+    if (dropdownAlign) {
+      setEffectiveAlign(dropdownAlign);
+    } else if (containerRef.current && typeof window !== 'undefined') {
+      const rect = containerRef.current.getBoundingClientRect();
+      const popoverEstimatedWidth = 300;
+      if (rect.right + 40 > window.innerWidth || rect.left + popoverEstimatedWidth > window.innerWidth) {
+        setEffectiveAlign('right');
+      } else {
+        setEffectiveAlign('left');
+      }
+    }
+  }, [dropdownAlign, isOpen]);
+
+  // Viewport position calculation with safe bounds clamping
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    const minWidth = variant === 'field' ? Math.max(rect.width, 280) : 280;
+    const popoverWidth = Math.min(minWidth, Math.max(viewportWidth - 24, 220));
+
+    // Vertical space calculation (open upward if low space below)
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const preferUpward = spaceBelow < 230 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(140, Math.min(280, preferUpward ? spaceAbove - 12 : spaceBelow - 12));
+
+    // Horizontal alignment calculation
+    let left = rect.left;
+    if (dropdownAlign === 'right' || effectiveAlign === 'right') {
+      left = rect.right - popoverWidth;
+    }
+
+    // Strict clamping within viewport boundaries to PREVENT any horizontal scroll
+    if (left + popoverWidth > viewportWidth - 12) {
+      left = viewportWidth - popoverWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    if (preferUpward) {
+      setPopoverCoords({
+        bottom: viewportHeight - rect.top + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: true
+      });
+    } else {
+      setPopoverCoords({
+        top: rect.bottom + 6,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: false
+      });
+    }
+  }, [dropdownAlign, effectiveAlign, variant]);
+
+  useEffect(() => {
+    if (isOpen && portal) {
+      updatePosition();
+      const handleScrollOrResize = () => updatePosition();
+      window.addEventListener('scroll', handleScrollOrResize, true);
+      window.addEventListener('resize', handleScrollOrResize);
+      return () => {
+        window.removeEventListener('scroll', handleScrollOrResize, true);
+        window.removeEventListener('resize', handleScrollOrResize);
+      };
+    }
+  }, [isOpen, portal, updatePosition]);
 
   // Close when clicked outside or pressed Escape
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
+      const target = event.target as Node;
+      if (containerRef.current && containerRef.current.contains(target)) return;
+      if (popoverRef.current && popoverRef.current.contains(target)) return;
+      setIsOpen(false);
     };
+
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setIsOpen(false);
@@ -80,7 +173,6 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
 
   const isAct = currentSession?.is_active || currentSession?.status === 'ACTIVE';
   const isFut = currentSession?.status === 'FUTURE';
-  const isArch = !isAct && !isFut && !!currentSession;
 
   // Color mappings
   const colorMap = {
@@ -141,7 +233,7 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
   // Variant base style
   const getButtonClass = () => {
     if (variant === 'field') {
-      return `w-full flex items-center justify-between px-3.5 py-2.5 bg-white hover:bg-slate-50 border rounded-xl text-left transition-all duration-200 shadow-2xs ${
+      return `w-full flex items-center justify-between px-3 py-1.5 sm:py-2 bg-white hover:bg-slate-50 border rounded-xl text-left transition-all duration-200 shadow-2xs ${
         isOpen 
           ? scheme.activeBorder 
           : 'border-slate-200 hover:border-slate-300 text-slate-800'
@@ -164,8 +256,150 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
     }`;
   };
 
+  // Popover content element
+  const popoverContent = (
+    <div 
+      ref={popoverRef}
+      style={portal && popoverCoords ? {
+        position: 'fixed',
+        top: popoverCoords.top !== undefined ? `${popoverCoords.top}px` : undefined,
+        bottom: popoverCoords.bottom !== undefined ? `${popoverCoords.bottom}px` : undefined,
+        left: `${popoverCoords.left}px`,
+        width: `${popoverCoords.width}px`,
+        zIndex: 99999
+      } : undefined}
+      className={`${portal ? '' : `absolute ${effectiveAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 max-w-[calc(100vw-24px)] z-[100]`} bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 animate-in fade-in zoom-in-95 duration-150`}
+    >
+      {/* Dropdown Header */}
+      <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1 flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+          <Calendar size={11} className={scheme.iconText} />
+          Sessions Académiques
+        </span>
+        <span className="text-[10px] font-bold text-slate-400">
+          {academicYears.length} session{academicYears.length > 1 ? 's' : ''}
+        </span>
+      </div>
+
+      <div 
+        style={popoverCoords?.maxHeight ? { maxHeight: `${popoverCoords.maxHeight}px` } : undefined}
+        className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar p-0.5"
+      >
+        {/* Allow All Option */}
+        {allowAll && (
+          <button
+            type="button"
+            onClick={() => {
+              onSelectYear('all');
+              setIsOpen(false);
+            }}
+            className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+              isAllSelected 
+                ? scheme.highlightBg + ' shadow-2xs font-bold' 
+                : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isAllSelected ? 'bg-indigo-600 ring-2 ring-indigo-500/20' : 'bg-slate-300'}`} />
+              <div className="min-w-0">
+                <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
+                  {allLabel}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 block">
+                  Afficher les données de toutes les sessions confondues
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                Toutes
+              </span>
+              {isAllSelected && (
+                <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+              )}
+            </div>
+          </button>
+        )}
+
+        {/* Session Items */}
+        {academicYears.map((y) => {
+          const itemActive = y.is_active || y.status === 'ACTIVE';
+          const itemFuture = y.status === 'FUTURE';
+          const isSelected = selectedYearId ? y.id === selectedYearId : itemActive;
+
+          return (
+            <button
+              key={y.id}
+              type="button"
+              onClick={() => {
+                onSelectYear(y.id);
+                setIsOpen(false);
+              }}
+              className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                isSelected 
+                  ? scheme.highlightBg + ' shadow-2xs font-bold' 
+                  : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+              }`}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-2 h-2 rounded-full shrink-0 ${
+                  itemActive 
+                    ? 'bg-emerald-500 ring-2 ring-emerald-500/20' 
+                    : itemFuture 
+                    ? 'bg-amber-500 ring-2 ring-amber-500/20' 
+                    : 'bg-slate-300'
+                }`} />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-black text-slate-900 tracking-tight">
+                      {y.label || y.name}
+                    </span>
+                    {y.session_type === 'INTENSIVE' && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-purple-50 text-purple-700 rounded border border-purple-200">
+                        Intensive
+                      </span>
+                    )}
+                    {y.session_type === 'SPECIAL' && (
+                      <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
+                        Spéciale
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-[10px] font-medium text-slate-400 block truncate">
+                    {itemActive ? 'Session en cours' : itemFuture ? 'Session en préparation' : 'Session clôturée / archivée'}
+                    {(y.start_date || y.end_date) && (
+                      <span className="ml-1 text-slate-300">
+                        • {y.start_date?.substring(0, 4) || ''}-{y.end_date?.substring(0, 4) || ''}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
+                  itemActive 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : itemFuture 
+                    ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                    : 'bg-slate-100 text-slate-500 border-slate-200'
+                }`}>
+                  {itemActive ? 'Active' : itemFuture ? 'En prép.' : 'Archivée'}
+                </span>
+                {isSelected && (
+                  <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                )}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
   return (
-    <div className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${isOpen ? 'z-[60]' : 'z-10'} ${className}`} ref={containerRef}>
+    <div className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${className}`} ref={containerRef}>
       <button
         type="button"
         disabled={disabled}
@@ -174,7 +408,7 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
         title={title}
         aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           {showIcon && (
             <div className={`flex items-center gap-1 shrink-0 ${scheme.iconText}`}>
               <Calendar size={size === 'xs' ? 12 : size === 'lg' ? 15 : 13} className="stroke-[2.4]" />
@@ -187,12 +421,12 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
           )}
 
           {isAllSelected ? (
-            <span className="font-extrabold text-slate-800 tracking-tight truncate">
+            <span className="font-extrabold text-slate-800 tracking-tight whitespace-nowrap">
               {allLabel}
             </span>
           ) : (
-            <div className="flex items-center gap-1.5 truncate">
-              <span className="font-extrabold text-slate-900 tracking-tight truncate">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <span className="font-extrabold text-slate-900 tracking-tight whitespace-nowrap">
                 {currentSession?.label || currentSession?.name || 'Session'}
               </span>
               {currentSession?.session_type === 'INTENSIVE' && (
@@ -209,10 +443,10 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
+        <div className="flex items-center gap-1.5 shrink-0 ml-2">
           {/* Status Badge */}
           {!isAllSelected && currentSession && (
-            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black border leading-none ${
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black border leading-none shrink-0 ${
               isAct 
                 ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                 : isFut 
@@ -222,7 +456,7 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                 isAct ? 'bg-emerald-500' : isFut ? 'bg-amber-500' : 'bg-slate-400'
               }`} />
-              <span className="hidden sm:inline">
+              <span className="shrink-0">
                 {isAct ? 'Active' : isFut ? 'En prép.' : 'Archivée'}
               </span>
             </span>
@@ -243,134 +477,11 @@ export const AcademicSessionPill: React.FC<AcademicSessionPillProps> = ({
         </div>
       </button>
 
-      {/* Modern Floating Dropdown Menu */}
+      {/* Popover Portal or Clamped Dropdown Menu */}
       {isOpen && (academicYears.length > 0 || allowAll) && (
-        <div 
-          className={`absolute ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-[100] animate-in fade-in zoom-in-95 duration-150`}
-        >
-          {/* Dropdown Header */}
-          <div className="px-2.5 py-1.5 border-b border-slate-100 mb-1 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Calendar size={11} className={scheme.iconText} />
-              Sessions Académiques
-            </span>
-            <span className="text-[10px] font-bold text-slate-400">
-              {academicYears.length} session{academicYears.length > 1 ? 's' : ''}
-            </span>
-          </div>
-
-          <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar p-0.5">
-            {/* Allow All Option */}
-            {allowAll && (
-              <button
-                type="button"
-                onClick={() => {
-                  onSelectYear('all');
-                  setIsOpen(false);
-                }}
-                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                  isAllSelected 
-                    ? scheme.highlightBg + ' shadow-2xs font-bold' 
-                    : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${isAllSelected ? 'bg-indigo-600 ring-2 ring-indigo-500/20' : 'bg-slate-300'}`} />
-                  <div className="min-w-0">
-                    <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
-                      {allLabel}
-                    </span>
-                    <span className="text-[10px] font-medium text-slate-400 block">
-                      Afficher les données de toutes les sessions confondues
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                  <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-                    Toutes
-                  </span>
-                  {isAllSelected && (
-                    <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                  )}
-                </div>
-              </button>
-            )}
-
-            {/* Session Items */}
-            {academicYears.map((y) => {
-              const itemActive = y.is_active || y.status === 'ACTIVE';
-              const itemFuture = y.status === 'FUTURE';
-              const isSelected = selectedYearId ? y.id === selectedYearId : itemActive;
-
-              return (
-                <button
-                  key={y.id}
-                  type="button"
-                  onClick={() => {
-                    onSelectYear(y.id);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                    isSelected 
-                      ? scheme.highlightBg + ' shadow-2xs font-bold' 
-                      : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-                  }`}
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-2 h-2 rounded-full shrink-0 ${
-                      itemActive 
-                        ? 'bg-emerald-500 ring-2 ring-emerald-500/20' 
-                        : itemFuture 
-                        ? 'bg-amber-500 ring-2 ring-amber-500/20' 
-                        : 'bg-slate-300'
-                    }`} />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-xs font-black text-slate-900 tracking-tight">
-                          {y.label || y.name}
-                        </span>
-                        {y.session_type === 'INTENSIVE' && (
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-purple-50 text-purple-700 rounded border border-purple-200">
-                            Intensive
-                          </span>
-                        )}
-                        {y.session_type === 'SPECIAL' && (
-                          <span className="text-[9px] font-extrabold px-1.5 py-0.2 bg-blue-50 text-blue-700 rounded border border-blue-200">
-                            Spéciale
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] font-medium text-slate-400 block truncate">
-                        {itemActive ? 'Session en cours' : itemFuture ? 'Session en préparation' : 'Session clôturée / archivée'}
-                        {(y.start_date || y.end_date) && (
-                          <span className="ml-1 text-slate-300">
-                            • {y.start_date?.substring(0, 4) || ''}-{y.end_date?.substring(0, 4) || ''}
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-md border ${
-                      itemActive 
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                        : itemFuture 
-                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
-                        : 'bg-slate-100 text-slate-500 border-slate-200'
-                    }`}>
-                      {itemActive ? 'Active' : itemFuture ? 'En prép.' : 'Archivée'}
-                    </span>
-                    {isSelected && (
-                      <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                    )}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+        portal && typeof document !== 'undefined'
+          ? createPortal(popoverContent, document.body)
+          : popoverContent
       )}
     </div>
   );

@@ -315,13 +315,13 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       {activeView === 'journal' ? (
         <>
           {/* FILTRES ARCHIVES GLOBALES */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/80 print:hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 sm:gap-4 items-end">
+          <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/80 print:hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 items-end">
               {/* 1. Session */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                   <Calendar size={13} className="text-indigo-600 shrink-0" />
-                  Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}
+                  <span>Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</span>
                 </label>
                 <AcademicSessionPill
                   academicYears={academicYears}
@@ -336,9 +336,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* 2. Filtre Classe / Option */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                   <Layers size={13} className="text-indigo-600 shrink-0" />
-                  Filtre {terminology.option}
+                  <span>Filtre {terminology.option}</span>
                 </label>
                 <ClassSelectorPill
                   classes={classes}
@@ -357,9 +357,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               {/* 3. Période & DateTime (Harmonisé DatePickerPill / SelectPill) */}
               <div className="space-y-1.5 min-w-0">
                 <div className="flex items-center justify-between gap-1">
-                  <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                     <Clock size={13} className="text-indigo-600 shrink-0" />
-                    Période
+                    <span>Période d'Émission</span>
                   </label>
                   {dateFilter === 'Date précise' && customDate !== todayStr && (
                     <button
@@ -411,16 +411,16 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* 4. Recherche Rapide */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                   <Search size={13} className="text-indigo-600 shrink-0" />
-                  Recherche Rapide
+                  <span>Recherche Rapide</span>
                 </label>
                 <div className="relative">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
                   <input 
                     type="text" 
                     placeholder={`${terminology.student}, ID ou Reçu...`}
-                    className="w-full pl-10 pr-8 py-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
+                    className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all min-h-[38px]"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                   />
@@ -569,13 +569,13 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         <div className="max-w-6xl mx-auto animate-in slide-in-from-bottom-8 duration-500 print:hidden space-y-8">
           
           {/* BARRE DE SÉLECTION */}
-          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-4 sm:p-5 flex flex-col md:flex-row items-end gap-4">
-            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4 w-full">
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 p-3.5 sm:p-5 flex flex-col md:flex-row items-end gap-3 sm:gap-4">
+            <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full">
               {/* 1. Session */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                   <Calendar size={13} className="text-indigo-600 shrink-0" />
-                  1. Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}
+                  <span>1. Session {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</span>
                 </label>
                 <AcademicSessionPill
                   academicYears={academicYears}
@@ -590,9 +590,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* 2. Classe / Option */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                   <Layers size={13} className="text-indigo-600 shrink-0" />
-                  2. {terminology.option}
+                  <span>2. {terminology.option}</span>
                 </label>
                 <ClassSelectorPill
                   classes={classes}
@@ -613,9 +613,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               {/* 3. Choisir Élève */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-1.5 truncate">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
                   <User size={13} className="text-indigo-600 shrink-0" />
-                  3. Choisir {terminology.student.toLowerCase()}
+                  <span>3. Choisir {terminology.student.toLowerCase()}</span>
                 </label>
                 <SelectPill
                   options={studentGenOptions}

@@ -298,12 +298,12 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
         title={title}
         aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {showIcon && (
             <div className={`flex items-center gap-1 shrink-0 ${scheme.iconText}`}>
               <GraduationCap size={size === 'xs' ? 12 : size === 'lg' ? 15 : 13} className="stroke-[2.4]" />
               {labelPrefix && (
-                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 shrink-0">
                   {labelPrefix}
                 </span>
               )}
@@ -315,12 +315,12 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
               {defaultAllLabel}
             </span>
           ) : selectedClass ? (
-            <div className="flex items-center gap-1.5 truncate">
+            <div className="flex items-center gap-1.5 min-w-0 truncate">
               <span className="font-extrabold text-slate-900 tracking-tight truncate">
                 {selectedClass.name}
               </span>
               {selectedClass.cycle && (
-                <span className="text-[9px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-black shrink-0 hidden sm:inline">
+                <span className="text-[9px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-black shrink-0 hidden md:inline">
                   {selectedClass.cycle}
                 </span>
               )}
@@ -335,11 +335,12 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
         <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
           {/* Active indicator or count */}
           {!isAllSelected && selectedClass ? (
-            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black border ${scheme.badge}`}>
-              Sélection
+            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black border leading-none shrink-0 ${scheme.badge}`}>
+              <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${scheme.dotColor.split(' ')[0]}`} />
+              <span className="hidden md:inline">Sélection</span>
             </span>
           ) : (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200">
+            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
               {classes.length}
             </span>
           )}

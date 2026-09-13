@@ -433,9 +433,6 @@ export const DailyCashClosureModal: React.FC<DailyCashClosureModalProps> = ({
       <div className={`space-y-6 text-slate-900 bg-white leading-normal ${isPrintOnly ? 'text-[11px]' : 'text-xs'}`}>
         {/* Entête Institutionnelle */}
         <div className="border-b-2 border-slate-900 pb-4 text-center space-y-1">
-          <div className="text-[11px] font-black uppercase tracking-widest text-slate-700">
-            RÉPUBLIQUE D'HAÏTI • MINISTÈRE DE L'ÉDUCATION NATIONALE ET DE LA FORMATION PROFESSIONNELLE (MENFP)
-          </div>
           <h1 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-slate-950">
             {school?.name || 'COLLÈGE DES INNOVATIONS'}
           </h1>
