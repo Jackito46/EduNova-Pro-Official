@@ -267,8 +267,15 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   );
   const [payInscriptionNow, setPayInscriptionNow] = useState(true);
   const [inscriptionPaymentMethod, setInscriptionPaymentMethod] = useState('Cash');
-  const [inscriptionCurrency, setInscriptionCurrency] = useState('USD');
+  const [inscriptionCurrency, setInscriptionCurrency] = useState<'HTG' | 'USD'>('HTG');
   const [exchangeRate, setExchangeRate] = useState<number>(0);
+  const [paidReceiptInfo, setPaidReceiptInfo] = useState<{
+    amount: number;
+    currency: string;
+    method: string;
+    ref: string;
+    date: string;
+  } | null>(null);
 
   // Mobile Money (MonCash / Natcash) specific configuration & verification
   const [moncashMode, setMoncashMode] = useState<'online' | 'manual'>('online');
@@ -647,6 +654,17 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
   }, [formData.selectedClassId, dbFees, isReenroll]);
 
+  // Synchroniser la devise d'encaissement avec la devise définie pour les frais de la classe
+  useEffect(() => {
+    if (currentPricing?.inscription?.currency) {
+      if (currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash') {
+        setInscriptionCurrency('HTG');
+      } else if (currentPricing.inscription.currency === 'USD') {
+        setInscriptionCurrency('USD');
+      }
+    }
+  }, [currentPricing.inscription.currency, inscriptionPaymentMethod]);
+
   const stepsConfig = useMemo(() => [
     { number: 1, title: isAdultLevel ? "Identité Étudiant" : `Identité ${terminology.student}`, subtitle: "État civil & profil", icon: User },
     { number: 2, title: isAdultLevel ? "Contact d'Urgence" : "Responsable Légal", subtitle: "Filiation & coordonnées", icon: Users },
@@ -857,7 +875,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           // 1. Insertion du paiement en statut EN_ATTENTE (non validé tant que l'argent n'est pas prélevé)
           const { data: pendingPayment, error: payErr } = await supabase.from('payments').insert({
             school_id: user.school_id,
-            campus_id: resolvedCampusId,
+            campus_id: resolvedCampusId || null,
             student_id: targetStudentId,
             academic_year_id: targetYearId,
             date: registrationDate || new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
@@ -865,17 +883,21 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             amount_htg_equivalent: equivalentHtgToSave,
             exchange_rate_applied: actualExchangeRate || 140,
             currency: 'HTG',
-            nature: 'RECOUVREMENT',
-            type: 'Revenu',
+            nature: "Frais d'inscription",
+            type: 'Inscription',
             fee_type: 'INSCRIPTION',
             method: 'MonCash',
             payment_method: 'MonCash',
             status: 'EN_ATTENTE',
             reference_number: orderId,
-            notes: `Réinscription MonCash initiée en ligne (Ordre: ${orderId}, Tél: ${moncashPayerPhone || formData.parentPhone || 'Non spécifié'})`
+            moncash_order_id: orderId,
+            moncash_status: 'PENDING'
           }).select().single();
 
-          if (payErr) throw payErr;
+          if (payErr) {
+            console.error('Erreur insertion paiement MonCash initial:', payErr);
+            throw payErr;
+          }
 
           // 2. Initialisation de la transaction auprès de la passerelle MonCash
           let redirectUrl: string | null = null;
@@ -914,8 +936,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
 
         // --- CAS 2 : MONCASH MANUEL / GUICHET OU AUTRES MODES DE RÈGLEMENT ---
-        let paymentNotes = `Règlement frais d'inscription (${inscriptionPaymentMethod})`;
-        let transactionRef: string | undefined = undefined;
+        let transactionRef = `REC-INSC-${Date.now().toString(36).toUpperCase()}`;
 
         if (inscriptionPaymentMethod === 'MonCash') {
           if (!moncashManualRef || moncashManualRef.trim().length < 4) {
@@ -924,12 +945,11 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             return;
           }
           transactionRef = moncashManualRef.trim();
-          paymentNotes = `Transfert direct MonCash certifié au guichet (Réf: ${transactionRef}, Expéditeur: ${moncashPayerPhone || formData.parentPhone || 'Non spécifié'})`;
         }
 
-        await supabase.from('payments').insert({
+        const paymentPayload: any = {
           school_id: user.school_id,
-          campus_id: resolvedCampusId,
+          campus_id: resolvedCampusId || null,
           student_id: targetStudentId,
           academic_year_id: targetYearId,
           date: registrationDate || new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
@@ -937,15 +957,50 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           amount_htg_equivalent: equivalentHtgToSave,
           exchange_rate_applied: actualExchangeRate || 140,
           currency: paymentCurrency,
-          nature: 'RECOUVREMENT',
-          type: 'Revenu',
+          nature: "Frais d'inscription",
+          type: 'Inscription',
           fee_type: 'INSCRIPTION',
           method: inscriptionPaymentMethod,
           payment_method: inscriptionPaymentMethod,
           status: 'VALIDE',
-          transaction_id: transactionRef,
-          reference_number: transactionRef,
-          notes: paymentNotes
+          reference_number: transactionRef
+        };
+
+        if (inscriptionPaymentMethod === 'MonCash') {
+          paymentPayload.moncash_transaction_id = transactionRef;
+          paymentPayload.moncash_status = 'COMPLETED';
+        }
+
+        const { error: payInsertError } = await supabase.from('payments').insert([paymentPayload]);
+        if (payInsertError) {
+          console.warn("Erreur insertion paiement standard, tentative fallback:", payInsertError);
+          const minimalPayload: any = {
+            school_id: user.school_id,
+            student_id: targetStudentId,
+            academic_year_id: targetYearId,
+            amount: amountToSave,
+            currency: paymentCurrency,
+            payment_method: inscriptionPaymentMethod,
+            method: inscriptionPaymentMethod,
+            nature: "Frais d'inscription",
+            type: 'Inscription',
+            fee_type: 'INSCRIPTION',
+            status: 'VALIDE',
+            reference_number: transactionRef
+          };
+          const { error: minError } = await supabase.from('payments').insert([minimalPayload]);
+          if (minError) {
+            console.error("Erreur critique insertion paiement inscription:", minError);
+            throw minError;
+          }
+        }
+
+        setPaidReceiptInfo({
+          amount: amountToSave,
+          currency: paymentCurrency,
+          method: inscriptionPaymentMethod,
+          ref: transactionRef,
+          date: registrationDate || new Date().toISOString().split('T')[0]
         });
 
         await supabase.from('students').update({ status: 'Actif' }).eq('id', targetStudentId);
@@ -975,10 +1030,9 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       // 1. Marquer le paiement comme VALIDE avec la référence réelle
       await supabase.from('payments').update({
         status: 'VALIDE',
-        transaction_id: txRef,
         reference_number: txRef,
-        receipt_number: `REC-${Date.now().toString().slice(-6)}`,
-        notes: `Paiement MonCash validé et encaissé avec succès (Réf: ${txRef})`
+        moncash_transaction_id: txRef,
+        moncash_status: 'COMPLETED'
       }).eq('id', paymentId);
 
       // 2. Activer l'élève et son inscription académique
@@ -987,6 +1041,14 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         .update({ status: 'ACTIVE' })
         .eq('student_id', targetStudentId)
         .eq('academic_year_id', targetYearId);
+
+      setPaidReceiptInfo({
+        amount: monCashPendingData.amount,
+        currency: monCashPendingData.currency,
+        method: 'MonCash',
+        ref: txRef,
+        date: new Date().toISOString().split('T')[0]
+      });
 
       setShowMonCashWaiting(false);
       setMonCashPendingData(null);
@@ -1004,7 +1066,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     try {
       await supabase.from('payments').update({
         status: 'ANNULE',
-        notes: 'Session de paiement MonCash annulée par l’utilisateur'
+        moncash_status: 'CANCELLED'
       }).eq('id', paymentId);
     } catch (err) {
       console.warn("Erreur annulation paiement MonCash:", err);
@@ -1067,28 +1129,70 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           )}
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-2">
+        {paidReceiptInfo && (
+          <div className="p-4 bg-emerald-50/90 rounded-2xl border border-emerald-200/80 text-left space-y-2 text-xs">
+            <div className="flex items-center justify-between border-b border-emerald-200/60 pb-2">
+              <span className="font-black text-emerald-950 flex items-center gap-1.5">
+                <CheckCircle2 size={16} className="text-emerald-600" />
+                Frais d'Inscription Encaissés à la Finalisation
+              </span>
+              <span className="px-2 py-0.5 bg-emerald-200/80 text-emerald-900 font-black rounded-md text-[10px] uppercase">
+                Soldé
+              </span>
+            </div>
+            <div className="grid grid-cols-2 gap-2 pt-1 text-slate-700">
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase font-bold">Montant Réglé</span>
+                <strong className="text-emerald-800 text-sm font-black">
+                  {paidReceiptInfo.amount.toLocaleString()} {paidReceiptInfo.currency}
+                </strong>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase font-bold">Mode d'Encaissement</span>
+                <strong className="text-slate-800 font-bold">{paidReceiptInfo.method}</strong>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase font-bold">N° Réf / Reçu</span>
+                <span className="font-mono font-bold text-slate-800">{paidReceiptInfo.ref}</span>
+              </div>
+              <div>
+                <span className="text-slate-500 block text-[10px] uppercase font-bold">Imputation Relevé</span>
+                <span className="text-emerald-700 font-bold">100% Réglé (0 HTG Dû)</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <div className="flex flex-wrap items-center justify-center gap-2.5 pt-2">
+          <button 
+            onClick={() => navigate(`/economat/releves?studentId=${savedStudentId || id}&tab=generator`, { state: { studentId: savedStudentId || id, academicYearId: targetYearId } })} 
+            className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-colors shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <FileText size={15} />
+            Relevé de Compte & Audit
+          </button>
           <button 
             onClick={() => navigate('/economat/frais', { state: { studentId: savedStudentId || id, academicYearId: targetYearId } })} 
-            className="w-full sm:w-auto px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-colors shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-colors shadow-xs flex items-center justify-center gap-2 cursor-pointer"
           >
             <Banknote size={15} />
-            Encaisser au Guichet
+            Encaisser Scolarité
           </button>
           <button 
             onClick={() => navigate('/eleves')} 
-            className="w-full sm:w-auto px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs transition-colors shadow-xs cursor-pointer"
+            className="w-full sm:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors shadow-2xs cursor-pointer"
           >
-            Accéder au Registre
+            Registre Élèves
           </button>
           {!isEdit && !isReenroll && (
             <button 
               onClick={() => {
                 setIsSuccess(false);
+                setPaidReceiptInfo(null);
                 setActiveStep(1);
                 setFormData(initialFormState);
               }} 
-              className="w-full sm:w-auto px-6 py-2.5 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-200 transition-colors cursor-pointer"
+              className="w-full sm:w-auto px-5 py-2.5 bg-slate-50 hover:bg-slate-100 text-slate-600 rounded-xl font-bold text-xs transition-colors border border-slate-200 cursor-pointer"
             >
               Inscrire un autre {terminology.student.toLowerCase()}
             </button>
@@ -2233,7 +2337,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   { value: 'HTG', label: 'HTG (Converti au taux officiel)', badge: 'HTG' }
                                 ]}
                                 value={inscriptionCurrency}
-                                onChange={(val) => setInscriptionCurrency(val)}
+                                onChange={(val) => setInscriptionCurrency(val as 'HTG' | 'USD')}
                                 disabled={currentPricing.inscription.currency === 'HTG' || inscriptionPaymentMethod === 'MonCash'}
                                 variant="field"
                                 size="md"
