@@ -1085,7 +1085,18 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           el.style.width = originalWidth;
           const imgData = canvas.toDataURL('image/png');
-          pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+          const pdfPageWidth = 210;
+          const pdfPageHeight = 297;
+          const contentHeightInPdf = (canvas.height * pdfPageWidth) / canvas.width;
+
+          if (contentHeightInPdf <= pdfPageHeight) {
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfPageWidth, contentHeightInPdf);
+          } else {
+            const scale = pdfPageHeight / contentHeightInPdf;
+            const scaledWidth = pdfPageWidth * scale;
+            const xOffset = (pdfPageWidth - scaledWidth) / 2;
+            pdf.addImage(imgData, 'PNG', xOffset, 0, scaledWidth, pdfPageHeight);
+          }
         }
       } else {
         const element = document.getElementById('releve-compte-print');
@@ -1099,7 +1110,18 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
           onclone: (clonedDoc) => fixOklchForCanvas(clonedDoc)
         });
         const imgData = canvas.toDataURL('image/png');
-        pdf.addImage(imgData, 'PNG', 0, 0, 210, 297);
+        const pdfPageWidth = 210;
+        const pdfPageHeight = 297;
+        const contentHeightInPdf = (canvas.height * pdfPageWidth) / canvas.width;
+
+        if (contentHeightInPdf <= pdfPageHeight) {
+          pdf.addImage(imgData, 'PNG', 0, 0, pdfPageWidth, contentHeightInPdf);
+        } else {
+          const scale = pdfPageHeight / contentHeightInPdf;
+          const scaledWidth = pdfPageWidth * scale;
+          const xOffset = (pdfPageWidth - scaledWidth) / 2;
+          pdf.addImage(imgData, 'PNG', xOffset, 0, scaledWidth, pdfPageHeight);
+        }
       }
 
       addSecurityWatermark(pdf, { user, ipAddress });
@@ -2139,7 +2161,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                         {pageData.isFirstPage ? (
                           <>
                             {/* En-tête Institutionnel & Certification */}
-                            <div className="flex justify-between items-start mb-3 pb-3 border-b border-slate-100">
+                            <div className="flex justify-between items-start mb-3 pb-3 border-b border-slate-200">
                               <div className="flex gap-3 sm:gap-4 items-center min-w-0">
                                 {schoolDetails?.logo_url ? (
                                   <div className="w-14 h-14 sm:w-16 sm:h-16 bg-white rounded-xl shadow-2xs border border-slate-200/80 p-1.5 flex items-center justify-center overflow-hidden shrink-0">
@@ -2156,16 +2178,16 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   </div>
                                 )}
                                 <div className="min-w-0">
-                                  <h1 className="text-base sm:text-lg md:text-xl font-black text-slate-900 uppercase tracking-tight leading-tight mb-1 truncate">
+                                  <h1 className="text-base sm:text-lg md:text-xl font-bold text-slate-900 uppercase tracking-wide leading-normal mb-1">
                                     {schoolDetails?.name || 'COLLÈGE DES INNOVATIONS'}
                                   </h1>
                                   <div className="space-y-0.5">
-                                    <p className="text-[9px] sm:text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                                      <Target size={10} className="text-slate-400 shrink-0" />
+                                    <p className="text-[9.5px] sm:text-[10px] font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5 leading-snug">
+                                      <Target size={11} className="text-slate-400 shrink-0" />
                                       <span>{schoolDetails?.address || 'Port-au-Prince, Haïti'}</span>
                                     </p>
-                                    <p className="text-[9px] sm:text-[9.5px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 truncate">
-                                      <RefreshCcw size={10} className="text-slate-400 shrink-0" />
+                                    <p className="text-[9.5px] sm:text-[10px] font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5 leading-snug">
+                                      <RefreshCcw size={11} className="text-slate-400 shrink-0" />
                                       <span>{schoolDetails?.phone} {schoolDetails?.email && `| ${schoolDetails.email}`}</span>
                                     </p>
                                   </div>
@@ -2173,15 +2195,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                               </div>
 
                               <div className="text-right shrink-0 pl-2">
-                                <div className="inline-block px-2.5 py-1 bg-slate-900 text-white rounded-md text-[9px] font-black uppercase tracking-[0.18em] mb-1.5 shadow-xs">
+                                <div className="inline-block px-3 py-1 bg-white border-2 border-slate-900 text-slate-900 rounded-md text-[9.5px] font-extrabold uppercase tracking-[0.2em] mb-1.5 shadow-2xs">
                                   RELEVÉ DE COMPTE
                                 </div>
                                 <div className="space-y-0.5">
-                                  <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Date d'émission</p>
-                                  <p className="text-xs font-black text-slate-900 whitespace-nowrap">
+                                  <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">Date d'émission</p>
+                                  <p className="text-xs font-bold text-slate-900 whitespace-nowrap leading-snug">
                                     {new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}
                                   </p>
-                                  <p className="text-[9px] font-mono font-bold text-slate-500">
+                                  <p className="text-[9px] font-mono font-bold text-slate-600">
                                     Réf: #ST-{selectedStudent.id.substring(0, 8).toUpperCase()}
                                   </p>
                                 </div>
@@ -2191,38 +2213,38 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                             {/* Cartes Informations Élève & Détails Scolaires (Compactes & Ergonomiques) */}
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mb-3">
                               {/* Carte Élève */}
-                              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/70 relative overflow-hidden flex flex-col justify-between">
+                              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/80 relative flex flex-col justify-between">
                                 <div>
-                                  <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
-                                    <User size={10} className="text-slate-400" /> Informations {terminology.student}
+                                  <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
+                                    <User size={10} className="text-slate-500" /> Informations {terminology.student}
                                   </p>
-                                  <p className="text-sm sm:text-base font-black text-slate-900 uppercase tracking-tight leading-tight truncate">
+                                  <p className="text-sm sm:text-base font-bold text-slate-900 uppercase tracking-normal leading-normal">
                                     {selectedStudent.fullName}
                                   </p>
                                 </div>
                                 <div className="flex items-center gap-2 mt-1.5">
-                                  <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[8.5px] font-black text-slate-500 uppercase tracking-wider">
+                                  <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded text-[8.5px] font-bold text-slate-600 uppercase tracking-wider">
                                     MATRICULE
                                   </span>
-                                  <p className="text-xs font-bold text-slate-700 font-mono">
+                                  <p className="text-xs font-bold text-slate-800 font-mono">
                                     {selectedStudent.id.substring(0, 8).toUpperCase()}
                                   </p>
                                 </div>
                               </div>
 
                               {/* Carte Détails Scolaires */}
-                              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/70 relative overflow-hidden flex flex-col justify-between">
-                                <p className="text-[8.5px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
-                                  <BadgeCheck size={10} className="text-slate-400" /> Détails {terminology.tuition.includes('Académique') ? 'Académiques' : 'Scolaires'}
+                              <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-200/80 relative flex flex-col justify-between">
+                                <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-[0.15em] mb-1 flex items-center gap-1">
+                                  <BadgeCheck size={10} className="text-slate-500" /> Détails {terminology.tuition.includes('Académique') ? 'Académiques' : 'Scolaires'}
                                 </p>
                                 <div className="grid grid-cols-2 gap-2">
                                   <div>
-                                    <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">{terminology.option} / Niveau</p>
-                                    <p className="text-xs sm:text-sm font-black text-slate-900 truncate">{selectedStudent.classe || 'N/A'}</p>
+                                    <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">{terminology.option} / Niveau</p>
+                                    <p className="text-xs sm:text-sm font-bold text-slate-900 leading-normal">{selectedStudent.classe || 'N/A'}</p>
                                   </div>
                                   <div>
-                                    <p className="text-[8.5px] font-bold text-slate-400 uppercase tracking-wider">Année {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</p>
-                                    <p className="text-xs sm:text-sm font-black text-slate-900 truncate">{selectedStudent.academicYear || 'Session active'}</p>
+                                    <p className="text-[8.5px] font-bold text-slate-500 uppercase tracking-wider">Année {terminology.academicYear.includes('Académique') ? 'Académique' : 'Scolaire'}</p>
+                                    <p className="text-xs sm:text-sm font-bold text-slate-900 leading-normal">{selectedStudent.academicYear || 'Session active'}</p>
                                   </div>
                                 </div>
                               </div>
@@ -2272,9 +2294,9 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   )}
                                 </tbody>
                                 <tfoot>
-                                  <tr className="bg-slate-900 text-white">
-                                    <td className="py-2 px-3 text-[9.5px] font-black uppercase tracking-[0.15em]">Total Engagement Session</td>
-                                    <td className="py-2 px-3 text-right font-mono text-sm sm:text-base font-black tracking-tight">{selectedStudent.totalDue.toLocaleString()} HTG</td>
+                                  <tr className="bg-slate-100/90 text-slate-900 border-t-2 border-b-2 border-slate-900">
+                                    <td className="py-2 px-3 text-[9.5px] font-extrabold uppercase tracking-[0.15em] text-slate-900">Total Engagement Session</td>
+                                    <td className="py-2 px-3 text-right font-mono text-sm sm:text-base font-black tracking-tight text-slate-950">{selectedStudent.totalDue.toLocaleString()} HTG</td>
                                   </tr>
                                 </tfoot>
                               </table>
@@ -2292,8 +2314,8 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 </div>
                               )}
                               <div className="min-w-0">
-                                <p className="text-xs font-black text-slate-900 uppercase truncate leading-tight">{schoolDetails?.name}</p>
-                                <p className="text-[9.5px] font-semibold text-slate-500 truncate">
+                                <p className="text-xs font-bold text-slate-900 uppercase leading-snug">{schoolDetails?.name}</p>
+                                <p className="text-[9.5px] font-medium text-slate-600 leading-snug">
                                   Relevé de Compte (Suite) — <strong className="text-slate-800">{selectedStudent.fullName}</strong> ({selectedStudent.id.substring(0, 8).toUpperCase()}) • {selectedStudent.classe}
                                 </p>
                               </div>
@@ -2427,60 +2449,68 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   </span>
                                 </div>
 
-                                <div className="p-3 sm:p-3.5 rounded-xl bg-slate-900 text-white relative overflow-hidden shadow-xs">
-                                  <div className="absolute top-0 right-0 p-3 opacity-10 pointer-events-none">
-                                    <DollarSign size={40} className="text-white" />
+                                <div className="p-3 sm:p-3.5 rounded-xl border-2 border-slate-900 bg-white text-slate-900 relative shadow-2xs">
+                                  <div className="flex items-center justify-between border-b border-slate-200 pb-1 mb-1.5">
+                                    <span className="text-[8.5px] font-extrabold uppercase tracking-[0.18em] text-slate-600">
+                                      Solde Restant Dû
+                                    </span>
+                                    {selectedStudent.isFullySettled ? (
+                                      <span className="text-[8px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded uppercase tracking-wider">
+                                        Compte Soldé
+                                      </span>
+                                    ) : (
+                                      <span className="text-[8px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded uppercase tracking-wider">
+                                        À régulariser
+                                      </span>
+                                    )}
                                   </div>
-                                  <p className="text-[8px] font-black text-white/50 uppercase tracking-[0.18em] mb-1">
-                                    Solde Restant Dû
-                                  </p>
 
                                   {selectedStudent.isFullySettled ? (
-                                    <div className="flex items-center gap-2 relative z-10">
-                                      <CheckCircle2 size={18} className="text-emerald-400 shrink-0" />
+                                    <div className="flex items-center gap-2 pt-0.5">
+                                      <CheckCircle2 size={18} className="text-emerald-600 shrink-0" />
                                       <div>
-                                        <span className="text-xl font-black font-mono tracking-tight text-emerald-400 leading-none block">
+                                        <span className="text-xl font-black font-mono tracking-tight text-emerald-700 leading-snug block">
                                           0 HTG
                                         </span>
-                                        <span className="text-[9px] font-bold text-emerald-300/80 uppercase tracking-widest">
+                                        <span className="text-[9px] font-bold text-emerald-700 uppercase tracking-wider">
                                           Compte Entièrement Soldé
                                         </span>
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="relative z-10">
+                                    <div className="pt-0.5">
                                       {selectedStudent.remainingUSD > 0 && selectedStudent.remainingHTG > 0 ? (
                                         <div>
-                                          <div className="flex items-baseline gap-1">
-                                            <span className="text-lg font-black font-mono tracking-tight text-white leading-tight">
-                                              {selectedStudent.remainingHTG.toLocaleString()} <span className="text-xs text-white/60">HTG</span>
+                                          <div className="flex items-baseline gap-1.5 flex-wrap">
+                                            <span className="text-xl font-black font-mono tracking-tight text-slate-950 leading-snug">
+                                              {selectedStudent.remainingHTG.toLocaleString()} <span className="text-xs font-bold text-slate-600">HTG</span>
                                             </span>
-                                            <span className="text-sm font-black font-mono text-emerald-400">
-                                              + ${selectedStudent.remainingUSD.toFixed(2)} <span className="text-[10px] text-emerald-400/70">USD</span>
+                                            <span className="text-base font-black font-mono text-indigo-900">
+                                              + ${selectedStudent.remainingUSD.toFixed(2)} <span className="text-[10px] font-bold text-indigo-700">USD</span>
                                             </span>
                                           </div>
-                                          <p className="text-[9px] text-white/60 font-mono mt-0.5">
+                                          <p className="text-[9.5px] text-slate-600 font-mono mt-0.5 font-medium">
                                             (Contre-valeur totale estimée: ≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
                                           </p>
                                         </div>
                                       ) : selectedStudent.remainingUSD > 0 ? (
                                         <div>
                                           <div className="flex items-baseline gap-1">
-                                            <span className="text-xl font-black font-mono tracking-tight text-white leading-tight">
+                                            <span className="text-xl font-black font-mono tracking-tight text-slate-950 leading-snug">
                                               ${selectedStudent.remainingUSD.toFixed(2)}
                                             </span>
-                                            <span className="text-xs font-bold text-white/60 uppercase">USD</span>
+                                            <span className="text-xs font-bold text-slate-600 uppercase">USD</span>
                                           </div>
-                                          <p className="text-[9px] text-white/60 font-mono mt-0.5">
+                                          <p className="text-[9.5px] text-slate-600 font-mono mt-0.5 font-medium">
                                             (≈ {selectedStudent.remainingHTGEquiv.toLocaleString()} HTG)
                                           </p>
                                         </div>
                                       ) : (
                                         <div className="flex items-baseline gap-1.5">
-                                          <span className="text-xl font-black font-mono tracking-tight text-white leading-tight">
+                                          <span className="text-xl font-black font-mono tracking-tight text-slate-950 leading-snug">
                                             {selectedStudent.remainingHTG.toLocaleString()}
                                           </span>
-                                          <span className="text-xs font-bold text-white/60 uppercase">HTG</span>
+                                          <span className="text-xs font-bold text-slate-600 uppercase">HTG</span>
                                         </div>
                                       )}
                                     </div>

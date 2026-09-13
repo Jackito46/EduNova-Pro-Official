@@ -2585,27 +2585,27 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
                     )}
                     <div>
-                      <h1 className="text-xl font-black text-slate-900 uppercase tracking-tight leading-none mb-2">{schoolDetails?.name}</h1>
+                      <h1 className="text-xl font-bold text-slate-900 uppercase tracking-wide leading-normal mb-2">{schoolDetails?.name}</h1>
                       <div className="space-y-0.5">
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                          <FileText size={10} className="text-slate-300" /> {schoolDetails?.address}
+                        <p className="text-[9.5px] font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5 leading-snug">
+                          <FileText size={11} className="text-slate-400" /> {schoolDetails?.address}
                         </p>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-1.5">
-                          <RefreshCcw size={10} className="text-slate-300" /> {schoolDetails?.phone} {schoolDetails?.email && `| ${schoolDetails.email}`}
+                        <p className="text-[9.5px] font-medium text-slate-600 uppercase tracking-wide flex items-center gap-1.5 leading-snug">
+                          <RefreshCcw size={11} className="text-slate-400" /> {schoolDetails?.phone} {schoolDetails?.email && `| ${schoolDetails.email}`}
                         </p>
                       </div>
                     </div>
                   </div>
 
                   <div className="text-right">
-                    <div className="inline-block px-3.5 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-black uppercase tracking-[0.2em] mb-2 shadow-md shadow-slate-200">
+                    <div className="inline-block px-3.5 py-1.5 bg-white border-2 border-slate-900 text-slate-900 rounded-lg text-[10px] font-extrabold uppercase tracking-[0.2em] mb-2 shadow-2xs">
                       RELEVÉ DE COMPTE
                     </div>
                     <div className="space-y-0.5">
-                      <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Date d'émission</p>
-                      <p className="text-xs font-black text-slate-900">{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
+                      <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider">Date d'émission</p>
+                      <p className="text-xs font-bold text-slate-900 leading-snug">{new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                       {(startDate || endDate) && (
-                        <p className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded mt-1 inline-block">
+                        <p className="text-[9px] font-bold text-indigo-800 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded mt-1 inline-block">
                           Période : {startDate ? `Du ${startDate}` : ''} {endDate ? `Au ${endDate}` : ''}
                         </p>
                       )}
@@ -2615,29 +2615,29 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {/* Student Info Card */}
                 <div className="grid grid-cols-2 gap-6 mb-8">
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Informations {terminology.student}</p>
+                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 relative">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Informations {terminology.student}</p>
                     <div className="relative z-10 space-y-1">
-                      <p className="text-xl font-black text-slate-900 uppercase tracking-tight leading-tight">
+                      <p className="text-xl font-bold text-slate-900 uppercase tracking-normal leading-normal">
                         {formatStudentName(printPreview.last_name, printPreview.first_name).fullName}
                       </p>
                       <div className="flex items-center gap-2 pt-1">
-                        <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-black text-slate-500 uppercase tracking-widest">MATRICULE</span>
-                        <p className="text-xs font-bold text-slate-700 font-mono">{printPreview.id.substring(0, 8).toUpperCase()}</p>
+                        <span className="px-2 py-0.5 bg-white border border-slate-200 rounded text-[9px] font-bold text-slate-600 uppercase tracking-wider">MATRICULE</span>
+                        <p className="text-xs font-bold text-slate-800 font-mono">{printPreview.id.substring(0, 8).toUpperCase()}</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-100 relative overflow-hidden">
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-3">Détails Académiques</p>
+                  <div className="p-5 bg-slate-50 rounded-2xl border border-slate-200/80 relative">
+                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-3">Détails Académiques</p>
                     <div className="grid grid-cols-2 gap-3 relative z-10">
                       <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{terminology.class}</p>
-                        <p className="text-sm font-black text-slate-900">{printPreview.className}</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">{terminology.class}</p>
+                        <p className="text-sm font-bold text-slate-900 leading-normal">{printPreview.className}</p>
                       </div>
                       <div>
-                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">{terminology.academicYear}</p>
-                        <p className="text-sm font-black text-slate-900">{printPreview.academicYear}</p>
+                        <p className="text-[9px] font-bold text-slate-500 uppercase tracking-wider mb-0.5">{terminology.academicYear}</p>
+                        <p className="text-sm font-bold text-slate-900 leading-normal">{printPreview.academicYear}</p>
                       </div>
                     </div>
                   </div>
@@ -2647,11 +2647,11 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="mb-8 overflow-hidden rounded-2xl border border-slate-200 shadow-xs">
                   <table className="w-full border-collapse">
                     <thead>
-                      <tr className="bg-slate-900 text-white">
-                        <th className="py-3 px-4 text-left text-[9px] font-black uppercase tracking-[0.15em]">Désignation des Frais</th>
-                        <th className="py-3 px-4 text-center text-[9px] font-black uppercase tracking-[0.15em]">Montant Exigé</th>
-                        <th className="py-3 px-4 text-right text-[9px] font-black uppercase tracking-[0.15em]">Encaissé</th>
-                        <th className="py-3 px-4 text-right text-[9px] font-black uppercase tracking-[0.15em]">Reste à Payer</th>
+                      <tr className="bg-slate-100 text-slate-800 border-b-2 border-slate-900">
+                        <th className="py-3 px-4 text-left text-[9px] font-extrabold uppercase tracking-[0.15em]">Désignation des Frais</th>
+                        <th className="py-3 px-4 text-center text-[9px] font-extrabold uppercase tracking-[0.15em]">Montant Exigé</th>
+                        <th className="py-3 px-4 text-right text-[9px] font-extrabold uppercase tracking-[0.15em]">Encaissé</th>
+                        <th className="py-3 px-4 text-right text-[9px] font-extrabold uppercase tracking-[0.15em]">Reste à Payer</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 text-xs">
@@ -2802,12 +2802,12 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       )}
                     </tbody>
                     <tfoot>
-                      <tr className="bg-slate-900 text-white">
-                        <td colSpan={2} className="py-3.5 px-4 text-xs font-black uppercase tracking-[0.15em]">Bilan Financier Global Session</td>
-                        <td className="py-3.5 px-4 text-right font-mono text-xs font-bold text-emerald-400">
+                      <tr className="bg-slate-100/90 text-slate-900 border-t-2 border-b-2 border-slate-900">
+                        <td colSpan={2} className="py-3 px-4 text-xs font-extrabold uppercase tracking-[0.15em] text-slate-900">Bilan Financier Global Session</td>
+                        <td className="py-3 px-4 text-right font-mono text-xs font-bold text-emerald-700">
                           +{printPreview.paid.toLocaleString()} G
                         </td>
-                        <td className="py-3.5 px-4 text-right font-mono text-sm font-black tracking-tight text-white">
+                        <td className="py-3 px-4 text-right font-mono text-sm font-black tracking-tight text-slate-950">
                           {(printPreview.totalDue - printPreview.paid).toLocaleString()} HTG
                         </td>
                       </tr>
@@ -2896,13 +2896,24 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 {/* Final Balance Card & Signature */}
                 <div className="grid grid-cols-2 gap-8 pt-8 border-t-2 border-slate-900">
                   <div className="space-y-4">
-                    <div className="p-5 rounded-2xl bg-slate-900 shadow-md shadow-slate-200 text-white">
-                      <p className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">Solde Restant Dû</p>
-                      <div className="flex items-baseline gap-2">
-                        <p className={`text-2xl font-black font-mono tracking-tighter ${printPreview.totalDue - printPreview.paid > 0 ? 'text-white' : 'text-emerald-400'}`}>
+                    <div className="p-5 rounded-2xl border-2 border-slate-900 bg-white text-slate-900 shadow-2xs">
+                      <div className="flex items-center justify-between border-b border-slate-200 pb-1 mb-2">
+                        <p className="text-[9px] font-extrabold uppercase tracking-[0.2em] text-slate-600">Solde Restant Dû</p>
+                        {printPreview.totalDue - printPreview.paid <= 0 ? (
+                          <span className="text-[8.5px] font-bold text-emerald-800 bg-emerald-100 border border-emerald-300 px-2 py-0.5 rounded uppercase tracking-wider">
+                            Soldé
+                          </span>
+                        ) : (
+                          <span className="text-[8.5px] font-bold text-amber-900 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded uppercase tracking-wider">
+                            À régulariser
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-baseline gap-2 pt-1">
+                        <p className={`text-2xl font-black font-mono tracking-tight ${printPreview.totalDue - printPreview.paid > 0 ? 'text-slate-950' : 'text-emerald-700'}`}>
                           {(printPreview.totalDue - printPreview.paid).toLocaleString()}
                         </p>
-                        <span className="text-xs font-bold text-white/40 uppercase tracking-widest">HTG</span>
+                        <span className="text-xs font-bold text-slate-600 uppercase tracking-wider">HTG</span>
                       </div>
                     </div>
                     

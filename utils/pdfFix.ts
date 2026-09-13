@@ -119,12 +119,25 @@ export const fixOklchForCanvas = (clonedDoc: Document) => {
       clonedDoc.body.style.wordSpacing = 'normal';
     }
 
-    // Ensure all table cells and text blocks don't clip text
-    const textEls = Array.from(clonedDoc.querySelectorAll('p, td, th, h1, h2, h3, h4, span')) as HTMLElement[];
+    // Ensure all table cells, headings, and text blocks don't clip or squash text
+    const allClonedNodes = Array.from(clonedDoc.querySelectorAll('*')) as HTMLElement[];
+    allClonedNodes.forEach(el => {
+      if (el.classList.contains('truncate') || el.classList.contains('overflow-hidden')) {
+        el.style.overflow = 'visible';
+        el.style.textOverflow = 'clip';
+      }
+    });
+
+    const textEls = Array.from(clonedDoc.querySelectorAll('p, td, th, h1, h2, h3, h4, h5, h6, span, div, strong, b')) as HTMLElement[];
     textEls.forEach(el => {
       el.style.letterSpacing = 'normal';
-      if (el.style.overflow === 'hidden') {
-        el.style.overflow = 'visible';
+      el.style.overflow = 'visible';
+      // If line-height is cramped, expand slightly so ascenders/descenders and accents aren't cut
+      const computed = window.getComputedStyle(el);
+      const lh = parseFloat(computed.lineHeight);
+      const fs = parseFloat(computed.fontSize);
+      if (!isNaN(lh) && !isNaN(fs) && lh < fs * 1.3) {
+        el.style.lineHeight = `${Math.round(fs * 1.35)}px`;
       }
     });
 
