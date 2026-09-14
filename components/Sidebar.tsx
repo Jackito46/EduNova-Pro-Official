@@ -391,10 +391,10 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                     renderNavLink({ name: 'Syllabus d\'évaluations', path: '/enseignant/syllabus' }, true, BookOpen)
                   )}
                   {renderNavLink({ name: 'Saisie des Notes', path: '/notes' }, true, ClipboardList)}
-                  {hasAccess(restrictedAcademicRoles) && isPresencesEnabled && renderNavLink({ name: 'Présences', path: '/presences' }, true, CalendarCheck)}
+                  {hasAccess(academicRoles) && isPresencesEnabled && renderNavLink({ name: 'Présences', path: '/presences' }, true, CalendarCheck)}
                   {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: 'Bulletins', path: '/bulletins' }, true, Files)}
                   {hasAccess(academicRoles) && isDisciplineEnabled && renderNavLink({ name: 'Discipline', path: '/discipline' }, true, ShieldAlert)}
-                  {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: 'Emplois du Temps', path: '/horaire' }, true, Clock)}
+                  {hasAccess(academicRoles) && renderNavLink({ name: 'Emplois du Temps', path: '/horaire' }, true, Clock)}
                 </div>
               )}
             </div>

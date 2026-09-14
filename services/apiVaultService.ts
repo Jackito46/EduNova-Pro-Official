@@ -1,3 +1,5 @@
+import { supabase } from '../supabase';
+
 /**
  * Service client pour le coffre-fort centralisé des clés API & passerelles.
  * Communique avec les endpoints sécurisés du serveur (/api/settings/api-credentials)
@@ -35,13 +37,28 @@ export interface ApiVaultResponse {
   error?: string;
 }
 
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  } catch (e) {
+    return {};
+  }
+}
+
 export class ApiVaultService {
   /**
    * Récupère toutes les clés et statuts de validation pour un établissement
    */
   static async getCredentials(schoolId: string): Promise<ApiVaultResponse> {
     try {
-      const res = await fetch(`/api/settings/api-credentials?school_id=${encodeURIComponent(schoolId)}`);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/settings/api-credentials?school_id=${encodeURIComponent(schoolId)}`, {
+        headers: {
+          ...authHeaders
+        }
+      });
       const data = await res.json();
       return data;
     } catch (err: any) {
@@ -61,9 +78,13 @@ export class ApiVaultService {
     isActive?: boolean;
   }): Promise<{ success: boolean; message?: string; error?: string; saved_keys?: string[] }> {
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/settings/api-credentials', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({
           school_id: params.schoolId,
           service_name: params.serviceName,
@@ -97,9 +118,13 @@ export class ApiVaultService {
     details?: any;
   }> {
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/settings/api-credentials/validate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({
           school_id: params.schoolId,
           service_name: params.serviceName,
@@ -127,9 +152,13 @@ export class ApiVaultService {
     keyName: string;
   }): Promise<{ success: boolean; clear_value?: string; error?: string }> {
     try {
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/settings/api-credentials/reveal', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({
           school_id: params.schoolId,
           service_name: params.serviceName,

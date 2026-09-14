@@ -36,14 +36,13 @@ export class MonCashService {
       // Récupération depuis le coffre-fort api_credentials
       const { data: creds } = await supabase
         .from('api_credentials')
-        .select('*')
+        .select('id, school_id, key_name, key_value, is_active, created_at, updated_at')
         .eq('school_id', schoolId)
         .eq('service_name', 'moncash')
         .eq('is_active', true);
 
       if (creds && creds.length > 0) {
         const clientId = creds.find(c => c.key_name === 'MONCASH_CLIENT_ID')?.key_value || '';
-        const clientSecret = creds.find(c => c.key_name === 'MONCASH_CLIENT_SECRET')?.encrypted_value || '';
         const businessKey = creds.find(c => c.key_name === 'MONCASH_BUSINESS_KEY')?.key_value || '';
         const mode = (creds.find(c => c.key_name === 'MONCASH_MODE')?.key_value || 'sandbox') as 'sandbox' | 'live';
         
@@ -52,7 +51,7 @@ export class MonCashService {
           school_id: schoolId,
           gateway_name: 'moncash',
           client_id: clientId,
-          client_secret: clientSecret,
+          client_secret: '', // Sécurité : Jamais transmis ni exposé côté client
           business_key: businessKey,
           mode,
           is_active: true,

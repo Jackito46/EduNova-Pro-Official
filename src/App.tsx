@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export default function App() {
-  return <div></div>;
-}
+import App from '../App';
+
+export default App;
+export * from '../App';

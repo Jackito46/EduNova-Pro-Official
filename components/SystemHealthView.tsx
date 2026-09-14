@@ -257,7 +257,9 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
         database: {
           status: 'healthy',
           latencyMs: 32,
-          host: 'iymzthjkucvhyjnxpslg.supabase.co',
+          host: import.meta.env.VITE_SUPABASE_URL 
+            ? (() => { try { return new URL(import.meta.env.VITE_SUPABASE_URL).hostname; } catch { return 'db.edunova.internal'; } })()
+            : 'db.edunova.internal',
           ssl: true,
           keepAliveDaemon: 'ACTIVE',
           tables: { schools: 1, profiles: 8, students: 24, payments: 12 },

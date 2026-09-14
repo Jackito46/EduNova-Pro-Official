@@ -1598,6 +1598,38 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'Paramètres manquants' });
     }
 
+    // Contrôle d'authentification et d'habilitation administrateur
+    const authHeader = req.headers.authorization;
+    if (authHeader) {
+      const token = authHeader.split(' ')[1];
+      if (token && supabaseUrl && supabaseAnonKey) {
+        try {
+          const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+            global: { headers: { Authorization: `Bearer ${token}` } }
+          });
+          const { data: userData, error: userErr } = await authClient.auth.getUser(token);
+          if (userErr || !userData?.user) {
+            return res.status(401).json({ success: false, error: 'Session non authentifiée ou expirée' });
+          }
+          
+          const { data: profile } = await authClient
+            .from('profiles')
+            .select('role, school_id')
+            .eq('id', userData.user.id)
+            .maybeSingle();
+            
+          const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'super_admin';
+          const isSchoolAdmin = (profile?.role === 'SCHOOL_ADMIN' || profile?.role === 'school_admin' || profile?.role === 'ADMIN' || profile?.role === 'admin') && profile?.school_id === school_id;
+          
+          if (!isSuperAdmin && !isSchoolAdmin) {
+            return res.status(403).json({ success: false, error: 'Accès refusé : privilèges administrateur requis pour révéler une clé secrète.' });
+          }
+        } catch (authEx) {
+          console.warn('Erreur vérification token reveal:', authEx);
+        }
+      }
+    }
+
     try {
       if (service_name === 'moncash' && (key_name === 'MONCASH_CLIENT_SECRET' || key_name === 'client_secret')) {
         const { data: gw } = await supabase
@@ -1935,7 +1967,7 @@ async function startServer() {
       };
 
       // Calcul de la signature
-      const webhookSecret = kobaraConfig.webhook_secret || 'sim_whsec_kbr_test_default';
+      const webhookSecret = kobaraConfig.webhook_secret || (process.env.KOBARA_WEBHOOK_SECRET || '').trim() || 'sim_whsec_kbr_test_default';
       const calculatedSignature = crypto.createHmac('sha256', webhookSecret).update(JSON.stringify(webhookPayload)).digest('hex');
       const signatureToUse = sign_valid ? calculatedSignature : 'sig_invalid_tampered_hash_00000000';
 
@@ -2098,7 +2130,13 @@ async function startServer() {
         rawSecret = cred?.encrypted_value || cred?.key_value || '';
       }
 
-      const effectiveSecret = decryptSecret(rawSecret) || 'kbr_sk_live_b46bb2574ac9ebfe3f9b50a8ce7090f5aed84daea2fa4cfa';
+      const effectiveSecret = decryptSecret(rawSecret) || (process.env.KOBARA_SECRET_KEY || '').trim();
+      if (!effectiveSecret) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Clé secrète Kobara non configurée sur cet établissement.' 
+        });
+      }
       const idempotencyKey = `edunova-${student_id || 'std'}-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
 
       const response = await fetch('https://api.kobara.app/v1/payments', {

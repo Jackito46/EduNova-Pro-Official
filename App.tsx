@@ -98,14 +98,16 @@ const originalToastError = toast.error;
 
 // Globally suppress console.error for expected refresh token errors to avoid AI Studio alert noise
 if (typeof window !== 'undefined') {
-  console.log('--- DIAGNOSTIC SCRIPT: DEPLOYMENT INFO ---');
-  console.log('Build Timestamp:', typeof __BUILD_TIMESTAMP__ !== 'undefined' ? __BUILD_TIMESTAMP__ : 'N/A');
-  console.log('Deployment Git Commit:', typeof __RENDER_GIT_COMMIT__ !== 'undefined' ? __RENDER_GIT_COMMIT__ : 'N/A');
-  console.log('Node Env:', typeof __NODE_ENV__ !== 'undefined' ? __NODE_ENV__ : 'N/A');
-  console.log('Environment variables loaded:', {
-    VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? '✓ Configured' : 'Missing',
-  });
-  console.log('-------------------------------------------');
+  if (import.meta.env.DEV) {
+    console.log('--- DIAGNOSTIC SCRIPT: DEPLOYMENT INFO ---');
+    console.log('Build Timestamp:', typeof __BUILD_TIMESTAMP__ !== 'undefined' ? __BUILD_TIMESTAMP__ : 'N/A');
+    console.log('Deployment Git Commit:', typeof __RENDER_GIT_COMMIT__ !== 'undefined' ? __RENDER_GIT_COMMIT__ : 'N/A');
+    console.log('Node Env:', typeof __NODE_ENV__ !== 'undefined' ? __NODE_ENV__ : 'N/A');
+    console.log('Environment variables loaded:', {
+      VITE_SUPABASE_URL: import.meta.env.VITE_SUPABASE_URL ? '✓ Configured' : 'Missing',
+    });
+    console.log('-------------------------------------------');
+  }
 
   const originalConsoleError = console.error;
   console.error = function(...args: any[]) {
@@ -242,7 +244,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
                 <Routes location={location}>
               <Route path="/" element={<Dashboard user={user} />} />
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
-              <Route path="/offline" element={<OfflineDashboard user={user} />} />
+              <Route path="/offline" element={<RoleGuard user={user} allowedRoles={allStaffRoles}><OfflineDashboard user={user} /></RoleGuard>} />
               <Route path="/super-admin" element={
                 <SuperAdminRoute user={user}>
                   <SuperAdminDashboard user={user} />
@@ -273,15 +275,18 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
               
               {/* Academic Routes */}
               <Route path="/eleves" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentList user={user} /></RoleGuard>} />
+              <Route path="/eleves/liste" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentList user={user} /></RoleGuard>} />
               <Route path="/eleves/validation" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><ValidationList user={user} /></RoleGuard>} />
               <Route path="/eleves/detail/:id" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentDetailView user={user} /></RoleGuard>} />
               <Route path="/eleves/ajouter" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
+              <Route path="/eleves/inscrire" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
               <Route path="/eleves/modifier/:id" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
               <Route path="/eleves/reinscrire/:id" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
               <Route path="/classes" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><ClassManagement user={user} /></RoleGuard>} />
               <Route path="/classes/ajouter" element={<RoleGuard user={user} allowedRoles={adminRoles}><ClassForm user={user} /></RoleGuard>} />
               <Route path="/classes/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><ClassForm user={user} /></RoleGuard>} />
               <Route path="/classes/:id/matieres" element={<RoleGuard user={user} allowedRoles={adminRoles}><ClassSubjectManager user={user} /></RoleGuard>} />
+              <Route path="/matieres" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><ClassManagement user={user} /></RoleGuard>} />
               <Route path="/matieres/ajouter" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
               <Route path="/matieres/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
               <Route path="/notes" element={<RoleGuard user={user} allowedRoles={academicRoles}><GradesView user={user} /></RoleGuard>} />
@@ -304,16 +309,21 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
               <Route path="/economat/frais" element={<RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard>} />
               <Route path="/economat/paiement" element={<RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard>} />
               <Route path="/economat/factures" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
+              <Route path="/economat/facture/:id" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
+              <Route path="/economat/recus" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
+              <Route path="/economat/recu/:id" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
               <Route path="/economat/releves" element={<RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard>} />
               <Route path="/economat/releve-compte" element={<RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard>} />
               <Route path="/economat/suivi" element={<RoleGuard user={user} allowedRoles={cashierRoles}><StudentPaymentTracking user={user} /></RoleGuard>} />
               <Route path="/economat/debiteurs" element={<RoleGuard user={user} allowedRoles={cashierRoles}><DebtorsListView user={user} /></RoleGuard>} />
               <Route path="/economat/liste" element={<RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard>} />
+              <Route path="/economat/historique" element={<RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard>} />
               <Route path="/economat/depenses" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpensesView user={user} /></RoleGuard>} />
               <Route path="/economat/depenses/ajouter" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard>} />
               <Route path="/economat/depenses/modifier/:id" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard>} />
               <Route path="/economat/fournitures" element={<RoleGuard user={user} allowedRoles={cashierRoles}><SuppliesView user={user} /></RoleGuard>} />
               <Route path="/economat/planification" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard>} />
+              <Route path="/economat/planning" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard>} />
               <Route path="/economat/frais-occasionnels" element={<RoleGuard user={user} allowedRoles={financeRoles}><AdHocCampaignsView user={user} /></RoleGuard>} />
               <Route path="/economat/derogations" element={<RoleGuard user={user} allowedRoles={adminRoles}><DiscountManagementView user={user} /></RoleGuard>} />
               <Route path="/economat/rapport-reductions" element={<RoleGuard user={user} allowedRoles={financeRoles}><ReductionReportView user={user} /></RoleGuard>} />

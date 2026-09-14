@@ -138,8 +138,8 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
     };
   }>({
     kobara: {
-      secret_key: 'kbr_sk_live_b46bb2574ac9ebfe3f9b50a8ce7090f5aed84daea2fa4cfa',
-      webhook_secret: 'whsec_81539ff02bf7f9',
+      secret_key: '',
+      webhook_secret: '',
       public_key: '',
       receiver_phone: '',
       receiver_phone_moncash: '',
@@ -148,14 +148,14 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       auto_payout: true,
       receiver_name: '',
       receiver_operator: 'moncash',
-      has_secret: true,
-      has_webhook_secret: true,
-      is_secret_encrypted: true,
+      has_secret: false,
+      has_webhook_secret: false,
+      is_secret_encrypted: false,
       mode: 'live',
       is_active: true,
-      validation_status: 'VALID',
-      last_validated_at: new Date().toISOString(),
-      validation_message: 'Connecté & Prêt pour encaissement Live (MonCash & Natcash)'
+      validation_status: 'UNTESTED',
+      last_validated_at: null,
+      validation_message: ''
     },
     moncash: {
       client_id: '',
@@ -446,10 +446,10 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
     }
   };
 
-  const renderUrl = 'https://edunova-9fgv.onrender.com';
+  const configuredAppUrl = (import.meta.env.VITE_APP_URL || '').trim();
   const currentOrigin = typeof window !== 'undefined' ? window.location.origin : '';
-  const [selectedHostType, setSelectedHostType] = useState<'render' | 'detected'>('render');
-  const effectiveBaseUrl = selectedHostType === 'render' ? renderUrl : currentOrigin;
+  const [selectedHostType, setSelectedHostType] = useState<'env' | 'detected'>(configuredAppUrl ? 'env' : 'detected');
+  const effectiveBaseUrl = (selectedHostType === 'env' && configuredAppUrl) ? configuredAppUrl : currentOrigin;
   const webhookUrl = `${effectiveBaseUrl}/api/moncash/webhook`;
   const kobaraWebhookUrl = `${effectiveBaseUrl}/api/webhooks/kobara`;
 
@@ -1645,17 +1645,19 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                         <span>URL Webhook MonCash</span>
                       </label>
                       <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedHostType('render')}
-                          className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
-                            selectedHostType === 'render'
-                              ? 'bg-red-600 text-white shadow-2xs'
-                              : 'text-slate-600 hover:text-slate-900'
-                          }`}
-                        >
-                          Render
-                        </button>
+                        {configuredAppUrl && (
+                          <button
+                            type="button"
+                            onClick={() => setSelectedHostType('env')}
+                            className={`px-2 py-0.5 text-[10px] font-bold rounded transition-all cursor-pointer ${
+                              selectedHostType === 'env'
+                                ? 'bg-red-600 text-white shadow-2xs'
+                                : 'text-slate-600 hover:text-slate-900'
+                            }`}
+                          >
+                            URL Configurée
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => setSelectedHostType('detected')}

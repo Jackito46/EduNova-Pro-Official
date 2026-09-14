@@ -44,8 +44,8 @@ export const KobaraSettingsTab: React.FC<KobaraSettingsTabProps> = ({
   const [testing, setTesting] = useState(false);
 
   // Valeurs du formulaire Kobara
-  const [secretKey, setSecretKey] = useState('kbr_sk_live_b46bb2574ac9ebfe3f9b50a8ce7090f5aed84daea2fa4cfa');
-  const [webhookSecret, setWebhookSecret] = useState('whsec_81539ff02bf7f9');
+  const [secretKey, setSecretKey] = useState('');
+  const [webhookSecret, setWebhookSecret] = useState('');
   const [publicKey, setPublicKey] = useState('');
   const [receiverPhone, setReceiverPhone] = useState('');
   const [receiverName, setReceiverName] = useState('');
@@ -55,9 +55,9 @@ export const KobaraSettingsTab: React.FC<KobaraSettingsTabProps> = ({
   const [autoPayout, setAutoPayout] = useState(true);
 
   // Statuts et affichage
-  const [hasSecret, setHasSecret] = useState(true);
-  const [hasWebhookSecret, setHasWebhookSecret] = useState(true);
-  const [isSecretEncrypted, setIsSecretEncrypted] = useState(true);
+  const [hasSecret, setHasSecret] = useState(false);
+  const [hasWebhookSecret, setHasWebhookSecret] = useState(false);
+  const [isSecretEncrypted, setIsSecretEncrypted] = useState(false);
   const [revealSecret, setRevealSecret] = useState(false);
   const [revealWebhook, setRevealWebhook] = useState(false);
   const [unmaskedSecret, setUnmaskedSecret] = useState<string | null>(null);
@@ -65,9 +65,9 @@ export const KobaraSettingsTab: React.FC<KobaraSettingsTabProps> = ({
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   // Validation
-  const [validationStatus, setValidationStatus] = useState<'VALID' | 'INVALID' | 'UNTESTED' | 'ERROR'>('VALID');
-  const [validationMessage, setValidationMessage] = useState('Connecté & Prêt pour encaissement Live');
-  const [lastValidatedAt, setLastValidatedAt] = useState<string | null>(new Date().toISOString());
+  const [validationStatus, setValidationStatus] = useState<'VALID' | 'INVALID' | 'UNTESTED' | 'ERROR'>('UNTESTED');
+  const [validationMessage, setValidationMessage] = useState('');
+  const [lastValidatedAt, setLastValidatedAt] = useState<string | null>(null);
 
   // URL du Webhook
   const webhookUrl = typeof window !== 'undefined' 
