@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, Check, LucideIcon, Search, X } from 'lucide-react';
+import { ChevronDown, Check, LucideIcon, Search, X, Plus } from 'lucide-react';
 
 export interface SelectOption {
   value: string;
@@ -26,6 +26,9 @@ export interface SelectPillProps {
   disabled?: boolean;
   searchable?: boolean;
   portal?: boolean;
+  allowCustom?: boolean;
+  onCreateCustom?: (query: string) => void;
+  customActionLabel?: (query: string) => string;
 }
 
 export const SelectPill: React.FC<SelectPillProps> = ({
@@ -42,7 +45,10 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   className = '',
   disabled = false,
   searchable = false,
-  portal = true
+  portal = true,
+  allowCustom = false,
+  onCreateCustom,
+  customActionLabel
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -302,56 +308,96 @@ export const SelectPill: React.FC<SelectPillProps> = ({
         className="max-h-60 overflow-y-auto space-y-0.5 custom-scrollbar p-0.5"
       >
         {filteredOptions.length === 0 ? (
-          <div className="py-4 px-3 text-center text-slate-500 text-xs font-semibold">
-            Aucune option correspondante
-          </div>
-        ) : (
-          filteredOptions.map((opt) => {
-            const isSelected = value === opt.value;
-            const OptIcon = opt.icon;
-
-            return (
+          <div className="py-3 px-3 text-center space-y-2">
+            <p className="text-slate-500 text-xs font-semibold">Aucune option correspondante</p>
+            {allowCustom && search.trim() && (
               <button
-                key={opt.value}
                 type="button"
                 onClick={() => {
-                  onChange(opt.value);
+                  if (onCreateCustom) {
+                    onCreateCustom(search.trim());
+                  } else {
+                    onChange(search.trim());
+                  }
+                  setSearch('');
                   setIsOpen(false);
                 }}
-                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                  isSelected
-                    ? scheme.highlightBg + ' shadow-2xs font-bold'
-                    : 'hover:bg-slate-50 text-slate-800 border border-transparent'
-                }`}
+                className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-300'}`} />
-                  {OptIcon && <OptIcon size={14} className={scheme.iconText} />}
-                  <div className="min-w-0">
-                    <span className="text-xs font-bold text-slate-900 tracking-tight block truncate">
-                      {opt.label}
-                    </span>
-                    {opt.description && (
-                      <span className="text-[10px] font-medium text-slate-500 block truncate">
-                        {opt.description}
+                <Plus size={13} />
+                <span>{customActionLabel ? customActionLabel(search.trim()) : `Créer "${search.trim()}"`}</span>
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {filteredOptions.map((opt) => {
+              const isSelected = value === opt.value;
+              const OptIcon = opt.icon;
+
+              return (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => {
+                    onChange(opt.value);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                    isSelected
+                      ? scheme.highlightBg + ' shadow-2xs font-bold'
+                      : 'hover:bg-slate-50 text-slate-800 border border-transparent'
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? scheme.dotColor : 'bg-slate-300'}`} />
+                    {OptIcon && <OptIcon size={14} className={scheme.iconText} />}
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-slate-900 tracking-tight block truncate">
+                        {opt.label}
+                      </span>
+                      {opt.description && (
+                        <span className="text-[10px] font-medium text-slate-500 block truncate">
+                          {opt.description}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    {opt.badge && (
+                      <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
+                        {opt.badge}
                       </span>
                     )}
+                    {isSelected && (
+                      <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                    )}
                   </div>
-                </div>
-
-                <div className="flex items-center gap-1 shrink-0 ml-2">
-                  {opt.badge && (
-                    <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200">
-                      {opt.badge}
-                    </span>
-                  )}
-                  {isSelected && (
-                    <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                  )}
-                </div>
-              </button>
-            );
-          })
+                </button>
+              );
+            })}
+            {allowCustom && search.trim() && !normalizedOptions.some(o => o.label.toLowerCase() === search.trim().toLowerCase()) && (
+              <div className="pt-1 mt-1 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (onCreateCustom) {
+                      onCreateCustom(search.trim());
+                    } else {
+                      onChange(search.trim());
+                    }
+                    setSearch('');
+                    setIsOpen(false);
+                  }}
+                  className="w-full py-1.5 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  <Plus size={12} />
+                  <span>{customActionLabel ? customActionLabel(search.trim()) : `Créer "${search.trim()}"`}</span>
+                </button>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>

@@ -47,24 +47,9 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
   const [roles, setRoles] = useState<StaffRole[]>([]);
   const [initialCampusId, setInitialCampusId] = useState<string>('');
 
-  // Custom states for searchable role dropdown
-  const [roleSearch, setRoleSearch] = useState('');
-  const [isRoleDropdownOpen, setIsRoleDropdownOpen] = useState(false);
+  // State for role creation & feedback
   const [isCreatingRole, setIsCreatingRole] = useState(false);
   const [roleSuccessMsg, setRoleSuccessMsg] = useState<string | null>(null);
-  const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsRoleDropdownOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
 
   useEffect(() => {
     if (roleSuccessMsg) {
@@ -219,17 +204,11 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
     });
   };
 
-  const handleSelectRole = (roleLabel: string) => {
-    setFormData(prev => ({ ...prev, role: roleLabel }));
-    setRoleSearch('');
-    setIsRoleDropdownOpen(false);
-  };
-
-  const handleCreateNewRole = async () => {
-    if (!roleSearch.trim()) return;
+  const handleCreateNewRole = async (roleLabel: string) => {
+    if (!roleLabel.trim()) return;
     setIsCreatingRole(true);
     try {
-      const newRoleLabel = roleSearch.trim();
+      const newRoleLabel = roleLabel.trim();
       const { data, error } = await supabase
         .from('staff_roles')
         .insert([
@@ -247,8 +226,6 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
         setRoles(prev => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)));
         setFormData(prev => ({ ...prev, role: data.label }));
         setRoleSuccessMsg(`Le poste "${data.label}" a été créé et sélectionné !`);
-        setRoleSearch('');
-        setIsRoleDropdownOpen(false);
       }
     } catch (err: any) {
       console.error("Erreur de création de poste:", err);
@@ -304,6 +281,22 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
   const payTypeOptions: SelectOption[] = useMemo(() => [
     { value: 'Fixe', label: 'Salaire Fixe Mensuel', badge: 'Fixe' },
     { value: 'Horaire', label: 'Taux Horaire / Prestation', badge: 'Horaire' }
+  ], []);
+
+  const roleOptions: SelectOption[] = useMemo(() => [
+    ...roles.map(r => ({
+      value: r.label,
+      label: r.label,
+      description: r.description
+    }))
+  ], [roles]);
+
+  const bankOptions: SelectOption[] = useMemo(() => [
+    ...COMMON_BANKS.map(b => ({
+      value: b,
+      label: b,
+      badge: b === 'MONCASH' || b === 'NATCASH' ? 'Mobile' : 'Banque'
+    }))
   ], []);
 
   const campusOptions: SelectOption[] = useMemo(() => [
@@ -913,146 +906,35 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4">
                   
-                  {/* Poste de Travail (Pillule Searchable Role Selector) */}
-                  <div className="space-y-1 relative" ref={dropdownRef}>
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
-                      <span className="flex items-center gap-1">
+                  {/* Poste de Travail (SelectPill Searchable & Custom Creation) */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
                         <Sparkles size={12} className="text-blue-500" /> Poste & Fonction <span className="text-rose-500">*</span>
-                      </span>
-                      <span className="text-[10px] text-blue-600 font-semibold lowercase">Recherche instantanée</span>
-                    </label>
-                    
-                    <div className="relative">
-                      <div 
-                        onClick={() => setIsRoleDropdownOpen(!isRoleDropdownOpen)}
-                        className={`w-full px-3 py-2 min-h-[38px] bg-slate-50 hover:bg-white border ${
-                          isRoleDropdownOpen ? 'border-blue-500 ring-2 ring-blue-50 bg-white' : 'border-slate-200/90'
-                        } rounded-xl text-xs sm:text-sm font-semibold text-slate-800 flex items-center justify-between cursor-pointer transition-all select-none shadow-2xs`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <Briefcase size={15} className="text-blue-600 shrink-0" />
-                          {formData.role ? (
-                            <span className="text-blue-900 font-bold truncate">{formData.role}</span>
-                          ) : (
-                            <span className="text-slate-400 font-normal">Sélectionner ou créer un poste...</span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-1">
-                          {formData.role && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setFormData(prev => ({ ...prev, role: '' }));
-                              }}
-                              className="p-0.5 hover:bg-slate-200 rounded-full transition-all text-slate-400 hover:text-slate-600"
-                            >
-                              <X size={12} />
-                            </button>
-                          )}
-                          <ChevronDown className={`text-slate-400 transition-transform duration-200 ${isRoleDropdownOpen ? 'rotate-180 text-blue-600' : ''}`} size={15} />
-                        </div>
-                      </div>
-
-                      {/* Dropdown Container */}
-                      <AnimatePresence>
-                        {isRoleDropdownOpen && (
-                          <motion.div 
-                            initial={{ opacity: 0, y: -6 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -6 }}
-                            transition={{ duration: 0.15 }}
-                            className="absolute left-0 right-0 mt-1 bg-white border border-slate-200 rounded-xl shadow-lg z-50 overflow-hidden flex flex-col"
-                            style={{ maxHeight: '300px' }}
-                          >
-                            {/* Search bar inside dropdown */}
-                            <div className="p-2 border-b border-slate-100 bg-slate-50/80 flex items-center gap-2">
-                              <Search className="text-slate-400 shrink-0" size={14} />
-                              <input 
-                                type="text"
-                                placeholder="Rechercher ou saisir..."
-                                className="w-full bg-transparent border-none outline-none text-xs text-slate-800 placeholder-slate-400 font-medium"
-                                value={roleSearch}
-                                onChange={(e) => setRoleSearch(e.target.value)}
-                                autoFocus
-                                onClick={(e) => e.stopPropagation()}
-                              />
-                              {roleSearch && (
-                                <button 
-                                  type="button" 
-                                  onClick={(e) => { e.stopPropagation(); setRoleSearch(''); }} 
-                                  className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full"
-                                >
-                                  <X size={11} />
-                                </button>
-                              )}
-                            </div>
-
-                            {/* Frequently Used Roles Shortcuts */}
-                            {roles.length > 0 && (
-                              <div className="p-2 bg-slate-50/50 border-b border-slate-100 flex flex-wrap gap-1 items-center">
-                                <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mr-0.5">Fréquents :</span>
-                                {roles.slice(0, 4).map(r => (
-                                  <button
-                                    key={r.id}
-                                    type="button"
-                                    onClick={(e) => { e.stopPropagation(); handleSelectRole(r.label); }}
-                                    className={`px-2 py-0.5 text-[11px] font-semibold rounded-md border transition-all ${
-                                      formData.role === r.label 
-                                        ? 'bg-blue-600 border-blue-600 text-white shadow-2xs' 
-                                        : 'bg-white border-slate-200 text-slate-700 hover:border-blue-300 hover:text-blue-600'
-                                    }`}
-                                  >
-                                    {r.label}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Scrollable list */}
-                            <div className="overflow-y-auto max-h-[180px] divide-y divide-slate-50">
-                              {roles.filter(r => r.label.toLowerCase().includes(roleSearch.toLowerCase())).length > 0 ? (
-                                roles.filter(r => r.label.toLowerCase().includes(roleSearch.toLowerCase())).map(r => (
-                                  <div 
-                                    key={r.id}
-                                    onClick={(e) => { e.stopPropagation(); handleSelectRole(r.label); }}
-                                    className={`px-3 py-2 flex items-center justify-between cursor-pointer hover:bg-blue-50/50 transition-all ${
-                                      formData.role === r.label ? 'bg-blue-50/80 font-bold text-blue-900' : 'text-slate-700'
-                                    }`}
-                                  >
-                                    <span className="text-xs font-medium">{r.label}</span>
-                                    {formData.role === r.label && <Check className="text-blue-600" size={14} />}
-                                  </div>
-                                ))
-                              ) : (
-                                <div className="p-3 text-center space-y-2">
-                                  <p className="text-[11px] text-slate-400 font-medium">Aucun poste préexistant ne correspond.</p>
-                                  {roleSearch.trim().length > 1 && (
-                                    <button
-                                      type="button"
-                                      disabled={isCreatingRole}
-                                      onClick={(e) => { e.stopPropagation(); handleCreateNewRole(); }}
-                                      className="w-full py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-[11px] font-bold shadow-xs transition-all flex items-center justify-center gap-1.5"
-                                    >
-                                      {isCreatingRole ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} />}
-                                      Créer le poste "{roleSearch.trim()}"
-                                    </button>
-                                  )}
-                                </div>
-                              )}
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-
+                      </label>
                       {roleSuccessMsg && (
-                        <p className="text-[11px] text-emerald-600 font-semibold mt-1 flex items-center gap-1">
-                          <CheckCircle2 size={11} /> {roleSuccessMsg}
-                        </p>
+                        <span className="text-[10px] text-emerald-600 font-bold flex items-center gap-1 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                          <CheckCircle2 size={10} /> {roleSuccessMsg}
+                        </span>
                       )}
-
-                      <input type="text" name="role" required className="sr-only" value={formData.role} readOnly />
                     </div>
+                    
+                    <SelectPill
+                      value={formData.role}
+                      onChange={(val) => setFormData(prev => ({ ...prev, role: val }))}
+                      options={roleOptions}
+                      placeholder="Sélectionner ou saisir un poste..."
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      icon={Briefcase}
+                      searchable={true}
+                      allowCustom={true}
+                      customActionLabel={(query) => `Créer le poste "${query}"`}
+                      onCreateCustom={handleCreateNewRole}
+                      className="w-full"
+                    />
+                    <input type="text" name="role" required className="sr-only" value={formData.role} readOnly />
                   </div>
 
                   {/* Type de Contrat (Pillule Visual Selector) */}
@@ -1144,19 +1026,27 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Nom de la Banque & Suggestions rapides */}
+                  {/* Nom de la Banque (SelectPill Searchable & Custom) */}
                   <div className="space-y-1">
-                    <label htmlFor="bankName" className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
+                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 flex items-center gap-1">
                       <Banknote size={12} className="text-slate-400" /> Domiciliation Bancaire
                     </label>
-                    <input 
-                      id="bankName" 
-                      name="bankName" 
-                      type="text" 
-                      placeholder="Ex : SOGEBANK, UNIBANK, BUH..." 
-                      className="w-full px-3 py-2 bg-slate-50/70 hover:bg-slate-50 focus:bg-white text-slate-900 border border-slate-200/90 rounded-xl text-xs sm:text-sm font-medium outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-50 transition-all shadow-2xs" 
-                      value={formData.bankName} 
-                      onChange={handleChange} 
+                    <SelectPill
+                      value={formData.bankName}
+                      onChange={(val) => setFormData(prev => ({ ...prev, bankName: val }))}
+                      options={bankOptions}
+                      placeholder="Sélectionner ou saisir une banque..."
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      icon={Banknote}
+                      searchable={true}
+                      allowCustom={true}
+                      customActionLabel={(query) => `Utiliser l'institution "${query.toUpperCase()}"`}
+                      onCreateCustom={(customBank) => {
+                        setFormData(prev => ({ ...prev, bankName: customBank.toUpperCase() }));
+                      }}
+                      className="w-full"
                     />
                     
                     {/* Quick bank pills */}
@@ -1166,9 +1056,9 @@ const StaffForm: React.FC<StaffFormProps> = ({ user }) => {
                           key={b}
                           type="button"
                           onClick={() => setFormData(prev => ({ ...prev, bankName: b }))}
-                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border transition-all ${
+                          className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md border transition-all cursor-pointer ${
                             formData.bankName === b 
-                              ? 'bg-blue-600 border-blue-600 text-white' 
+                              ? 'bg-blue-600 border-blue-600 text-white shadow-2xs' 
                               : 'bg-slate-100 border-slate-200 text-slate-600 hover:bg-slate-200'
                           }`}
                         >
