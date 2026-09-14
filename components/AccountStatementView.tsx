@@ -371,14 +371,18 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           setAcademicYears(yearsData);
           const active = yearsData.find(y => y.status === 'ACTIVE') || yearsData[0];
           if (active) {
-            setSelectedYear(active.id);
-            setGenYear(active.id);
+            setSelectedYear(prev => prev || active.id);
+            if (!studentIdParam && !yearParam) {
+              setGenYear(prev => prev || active.id);
+            }
           }
         }
 
         if (classesData) {
           setClasses(classesData);
-          if (classesData.length > 0) setGenClass(classesData[0].id);
+          if (!studentIdParam && classesData.length > 0) {
+            setGenClass(prev => prev || classesData[0].id);
+          }
         }
 
         if (studentsData) setStudents(studentsData);
@@ -1069,7 +1073,13 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
 
         if (!targetYear) {
-          targetYear = academicYears.find(y => y.status === 'ACTIVE')?.id || academicYears[0]?.id || selectedYear || genYear;
+          const { data: actYear } = await supabase
+            .from('academic_years')
+            .select('id')
+            .eq('school_id', user.school_id)
+            .eq('status', 'ACTIVE')
+            .maybeSingle();
+          targetYear = actYear?.id || academicYears.find(y => y.status === 'ACTIVE')?.id || academicYears[0]?.id || selectedYear || genYear;
         }
 
         if (targetYear) {
@@ -1095,12 +1105,12 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   // Défilement fluide vers le relevé dès qu'il est chargé
   const statementCardRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (selectedGenStudent && studentIdParam) {
+    if (selectedGenStudent && (studentIdParam || activeView === 'generator')) {
       setTimeout(() => {
         statementCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 150);
     }
-  }, [selectedGenStudent?.id, studentIdParam]);
+  }, [selectedGenStudent?.id, studentIdParam, activeView]);
 
   const navigateAuditStudent = (direction: 'prev' | 'next') => {
     if (currentGenStudentIndex === -1 || availableStudentsForGen.length === 0) return;
@@ -1603,10 +1613,14 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <button 
                               onClick={() => {
                                 setActiveView('generator');
-                                setGenClass(b.classId);
-                                loadStudentAudit(b);
+                                if (b.classId) setGenClass(b.classId);
+                                if (selectedYear) setGenYear(selectedYear);
+                                loadStudentAudit(b, selectedYear);
+                                setTimeout(() => {
+                                  statementCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }, 150);
                               }}
-                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-xs shadow-xs hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95 whitespace-nowrap"
+                              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-white border border-slate-200 text-slate-700 font-bold rounded-xl text-xs shadow-xs hover:bg-indigo-600 hover:text-white hover:border-indigo-600 transition-all active:scale-95 whitespace-nowrap cursor-pointer"
                             >
                               <Eye size={14} />
                               Audit Détaillé
@@ -1665,46 +1679,46 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="font-black text-base tracking-tight text-slate-900">Diagnostic & Comparatif Facturé vs Encaissé</h3>
+                    <h3 className="font-black text-base tracking-tight text-slate-900">Comparatif Facturé vs Encaissé</h3>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
                       Synchronisé
                     </span>
                   </div>
                   <p className="text-slate-600 text-xs font-medium mt-0.5">
-                    Analyse en temps réel de la cohérence des encaissements enregistrés vs engagements théoriques des élèves.
+                    Analyse en temps réel des encaissements effectifs vs engagements scolaires.
                   </p>
                 </div>
               </div>
               
               <button
                 onClick={() => {
-                  toast.info("Ré-analyse du recouvrement et des paiements...");
+                  toast.info("Actualisation des données en cours...");
                   calculateBalances();
                 }}
                 className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm shadow-indigo-200 cursor-pointer active:scale-95"
               >
                 <RefreshCcw size={14} className={isCalculatingBalances ? "animate-spin" : ""} />
-                Ré-analyser & Rafraîchir les logs
+                Actualiser les données
               </button>
             </div>
 
-            {/* METRIQUES DE SYNCHRONISATION AUDIT */}
+            {/* SYNTHÈSE DES ENCAISSEMENTS */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-slate-100 text-xs">
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1 shadow-2xs">
-                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Reçus Enregistrés</span>
-                <p className="text-indigo-900 font-black text-sm">{auditDiagnosticInfo.totalPaymentsFetched} reçus recensés</p>
+                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Volume des Reçus</span>
+                <p className="text-indigo-900 font-black text-sm">{auditDiagnosticInfo.totalPaymentsFetched} reçus</p>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1 shadow-2xs">
-                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Paiements Imputés</span>
+                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Paiements Validés</span>
                 <p className="text-emerald-800 font-black text-sm">{auditDiagnosticInfo.matchedPaymentsCount} validés</p>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1 shadow-2xs">
-                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Taux de Référence</span>
+                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Taux Officiel</span>
                 <p className="text-amber-800 font-black text-sm">1 USD = {auditDiagnosticInfo.exchangeRateApplied} HTG</p>
               </div>
               <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200 space-y-1 shadow-2xs">
-                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Comptes Audités</span>
-                <p className="text-cyan-900 font-black text-sm">{auditDiagnosticInfo.totalStudentsProcessed} élèves</p>
+                <span className="text-[10px] text-slate-600 uppercase font-bold tracking-wider block">Effectif Traité</span>
+                <p className="text-cyan-900 font-black text-sm">{auditDiagnosticInfo.totalStudentsProcessed} {terminology.students.toLowerCase()}</p>
               </div>
             </div>
           </div>
@@ -1962,7 +1976,12 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <button
                               onClick={() => {
                                 setActiveView('generator');
-                                loadStudentAudit(b);
+                                if (b.classId) setGenClass(b.classId);
+                                if (selectedYear) setGenYear(selectedYear);
+                                loadStudentAudit(b, selectedYear);
+                                setTimeout(() => {
+                                  statementCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                }, 150);
                               }}
                               className="px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 ml-auto cursor-pointer shadow-2xs active:scale-95 whitespace-nowrap"
                             >

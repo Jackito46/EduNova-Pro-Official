@@ -1787,7 +1787,7 @@ export const DailyCashClosureModal: React.FC<DailyCashClosureModalProps> = ({
             <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 shrink-0">
               <span className="flex items-center gap-1.5">
                 <Info size={14} className="text-indigo-400" />
-                Document conforme aux exigences de gestion comptable et d'audit du MENFP.
+                Document officiel conforme aux normes d'audit et de gestion comptable.
               </span>
               <div className="flex items-center gap-2">
                 <button

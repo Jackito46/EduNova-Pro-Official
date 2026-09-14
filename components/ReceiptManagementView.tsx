@@ -315,8 +315,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       {activeView === 'journal' ? (
         <>
           {/* FILTRES ARCHIVES GLOBALES */}
-          <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/80 print:hidden">
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4 items-end">
+          <div className="bg-white p-3.5 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/80 print:hidden relative z-20 overflow-visible">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 items-end">
               {/* 1. Session */}
               <div className="space-y-1.5 min-w-0">
                 <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
@@ -330,6 +330,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   variant="field"
                   size="sm"
                   colorScheme="indigo"
+                  portal={true}
                   className="w-full"
                 />
               </div>
@@ -349,6 +350,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   variant="field"
                   size="sm"
                   colorScheme="indigo"
+                  portal={true}
                   className="w-full"
                   title={`Filtrer par ${terminology.class.toLowerCase()}`}
                 />

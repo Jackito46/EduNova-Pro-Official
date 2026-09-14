@@ -372,18 +372,18 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
               <span className="flex items-center gap-1">
                 <span>💡 Information Système</span>
               </span>
-              <span className="flex items-center gap-1 text-[9.5px] text-slate-500 font-mono">
+              <span className="flex items-center gap-1 text-[9.5px] text-slate-500 font-medium">
                 {netStatus === 'offline' || isOffline ? (
                   <span className="flex items-center gap-1 text-amber-400 font-medium">
-                    <WifiOff size={10} /> Hors-ligne
+                    <WifiOff size={10} /> Mode Hors-ligne
                   </span>
                 ) : netStatus === 'checking' ? (
                   <span className="flex items-center gap-1 text-sky-400 font-medium">
-                    <div className="w-1.5 h-1.5 rounded-full border border-sky-400 border-t-transparent animate-spin" /> Test réseau...
+                    <div className="w-1.5 h-1.5 rounded-full border border-sky-400 border-t-transparent animate-spin" /> Connexion...
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <Wifi size={10} /> Connecté {netLatency !== null ? `(${netLatency}ms)` : `(${elapsedSeconds}s)`}
+                    <Wifi size={10} /> En ligne
                   </span>
                 )}
               </span>
@@ -474,7 +474,7 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
         {/* Security watermark footer */}
         <div className="mt-5 flex items-center gap-1.5 text-slate-500 text-[10.5px] font-medium">
           <ShieldCheck size={13} className="text-sky-400" />
-          <span>Session Sécurisée • Protocole EduNova Guard v2.6</span>
+          <span>EduNova Pro • Système Intégré de Gestion Scolaire</span>
         </div>
       </div>
     </div>
