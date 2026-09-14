@@ -135,7 +135,7 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
 
     const recoveryTimer = setTimeout(() => {
       setShowRecoveryActions(true);
-    }, 2800);
+    }, 400);
 
     const memoInterval = setInterval(() => {
       setMemoIndex((prev) => (prev + 1) % MEMOS.length);
@@ -179,80 +179,87 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-hidden font-sans select-none">
-      {/* Background ambient glowing lighting effect */}
+      {/* Dynamic atmospheric mesh background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
         <motion.div
           animate={{
-            scale: [1, 1.25, 1],
-            opacity: [0.18, 0.28, 0.18],
-            x: [0, 40, 0],
-            y: [0, -30, 0]
+            scale: [1, 1.2, 1],
+            opacity: [0.18, 0.3, 0.18],
+            x: [0, 25, 0],
+            y: [0, -20, 0]
           }}
-          transition={{ duration: 14, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -top-[15%] -left-[10%] w-[620px] h-[620px] bg-blue-600/30 rounded-full blur-[140px]"
+          transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -top-[15%] -left-[10%] w-[540px] h-[540px] bg-blue-600/25 rounded-full blur-[130px]"
         />
         <motion.div
           animate={{
-            scale: [1, 1.3, 1],
-            opacity: [0.12, 0.22, 0.12],
-            x: [0, -35, 0],
-            y: [0, 35, 0]
+            scale: [1, 1.25, 1],
+            opacity: [0.12, 0.24, 0.12],
+            x: [0, -25, 0],
+            y: [0, 25, 0]
           }}
-          transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-          className="absolute -bottom-[20%] -right-[10%] w-[620px] h-[620px] bg-indigo-600/30 rounded-full blur-[140px]"
+          transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+          className="absolute -bottom-[20%] -right-[10%] w-[540px] h-[540px] bg-indigo-600/25 rounded-full blur-[130px]"
         />
-        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:24px_24px] opacity-35" />
+        <div className="absolute inset-0 bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:28px_28px] opacity-25" />
       </div>
 
       <div className="max-w-md w-full relative z-10 flex flex-col items-center">
-        {/* Brand Identity & Official Logo */}
+        {/* Brand Identity & Floating Emblem */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.9, y: 15 }}
+          initial={{ opacity: 0, scale: 0.94, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: "easeOut" }}
-          className="flex flex-col items-center text-center mb-7"
+          transition={{ duration: 0.5, ease: "easeOut" }}
+          className="flex flex-col items-center text-center mb-6"
         >
           <div className="relative mb-3.5 group">
-            <div className="absolute inset-0 bg-blue-500/35 blur-2xl rounded-3xl animate-pulse" />
-            <Logo
-              src="/logo.png"
-              size="xl"
-              className="w-20 h-20 sm:w-22 sm:h-22 relative z-10 rounded-2xl shadow-2xl ring-1 ring-white/15"
-              imgClassName="object-contain w-full h-full scale-[1.02]"
-              alt="EduNova Pro Logo"
-            />
+            {/* Ambient Back Glow */}
+            <div className="absolute -inset-2 bg-gradient-to-r from-blue-500/30 to-indigo-500/30 blur-2xl rounded-3xl animate-pulse" />
+            
+            {/* Subtle orbital dashed halo */}
+            <div className="absolute -inset-3.5 border border-sky-400/20 border-dashed rounded-[26px] animate-[spin_24s_linear_infinite]" />
+
+            <div className="relative z-10 w-20 h-20 sm:w-22 sm:h-22 p-2 rounded-2xl bg-gradient-to-b from-slate-800/80 to-slate-900/90 backdrop-blur-xl border border-white/15 shadow-[0_20px_40px_-12px_rgba(0,0,0,0.8),0_0_24px_rgba(56,189,248,0.25)] flex items-center justify-center">
+              <Logo
+                src="/logo.png"
+                size="xl"
+                className="w-full h-full object-contain"
+                imgClassName="object-contain w-full h-full scale-[1.02]"
+                alt="EduNova Pro Logo"
+              />
+            </div>
           </div>
 
           <div className="flex items-center gap-2 mb-1">
-            <h1 className="text-3xl sm:text-4xl font-black tracking-tight text-white">
-              EduNova <span className="text-blue-400 font-medium">Pro</span>
+            <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+              EduNova <span className="text-sky-400 font-semibold">Pro</span>
             </h1>
           </div>
           <p className="text-slate-400 text-[11px] font-bold uppercase tracking-[0.25em]">
-            Système Intégré de Gestion Académique
+            Système Intégré de Gestion Scolaire
           </p>
         </motion.div>
 
-        {/* Loading Progress Card with Real-time Step Indicators */}
+        {/* Loading Progress Card with Refined Ergonomics */}
         <motion.div
-          initial={{ opacity: 0, y: 18 }}
+          initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.1 }}
-          className="w-full bg-slate-900/85 backdrop-blur-2xl border border-slate-800/90 rounded-3xl p-5 sm:p-7 shadow-2xl space-y-5"
+          transition={{ duration: 0.45, delay: 0.08 }}
+          className="w-full bg-slate-900/80 backdrop-blur-2xl border border-slate-800/80 rounded-2xl p-5 sm:p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] space-y-4"
         >
           {/* User Session Teaser if cached session exists */}
           {cachedUserName && (
             <motion.div
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="flex items-center justify-between p-3 rounded-2xl bg-blue-950/40 border border-blue-800/40 text-xs"
+              className="flex items-center justify-between p-2.5 rounded-xl bg-blue-950/40 border border-blue-800/35 text-xs"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-400/30 flex items-center justify-center shrink-0">
-                  <UserCheck size={16} />
+                <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-300 border border-blue-400/30 flex items-center justify-center shrink-0">
+                  <UserCheck size={14} />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-slate-200 font-bold truncate">{cachedUserName}</p>
+                  <p className="text-slate-200 font-bold truncate text-xs">{cachedUserName}</p>
                   <p className="text-[10px] text-blue-400/90 font-medium uppercase tracking-wider">
                     {cachedUserRole || 'Session Enregistrée'}
                   </p>
@@ -264,23 +271,26 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
             </motion.div>
           )}
 
-          {/* Progress Bar & percentage */}
-          <div className="space-y-2.5">
+          {/* Progress Bar & Percentage */}
+          <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-300 flex items-center gap-2">
-                <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-ping" />
+              <span className="font-semibold text-slate-300 flex items-center gap-2">
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+                </span>
                 {activeStep === 1 
                   ? "Connexion au serveur sécurisé..." 
                   : activeStep === 2 
                   ? "Vérification des accréditations..." 
                   : "Préparation de l'espace académique..."}
               </span>
-              <span className="font-mono text-blue-400 font-bold">{progress}%</span>
+              <span className="font-mono text-sky-400 font-bold">{progress}%</span>
             </div>
 
-            <div className="w-full h-2.5 bg-slate-800/90 rounded-full overflow-hidden p-0.5 border border-slate-700/60 shadow-inner">
+            <div className="w-full h-2 bg-slate-800/90 rounded-full overflow-hidden p-0.5 border border-slate-700/50 shadow-inner">
               <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 rounded-full shadow-[0_0_14px_rgba(59,130,246,0.6)]"
+                className="h-full bg-gradient-to-r from-blue-500 via-indigo-500 to-sky-400 rounded-full shadow-[0_0_12px_rgba(56,189,248,0.65)]"
                 initial={{ width: '15%' }}
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
@@ -288,8 +298,8 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
             </div>
           </div>
 
-          {/* Sequential Step Indications */}
-          <div className="space-y-2 pt-1">
+          {/* Sequential Step Indications - Compact & Épuré */}
+          <div className="space-y-1.5 pt-1">
             {dynamicSteps.map((step) => {
               const isDone = activeStep > step.id;
               const isCurrent = activeStep === step.id;
@@ -297,31 +307,31 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
               return (
                 <div
                   key={step.id}
-                  className={`flex items-start gap-3 p-2.5 rounded-xl transition-all duration-300 ${
+                  className={`flex items-start gap-2.5 p-2 rounded-xl transition-all duration-300 ${
                     isCurrent
-                      ? 'bg-blue-950/60 border border-blue-800/70 shadow-xs'
+                      ? 'bg-blue-950/50 border border-blue-800/60 shadow-xs'
                       : isDone
-                      ? 'bg-slate-800/40 border border-transparent opacity-80'
-                      : 'opacity-40'
+                      ? 'bg-slate-800/30 border border-transparent opacity-80'
+                      : 'opacity-35'
                   }`}
                 >
                   <div className="shrink-0 mt-0.5">
                     {isDone ? (
-                      <CheckCircle2 size={16} className="text-emerald-400" />
+                      <CheckCircle2 size={15} className="text-emerald-400" />
                     ) : isCurrent ? (
-                      <div className="w-4 h-4 rounded-full border-2 border-transparent border-t-blue-400 border-r-indigo-400 animate-spin" />
+                      <div className="w-3.5 h-3.5 rounded-full border-2 border-transparent border-t-sky-400 border-r-indigo-400 animate-spin" />
                     ) : (
-                      <div className="w-4 h-4 rounded-full border border-slate-600 flex items-center justify-center text-[9px] text-slate-500">
+                      <div className="w-3.5 h-3.5 rounded-full border border-slate-600 flex items-center justify-center text-[8.5px] text-slate-500 font-bold">
                         {step.id}
                       </div>
                     )}
                   </div>
 
                   <div className="min-w-0 flex-1">
-                    <p className={`text-xs font-bold leading-tight ${isCurrent ? 'text-white' : isDone ? 'text-slate-300' : 'text-slate-500'}`}>
+                    <p className={`text-xs font-semibold leading-tight ${isCurrent ? 'text-white' : isDone ? 'text-slate-300' : 'text-slate-500'}`}>
                       {step.label}
                     </p>
-                    <p className="text-[11px] text-slate-400 font-normal mt-0.5 leading-snug">
+                    <p className="text-[10.5px] text-slate-400 font-normal mt-0.5 leading-snug truncate">
                       {step.desc}
                     </p>
                   </div>
@@ -335,67 +345,67 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
             <motion.div 
               initial={{ opacity: 0, y: -4 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-2xl flex items-start gap-3 text-xs text-amber-200"
+              className="p-3 bg-amber-950/40 border border-amber-500/40 rounded-xl flex items-start gap-2.5 text-xs text-amber-200"
             >
               <div className="p-1.5 rounded-lg bg-amber-500/20 text-amber-400 shrink-0 mt-0.5">
-                <WifiOff size={16} />
+                <WifiOff size={15} />
               </div>
               <div className="space-y-1 min-w-0 flex-1">
                 <div className="flex items-center justify-between">
-                  <p className="font-bold text-amber-300">Réseau distant inaccessible</p>
-                  <span className="text-[10px] px-1.5 py-0.5 bg-amber-500/20 rounded font-mono text-amber-300">
+                  <p className="font-bold text-amber-300 text-xs">Réseau distant inaccessible</p>
+                  <span className="text-[9.5px] px-1.5 py-0.5 bg-amber-500/20 rounded font-mono text-amber-300">
                     Hors-ligne
                   </span>
                 </div>
-                <p className="text-[11px] text-amber-200/85 leading-relaxed">
+                <p className="text-[10.5px] text-amber-200/85 leading-relaxed">
                   {cachedUserName 
-                    ? "Aucune liaison réseau active détectée. Vous pouvez poursuivre l'activité en Mode Hors-ligne sécurisé grâce à vos données en cache."
-                    : "Une connexion réseau est nécessaire pour la première authentification. Veuillez vérifier votre accès Wi-Fi ou réseau mobile."}
+                    ? "Aucune liaison active. Poursuivez en mode hors-ligne avec vos données locales."
+                    : "Connexion nécessaire pour la première authentification."}
                 </p>
               </div>
             </motion.div>
           )}
 
-          {/* Dynamic Informative Memo Card */}
-          <div className="pt-2 border-t border-slate-800/80">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
+          {/* Dynamic Informative Memo Card - Épuré */}
+          <div className="pt-2 border-t border-slate-800/70">
+            <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
+              <span className="flex items-center gap-1">
                 <span>💡 Information Système</span>
               </span>
-              <span className="flex items-center gap-1 text-[10px] text-slate-500 font-mono">
+              <span className="flex items-center gap-1 text-[9.5px] text-slate-500 font-mono">
                 {netStatus === 'offline' || isOffline ? (
                   <span className="flex items-center gap-1 text-amber-400 font-medium">
-                    <WifiOff size={11} /> Hors-ligne
+                    <WifiOff size={10} /> Hors-ligne
                   </span>
                 ) : netStatus === 'checking' ? (
-                  <span className="flex items-center gap-1 text-blue-400 font-medium">
-                    <div className="w-2 h-2 rounded-full border border-blue-400 border-t-transparent animate-spin" /> Test réseau...
+                  <span className="flex items-center gap-1 text-sky-400 font-medium">
+                    <div className="w-1.5 h-1.5 rounded-full border border-sky-400 border-t-transparent animate-spin" /> Test réseau...
                   </span>
                 ) : (
                   <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                    <Wifi size={11} /> Connecté {netLatency !== null ? `(${netLatency}ms)` : `(${elapsedSeconds}s)`}
+                    <Wifi size={10} /> Connecté {netLatency !== null ? `(${netLatency}ms)` : `(${elapsedSeconds}s)`}
                   </span>
                 )}
               </span>
             </div>
 
-            <div className="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-3.5 min-h-[72px] flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl bg-blue-500/15 text-blue-400 border border-blue-500/25 flex items-center justify-center shrink-0">
-                <ActiveMemoIcon size={16} />
+            <div className="bg-slate-950/60 border border-slate-800/70 rounded-xl p-3 min-h-[64px] flex items-start gap-2.5">
+              <div className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                <ActiveMemoIcon size={14} />
               </div>
               <AnimatePresence mode="wait">
                 <motion.div
                   key={memoIndex}
-                  initial={{ opacity: 0, y: 4 }}
+                  initial={{ opacity: 0, y: 3 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -4 }}
-                  transition={{ duration: 0.25 }}
+                  exit={{ opacity: 0, y: -3 }}
+                  transition={{ duration: 0.2 }}
                   className="flex-1 min-w-0"
                 >
-                  <p className="text-xs font-bold text-slate-200">
+                  <p className="text-[11.5px] font-bold text-slate-200">
                     {MEMOS[memoIndex].title}
                   </p>
-                  <p className="text-[11px] text-slate-400 font-medium leading-relaxed mt-0.5">
+                  <p className="text-[10.5px] text-slate-400 font-normal leading-relaxed mt-0.5 line-clamp-2">
                     {MEMOS[memoIndex].text}
                   </p>
                 </motion.div>
@@ -410,15 +420,15 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                className="pt-2 flex flex-col sm:flex-row gap-2"
+                className="pt-1.5 flex flex-col sm:flex-row gap-2"
               >
                 {cachedUserName && onContinueOffline && (
                   <button
                     type="button"
                     onClick={onContinueOffline}
-                    className="flex-1 py-2.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/30 cursor-pointer"
+                    className="flex-1 py-2 px-2.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-emerald-900/30 cursor-pointer"
                   >
-                    <Zap size={14} />
+                    <Zap size={13} />
                     <span>Mode Hors-ligne</span>
                   </button>
                 )}
@@ -427,10 +437,10 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                   <button
                     type="button"
                     onClick={onSkipToLogin}
-                    className="flex-1 py-2.5 px-3 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/30 cursor-pointer"
+                    className="flex-1 py-2 px-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-md shadow-blue-900/30 cursor-pointer"
                   >
                     <span>Page de Connexion</span>
-                    <ArrowRight size={14} />
+                    <ArrowRight size={13} />
                   </button>
                 )}
 
@@ -439,21 +449,21 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                     type="button"
                     onClick={runNetworkPreflight}
                     disabled={isCheckingNet}
-                    className="py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-900/30"
+                    className="py-2 px-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-md shadow-indigo-900/30"
                     title="Vérifier la connectivité réseau"
                   >
-                    <RefreshCw size={13} className={isCheckingNet ? "animate-spin" : ""} />
-                    <span>{isCheckingNet ? "Test..." : "Tester la connexion"}</span>
+                    <RefreshCw size={12} className={isCheckingNet ? "animate-spin" : ""} />
+                    <span>{isCheckingNet ? "Test..." : "Tester"}</span>
                   </button>
                 )}
 
                 <button
                   type="button"
                   onClick={() => window.location.reload()}
-                  className="py-2.5 px-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
+                  className="py-2 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs font-semibold transition-colors flex items-center justify-center gap-1.5 cursor-pointer border border-slate-700"
                   title="Recharger l'application"
                 >
-                  <RefreshCw size={13} />
+                  <RefreshCw size={12} />
                   <span>Actualiser</span>
                 </button>
               </motion.div>
@@ -462,8 +472,8 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
         </motion.div>
 
         {/* Security watermark footer */}
-        <div className="mt-7 flex items-center gap-2 text-slate-500 text-[11px] font-medium">
-          <ShieldCheck size={14} className="text-blue-400" />
+        <div className="mt-5 flex items-center gap-1.5 text-slate-500 text-[10.5px] font-medium">
+          <ShieldCheck size={13} className="text-sky-400" />
           <span>Session Sécurisée • Protocole EduNova Guard v2.6</span>
         </div>
       </div>

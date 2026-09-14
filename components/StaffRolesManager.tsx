@@ -1,6 +1,24 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../supabase';
-import { Plus, Trash2, Edit2, Save, X, Briefcase, RefreshCcw, AlertTriangle, Check, Search, ShieldCheck, Sparkles, Building2 } from 'lucide-react';
+import { 
+  Plus, 
+  Trash2, 
+  Edit2, 
+  X, 
+  Briefcase, 
+  RefreshCcw, 
+  AlertTriangle, 
+  Check, 
+  Search, 
+  ShieldCheck, 
+  Sparkles, 
+  Building2, 
+  Lock,
+  CheckCircle2,
+  SlidersHorizontal,
+  Info
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Modal from './Modal';
 import { UserProfile } from '../types';
 
@@ -10,6 +28,8 @@ interface StaffRole {
   school_id: string | null;
   description?: string;
 }
+
+type FilterScope = 'all' | 'standard' | 'custom';
 
 const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose: () => void }> = ({ user, isOpen, onClose }) => {
   const [roles, setRoles] = useState<StaffRole[]>([]);
@@ -23,6 +43,9 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [showStandardAlert, setShowStandardAlert] = useState(false);
   const [roleSearchFilter, setRoleSearchFilter] = useState('');
+  const [activeScope, setActiveScope] = useState<FilterScope>('all');
+  
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const fetchRoles = async () => {
     setLoading(true);
@@ -58,18 +81,28 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
     if (isOpen) {
       fetchRoles();
       setRoleSearchFilter('');
+      setActiveScope('all');
       setEditingId(null);
       setError(null);
       setSuccessMsg(null);
+      setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [isOpen, user.school_id]);
 
   useEffect(() => {
     if (successMsg) {
-      const t = setTimeout(() => setSuccessMsg(null), 3500);
+      const t = setTimeout(() => setSuccessMsg(null), 2800);
       return () => clearTimeout(t);
     }
   }, [successMsg]);
+
+  // Statistics calculation
+  const stats = useMemo(() => {
+    const total = roles.length;
+    const standardCount = roles.filter(r => !r.school_id).length;
+    const customCount = roles.filter(r => !!r.school_id).length;
+    return { total, standardCount, customCount };
+  }, [roles]);
 
   const handleAdd = async () => {
     const trimmed = newLabel.trim();
@@ -93,10 +126,10 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
       if (error) throw error;
       setRoles(prev => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)));
       setNewLabel('');
-      setSuccessMsg(`Poste "${trimmed}" ajouté avec succès !`);
+      setSuccessMsg(`Poste "${trimmed}" ajouté avec succès au catalogue École Connectée !`);
     } catch (err: any) {
       console.error('Error adding role:', err);
-      setError(err.message || 'Impossible d\'ajouter ce poste.');
+      setError(err.message || "Impossible d'ajouter ce poste.");
     } finally {
       setIsSaving(false);
     }
@@ -117,10 +150,10 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
       if (error) throw error;
       setRoles(prev => prev.map(r => r.id === id ? { ...r, label: trimmed } : r).sort((a, b) => a.label.localeCompare(b.label)));
       setEditingId(null);
-      setSuccessMsg(`Poste mis à jour en "${trimmed}"`);
+      setSuccessMsg(`Intitulé mis à jour : "${trimmed}"`);
     } catch (err: any) {
       console.error('Error updating role:', err);
-      setError("Impossible de modifier un poste standard ou erreur réseau.");
+      setError("Impossible de modifier un poste standard du socle ou erreur réseau.");
     } finally {
       setIsSaving(false);
     }
@@ -128,7 +161,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
 
   const handleDelete = async (id: string, schoolId: string | null) => {
     if (!schoolId) {
-      setError("Impossible de supprimer un poste standard.");
+      setError("Les postes du socle standard École Connectée sont protégés.");
       return;
     }
     
@@ -143,13 +176,13 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
         
       if (error) {
         if (error.code === '23503') {
-          throw new Error("Ce poste est actuellement rattaché à un ou plusieurs collaborateurs RH et ne peut pas être supprimé.");
+          throw new Error("Ce poste est actuellement attribué à un ou plusieurs collaborateurs RH de l'établissement.");
         }
         throw error;
       }
       setRoles(prev => prev.filter(r => r.id !== id));
       setDeleteConfirmId(null);
-      setSuccessMsg("Poste supprimé du catalogue avec succès.");
+      setSuccessMsg("Poste retiré du catalogue avec succès.");
     } catch (err: any) {
       console.error('Error deleting role:', err);
       setError(err.message || "Erreur lors de la suppression du poste.");
@@ -208,7 +241,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
         .map(r => ({ ...r, school_id: user.school_id }));
 
       if (rolesToInsert.length === 0) {
-        setError("Tous les postes standards sont déjà présents dans votre catalogue.");
+        setError("Tous les postes du socle standard sont déjà présents dans votre catalogue.");
         return;
       }
 
@@ -221,7 +254,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
       
       if (data) {
         setRoles(prev => [...prev, ...data].sort((a, b) => a.label.localeCompare(b.label)));
-        setSuccessMsg(`${data.length} postes standards importés avec succès !`);
+        setSuccessMsg(`${data.length} postes du socle standard importés avec succès !`);
       }
     } catch (err: any) {
       console.error('Error injecting roles:', err);
@@ -231,9 +264,17 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
     }
   };
 
-  const filteredRolesList = roles.filter(r => 
-    r.label.toLowerCase().includes(roleSearchFilter.toLowerCase())
-  );
+  // Filter by both search term and scope tab
+  const filteredRolesList = useMemo(() => {
+    return roles.filter(r => {
+      const matchesSearch = r.label.toLowerCase().includes(roleSearchFilter.toLowerCase());
+      if (!matchesSearch) return false;
+
+      if (activeScope === 'standard') return !r.school_id;
+      if (activeScope === 'custom') return !!r.school_id;
+      return true;
+    });
+  }, [roles, roleSearchFilter, activeScope]);
 
   return (
     <Modal 
@@ -244,71 +285,134 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
       hideIcon
       hideTitle
       hideCloseButton
-      containerClassName="rounded-3xl max-w-2xl w-full mx-auto overflow-hidden border border-slate-200/90 shadow-2xl"
+      containerClassName="rounded-2xl max-w-3xl w-full mx-auto overflow-hidden border border-slate-200/90 shadow-2xl p-0"
       contentClassName="p-0 overflow-hidden"
     >
-      <div className="flex flex-col h-[82vh] max-h-[620px] bg-slate-50 font-sans select-none overflow-hidden">
+      <div className="flex flex-col h-[88vh] max-h-[680px] bg-slate-50 font-sans select-none overflow-hidden">
         
-        {/* Compact, Clean Header Banner with ONE close button */}
-        <div className="px-5 sm:px-6 py-3.5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center font-bold shadow-inner shrink-0">
-              <Briefcase size={18} className="text-indigo-300" />
+        {/* Modern Compact Header: Identity École Connectée */}
+        <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center font-bold shadow-inner shrink-0">
+              <Briefcase size={15} className="text-indigo-300" />
             </div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-extrabold tracking-tight text-white">
-                Catalogue des Postes RH
-              </h3>
-              <span className="px-2.5 py-0.5 rounded-full bg-indigo-500/25 text-indigo-200 border border-indigo-400/30 text-[11px] font-bold">
-                {roles.length} {roles.length > 1 ? 'postes' : 'poste'}
-              </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm sm:text-base font-extrabold tracking-tight text-white leading-none truncate">
+                  Catalogue des Postes RH
+                </h3>
+                <span className="px-2 py-0.5 rounded-full bg-indigo-500/25 text-indigo-200 border border-indigo-400/30 text-[10px] font-bold shrink-0">
+                  {stats.total} {stats.total > 1 ? 'postes' : 'poste'}
+                </span>
+              </div>
+              <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
+                Référentiel Métiers RH • École Connectée
+              </p>
             </div>
           </div>
 
-          {/* Single Top Close Button */}
-          <button 
-            type="button"
-            onClick={onClose} 
-            className="p-1.5 sm:p-2 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-xl transition-all border border-white/10 active:scale-95 shrink-0"
-            aria-label="Fermer"
-            title="Fermer"
-          >
-            <X size={17} />
-          </button>
+          {/* Header Stats Pills & Close */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="hidden sm:flex items-center gap-1.5 text-[10px] font-semibold text-slate-300">
+              <span className="px-2 py-0.5 bg-slate-800/80 rounded-md border border-slate-700/60 flex items-center gap-1">
+                <ShieldCheck size={11} className="text-indigo-400" />
+                <span>{stats.standardCount} standard</span>
+              </span>
+              <span className="px-2 py-0.5 bg-slate-800/80 rounded-md border border-slate-700/60 flex items-center gap-1">
+                <Building2 size={11} className="text-emerald-400" />
+                <span>{stats.customCount} école</span>
+              </span>
+            </div>
+
+            <button 
+              type="button"
+              onClick={onClose} 
+              className="p-1.5 bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white rounded-lg transition-all border border-white/10 active:scale-95 shrink-0 cursor-pointer"
+              aria-label="Fermer"
+              title="Fermer (Échap)"
+            >
+              <X size={15} />
+            </button>
+          </div>
         </div>
 
-        {/* Top Control Bar: Notifications, Add Form & Search (Fixed - No scroll) */}
-        <div className="p-4 sm:p-5 bg-white border-b border-slate-200/80 space-y-3 shrink-0">
-          {/* Notifications */}
-          {error && (
-            <div className="p-3 bg-rose-50 text-rose-700 border border-rose-200 rounded-xl flex items-center justify-between gap-2 text-xs shadow-xs animate-in fade-in">
-              <div className="flex items-center gap-2 font-semibold">
-                <AlertTriangle size={15} className="shrink-0 text-rose-600" />
-                <span>{error}</span>
-              </div>
-              <button type="button" onClick={() => setError(null)} className="text-rose-400 hover:text-rose-700 p-0.5">
-                <X size={14} />
+        {/* Compact Integrated Command Bar (Reduced vertical margins, high density) */}
+        <div className="px-3 sm:px-4 py-2 bg-white border-b border-slate-200/80 space-y-1.5 shrink-0">
+          
+          {/* Row 1: Scope Filters + Fast Search (Responsive layout) */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5">
+            {/* Scope segmented tabs */}
+            <div className="flex items-center p-0.5 bg-slate-100 rounded-lg border border-slate-200/70 text-xs font-semibold self-start sm:self-auto">
+              <button
+                type="button"
+                onClick={() => setActiveScope('all')}
+                className={`px-2 py-1 rounded-md transition-all text-[11px] font-bold cursor-pointer ${
+                  activeScope === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tous ({stats.total})
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveScope('standard')}
+                className={`px-2 py-1 rounded-md transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer ${
+                  activeScope === 'standard'
+                    ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-indigo-900'
+                }`}
+              >
+                <ShieldCheck size={11} className={activeScope === 'standard' ? 'text-indigo-600' : 'text-slate-400'} />
+                <span>Socle Standard ({stats.standardCount})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveScope('custom')}
+                className={`px-2 py-1 rounded-md transition-all text-[11px] font-bold flex items-center gap-1 cursor-pointer ${
+                  activeScope === 'custom'
+                    ? 'bg-white text-indigo-950 shadow-xs border border-slate-200/60'
+                    : 'text-slate-600 hover:text-indigo-900'
+                }`}
+              >
+                <Building2 size={11} className={activeScope === 'custom' ? 'text-emerald-600' : 'text-slate-400'} />
+                <span>Spécifiques École ({stats.customCount})</span>
               </button>
             </div>
-          )}
 
-          {successMsg && (
-            <div className="p-3 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-xl flex items-center gap-2 text-xs shadow-xs font-bold animate-in fade-in">
-              <Check size={15} className="shrink-0 text-emerald-600 stroke-[2.5]" />
-              <span>{successMsg}</span>
-            </div>
-          )}
-
-          {/* Add & Filter Row */}
-          <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
-            {/* Add Input */}
-            <div className="sm:col-span-7 flex gap-1.5">
+            {/* Fast search field */}
+            <div className="relative flex-1 sm:max-w-xs">
               <input
+                type="text"
+                value={roleSearchFilter}
+                onChange={(e) => setRoleSearchFilter(e.target.value)}
+                placeholder="Filtrer les intitulés..."
+                className="w-full h-8 pl-7 pr-6 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-1 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
+              />
+              <Search size={12} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+              {roleSearchFilter && (
+                <button 
+                  type="button" 
+                  onClick={() => setRoleSearchFilter('')}
+                  className="absolute right-1.5 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full cursor-pointer"
+                  title="Effacer le filtre"
+                >
+                  <X size={11} />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Row 2: Ergonomic Quick-Add Form with Compact Rhythm */}
+          <div className="flex items-center gap-1.5 pt-0.5">
+            <div className="relative flex-1">
+              <input
+                ref={inputRef}
                 type="text"
                 value={newLabel}
                 onChange={(e) => setNewLabel(e.target.value)}
-                placeholder="Ex : Coordinateur Pédagogique..."
-                className="flex-1 px-3.5 py-2 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold focus:bg-white focus:border-indigo-600 focus:ring-3 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-400 placeholder:font-normal"
+                placeholder="Ajouter un nouveau poste RH à l'établissement... (Ex: Responsable Vie Scolaire)"
+                className="w-full h-8 px-2.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg text-xs font-semibold focus:bg-white focus:border-indigo-600 focus:ring-1 focus:ring-indigo-100 outline-none transition-all placeholder:text-slate-400 placeholder:font-normal"
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') {
                     e.preventDefault();
@@ -317,184 +421,247 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
                 }}
                 disabled={isSaving}
               />
-              <button
-                type="button"
-                onClick={handleAdd}
-                disabled={isSaving || !newLabel.trim()}
-                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm shadow-indigo-600/20 disabled:opacity-50 flex items-center justify-center gap-1.5 active:scale-95 shrink-0"
-              >
-                {isSaving && newLabel.trim() ? (
-                  <RefreshCcw size={14} className="animate-spin" />
-                ) : (
-                  <Plus size={15} />
-                )}
-                <span>Ajouter</span>
-              </button>
             </div>
+            <button
+              type="button"
+              onClick={handleAdd}
+              disabled={isSaving || !newLabel.trim()}
+              className="h-8 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs transition-all shadow-xs disabled:opacity-40 flex items-center justify-center gap-1 active:scale-95 shrink-0 cursor-pointer"
+              title="Ajouter au catalogue établissement (Entrée)"
+            >
+              {isSaving && newLabel.trim() ? (
+                <RefreshCcw size={12} className="animate-spin" />
+              ) : (
+                <Plus size={13} className="stroke-[2.5]" />
+              )}
+              <span>Ajouter</span>
+            </button>
+          </div>
 
-            {/* Search Filter */}
-            <div className="sm:col-span-5 relative">
-              <input
-                type="text"
-                value={roleSearchFilter}
-                onChange={(e) => setRoleSearchFilter(e.target.value)}
-                placeholder="Filtrer un poste..."
-                className="w-full pl-8 pr-7 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-medium text-slate-800 outline-none focus:bg-white focus:border-indigo-500 focus:ring-3 focus:ring-indigo-100 transition-all placeholder:text-slate-400"
-              />
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              {roleSearchFilter && (
-                <button 
-                  type="button" 
-                  onClick={() => setRoleSearchFilter('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
+          {/* Compact Inline Feedback (Zero layout displacement) */}
+          <AnimatePresence>
+            {error && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-2.5 py-1 bg-rose-50 text-rose-700 border border-rose-200 rounded-lg flex items-center justify-between gap-2 text-[11px]"
+              >
+                <div className="flex items-center gap-1 font-semibold min-w-0">
+                  <AlertTriangle size={12} className="shrink-0 text-rose-600" />
+                  <span className="truncate">{error}</span>
+                </div>
+                <button type="button" onClick={() => setError(null)} className="text-rose-400 hover:text-rose-700 p-0.5 shrink-0 cursor-pointer">
+                  <X size={11} />
+                </button>
+              </motion.div>
+            )}
+
+            {successMsg && (
+              <motion.div 
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg flex items-center gap-1 text-[11px] font-bold"
+              >
+                <CheckCircle2 size={12} className="shrink-0 text-emerald-600" />
+                <span className="truncate">{successMsg}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* High-Density Roles Table/List (Ultra-ergonomic, compact vertical rhythm) */}
+        <div className="flex-1 min-h-0 overflow-y-auto px-2.5 sm:px-4 py-2">
+          {loading ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center text-slate-400">
+              <RefreshCcw size={20} className="animate-spin mb-1.5 text-indigo-600" />
+              <p className="text-xs font-bold text-slate-700">Synchronisation du catalogue des postes...</p>
+            </div>
+          ) : filteredRolesList.length === 0 ? (
+            <div className="h-full flex flex-col items-center justify-center p-6 text-center space-y-1.5">
+              <div className="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400">
+                <Briefcase size={16} />
+              </div>
+              <p className="text-xs font-bold text-slate-800">Aucun poste ne correspond</p>
+              <p className="text-[11px] text-slate-400 max-w-xs">
+                {roleSearchFilter 
+                  ? `Aucun intitulé ne correspond à "${roleSearchFilter}".` 
+                  : activeScope !== 'all' 
+                    ? 'Aucun poste dans ce filtre de périmètre.' 
+                    : 'Le catalogue est vide pour le moment.'}
+              </p>
+              {(roleSearchFilter || activeScope !== 'all') && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRoleSearchFilter('');
+                    setActiveScope('all');
+                  }}
+                  className="mt-1 px-2.5 py-1 text-xs font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 rounded-md transition-colors cursor-pointer"
                 >
-                  <X size={13} />
+                  Réinitialiser les filtres
                 </button>
               )}
             </div>
-          </div>
-        </div>
-
-        {/* Roles Container List (THE ONLY SCROLLBAR) */}
-        <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 sm:p-5">
-          {loading ? (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center text-slate-400">
-              <RefreshCcw size={24} className="animate-spin mb-2 text-indigo-600" />
-              <p className="text-xs font-bold text-slate-700">Chargement du catalogue...</p>
-            </div>
-          ) : filteredRolesList.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center p-8 text-center space-y-1.5">
-              <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-400">
-                <Briefcase size={20} />
-              </div>
-              <p className="text-xs font-bold text-slate-800">Aucun poste trouvé</p>
-              <p className="text-[11px] text-slate-400">
-                {roleSearchFilter ? 'Aucun résultat pour ce filtre.' : 'Le catalogue est actuellement vide.'}
-              </p>
-            </div>
           ) : (
-            <div className="bg-white border border-slate-200/80 rounded-2xl divide-y divide-slate-100 shadow-xs overflow-hidden">
-              {filteredRolesList.map(role => (
-                <div key={role.id} className="p-2.5 sm:p-3 flex items-center justify-between hover:bg-slate-50/90 transition-colors group">
-                  {editingId === role.id ? (
-                    <div className="flex-1 flex items-center gap-2 mr-2">
-                      <input
-                        type="text"
-                        value={editLabel}
-                        onChange={(e) => setEditLabel(e.target.value)}
-                        className="flex-1 px-3 py-1.5 bg-white text-slate-900 border border-indigo-500 rounded-xl text-xs sm:text-sm font-bold outline-none ring-2 ring-indigo-500/20"
-                        autoFocus
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault();
-                            handleUpdate(role.id);
-                          } else if (e.key === 'Escape') {
-                            setEditingId(null);
-                          }
-                        }}
-                      />
-                      <button 
-                        type="button"
-                        onClick={() => handleUpdate(role.id)} 
-                        disabled={isSaving} 
-                        className="p-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs transition-all active:scale-95" 
-                        title="Sauvegarder"
-                      >
-                        <Save size={14} />
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={() => setEditingId(null)} 
-                        disabled={isSaving} 
-                        className="p-2 text-slate-500 hover:bg-slate-200 rounded-xl transition-all" 
-                        title="Annuler"
-                      >
-                        <X size={14} />
-                      </button>
-                    </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-3 min-w-0 pr-2">
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center font-bold shrink-0 ${
-                          role.school_id 
-                            ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' 
-                            : 'bg-slate-100 text-slate-500 border border-slate-200'
-                        }`}>
-                          <Briefcase size={13} />
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-bold text-slate-900 truncate leading-tight">
-                            {role.label}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`inline-block text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
-                              role.school_id 
-                                ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' 
-                                : 'bg-slate-100 text-slate-600 border border-slate-200/60'
-                            }`}>
-                              {role.school_id ? 'Personnalisé' : 'Standard (Système)'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button 
-                          type="button"
-                          onClick={() => { setEditingId(role.id); setEditLabel(role.label); }}
-                          disabled={!role.school_id}
-                          className={`p-1.5 rounded-lg transition-all ${
-                            role.school_id 
-                              ? 'text-slate-500 hover:text-indigo-600 hover:bg-indigo-50' 
-                              : 'text-slate-300 cursor-not-allowed'
-                          }`}
-                          title={role.school_id ? "Modifier le nom du poste" : "Poste standard protégé"}
-                        >
-                          <Edit2 size={13} />
-                        </button>
-                        <button 
-                          type="button"
-                          onClick={() => {
-                            if (!role.school_id) {
-                              setShowStandardAlert(true);
-                            } else {
-                              setDeleteConfirmId(role.id);
+            <div className="bg-white border border-slate-200/80 rounded-xl divide-y divide-slate-100 shadow-xs overflow-hidden">
+              {filteredRolesList.map((role) => {
+                const isCustom = !!role.school_id;
+                const isEditing = editingId === role.id;
+
+                return (
+                  <div 
+                    key={role.id} 
+                    className={`px-3 py-1.5 sm:py-2 flex items-center justify-between transition-colors group ${
+                      isEditing ? 'bg-indigo-50/50' : 'hover:bg-slate-50/80'
+                    }`}
+                  >
+                    {isEditing ? (
+                      /* Inline Editing View - Tight, fast */
+                      <div className="flex-1 flex items-center gap-1.5 py-0.5">
+                        <input
+                          type="text"
+                          value={editLabel}
+                          onChange={(e) => setEditLabel(e.target.value)}
+                          className="flex-1 h-7 px-2 bg-white text-slate-900 border border-indigo-500 rounded-md text-xs font-bold outline-none ring-1 ring-indigo-500/20"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              handleUpdate(role.id);
+                            } else if (e.key === 'Escape') {
+                              setEditingId(null);
                             }
                           }}
-                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                          title={role.school_id ? "Supprimer ce poste" : "Poste standard protégé"}
+                        />
+                        <button 
+                          type="button"
+                          onClick={() => handleUpdate(role.id)} 
+                          disabled={isSaving} 
+                          className="h-7 px-2 text-white bg-emerald-600 hover:bg-emerald-700 rounded-md text-xs font-bold transition-all active:scale-95 flex items-center gap-1 shrink-0 cursor-pointer" 
+                          title="Enregistrer (Entrée)"
                         >
-                          <Trash2 size={13} />
+                          <Check size={12} className="stroke-[2.5]" />
+                          <span className="hidden sm:inline">Valider</span>
+                        </button>
+                        <button 
+                          type="button"
+                          onClick={() => setEditingId(null)} 
+                          disabled={isSaving} 
+                          className="h-7 px-1.5 text-slate-500 hover:text-slate-700 hover:bg-slate-200/80 rounded-md text-xs font-medium transition-all shrink-0 cursor-pointer" 
+                          title="Annuler (Échap)"
+                        >
+                          <X size={13} />
                         </button>
                       </div>
-                    </>
-                  )}
-                </div>
-              ))}
+                    ) : (
+                      /* Compact Row View - Single Line with Category Badge */
+                      <>
+                        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 pr-2">
+                          {/* Mini icon */}
+                          <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center shrink-0 ${
+                            isCustom 
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                              : 'bg-indigo-50 text-indigo-600 border border-indigo-100'
+                          }`}>
+                            <Briefcase size={11} />
+                          </div>
+
+                          {/* Role Title & Inline Badge */}
+                          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-wrap sm:flex-nowrap">
+                            <span className="text-xs font-bold text-slate-900 truncate leading-snug group-hover:text-indigo-950 transition-colors">
+                              {role.label}
+                            </span>
+                            
+                            {/* Inline Badges respecting École Connectée Terminology */}
+                            {isCustom ? (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded shrink-0">
+                                <Building2 size={9} className="text-emerald-600" />
+                                <span>Spécifique École</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.5 rounded shrink-0">
+                                <ShieldCheck size={9} className="text-indigo-600" />
+                                <span>Socle Standard</span>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Compact Action Buttons */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          {isCustom ? (
+                            <>
+                              <button 
+                                type="button"
+                                onClick={() => { setEditingId(role.id); setEditLabel(role.label); }}
+                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-md transition-colors active:scale-90 cursor-pointer"
+                                title="Modifier l'intitulé du poste"
+                                aria-label="Modifier"
+                              >
+                                <Edit2 size={12} />
+                              </button>
+                              <button 
+                                type="button"
+                                onClick={() => setDeleteConfirmId(role.id)}
+                                className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-md transition-colors active:scale-90 cursor-pointer"
+                                title="Supprimer ce poste personnalisé"
+                                aria-label="Supprimer"
+                              >
+                                <Trash2 size={12} />
+                              </button>
+                            </>
+                          ) : (
+                            /* Protected standard role badge with informational tooltip */
+                            <button
+                              type="button"
+                              onClick={() => setShowStandardAlert(true)}
+                              className="p-1 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
+                              title="Poste standard protégé du socle académique École Connectée"
+                              aria-label="Protégé"
+                            >
+                              <Lock size={11} />
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
 
-        {/* Modal Footer with Actions (Fixed - No scroll) */}
-        <div className="px-5 sm:px-6 py-3 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 bg-white shrink-0">
+        {/* Modal Footer with Actions: Compact, fluid & responsive */}
+        <div className="px-3 sm:px-5 py-2 bg-white border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-1.5 shrink-0">
+          
+          {/* Left Action: Standard roles import */}
           <button 
             type="button"
             onClick={injectStandardRoles}
             disabled={isSaving}
-            className="w-full sm:w-auto px-3.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50"
-            title="Importer le référentiel des 30+ postes académiques et administratifs standards"
+            className="w-full sm:w-auto px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/70 rounded-lg font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 disabled:opacity-50 cursor-pointer"
+            title="Importer ou compléter le référentiel des postes académiques et administratifs standards"
           >
-            {isSaving ? <RefreshCcw size={13} className="animate-spin" /> : <Sparkles size={13} className="text-indigo-600" />}
-            <span>Importer les postes standards (+30)</span>
+            {isSaving ? <RefreshCcw size={12} className="animate-spin" /> : <Sparkles size={12} className="text-indigo-600" />}
+            <span>Importer le socle standard (+30)</span>
           </button>
           
-          <button 
-            type="button"
-            onClick={onClose}
-            className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-sm active:scale-95 text-center"
-          >
-            Fermer
-          </button>
+          {/* Right Action: Close */}
+          <div className="w-full sm:w-auto flex items-center justify-end gap-2">
+            <span className="text-[11px] font-medium text-slate-400 hidden sm:inline-block pr-1">
+              {filteredRolesList.length} sur {stats.total} poste{stats.total > 1 ? 's' : ''}
+            </span>
+            <button 
+              type="button"
+              onClick={onClose}
+              className="w-full sm:w-auto px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-xs transition-all active:scale-95 text-center cursor-pointer"
+            >
+              Fermer
+            </button>
+          </div>
         </div>
       </div>
 
@@ -504,12 +671,12 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
         onClose={() => setDeleteConfirmId(null)}
         onConfirm={() => deleteConfirmId && handleDelete(deleteConfirmId, user.school_id)}
         title="Supprimer ce poste ?"
-        message={`Êtes-vous sûr de vouloir supprimer le poste "${roles.find(r => r.id === deleteConfirmId)?.label}" du catalogue ?`}
+        message={`Êtes-vous sûr de vouloir supprimer le poste "${roles.find(r => r.id === deleteConfirmId)?.label}" du catalogue de votre établissement ?`}
         type="danger"
         confirmLabel="Supprimer définitivement"
         cancelLabel="Conserver"
         isLoading={isSaving}
-        containerClassName="rounded-3xl"
+        containerClassName="rounded-2xl max-w-md"
       />
 
       {/* Standard Role Alert */}
@@ -517,11 +684,11 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
         isOpen={showStandardAlert}
         onClose={() => setShowStandardAlert(false)}
         title="Poste Standard Protégé"
-        message="Ce poste fait partie du référentiel standard EduNova. Il est protégé pour garantir l'intégrité des rapports ministériels et académiques. Vous pouvez en revanche créer ou modifier vos propres postes personnalisés."
+        message="Ce poste fait partie du socle académique standard École Connectée. Il est protégé pour garantir la cohérence des rapports administratifs, financiers et académiques. Vous pouvez créer ou personnaliser vos propres postes d'établissement à l'aide du formulaire supérieur."
         type="info"
         confirmLabel="Compris"
         onConfirm={() => setShowStandardAlert(false)}
-        containerClassName="rounded-3xl"
+        containerClassName="rounded-2xl max-w-md"
       />
     </Modal>
   );

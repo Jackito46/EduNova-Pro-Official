@@ -38,7 +38,7 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ user, chil
   useEffect(() => {
     const checkSubscription = async () => {
       // Super admins are never blocked
-      if (user.is_super_admin) {
+      if (user.is_super_admin || user.role === 'SUPER_ADMIN') {
         setIsActive(true);
         setLoading(false);
         return;
@@ -51,11 +51,18 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ user, chil
       }
 
       try {
-        const { data: school, error: schoolError } = await supabase
+        let timeoutId: any;
+        const queryPromise = supabase
           .from('schools')
           .select('*')
           .eq('id', user.school_id)
           .single();
+        const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => {
+          timeoutId = setTimeout(() => reject(new Error("Timeout subscription check")), 3000);
+        });
+
+        const { data: school, error: schoolError } = await Promise.race([queryPromise, timeoutPromise]) as any;
+        clearTimeout(timeoutId);
 
         if (schoolError) throw schoolError;
 

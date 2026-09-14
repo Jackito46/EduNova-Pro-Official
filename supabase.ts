@@ -61,24 +61,47 @@ const safeStorage = {
   }
 };
 
-// Helper to check if any stored auth token exists
+// Helper to check if any valid stored auth token exists
 export const hasStoredAuthToken = (): boolean => {
   if (typeof window === 'undefined') return false;
   try {
     const isLoggedOut = window.localStorage.getItem('edunova_logged_out') === 'true';
     if (isLoggedOut) return false;
 
-    const keys = ['edunova-auth-token', 'supabase.auth.token'];
+    // Check EduNova specific auth token
+    const tokenStr = window.localStorage.getItem('edunova-auth-token') || window.localStorage.getItem('supabase.auth.token');
+    if (tokenStr) {
+      try {
+        const parsed = JSON.parse(tokenStr);
+        // Supabase stores either { access_token, expires_at } or { currentSession: { access_token } }
+        const session = parsed?.currentSession || parsed;
+        if (session?.access_token) {
+          // If token has an expiration and is expired by more than 2 hours without refresh, ignore it
+          if (session.expires_at && typeof session.expires_at === 'number') {
+            const expiresAtMs = session.expires_at > 1e11 ? session.expires_at : session.expires_at * 1000;
+            if (expiresAtMs < Date.now() - 7200000) {
+              return false;
+            }
+          }
+          return true;
+        }
+      } catch (e) {}
+    }
+
+    // Check other Supabase project tokens
     for (let i = 0; i < window.localStorage.length; i++) {
       const key = window.localStorage.key(i);
-      if (key && (key.startsWith('sb-') || key.startsWith('edunova'))) {
-        keys.push(key);
-      }
-    }
-    for (const k of keys) {
-      const item = window.localStorage.getItem(k);
-      if (item && (item.includes('access_token') || item.includes('current_session_id'))) {
-        return true;
+      if (key && (key.startsWith('sb-') && key.endsWith('-auth-token'))) {
+        const val = window.localStorage.getItem(key);
+        if (val && val.includes('access_token')) {
+          try {
+            const parsed = JSON.parse(val);
+            const session = parsed?.currentSession || parsed;
+            if (session?.access_token) {
+              return true;
+            }
+          } catch (e) {}
+        }
       }
     }
   } catch (e) {}

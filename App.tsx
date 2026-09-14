@@ -389,8 +389,9 @@ const App: React.FC = () => {
       if (isLoggedOut) return false;
       const cached = window.localStorage.getItem('edunova_user_profile');
       if (cached) return false; // Immediate render if cached profile exists!
-      // If no cached profile and no auth token stored, user is 100% unauthenticated -> render Login instantly!
-      return hasStoredAuthToken();
+      // CRITICAL: If no cached profile exists, never block the login screen with a loading overlay.
+      // The Login screen must be accessible immediately.
+      return false;
     } catch (e) {
       return false;
     }
@@ -591,13 +592,13 @@ const App: React.FC = () => {
   useEffect(() => {
     let mounted = true;
 
-    // Failsafe timeout to prevent infinite loading - 2.5s max
+    // Failsafe timeout to prevent infinite loading - 1.2s max
     const loadingTimeout = setTimeout(() => {
-      if (mounted && loading) {
-        console.warn("App.tsx: Loading timeout reached (2.5s), forcing loading to false");
+      if (mounted) {
+        console.warn("App.tsx: Loading timeout reached (1.2s), forcing loading to false");
         setLoading(false);
       }
-    }, 2500);
+    }, 1200);
 
     const initializeAuth = async (retryCount = 0) => {
       setLoadingStage(1);
@@ -1178,6 +1179,23 @@ const App: React.FC = () => {
     );
   }
 
+  if (!user) {
+    console.log("App.tsx: Rendering Login component");
+    return (
+      <ErrorBoundary>
+        <Login onLogin={(u) => {
+          try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
+          setUser(u);
+          // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
+          if (window.location.hash !== '#/') {
+            window.location.hash = '#/';
+          }
+        }} onReset={purgeSystemState} />
+        <PwaInstallModal />
+      </ErrorBoundary>
+    );
+  }
+
   if (loading) {
     console.log("App.tsx: Rendering AppLoadingScreen with dynamic stages and session hydration");
     const cachedProfile = (() => {
@@ -1206,23 +1224,6 @@ const App: React.FC = () => {
           setUser(null);
         }}
       />
-    );
-  }
-
-  if (!user) {
-    console.log("App.tsx: Rendering Login component");
-    return (
-      <ErrorBoundary>
-        <Login onLogin={(u) => {
-          try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-          setUser(u);
-          // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
-          if (window.location.hash !== '#/') {
-            window.location.hash = '#/';
-          }
-        }} onReset={purgeSystemState} />
-        <PwaInstallModal />
-      </ErrorBoundary>
     );
   }
 
