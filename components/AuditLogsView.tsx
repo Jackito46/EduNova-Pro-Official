@@ -34,7 +34,8 @@ import {
   LogOut,
   CreditCard,
   Copy,
-  Check
+  Check,
+  Database
 } from 'lucide-react';
 import { useSchool } from '../contexts/SchoolContext';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -71,9 +72,15 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [dateTo, setDateTo] = useState<string>('');
   const [activeDatePreset, setActiveDatePreset] = useState<'ALL' | 'TODAY' | '7D' | '30D'>('ALL');
 
-  // Pagination
+  // Pagination & Contrôle du flux
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageSize, setPageSize] = useState<number>(25);
+  const [jumpToPageInput, setJumpToPageInput] = useState<string>('');
+
+  // Gestion des grands volumes d'historique (Serveur & Base de données)
+  const [fetchLimit, setFetchLimit] = useState<number>(500);
+  const [totalInDb, setTotalInDb] = useState<number | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState<boolean>(false);
 
   // Modal d'inspection détaillée
   const [selectedLogForModal, setSelectedLogForModal] = useState<AuditLog | null>(null);
@@ -211,7 +218,7 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return `${translateAction(action)} sur l'élément ${translateEntity(entity_type)}.`;
   };
 
-  const fetchLogs = async (showRefreshIndicator = false) => {
+  const fetchLogs = async (showRefreshIndicator = false, customLimit?: number) => {
     if (!user.school_id && !user.is_super_admin) return;
     
     if (showRefreshIndicator) {
@@ -220,7 +227,27 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       setLoading(true);
     }
 
+    const currentLimit = customLimit || fetchLimit;
+
     try {
+      // 1. Récupération du volume total d'enregistrements en base pour cette école
+      let countQuery = supabase
+        .from('audit_logs')
+        .select('id', { count: 'exact', head: true });
+
+      if (user.school_id) {
+        countQuery = countQuery.eq('school_id', user.school_id);
+      }
+      if (user.role === UserRole.SECRETARY) {
+        countQuery = countQuery.eq('user_id', user.id);
+      }
+
+      const { count: dbCount } = await countQuery;
+      if (typeof dbCount === 'number') {
+        setTotalInDb(dbCount);
+      }
+
+      // 2. Récupération des logs avec la limite demandée
       let query = supabase
         .from('audit_logs')
         .select(`
@@ -228,7 +255,7 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           profiles:user_id(full_name, email, role, campus_id)
         `)
         .order('created_at', { ascending: false })
-        .limit(350);
+        .limit(currentLimit);
 
       if (user.school_id) {
         query = query.eq('school_id', user.school_id);
@@ -249,6 +276,18 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
     } finally {
       setLoading(false);
       setIsRefreshing(false);
+    }
+  };
+
+  // Chargement incrémental pour grands volumes d'historique
+  const handleLoadMore = async (increment = 500) => {
+    const nextLimit = (fetchLimit || 500) + increment;
+    setFetchLimit(nextLimit);
+    setIsLoadingMore(true);
+    try {
+      await fetchLogs(false, nextLimit);
+    } finally {
+      setIsLoadingMore(false);
     }
   };
 
@@ -393,6 +432,47 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [filteredLogs, currentPage, pageSize]);
 
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
+
+  // Saut direct à une page précise
+  const handleJumpToPage = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const target = parseInt(jumpToPageInput, 10);
+    if (!isNaN(target) && target >= 1 && target <= totalPages) {
+      setCurrentPage(target);
+      setJumpToPageInput('');
+    }
+  };
+
+  // Liste ordonnée des numéros de pages avec ellipses dynamiques
+  const pageNumbers = useMemo(() => {
+    if (totalPages <= 7) {
+      return Array.from({ length: totalPages }, (_, i) => i + 1);
+    }
+
+    const pages: (number | string)[] = [];
+    const showEllipsisStart = currentPage > 4;
+    const showEllipsisEnd = currentPage < totalPages - 3;
+
+    if (!showEllipsisStart && showEllipsisEnd) {
+      for (let i = 1; i <= 5; i++) pages.push(i);
+      pages.push('...');
+      pages.push(totalPages);
+    } else if (showEllipsisStart && !showEllipsisEnd) {
+      pages.push(1);
+      pages.push('...');
+      for (let i = totalPages - 4; i <= totalPages; i++) pages.push(i);
+    } else {
+      pages.push(1);
+      pages.push('...');
+      pages.push(currentPage - 1);
+      pages.push(currentPage);
+      pages.push(currentPage + 1);
+      pages.push('...');
+      pages.push(totalPages);
+    }
+
+    return pages;
+  }, [totalPages, currentPage]);
 
   // Statistiques condensées
   const stats = useMemo(() => {
@@ -864,42 +944,97 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </button>
             )}
 
-            <div className="flex items-center gap-1 text-[11px] text-slate-500 font-bold">
-              <span>Lignes :</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                className="px-2 py-0.5 bg-slate-50 text-slate-900 border border-slate-200 rounded-lg font-bold text-xs outline-none cursor-pointer"
-              >
-                <option value={15}>15</option>
-                <option value={25}>25</option>
-                <option value={50}>50</option>
-                <option value={100}>100</option>
-              </select>
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-bold">
+              <span>Afficher :</span>
+              <div className="inline-flex p-0.5 bg-slate-100/90 rounded-lg border border-slate-200/80">
+                {[15, 25, 50, 100].map(size => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => {
+                      setPageSize(size);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all cursor-pointer ${
+                      pageSize === size
+                        ? 'bg-white text-blue-700 shadow-2xs font-extrabold'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    {size}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
       </div>
 
       {/* ========================================================= */}
-      {/* TABLEAU COMPACT ET RESPONSIVE                             */}
+      {/* TABLEAU COMPACT ET RESPONSIVE AVEC DOUBLE PAGINATION      */}
       {/* ========================================================= */}
       <div className="bg-white rounded-2xl shadow-xs border border-slate-200/80 overflow-hidden">
         
-        {/* Entête du tableau avec compte d'affichage */}
-        <div className="px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 flex items-center justify-between gap-2 text-xs font-bold text-slate-700">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-blue-600"></span>
-            <span>Flux de traçabilité des opérations</span>
+        {/* Entête du tableau avec compte d'affichage et pagination rapide */}
+        <div className="px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-200/80 flex flex-wrap items-center justify-between gap-2.5 text-xs font-bold text-slate-700">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-blue-600 shrink-0"></span>
+            <span className="font-extrabold text-slate-900">Flux de traçabilité des opérations</span>
+            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/80">
+              {filteredLogs.length === 0 
+                ? '0 résultat' 
+                : `${filteredLogs.length} événement${filteredLogs.length > 1 ? 's' : ''}`}
+            </span>
+            {totalInDb !== null && (
+              <span className="text-[11px] text-slate-500 font-medium hidden md:inline">
+                ({logs.length} chargés / {totalInDb.toLocaleString()} en base)
+              </span>
+            )}
           </div>
-          <span className="text-[11px] font-semibold text-slate-500">
-            {filteredLogs.length === 0 
-              ? 'Aucun résultat' 
-              : `${filteredLogs.length} événement${filteredLogs.length > 1 ? 's' : ''} trouvé${filteredLogs.length > 1 ? 's' : ''}`}
-          </span>
+
+          {/* Navigation pagination rapide en haut */}
+          {filteredLogs.length > 0 && (
+            <div className="flex items-center gap-2 text-xs">
+              <div className="flex items-center gap-1 font-bold text-slate-600 text-xs">
+                <span className="text-[11px] text-slate-500 font-semibold">
+                  Page <span className="text-slate-900 font-extrabold">{currentPage}</span> / {totalPages}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  disabled={currentPage === 1}
+                  className="p-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                  title="Page précédente"
+                >
+                  <ChevronLeft size={13} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  disabled={currentPage === totalPages}
+                  className="p-1 rounded-md bg-white border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                  title="Page suivante"
+                >
+                  <ChevronRight size={13} />
+                </button>
+              </div>
+
+              {totalInDb !== null && totalInDb > logs.length && (
+                <button
+                  type="button"
+                  onClick={() => handleLoadMore(500)}
+                  disabled={isLoadingMore}
+                  className="hidden lg:inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-[11px] font-bold transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                  title="Charger 500 événements plus anciens"
+                >
+                  {isLoadingMore ? <Loader2 size={11} className="animate-spin" /> : <Database size={11} />}
+                  <span>+500 de plus</span>
+                </button>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Tableau scrollable */}
@@ -1057,18 +1192,54 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* ========================================================= */}
-        {/* CONTRÔLES DE PAGINATION INTÉGRÉS                          */}
+        {/* CONTRÔLES DE PAGINATION INTÉGRÉS ET GESTION DU VOLUME     */}
         {/* ========================================================= */}
         {filteredLogs.length > 0 && (
-          <div className="px-3.5 py-2.5 bg-slate-50/80 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
-            <div className="text-slate-600 font-medium">
-              Affichage de <span className="font-bold text-slate-900">{(currentPage - 1) * pageSize + 1}</span> à{' '}
-              <span className="font-bold text-slate-900">{Math.min(currentPage * pageSize, filteredLogs.length)}</span> sur{' '}
-              <span className="font-bold text-slate-900">{filteredLogs.length}</span> entrées (Page {currentPage} sur {totalPages})
+          <div className="px-3.5 py-3 bg-slate-50/90 border-t border-slate-200/80 flex flex-col xl:flex-row items-center justify-between gap-3 text-xs">
+            
+            {/* Gauche : Statistiques d'affichage et volume en base */}
+            <div className="flex flex-col sm:flex-row items-center gap-2 text-slate-600 font-medium text-center sm:text-left">
+              <div>
+                Affichage de <span className="font-extrabold text-slate-900">{(currentPage - 1) * pageSize + 1}</span> à{' '}
+                <span className="font-extrabold text-slate-900">{Math.min(currentPage * pageSize, filteredLogs.length)}</span> sur{' '}
+                <span className="font-extrabold text-slate-900">{filteredLogs.length.toLocaleString()}</span> entrée{filteredLogs.length > 1 ? 's' : ''}
+                {filteredLogs.length < logs.length && (
+                  <span className="text-slate-400 text-[11px]"> (filtré sur {logs.length} en mémoire)</span>
+                )}
+              </div>
+
+              {totalInDb !== null && totalInDb > logs.length && (
+                <div className="flex items-center gap-1.5 pl-0 sm:pl-2 sm:border-l sm:border-slate-200">
+                  <span className="text-[11px] font-bold text-slate-500 flex items-center gap-1">
+                    <Database size={12} className="text-blue-600 shrink-0" />
+                    {totalInDb.toLocaleString()} en base
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadMore(500)}
+                    disabled={isLoadingMore}
+                    className="px-2 py-0.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-md text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                    title="Charger 500 entrées supplémentaires"
+                  >
+                    {isLoadingMore ? <Loader2 size={10} className="animate-spin" /> : null}
+                    <span>+500</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadMore(totalInDb - logs.length)}
+                    disabled={isLoadingMore}
+                    className="px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-md text-[10px] font-extrabold transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                    title="Charger l'intégralité des événements d'audit"
+                  >
+                    <span>Tout ({totalInDb})</span>
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="flex items-center gap-1 self-center">
-              {/* Premier */}
+            {/* Centre : Boutons de pages (Précédent, Numéros, Suivant) */}
+            <div className="flex items-center gap-1 flex-wrap justify-center">
+              {/* Première page */}
               <button
                 type="button"
                 onClick={() => setCurrentPage(1)}
@@ -1079,7 +1250,7 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <ChevronsLeft size={14} />
               </button>
 
-              {/* Précédent */}
+              {/* Page précédente */}
               <button
                 type="button"
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -1090,49 +1261,36 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <ChevronLeft size={14} />
               </button>
 
-              {/* Numéros de page dynamiques */}
+              {/* Numéros de page avec ellipses optimisées */}
               <div className="flex items-center gap-1 px-1">
-                {Array.from({ length: totalPages }, (_, i) => i + 1)
-                  .filter(page => {
-                    return page === 1 || 
-                           page === totalPages || 
-                           Math.abs(page - currentPage) <= 1;
-                  })
-                  .reduce((acc: (number | string)[], page, idx, arr) => {
-                    if (idx > 0 && page - (arr[idx - 1] as number) > 1) {
-                      acc.push('...');
-                    }
-                    acc.push(page);
-                    return acc;
-                  }, [])
-                  .map((item, idx) => {
-                    if (item === '...') {
-                      return (
-                        <span key={`dots-${idx}`} className="px-1 text-slate-400 font-bold select-none">
-                          …
-                        </span>
-                      );
-                    }
-                    const pageNum = item as number;
-                    const isCurrent = pageNum === currentPage;
+                {pageNumbers.map((item, idx) => {
+                  if (item === '...') {
                     return (
-                      <button
-                        key={pageNum}
-                        type="button"
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                          isCurrent
-                            ? 'bg-blue-600 text-white shadow-2xs font-extrabold'
-                            : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
+                      <span key={`dots-${idx}`} className="px-1 text-slate-400 font-bold select-none">
+                        …
+                      </span>
                     );
-                  })}
+                  }
+                  const pageNum = item as number;
+                  const isCurrent = pageNum === currentPage;
+                  return (
+                    <button
+                      key={pageNum}
+                      type="button"
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`min-w-[30px] h-7 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                        isCurrent
+                          ? 'bg-blue-600 text-white shadow-2xs font-black ring-2 ring-blue-600/20'
+                          : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
               </div>
 
-              {/* Suivant */}
+              {/* Page suivante */}
               <button
                 type="button"
                 onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
@@ -1143,7 +1301,7 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <ChevronRight size={14} />
               </button>
 
-              {/* Dernier */}
+              {/* Dernière page */}
               <button
                 type="button"
                 onClick={() => setCurrentPage(totalPages)}
@@ -1154,6 +1312,53 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <ChevronsRight size={14} />
               </button>
             </div>
+
+            {/* Droite : Saut direct à une page & Sélecteur de taille */}
+            <div className="flex items-center gap-2.5 flex-wrap justify-center sm:justify-end">
+              <form onSubmit={handleJumpToPage} className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-slate-500">Aller à :</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={totalPages}
+                  placeholder={String(currentPage)}
+                  value={jumpToPageInput}
+                  onChange={(e) => setJumpToPageInput(e.target.value)}
+                  className="w-12 px-1.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-extrabold text-slate-900 text-center outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 shadow-2xs"
+                />
+                <button
+                  type="submit"
+                  disabled={!jumpToPageInput || Number(jumpToPageInput) < 1 || Number(jumpToPageInput) > totalPages}
+                  className="px-2 py-1 bg-slate-200 hover:bg-blue-600 hover:text-white text-slate-700 rounded-lg text-[11px] font-bold transition-all disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+                >
+                  OK
+                </button>
+              </form>
+
+              <div className="flex items-center gap-1 text-[11px] text-slate-500 font-bold border-l border-slate-200 pl-2">
+                <span>Lignes :</span>
+                <div className="inline-flex p-0.5 bg-white rounded-lg border border-slate-200 shadow-2xs">
+                  {[15, 25, 50, 100].map(size => (
+                    <button
+                      key={size}
+                      type="button"
+                      onClick={() => {
+                        setPageSize(size);
+                        setCurrentPage(1);
+                      }}
+                      className={`px-1.5 py-0.5 rounded text-[10px] font-extrabold transition-all cursor-pointer ${
+                        pageSize === size
+                          ? 'bg-blue-600 text-white shadow-2xs'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      {size}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
           </div>
         )}
       </div>
