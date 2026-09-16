@@ -6,6 +6,10 @@ import {
   Printer, 
   FileText, 
   ChevronDown, 
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
   X, 
   History, 
   User, 
@@ -67,6 +71,10 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [customDate, setCustomDate] = useState<string>(todayStr);
   const [activeView, setActiveView] = useState<'journal' | 'generator'>('journal');
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
+
+  // Pagination pour le tableau du Journal des Reçus
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(15);
   
   // Options de filtrage de dates harmonisées (SelectPill)
   const dateFilterOptions: SelectOption[] = useMemo(() => [
@@ -215,6 +223,29 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       };
     });
   }, [payments, selectedYear, selectedClass, searchTerm, dateFilter, customDate, students, classes]);
+
+  // Réinitialiser la page courante à 1 dès qu'un critère de filtre ou recherche change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedYear, selectedClass, dateFilter, customDate]);
+
+  // Nombre total de pages pour la pagination du journal
+  const totalPages = useMemo(() => {
+    return Math.max(1, Math.ceil(filteredPayments.length / itemsPerPage));
+  }, [filteredPayments.length, itemsPerPage]);
+
+  // Ajustement si la page courante dépasse le nombre total de pages
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [totalPages, currentPage]);
+
+  // Découpage des paiements pour la page courante
+  const paginatedPayments = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    return filteredPayments.slice(startIndex, startIndex + itemsPerPage);
+  }, [filteredPayments, currentPage, itemsPerPage]);
 
   // Étudiants disponibles pour la classe sélectionnée dans le générateur
   const availableStudentsForGen = useMemo(() => {
@@ -440,21 +471,21 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* TABLEAU REGISTRE GLOBAL */}
-          <div className="bg-white rounded-[2rem] shadow-sm border border-slate-200/60 overflow-hidden">
-            <div className="px-8 py-6 bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-white/10 rounded-xl border border-white/10">
+          <div className="bg-white rounded-2xl sm:rounded-[2rem] shadow-sm border border-slate-200/80 overflow-hidden">
+            <div className="px-5 sm:px-6 lg:px-8 py-4 sm:py-5 bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-4 sm:gap-6">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="p-2.5 sm:p-3 bg-white/10 rounded-xl border border-white/10 shrink-0">
                   <History size={20} className="text-indigo-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold tracking-tight">Registre Historique</h3>
+                  <h3 className="text-base sm:text-lg font-bold tracking-tight">Registre Historique</h3>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">{filteredPayments.length} transactions enregistrées</p>
                 </div>
               </div>
-              <div className="flex items-center gap-4 print:hidden">
-                <div className="bg-white/5 px-6 py-3 rounded-xl border border-white/10 text-right">
+              <div className="flex items-center gap-3 sm:gap-4 print:hidden w-full md:w-auto justify-between md:justify-end">
+                <div className="bg-white/5 px-4 sm:px-5 py-2 rounded-xl border border-white/10 text-right">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Collecte Totale</p>
-                  <p className="text-xl font-bold text-emerald-400">
+                  <p className="text-base sm:text-xl font-bold text-emerald-400 whitespace-nowrap">
                     {filteredPayments
                       .filter(p => 
                         p.status !== 'ANNULE' && 
@@ -467,27 +498,27 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
                 <button 
                   onClick={() => window.print()}
-                  className="flex items-center gap-2 px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs tracking-tight transition-all shadow-lg shadow-indigo-500/20 active:scale-95"
+                  className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-xs tracking-tight transition-all shadow-lg shadow-indigo-500/20 active:scale-95 cursor-pointer whitespace-nowrap"
                 >
-                  <Printer size={16} />
-                  Imprimer
+                  <Printer size={15} />
+                  <span>Imprimer</span>
                 </button>
               </div>
             </div>
-            <div className="overflow-x-auto print:overflow-visible custom-scrollbar">
-              <table className="w-full text-left border-collapse min-w-[1000px]">
+            <div className="w-full overflow-x-auto print:overflow-visible">
+              <table className="w-full text-left border-collapse min-w-[760px] xl:min-w-0">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                    <th className="px-8 py-5">Date</th>
-                    <th className="px-8 py-5">{terminology.student} & {terminology.class}</th>
-                    <th className="px-8 py-5">Référence</th>
-                    <th className="px-8 py-5">Nature</th>
-                    <th className="px-8 py-5 text-right">Montant</th>
-                    <th className="px-8 py-5 text-center">Statut</th>
-                    <th className="px-8 py-5 text-center print:hidden">Action</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[115px]">Date</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 min-w-[170px]">{terminology.student} & {terminology.class}</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Référence</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Nature</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[130px]">Montant</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 text-center whitespace-nowrap w-[95px]">Statut</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[115px] print:hidden">Action</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-50">
+                <tbody className="divide-y divide-slate-100 text-xs">
                   {loading ? (
                     <tr>
                       <td colSpan={7} className="py-8">
@@ -495,60 +526,62 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <SkeletonTable rows={5} />
                       </td>
                     </tr>
-                  ) : filteredPayments.map((p) => (
+                  ) : paginatedPayments.map((p) => (
                     <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <Calendar size={14} className="text-slate-300 hidden md:block" />
-                          <div>
-                            <p className="font-bold text-slate-900 text-sm whitespace-nowrap">{p.date}</p>
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
+                        <div className="flex items-center gap-2">
+                          <Calendar size={13} className="text-slate-400 shrink-0 hidden sm:block" />
+                          <span className="font-bold text-slate-900 text-xs whitespace-nowrap">{p.date}</span>
+                        </div>
+                      </td>
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 align-middle">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-bold text-xs shrink-0 group-hover:bg-indigo-600 group-hover:text-white transition-colors">
+                            {p.studentName ? p.studentName.charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <div className="min-w-0 truncate">
+                            <p className="font-bold text-slate-900 text-xs truncate" title={p.studentName}>{p.studentName}</p>
+                            <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight truncate" title={p.classe}>{p.classe}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="px-8 py-5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-xs group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                            {p.studentName.charAt(0).toUpperCase()}
-                          </div>
-                          <div>
-                            <p className="font-bold text-slate-900 text-sm">{p.studentName}</p>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">{p.classe}</p>
-                          </div>
-                        </div>
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
+                        <span className="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold border border-slate-200/70 whitespace-nowrap">
+                          RCP-{p.id?.substring(0, 8)}
+                        </span>
                       </td>
-                      <td className="px-8 py-5">
-                        <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-mono text-[10px] border border-slate-200/50">RCP-{p.id?.substring(0,8)}</span>
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
+                        <span className="inline-block text-[10px] font-bold text-slate-700 uppercase tracking-tight bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70 whitespace-nowrap">
+                          {p.nature}
+                        </span>
                       </td>
-                      <td className="px-8 py-5">
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/30">{p.nature}</span>
-                      </td>
-                      <td className="px-8 py-5 text-right font-bold text-slate-900">
-                        <div className="flex flex-col items-end">
-                          <span className="text-sm">{p.amount.toLocaleString()} G</span>
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 text-right whitespace-nowrap align-middle">
+                        <div className="flex flex-col items-end whitespace-nowrap">
+                          <span className="text-xs font-black text-slate-900 whitespace-nowrap">{p.amount.toLocaleString()} G</span>
                           {p.currency !== 'HTG' && (
-                            <span className="text-[9px] text-slate-400 font-medium italic">({p.original_amount.toLocaleString()} {p.currency})</span>
+                            <span className="text-[10px] text-slate-400 font-medium italic whitespace-nowrap">({p.original_amount.toLocaleString()} {p.currency})</span>
                           )}
                         </div>
                       </td>
-                      <td className="px-8 py-5 text-center">
-                        <div className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-tighter ${
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 text-center whitespace-nowrap align-middle">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight whitespace-nowrap border ${
                           p.payment_method?.includes('EN ATTENTE') 
-                            ? 'bg-amber-100 text-amber-700' 
+                            ? 'bg-amber-50 text-amber-700 border-amber-200' 
                             : p.status === 'ANNULE' 
-                              ? 'bg-rose-100 text-rose-700' 
-                              : 'bg-emerald-100 text-emerald-700'
+                              ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                         }`}>
                           {p.payment_method?.includes('EN ATTENTE') ? 'En attente' : p.status === 'ANNULE' ? 'Annulé' : 'Validé'}
-                        </div>
+                        </span>
                       </td>
-                      <td className="px-8 py-5 text-center print:hidden">
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 text-right whitespace-nowrap align-middle print:hidden">
                         <button 
                           onClick={() => handleOpenPreview(p)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10px] uppercase tracking-tight shadow-sm transition-all active:scale-95 cursor-pointer"
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-[11px] uppercase tracking-tight shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                           title="Réimprimer ce reçu"
                         >
-                          <Printer size={13} />
-                          Réimprimer
+                          <Printer size={12} />
+                          <span>Réimprimer</span>
                         </button>
                       </td>
                     </tr>
@@ -564,6 +597,119 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </tbody>
               </table>
             </div>
+
+            {/* BARRE DE PAGINATION MODERNE ET ERGONOMIQUE */}
+            {!loading && filteredPayments.length > 0 && (
+              <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-50/80 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs print:hidden">
+                <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto text-slate-600 font-medium">
+                  <span>
+                    Affichage de <span className="font-bold text-slate-900">{filteredPayments.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> à <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredPayments.length)}</span> sur <span className="font-bold text-slate-900">{filteredPayments.length}</span> reçu{filteredPayments.length > 1 ? 's' : ''}
+                  </span>
+
+                  {/* Sélecteur de pagination par page */}
+                  <div className="flex items-center gap-1.5 pl-2 sm:border-l sm:border-slate-200">
+                    <span className="text-slate-500 text-[11px]">Afficher :</span>
+                    <select
+                      value={itemsPerPage}
+                      onChange={(e) => {
+                        setItemsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                      }}
+                      className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer shadow-2xs transition-colors"
+                    >
+                      <option value={10}>10 / page</option>
+                      <option value={15}>15 / page</option>
+                      <option value={25}>25 / page</option>
+                      <option value={50}>50 / page</option>
+                      <option value={100}>100 / page</option>
+                    </select>
+                  </div>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="flex items-center gap-1">
+                    {/* Première page */}
+                    <button
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                      title="Première page"
+                    >
+                      <ChevronsLeft size={15} />
+                    </button>
+
+                    {/* Page précédente */}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                      title="Page précédente"
+                    >
+                      <ChevronLeft size={15} />
+                    </button>
+
+                    {/* Numéros de page avec fenêtre dynamique */}
+                    <div className="flex items-center gap-1 mx-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter(page => {
+                          if (totalPages <= 7) return true;
+                          if (page === 1 || page === totalPages) return true;
+                          return Math.abs(page - currentPage) <= 1;
+                        })
+                        .reduce<(number | string)[]>((acc, page, index, arr) => {
+                          if (index > 0 && (page as number) - (arr[index - 1] as number) > 1) {
+                            acc.push('...');
+                          }
+                          acc.push(page);
+                          return acc;
+                        }, [])
+                        .map((item, idx) => {
+                          if (typeof item === 'string') {
+                            return (
+                              <span key={`ellipsis-${idx}`} className="px-1 text-xs font-bold text-slate-400">
+                                ...
+                              </span>
+                            );
+                          }
+                          return (
+                            <button
+                              key={item}
+                              onClick={() => setCurrentPage(item as number)}
+                              className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                                currentPage === item
+                                  ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                                  : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 shadow-2xs'
+                              }`}
+                            >
+                              {item}
+                            </button>
+                          );
+                        })}
+                    </div>
+
+                    {/* Page suivante */}
+                    <button
+                      onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                      title="Page suivante"
+                    >
+                      <ChevronRight size={15} />
+                    </button>
+
+                    {/* Dernière page */}
+                    <button
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                      title="Dernière page"
+                    >
+                      <ChevronsRight size={15} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </>
       ) : (
@@ -697,52 +843,56 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {studentPaymentsHistory.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
+                    <table className="w-full text-left border-collapse min-w-[620px] sm:min-w-0">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                          <th className="px-8 py-5">Date</th>
-                          <th className="px-8 py-5">Référence</th>
-                          <th className="px-8 py-5">Nature</th>
-                          <th className="px-8 py-5 text-right">Montant</th>
-                          <th className="px-8 py-5 text-center">Action</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap">Date</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap">Référence</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap">Nature</th>
+                          <th className="px-4 py-3.5 text-right whitespace-nowrap">Montant</th>
+                          <th className="px-4 py-3.5 text-right whitespace-nowrap">Action</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-50">
+                      <tbody className="divide-y divide-slate-100 text-xs">
                         {studentPaymentsHistory.map((p) => (
                           <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
-                            <td className="px-8 py-5">
-                              <div className="flex items-center gap-3">
-                                <Calendar size={14} className="text-slate-300" />
+                            <td className="px-4 py-3.5 whitespace-nowrap align-middle">
+                              <div className="flex items-center gap-2">
+                                <Calendar size={13} className="text-slate-400 shrink-0 hidden sm:block" />
                                 <div>
-                                  <p className="font-bold text-slate-900 text-sm">{p.date}</p>
-                                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight">Enregistré</p>
+                                  <p className="font-bold text-slate-900 text-xs whitespace-nowrap">{p.date}</p>
+                                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight whitespace-nowrap">Enregistré</p>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-8 py-5">
-                              <span className="bg-slate-100 text-slate-600 px-2.5 py-1 rounded-lg font-mono text-[10px] border border-slate-200/50">RCP-{p.id.substring(0,8)}</span>
+                            <td className="px-4 py-3.5 whitespace-nowrap align-middle">
+                              <span className="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold border border-slate-200/70 whitespace-nowrap">
+                                RCP-{p.id.substring(0, 8)}
+                              </span>
                             </td>
-                            <td className="px-8 py-5">
-                              <div className="flex items-center gap-2">
-                                <CheckCircle2 size={16} className="text-emerald-500" />
-                                <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/30">{p.nature}</span>
+                            <td className="px-4 py-3.5 whitespace-nowrap align-middle">
+                              <div className="flex items-center gap-1.5">
+                                <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />
+                                <span className="inline-block text-[10px] font-bold text-slate-700 uppercase tracking-tight bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70 whitespace-nowrap">
+                                  {p.nature}
+                                </span>
                               </div>
                             </td>
-                            <td className="px-8 py-5 text-right">
-                              <div className="flex flex-col items-end">
-                                <p className="text-sm font-bold text-slate-900">{p.amount.toLocaleString()} G</p>
+                            <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle">
+                              <div className="flex flex-col items-end whitespace-nowrap">
+                                <p className="text-xs font-black text-slate-900 whitespace-nowrap">{p.amount.toLocaleString()} G</p>
                                 {p.currency !== 'HTG' && (
-                                  <p className="text-[9px] text-slate-400 font-medium italic">({p.original_amount.toLocaleString()} {p.currency})</p>
+                                  <p className="text-[10px] text-slate-400 font-medium italic whitespace-nowrap">({p.original_amount.toLocaleString()} {p.currency})</p>
                                 )}
                               </div>
                             </td>
-                            <td className="px-8 py-5 text-center">
+                            <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle">
                               <button 
                                 onClick={() => handleOpenPreview(p)}
-                                className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 text-white font-bold rounded-lg text-[10px] uppercase tracking-tight shadow-md shadow-indigo-500/20 hover:bg-indigo-500 transition-all active:scale-95"
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white font-bold rounded-lg text-[11px] uppercase tracking-tight shadow-2xs transition-all cursor-pointer whitespace-nowrap"
                               >
-                                <Printer size={14} />
-                                Imprimer Reçu
+                                <Printer size={12} />
+                                <span>Imprimer Reçu</span>
                               </button>
                             </td>
                           </tr>

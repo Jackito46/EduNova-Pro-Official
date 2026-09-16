@@ -19,7 +19,7 @@ import { DatePickerPill } from './DatePickerPill';
 interface AuditLog {
   id: string;
   created_at: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE';
+  action: string;
   entity_type: string;
   entity_id: string;
   user_id: string;
@@ -45,8 +45,13 @@ const FIELD_LABELS: Record<string, string> = {
   reference_number: 'N° de référence',
   reference: 'Référence bordereau',
   transaction_id: 'ID Transaction',
+  transaction_reference: 'Réf. Transaction',
   fee_type: 'Rubrique de frais',
+  feetype: 'Rubrique de frais',
+  feeType: 'Rubrique de frais',
+  fee_type_id: 'Réf. Rubrique',
   plan_name: 'Rubrique / Échéance',
+  plan_id: 'Plan de scolarité',
   category: 'Catégorie de dépense',
   expense_type: 'Type de dépense',
   student_name: 'Nom de l\'élève',
@@ -66,6 +71,12 @@ const FIELD_LABELS: Record<string, string> = {
   currency: 'Devise',
   closure_date: 'Date de clôture',
   due_date: 'Date d\'échéance',
+  payment_date: 'Date de versement',
+  date: 'Date',
+  paid_by: 'Payeur',
+  payer_name: 'Nom du payeur',
+  recorded_by: 'Enregistré par',
+  authorized_by: 'Autorisé par',
   discount_label: 'Régime d\'allègement',
   discount_rate: 'Taux de réduction (%)',
   discount_amount: 'Montant déduit',
@@ -79,8 +90,207 @@ const FIELD_LABELS: Record<string, string> = {
   created_at: 'Date d\'enregistrement',
   updated_at: 'Date de modification',
   class_name: 'Classe',
+  className: 'Classe',
+  student_class: 'Classe',
+  class_id: 'ID Classe',
   period: 'Période',
-  academic_year: 'Année académique'
+  academic_year: 'Année académique',
+  academic_year_id: 'Session académique',
+  exchange_rate: 'Taux de change',
+  exchange_rate_applied: 'Taux appliqué',
+  order_id: 'N° de Commande',
+  channel: 'Canal de paiement',
+  payment_channel: 'Canal de versement',
+  cash_desk_id: 'Caisse',
+  closure_id: 'Réf. Clôture',
+  enrollment_id: 'Réf. Inscription',
+  action_type: 'Type d\'opération'
+};
+
+const formatFieldKey = (key: string): string => {
+  const low = key.toLowerCase();
+  if (FIELD_LABELS[key]) return FIELD_LABELS[key];
+  if (FIELD_LABELS[low]) return FIELD_LABELS[low];
+  return key
+    .replace(/([A-Z])/g, ' $1')
+    .replace(/_/g, ' ')
+    .trim()
+    .toUpperCase();
+};
+
+const getActionMeta = (action: string) => {
+  const norm = (action || '').toUpperCase();
+  if (norm === 'CREATE' || norm.includes('CREATE') || norm.includes('PROCESSED') || norm.includes('ENCAISSE')) {
+    let label = 'Création';
+    if (norm === 'PAYMENT_PROCESSED') label = 'Paiement';
+    else if (norm === 'EXPENSE_CREATED') label = 'Dépense';
+    else if (norm === 'PAYROLL_PROCESSED') label = 'Paie';
+    return {
+      label,
+      fullLabel: norm.replace(/_/g, ' '),
+      bg: 'bg-emerald-50 text-emerald-700 border-emerald-200',
+      badgeClass: 'bg-emerald-100 text-emerald-800',
+      icon: <ArrowDownRight className="text-emerald-600 shrink-0" size={13} />
+    };
+  }
+  if (norm === 'UPDATE' || norm.includes('MODIF') || norm.includes('UPDATE')) {
+    let label = 'Modification';
+    if (norm === 'CASH_CLOSURE_MODIFIED') label = 'Modif. Clôture';
+    return {
+      label,
+      fullLabel: norm.replace(/_/g, ' '),
+      bg: 'bg-amber-50 text-amber-700 border-amber-200',
+      badgeClass: 'bg-amber-100 text-amber-800',
+      icon: <Edit3 className="text-amber-600 shrink-0" size={13} />
+    };
+  }
+  if (norm === 'DELETE' || norm.includes('DELETE') || norm.includes('SUPPR') || norm.includes('VOID') || norm.includes('CANCEL')) {
+    let label = norm.includes('VOID') || norm.includes('CANCEL') ? 'Annulation' : 'Suppression';
+    return {
+      label,
+      fullLabel: norm.replace(/_/g, ' '),
+      bg: 'bg-rose-50 text-rose-700 border-rose-200',
+      badgeClass: 'bg-rose-100 text-rose-800',
+      icon: <Trash2 className="text-rose-600 shrink-0" size={13} />
+    };
+  }
+  if (norm.includes('VALIDAT')) {
+    return {
+      label: 'Validation',
+      fullLabel: norm.replace(/_/g, ' '),
+      bg: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      badgeClass: 'bg-indigo-100 text-indigo-800',
+      icon: <Check size={13} className="text-indigo-600 shrink-0" />
+    };
+  }
+  if (norm.includes('REOPEN')) {
+    return {
+      label: 'Réouverture',
+      fullLabel: norm.replace(/_/g, ' '),
+      bg: 'bg-purple-50 text-purple-700 border-purple-200',
+      badgeClass: 'bg-purple-100 text-purple-800',
+      icon: <RefreshCw size={13} className="text-purple-600 shrink-0" />
+    };
+  }
+
+  return {
+    label: norm.replace(/_/g, ' ').toLowerCase().replace(/^\w/, c => c.toUpperCase()),
+    fullLabel: norm.replace(/_/g, ' '),
+    bg: 'bg-slate-100 text-slate-700 border-slate-200',
+    badgeClass: 'bg-slate-200 text-slate-800',
+    icon: <History size={13} className="text-slate-600 shrink-0" />
+  };
+};
+
+const renderFieldValue = (key: string, value: any, detailsObj: any) => {
+  const isUrl = isUrlString(value) || key.toLowerCase().includes('url');
+  const isAmount = key.toLowerCase().includes('amount') || 
+                   key.toLowerCase().includes('salary') || 
+                   key.toLowerCase().includes('htg') || 
+                   key.toLowerCase().includes('usd') || 
+                   key.toLowerCase().includes('reduction') ||
+                   key.toLowerCase().includes('total');
+
+  if (isUrl && typeof value === 'string') {
+    return (
+      <div className="pt-0.5">
+        <a
+          href={value}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold transition-all shadow-xs active:scale-95 cursor-pointer max-w-full truncate"
+        >
+          <FileText size={13} className="shrink-0" />
+          <span className="truncate">Consulter le document</span>
+          <ExternalLink size={11} className="shrink-0" />
+        </a>
+      </div>
+    );
+  }
+
+  if (key === 'payment_method' || key === 'method') {
+    return (
+      <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-black border border-indigo-100 truncate max-w-full">
+        {formatPaymentMethod(String(value))}
+      </span>
+    );
+  }
+
+  if (typeof value === 'boolean') {
+    return (
+      <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold ${
+        value ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600 border border-slate-200'
+      }`}>
+        {value ? 'Oui' : 'Non'}
+      </span>
+    );
+  }
+
+  if (isAmount && (typeof value === 'number' || (!isNaN(Number(value)) && String(value).trim() !== ''))) {
+    const num = Number(value);
+    const curr = detailsObj?.currency || (key.toLowerCase().includes('usd') ? 'USD' : 'HTG');
+    return (
+      <p className="text-xs font-black text-slate-900 font-mono tracking-tight truncate">
+        {num.toLocaleString()} {curr}
+      </p>
+    );
+  }
+
+  if (typeof value === 'string') {
+    // Si référence de frais ad-hoc
+    if (value.startsWith('ADHOC_') || value.startsWith('adhoc_')) {
+      const cleanRef = value.replace(/^ADHOC_/i, '');
+      return (
+        <div className="space-y-1 min-w-0">
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+            Frais Exceptionnel (Ad-hoc)
+          </span>
+          <p className="text-[10px] font-mono text-slate-500 break-all select-all leading-tight">
+            Réf : {cleanRef}
+          </p>
+        </div>
+      );
+    }
+
+    // Détection date ISO
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value) && !isNaN(Date.parse(value))) {
+      return (
+        <p className="text-xs font-bold text-slate-900 truncate">
+          {new Date(value).toLocaleString('fr-FR')}
+        </p>
+      );
+    }
+
+    // Détection UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value.trim());
+    if (isUuid) {
+      return (
+        <span className="font-mono text-[10.5px] font-bold text-slate-800 bg-slate-100/90 px-2 py-0.5 rounded-md break-all select-all inline-block max-w-full border border-slate-200/60">
+          {value}
+        </span>
+      );
+    }
+
+    return (
+      <p className="text-xs font-bold text-slate-900 break-words break-all leading-snug">
+        {value}
+      </p>
+    );
+  }
+
+  if (typeof value === 'object' && value !== null) {
+    return (
+      <div className="text-[10.5px] font-mono bg-slate-100/90 p-2 rounded-xl text-slate-800 break-all whitespace-pre-wrap max-h-36 overflow-y-auto border border-slate-200/80">
+        {JSON.stringify(value, null, 2)}
+      </div>
+    );
+  }
+
+  return (
+    <p className="text-xs font-bold text-slate-900 break-words">
+      {String(value ?? '—')}
+    </p>
+  );
 };
 
 const formatPaymentMethod = (method?: string): string => {
@@ -487,93 +697,81 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
   };
 
-  // Rendu épuré et propre du corps du modal
+  // Rendu épuré et propre du corps du modal sans débordement
   const renderDetailModalContent = (log: AuditLog) => {
     const d = log.details;
-    const isObject = d && typeof d === 'object';
+    const isObject = d && typeof d === 'object' && !Array.isArray(d);
 
     return (
-      <div className="space-y-4">
+      <div className="space-y-4 min-w-0">
         {/* En-tête avec bascule propre JSON si nécessaire */}
-        <div className="flex items-center justify-between pb-1">
-          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-            {detailModalTab === 'METIER' ? "Paramètres enregistrés" : "Données techniques brutes"}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1 border-b border-slate-100">
+          <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 truncate">
+            <Layers size={14} className="text-indigo-600 shrink-0" />
+            <span className="truncate">
+              {detailModalTab === 'METIER' ? "Paramètres enregistrés" : "Données techniques brutes"}
+            </span>
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 self-start sm:self-auto">
             <button
+              type="button"
               onClick={() => setDetailModalTab(prev => prev === 'METIER' ? 'JSON' : 'METIER')}
-              className="px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-[11px] font-bold transition-all cursor-pointer border border-slate-200"
+              className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-200/80 shadow-2xs"
             >
-              {detailModalTab === 'METIER' ? 'Voir format JSON' : 'Vue synthétique'}
+              {detailModalTab === 'METIER' ? 'Format JSON brut' : 'Vue formulaire'}
             </button>
             {detailModalTab === 'JSON' && (
               <button
+                type="button"
                 onClick={() => copyToClipboard(JSON.stringify(log.details, null, 2))}
-                className="flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-800 rounded-lg text-[11px] font-bold transition-colors cursor-pointer border border-slate-200 shadow-2xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 active:scale-95 text-slate-800 rounded-xl text-xs font-bold transition-all cursor-pointer border border-slate-200 shadow-2xs"
               >
                 {copiedDetail ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
-                {copiedDetail ? "Copié" : "Copier"}
+                <span>{copiedDetail ? "Copié !" : "Copier"}</span>
               </button>
             )}
           </div>
         </div>
 
         {detailModalTab === 'METIER' ? (
-          <div className="space-y-3">
+          <div className="space-y-3 min-w-0">
             {/* Grille des informations structurées */}
             {isObject ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 min-w-0">
                 {Object.entries(d)
                   .filter(([key]) => !['school_id', 'campus_id', 'updated_at', 'created_at'].includes(key))
                   .map(([key, value]) => {
-                    const label = FIELD_LABELS[key] || key;
-                    const isUrl = isUrlString(value) || key.includes('url');
-                    const isAmount = key.includes('amount') || key.includes('salary') || key.includes('htg') || key.includes('usd') || key.includes('reduction');
+                    const label = formatFieldKey(key);
 
                     return (
-                      <div key={key} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/90 space-y-1 shadow-2xs">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">
+                      <div
+                        key={key}
+                        className="p-3 bg-slate-50/90 rounded-2xl border border-slate-200/80 space-y-1.5 shadow-2xs min-w-0 overflow-hidden flex flex-col justify-between"
+                      >
+                        <span
+                          className="text-[10px] font-bold uppercase tracking-wider text-slate-500 block truncate"
+                          title={label}
+                        >
                           {label}
                         </span>
 
-                        {isUrl && typeof value === 'string' ? (
-                          <div className="pt-0.5">
-                            <a
-                              href={value}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-xs"
-                            >
-                              <FileText size={13} />
-                              <span>Consulter le document</span>
-                              <ExternalLink size={11} />
-                            </a>
-                          </div>
-                        ) : key === 'payment_method' || key === 'method' ? (
-                          <span className="inline-block px-2.5 py-1 bg-indigo-50 text-indigo-800 rounded-lg text-xs font-extrabold border border-indigo-100">
-                            {formatPaymentMethod(String(value))}
-                          </span>
-                        ) : (
-                          <p className="text-xs font-bold text-slate-900 break-words">
-                            {isAmount && typeof value === 'number'
-                              ? `${value.toLocaleString()} ${d.currency || 'HTG'}`
-                              : (typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value))}
-                          </p>
-                        )}
+                        <div className="min-w-0 overflow-hidden">
+                          {renderFieldValue(key, value, d)}
+                        </div>
                       </div>
                     );
                   })}
               </div>
             ) : (
-              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-slate-800 text-xs font-medium">
+              <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 text-slate-800 text-xs font-medium break-words">
                 {String(d || 'Aucun détail supplémentaire')}
               </div>
             )}
           </div>
         ) : (
-          /* Vue JSON épurée */
-          <div className="space-y-2">
-            <pre className="p-4 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-2xl overflow-x-auto max-h-80 leading-relaxed border border-slate-800 shadow-inner">
+          /* Vue JSON épurée sans débordement horizontal */
+          <div className="space-y-2 min-w-0">
+            <pre className="p-4 bg-slate-900 text-emerald-400 font-mono text-[11px] rounded-2xl overflow-x-auto max-h-80 leading-relaxed border border-slate-800 shadow-inner break-all whitespace-pre-wrap">
               {JSON.stringify(log.details, null, 2)}
             </pre>
           </div>
@@ -878,15 +1076,17 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Action Type */}
                     <td className="px-3 py-2 sm:px-3.5 sm:py-2.5 whitespace-nowrap align-middle">
-                      <div className="flex items-center gap-1">
-                        {getActionIcon(log.action)}
-                        <span className={`text-[10px] font-black uppercase tracking-wider ${
-                          log.action === 'CREATE' ? 'text-emerald-700 font-extrabold' : 
-                          log.action === 'UPDATE' ? 'text-amber-700 font-extrabold' : 'text-rose-700 font-extrabold'
-                        }`}>
-                          {log.action}
-                        </span>
-                      </div>
+                      {(() => {
+                        const meta = getActionMeta(log.action);
+                        return (
+                          <div className="flex items-center gap-1">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider border ${meta.bg}`} title={meta.fullLabel}>
+                              {meta.icon}
+                              <span>{meta.label}</span>
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </td>
 
                     {/* Entity */}
@@ -972,93 +1172,118 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {/* Detail Modal */}
-      {selectedLogForDetail && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[88vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-900 text-white rounded-t-3xl">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-600/30 text-indigo-400 rounded-xl border border-indigo-500/30">
-                  <ShieldCheck size={20} />
-                </div>
-                <div>
-                  <h3 className="font-black text-white text-sm">Détails de l'Opération</h3>
-                  <p className="text-[11px] text-slate-400 font-medium">
-                    Réf. Audit : <span className="font-mono font-bold text-indigo-300">{selectedLogForDetail.id}</span>
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedLogForDetail(null)}
-                className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-full transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-6 overflow-y-auto space-y-4 text-xs">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Date & Heure</span>
-                  <p className="font-black text-slate-900 mt-0.5">
-                    {new Date(selectedLogForDetail.created_at).toLocaleString('fr-FR')}
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Opérateur</span>
-                  <p className="font-black text-slate-900 mt-0.5 truncate" title={selectedLogForDetail.profiles?.full_name || 'Inconnu'}>
-                    {selectedLogForDetail.profiles?.full_name || 'Inconnu'}
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Action</span>
-                  <p className={`font-black mt-0.5 uppercase ${
-                    selectedLogForDetail.action === 'CREATE' ? 'text-emerald-700' :
-                    selectedLogForDetail.action === 'UPDATE' ? 'text-amber-700' : 'text-rose-700'
-                  }`}>
-                    {selectedLogForDetail.action}
-                  </p>
-                </div>
-                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase block">Entité</span>
-                  <p className="font-black text-slate-900 mt-0.5 uppercase">
-                    {getEntityLabel(selectedLogForDetail.entity_type)}
-                  </p>
-                </div>
-              </div>
-
-              {selectedLogForDetail.entity_id && (
-                <div className="p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-bold text-indigo-700 uppercase block">ID de l'objet audité</span>
-                    <span className="font-mono font-bold text-slate-900 text-xs">{selectedLogForDetail.entity_id}</span>
+      {selectedLogForDetail && (() => {
+        const actionMeta = getActionMeta(selectedLogForDetail.action);
+        return (
+          <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-3xl w-full max-h-[90vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+              {/* Modal Header */}
+              <div className="shrink-0 p-4 sm:p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900 text-white rounded-t-3xl gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2.5 bg-indigo-600/30 text-indigo-400 rounded-xl border border-indigo-500/30 shrink-0">
+                    <ShieldCheck size={20} />
                   </div>
-                  <button
-                    onClick={() => copyToClipboard(selectedLogForDetail.entity_id)}
-                    className="p-1.5 px-3 bg-white border border-indigo-200 hover:bg-indigo-50 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                  >
-                    <Copy size={12} /> Copier ID
-                  </button>
+                  <div className="min-w-0">
+                    <h3 className="font-black text-white text-sm sm:text-base truncate">Détails de l'Opération</h3>
+                    <div className="flex items-center gap-1.5 text-[11px] text-slate-400 font-medium">
+                      <span className="shrink-0">Réf. Audit :</span>
+                      <span
+                        className="font-mono font-bold text-indigo-300 truncate max-w-[180px] sm:max-w-[320px] select-all cursor-pointer hover:underline"
+                        onClick={() => copyToClipboard(selectedLogForDetail.id)}
+                        title="Cliquer pour copier la référence"
+                      >
+                        {selectedLogForDetail.id}
+                      </span>
+                    </div>
+                  </div>
                 </div>
-              )}
+                <button
+                  onClick={() => setSelectedLogForDetail(null)}
+                  className="p-2 hover:bg-slate-800 text-slate-400 hover:text-white rounded-full transition-colors cursor-pointer shrink-0"
+                  title="Fermer la fenêtre"
+                >
+                  <X size={18} />
+                </button>
+              </div>
 
-              {/* Rendu dynamique des détails */}
-              {renderDetailModalContent(selectedLogForDetail)}
-            </div>
+              {/* Modal Content */}
+              <div className="flex-1 min-h-0 overflow-y-auto p-4 sm:p-6 space-y-4 text-xs">
+                {/* 4 Métriques en-tête avec min-w-0 et overflow-hidden */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 min-w-0 overflow-hidden flex flex-col justify-between shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider truncate">Date & Heure</span>
+                    <p className="font-black text-slate-900 mt-1 text-xs truncate" title={new Date(selectedLogForDetail.created_at).toLocaleString('fr-FR')}>
+                      {new Date(selectedLogForDetail.created_at).toLocaleString('fr-FR', {
+                        day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                      })}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 min-w-0 overflow-hidden flex flex-col justify-between shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider truncate">Opérateur</span>
+                    <p className="font-black text-slate-900 mt-1 text-xs truncate" title={selectedLogForDetail.profiles?.full_name || 'Inconnu'}>
+                      {selectedLogForDetail.profiles?.full_name || 'Inconnu'}
+                    </p>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 min-w-0 overflow-hidden flex flex-col justify-between shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider truncate">Action</span>
+                    <div className="mt-1 min-w-0">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-black border ${actionMeta.bg} truncate max-w-full`}
+                        title={selectedLogForDetail.action}
+                      >
+                        {actionMeta.icon}
+                        <span className="truncate">{actionMeta.label}</span>
+                      </span>
+                    </div>
+                  </div>
+                  <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 min-w-0 overflow-hidden flex flex-col justify-between shadow-2xs">
+                    <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider truncate">Entité</span>
+                    <p className="font-black text-slate-900 mt-1 text-xs truncate" title={getEntityLabel(selectedLogForDetail.entity_type)}>
+                      {getEntityLabel(selectedLogForDetail.entity_type)}
+                    </p>
+                  </div>
+                </div>
 
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-end rounded-b-3xl">
-              <button
-                onClick={() => setSelectedLogForDetail(null)}
-                className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors cursor-pointer"
-              >
-                Fermer
-              </button>
+                {/* ID Entité avec bouton copier aligné et responsive */}
+                {selectedLogForDetail.entity_id && (
+                  <div className="p-3 sm:p-3.5 bg-indigo-50/60 rounded-2xl border border-indigo-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 min-w-0">
+                    <div className="min-w-0 flex-1">
+                      <span className="text-[10px] font-bold text-indigo-700 uppercase block tracking-wider">ID de l'objet audité</span>
+                      <span className="font-mono font-bold text-slate-900 text-xs break-all select-all block mt-0.5">
+                        {selectedLogForDetail.entity_id}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => copyToClipboard(selectedLogForDetail.entity_id)}
+                      className="shrink-0 p-1.5 px-3 bg-white border border-indigo-200 hover:bg-indigo-50 active:scale-95 text-indigo-700 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-2xs cursor-pointer transition-all self-start sm:self-center"
+                    >
+                      {copiedDetail ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                      <span>{copiedDetail ? "Copié !" : "Copier ID"}</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Rendu dynamique des détails */}
+                {renderDetailModalContent(selectedLogForDetail)}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="shrink-0 p-3.5 sm:p-4 border-t border-slate-100 bg-slate-50 flex items-center justify-between rounded-b-3xl gap-3">
+                <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5 min-w-0 truncate">
+                  <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+                  <span className="truncate">Entrée certifiée conforme dans le journal immuable</span>
+                </div>
+                <button
+                  onClick={() => setSelectedLogForDetail(null)}
+                  className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shrink-0 shadow-xs"
+                >
+                  Fermer
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 };

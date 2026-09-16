@@ -259,7 +259,7 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
   // Variant base style
   const getButtonClass = () => {
     if (variant === 'field') {
-      return `w-full flex items-center justify-between px-3.5 py-2.5 bg-white hover:bg-slate-50 border rounded-xl text-left transition-all duration-200 shadow-2xs ${
+      return `w-full flex items-center justify-between px-2.5 sm:px-3 py-2 bg-white hover:bg-slate-50 border rounded-xl text-left transition-all duration-200 shadow-2xs min-h-[38px] ${
         isOpen 
           ? scheme.activeBorder 
           : 'border-slate-200 hover:border-slate-300 text-slate-800'
@@ -311,12 +311,12 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
           )}
 
           {isAllSelected ? (
-            <span className="font-extrabold text-slate-800 tracking-tight truncate">
+            <span className="font-bold sm:font-extrabold text-slate-800 tracking-tight text-xs truncate" title={defaultAllLabel}>
               {defaultAllLabel}
             </span>
           ) : selectedClass ? (
-            <div className="flex items-center gap-1.5 min-w-0 truncate">
-              <span className="font-extrabold text-slate-900 tracking-tight truncate">
+            <div className="flex items-center gap-1.5 min-w-0 truncate" title={selectedClass.name}>
+              <span className="font-bold sm:font-extrabold text-slate-900 tracking-tight text-xs truncate">
                 {selectedClass.name}
               </span>
               {selectedClass.cycle && (
@@ -326,21 +326,21 @@ export const ClassSelectorPill: React.FC<ClassSelectorPillProps> = ({
               )}
             </div>
           ) : (
-            <span className="font-semibold text-slate-500 tracking-tight truncate">
+            <span className="font-semibold text-slate-500 tracking-tight text-xs truncate" title={emptyLabel}>
               {emptyLabel}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
+        <div className="flex items-center gap-1 shrink-0 ml-1">
           {/* Active indicator or count */}
           {!isAllSelected && selectedClass ? (
             <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-black border leading-none shrink-0 ${scheme.badge}`}>
               <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${scheme.dotColor.split(' ')[0]}`} />
-              <span className="hidden md:inline">Sélection</span>
+              <span className="hidden sm:inline">Sélection</span>
             </span>
           ) : (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-700 border border-slate-200 shrink-0">
+            <span className="hidden sm:inline-flex px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200/80 shrink-0" title={`${classes.length} classes au total`}>
               {classes.length}
             </span>
           )}

@@ -4,11 +4,14 @@ import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile, StaffMember, PayrollPeriod, PayrollSlip, SalaryAdvance } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
+import { SelectPill, SelectOption } from './SelectPill';
 import { 
   Wallet, Calendar, CheckCircle, Clock, AlertCircle, 
   FileText, User, Plus, Search, DollarSign, Save, X,
   HandCoins, Check, Ban, Info, RefreshCcw, BarChart3, Trash2,
-  Download, Building2, ChevronDown, ChevronUp, Award, Sparkles, Filter, Users, CheckCircle2
+  Download, Building2, ChevronDown, ChevronUp, Award, Sparkles, Filter, Users, CheckCircle2,
+  LayoutGrid, Table, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CreditCard,
+  Zap, Landmark
 } from 'lucide-react';
 
 interface PayrollManagementViewProps {
@@ -305,6 +308,21 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const [periodSearchTerm, setPeriodSearchTerm] = useState<string>('');
   const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
 
+  // États modernes pour la section Arriérés & Paiements (Vue Tableau & Cartes)
+  const [arrearsViewMode, setArrearsViewMode] = useState<'cards' | 'table'>('table');
+  const [arrearsRoleFilter, setArrearsRoleFilter] = useState<string>('ALL');
+  const [arrearsPeriodFilter, setArrearsPeriodFilter] = useState<string>('ALL');
+  const [arrearsSortBy, setArrearsSortBy] = useState<'amount-desc' | 'amount-asc' | 'name-asc'>('amount-desc');
+  const [arrearsCurrentPage, setArrearsCurrentPage] = useState<number>(1);
+  const [arrearsItemsPerPage, setArrearsItemsPerPage] = useState<number>(10);
+
+  // États modernes pour la section Historique des Paiements
+  const [historyCurrentPage, setHistoryCurrentPage] = useState<number>(1);
+  const [historyItemsPerPage, setHistoryItemsPerPage] = useState<number>(10);
+  const [historyPeriodFilter, setHistoryPeriodFilter] = useState<string>('ALL');
+  const [historyMethodFilter, setHistoryMethodFilter] = useState<string>('ALL');
+  const [historySortBy, setHistorySortBy] = useState<'date-desc' | 'date-asc' | 'amount-desc' | 'amount-asc' | 'name-asc'>('date-desc');
+
   // Modal specific states
   const [modalLoading, setModalLoading] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
@@ -337,6 +355,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const [advancePaymentRefNumber, setAdvancePaymentRefNumber] = useState('');
   const [advancePaymentRefError, setAdvancePaymentRefError] = useState<string | null>(null);
   const [isCheckingAdvanceRef, setIsCheckingAdvanceRef] = useState(false);
+  const [globalSettings, setGlobalSettings] = useState<any>(null);
 
 
   // Advances state
@@ -347,8 +366,54 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const [periodToDelete, setPeriodToDelete] = useState<PayrollPeriod | null>(null);
   const [slipToDelete, setSlipToDelete] = useState<PayrollSlip | null>(null);
+  const [expertAdvanceData, setExpertAdvanceData] = useState<{
+    staff: StaffMember;
+    slip?: PayrollSlip;
+    advances: SalaryAdvance[];
+  } | null>(null);
 
   const canValidate = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'DIRECTOR', 'ACCOUNTANT'].includes(user.role);
+
+  // Options harmonisées pour les sélecteurs de style 'pillule'
+  const payrollPaymentMethodOptions: SelectOption[] = React.useMemo(() => [
+    { value: 'Espèces', label: 'Cash / Espèces', icon: CreditCard },
+    { value: 'Virement', label: 'Dépôt Bancaire / Virement', icon: Building2 },
+    { value: 'MonCash', label: 'MonCash (Digicel)', icon: Zap },
+    { value: 'Chèque', label: 'Chèque Bancaire', icon: Landmark },
+  ], []);
+
+  const bankOptions: SelectOption[] = React.useMemo(() => {
+    if (globalSettings?.banks && Array.isArray(globalSettings.banks) && globalSettings.banks.length > 0) {
+      return globalSettings.banks.map((b: string) => ({
+        value: b,
+        label: b,
+        icon: Building2
+      }));
+    }
+    return [
+      { value: 'Unibank', label: 'Unibank', icon: Building2 },
+      { value: 'Sogebank', label: 'Sogebank', icon: Building2 },
+      { value: 'BNC', label: 'BNC', icon: Building2 },
+      { value: 'BUH', label: 'BUH', icon: Building2 },
+      { value: 'Capital Bank', label: 'Capital Bank', icon: Building2 }
+    ];
+  }, [globalSettings?.banks]);
+
+  const monthOptions: SelectOption[] = React.useMemo(() => 
+    MONTHS.map((m, i) => ({
+      value: String(i + 1),
+      label: m,
+      icon: Calendar
+    })),
+  []);
+
+  const advanceStaffOptions: SelectOption[] = React.useMemo(() => 
+    staff.map(s => ({
+      value: s.id,
+      label: `${formatStudentName(s.last_name, s.first_name).fullName} (${s.role})`,
+      icon: User
+    })),
+  [staff]);
 
   const verifyPayrollReference = async (ref: string, isAdvance: boolean = false, currentBank: string = '') => {
     if (!ref || !user?.school_id || ((!isAdvance && paymentMethod !== 'Chèque') || (isAdvance && advancePaymentMethod !== 'Chèque'))) {
@@ -407,8 +472,6 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       fetchData();
     }
   }, [selectedPeriodId]);
-
-  const [globalSettings, setGlobalSettings] = useState<any>(null);
 
   const fetchData = async () => {
     if (!user.school_id) return;
@@ -1500,6 +1563,24 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const renderArrearsTab = () => {
     // Group unpaid slips by employee
     const unpaidSlips = slips.filter(s => s.status === 'UNPAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId));
+    
+    // Global metrics across all unpaid slips
+    const totalArrearsGlobal = unpaidSlips.reduce((sum, s) => sum + s.net_salary, 0);
+    const totalDeductionsGlobal = unpaidSlips.reduce((sum, s) => sum + (s.deductions || 0), 0);
+    const totalSlipsCount = unpaidSlips.length;
+
+    // Distinct periods in unpaid slips for filtering
+    const distinctPeriods = Array.from(new Set(unpaidSlips.map(s => s.period_id))).map(periodId => {
+      const pObj = periods.find(p => p.id === periodId) || unpaidSlips.find(s => s.period_id === periodId)?.period;
+      return {
+        id: periodId,
+        label: pObj ? getPeriodName(pObj) : 'Période inconnue'
+      };
+    });
+
+    // Distinct roles in unpaid slips for filtering
+    const distinctRoles = Array.from(new Set(unpaidSlips.map(s => s.staff?.role).filter(Boolean))) as string[];
+
     const arrearsByStaff = unpaidSlips.reduce((acc, slip) => {
       if (!acc[slip.staff_id]) {
         acc[slip.staff_id] = {
@@ -1513,259 +1594,1248 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       return acc;
     }, {} as Record<string, { staff: StaffMember | undefined, totalOwed: number, slips: PayrollSlip[] }>);
 
-    let arrearsList = Object.values(arrearsByStaff).sort((a, b) => b.totalOwed - a.totalOwed);
+    let arrearsList = Object.values(arrearsByStaff);
 
+    // Apply filters
     if (searchTerm) {
+      const q = searchTerm.toLowerCase().trim();
       arrearsList = arrearsList.filter(arrear => 
-        arrear.staff?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        arrear.staff?.last_name.toLowerCase().includes(searchTerm.toLowerCase())
+        arrear.staff?.first_name.toLowerCase().includes(q) ||
+        arrear.staff?.last_name.toLowerCase().includes(q) ||
+        arrear.staff?.role?.toLowerCase().includes(q) ||
+        arrear.slips.some(s => s.period && getPeriodName(s.period).toLowerCase().includes(q))
       );
     }
 
-    const totalArrearsAmount = arrearsList.reduce((sum, a) => sum + a.totalOwed, 0);
+    if (arrearsRoleFilter !== 'ALL') {
+      arrearsList = arrearsList.filter(arrear => arrear.staff?.role === arrearsRoleFilter);
+    }
+
+    if (arrearsPeriodFilter !== 'ALL') {
+      arrearsList = arrearsList.filter(arrear => arrear.slips.some(s => s.period_id === arrearsPeriodFilter));
+    }
+
+    // Sort
+    arrearsList.sort((a, b) => {
+      if (arrearsSortBy === 'amount-desc') return b.totalOwed - a.totalOwed;
+      if (arrearsSortBy === 'amount-asc') return a.totalOwed - b.totalOwed;
+      if (arrearsSortBy === 'name-asc') {
+        const nameA = `${a.staff?.last_name || ''} ${a.staff?.first_name || ''}`;
+        const nameB = `${b.staff?.last_name || ''} ${b.staff?.first_name || ''}`;
+        return nameA.localeCompare(nameB);
+      }
+      return 0;
+    });
+
+    const filteredTotalOwed = arrearsList.reduce((sum, a) => sum + a.totalOwed, 0);
+    const totalStaffCount = Object.keys(arrearsByStaff).length;
+
+    // Pagination calculations
+    const totalPages = Math.max(1, Math.ceil(arrearsList.length / arrearsItemsPerPage));
+    const safeCurrentPage = Math.min(arrearsCurrentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * arrearsItemsPerPage;
+    const paginatedList = arrearsList.slice(startIndex, startIndex + arrearsItemsPerPage);
 
     return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 rounded-2xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center font-bold border border-amber-100/80 shrink-0">
-              <AlertCircle className="w-5 h-5" />
-            </div>
+      <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-300">
+        {/* KPI DASHBOARD CARDS - SYNTHÈSE COMPACTE & ÉPURÉE */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Total Arriérés */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-rose-100 shadow-2xs flex items-center justify-between hover:border-rose-200 transition-all">
             <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-slate-800 text-base">Arriérés de Salaire</h3>
-                <span className="text-xs font-semibold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full">
-                  {arrearsList.length} employé{arrearsList.length > 1 ? 's' : ''}
-                </span>
-                {totalArrearsAmount > 0 && (
-                  <span className="text-xs font-bold text-rose-600 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-100">
-                    Total Dû : {totalArrearsAmount.toLocaleString()} HTG
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-slate-500 font-medium mt-0.5">Salaires impayés sur les périodes préparées</p>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total des Arriérés Dûs</p>
+              <h4 className="text-lg sm:text-xl font-black text-rose-600 mt-0.5 tabular-nums">
+                {totalArrearsGlobal.toLocaleString()} <span className="text-xs font-bold text-rose-500">HTG</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">
+                Sur {totalSlipsCount} bulletin{totalSlipsCount > 1 ? 's' : ''} impayé{totalSlipsCount > 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-rose-50 border border-rose-100/80 flex items-center justify-center text-rose-600 shrink-0">
+              <CreditCard className="w-5 h-5" />
             </div>
           </div>
 
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Rechercher un employé..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-600 outline-none transition-all shadow-2xs"
+          {/* Personnel Concerné */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between hover:border-indigo-200 transition-all">
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Personnel Concerné</p>
+              <h4 className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 tabular-nums">
+                {totalStaffCount} <span className="text-xs font-bold text-slate-500">employé{totalStaffCount > 1 ? 's' : ''}</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">En attente de versement</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shrink-0">
+              <Users className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Mois / Périodes en attente */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between hover:border-amber-200 transition-all">
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Périodes Non Réglées</p>
+              <h4 className="text-lg sm:text-xl font-black text-amber-600 mt-0.5 tabular-nums">
+                {distinctPeriods.length} <span className="text-xs font-bold text-amber-600">période{distinctPeriods.length > 1 ? 's' : ''}</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate max-w-[140px] sm:max-w-[180px]">
+                {distinctPeriods.map(p => p.label).slice(0, 2).join(', ')}{distinctPeriods.length > 2 ? '...' : ''}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-amber-600 shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Déductions / Avances récupérées - OPTIMISÉ POUR L'EXPERT PAIE */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between hover:border-emerald-200 transition-all">
+            <div>
+              <div className="flex items-center gap-1.5">
+                <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Déductions Retenues</p>
+                <span className="text-[9px] font-black text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded-md border border-emerald-200">Expert</span>
+              </div>
+              <h4 className="text-lg sm:text-xl font-black text-emerald-600 mt-0.5 tabular-nums">
+                {totalDeductionsGlobal.toLocaleString()} <span className="text-xs font-bold text-emerald-500">HTG</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">Avances & prêts décomptés</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-emerald-600 shrink-0">
+              <HandCoins className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* BARRE D'OUTILS MODERNE - RECHERCHE PILL, SELECTPILL HARMONISÉ, TRI & COMMUTATEUR DE VUE */}
+        <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 flex-1">
+            {/* Recherche Pill */}
+            <div className="relative flex-1 min-w-[200px] sm:min-w-[240px] max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Rechercher par nom, rôle, période..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setArrearsCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setArrearsCurrentPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Filtre par Poste / Rôle avec SelectPill */}
+            {distinctRoles.length > 0 && (
+              <SelectPill
+                options={[
+                  { value: 'ALL', label: `Tous les rôles (${distinctRoles.length})`, icon: Users },
+                  ...distinctRoles.map(role => ({ value: role, label: role, icon: Award }))
+                ]}
+                value={arrearsRoleFilter}
+                onChange={(val) => {
+                  setArrearsRoleFilter(val);
+                  setArrearsCurrentPage(1);
+                }}
+                variant="pill"
+                size="sm"
+                colorScheme="slate"
+                icon={Users}
+                searchable={distinctRoles.length > 6}
+                portal={true}
+              />
+            )}
+
+            {/* Filtre par Période avec SelectPill */}
+            {distinctPeriods.length > 1 && (
+              <SelectPill
+                options={[
+                  { value: 'ALL', label: `Toutes les périodes (${distinctPeriods.length})`, icon: Calendar },
+                  ...distinctPeriods.map(period => ({ value: period.id, label: period.label, icon: Calendar }))
+                ]}
+                value={arrearsPeriodFilter}
+                onChange={(val) => {
+                  setArrearsPeriodFilter(val);
+                  setArrearsCurrentPage(1);
+                }}
+                variant="pill"
+                size="sm"
+                colorScheme="slate"
+                icon={Calendar}
+                portal={true}
+              />
+            )}
+
+            {/* Tri avec SelectPill */}
+            <SelectPill
+              options={[
+                { value: 'amount-desc', label: 'Montant dû (Plus élevé)', icon: ArrowUpDown },
+                { value: 'amount-asc', label: 'Montant dû (Plus faible)', icon: ArrowUpDown },
+                { value: 'name-asc', label: "Nom employé (A-Z)", icon: ArrowUpDown },
+              ]}
+              value={arrearsSortBy}
+              onChange={(val) => setArrearsSortBy(val as any)}
+              variant="pill"
+              size="sm"
+              colorScheme="slate"
+              icon={ArrowUpDown}
+              portal={true}
             />
-            {searchTerm && (
+          </div>
+
+          {/* COMMUTATEUR DE VUE : TABLEAU & CARTES / LISTE */}
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+            {filteredTotalOwed > 0 && (
+              <span className="hidden sm:inline-flex text-xs font-bold text-slate-500">
+                Total sélection : <strong className="text-rose-600 ml-1">{filteredTotalOwed.toLocaleString()} HTG</strong>
+              </span>
+            )}
+
+            <div className="flex items-center p-0.5 bg-slate-100/90 border border-slate-200 rounded-full">
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+                onClick={() => setArrearsViewMode('table')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  arrearsViewMode === 'table'
+                    ? 'bg-white text-indigo-600 shadow-2xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Afficher sous forme de tableau"
               >
-                <X size={14} />
+                <Table size={13} />
+                <span>Tableau</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setArrearsViewMode('cards')}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                  arrearsViewMode === 'cards'
+                    ? 'bg-white text-indigo-600 shadow-2xs font-black'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Afficher sous forme de cartes"
+              >
+                <LayoutGrid size={13} />
+                <span>Cartes</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* CONTENU PRINCIPAL SELON LA VUE SÉLECTIONNÉE */}
+        {paginatedList.length === 0 ? (
+          /* État vide soigné */
+          <div className="text-center py-16 px-4 bg-white rounded-2xl shadow-2xs border border-slate-200/80">
+            <div className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-3.5 border border-emerald-100/80">
+              <CheckCircle2 className="w-7 h-7" />
+            </div>
+            <h3 className="text-lg font-bold text-slate-900">
+              {unpaidSlips.length === 0 ? 'Aucun arriéré de salaire' : 'Aucun résultat correspondant'}
+            </h3>
+            <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto mt-1">
+              {unpaidSlips.length === 0 
+                ? 'Tous les salaires préparés ont été intégralement payés pour cet établissement.'
+                : 'Aucun employé avec des arriérés ne correspond aux critères de recherche ou de filtre sélectionnés.'}
+            </p>
+            {(searchTerm || arrearsRoleFilter !== 'ALL' || arrearsPeriodFilter !== 'ALL') && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setArrearsRoleFilter('ALL');
+                  setArrearsPeriodFilter('ALL');
+                }}
+                className="mt-4 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl transition-all cursor-pointer inline-flex items-center gap-2"
+              >
+                <RefreshCcw size={13} />
+                Réinitialiser les filtres
               </button>
             )}
           </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {arrearsList.map((arrear) => (
-            <div key={arrear.staff?.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold">
-                    {arrear.staff?.first_name.charAt(0)}{arrear.staff?.last_name.charAt(0)}
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-slate-800">{formatStudentName(arrear.staff?.last_name, arrear.staff?.first_name).fullName}</h3>
-                    <p className="text-xs text-slate-500">{arrear.staff?.role}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-slate-500  tracking-wider font-semibold mb-1">Total Dû</p>
-                  <p className="text-lg font-semibold text-red-600">{arrear.totalOwed.toLocaleString()} HTG</p>
-                </div>
-              </div>
-              <div className="p-4">
-                <h4 className="text-xs font-semibold text-slate-400  tracking-wider mb-3">Mois impayés</h4>
-                <div className="space-y-3">
-                  {arrear.slips.map(slip => {
-                    const memberAdvances = advances.filter(a => 
-                      a.staff_id === slip.staff_id && 
-                      (a.status === 'APPROVED' || a.status === 'PAID')
-                    );
-                    // Advances approved BEFORE the slip was created (should be in this slip)
-                    const currentAdvances = memberAdvances.filter(a => 
-                      !slip.created_at || new Date(a.approved_at || a.requested_at).getTime() <= new Date(slip.created_at).getTime()
-                    );
-                    // Advances approved AFTER the slip was created (deferred to next month)
-                    const futureAdvances = memberAdvances.filter(a => 
-                      slip.created_at && new Date(a.approved_at || a.requested_at).getTime() > new Date(slip.created_at).getTime()
-                    );
-
-                    const totalCurrentAdvanceAmount = currentAdvances.reduce((sum, a) => sum + a.amount, 0);
-                    const totalFutureAdvanceAmount = futureAdvances.reduce((sum, a) => sum + a.amount, 0);
-                    const hasDiscrepancy = slip.deductions !== totalCurrentAdvanceAmount;
+        ) : arrearsViewMode === 'table' ? (
+          /* 1. VUE TABLEAU MODERNE & ÉPURÉE */
+          <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xs border border-slate-200/80 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-xs">
+                <thead>
+                  <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    <th className="py-2.5 px-3 sm:px-4">Employé</th>
+                    <th className="py-2.5 px-3 sm:px-4">Périodes Impayées</th>
+                    <th className="py-2.5 px-3 sm:px-4">
+                      <div className="flex items-center gap-1">
+                        <span>Déductions & Avances</span>
+                        <span className="text-[9px] font-black text-emerald-700 bg-emerald-100/90 px-1 rounded">Expert</span>
+                      </div>
+                    </th>
+                    <th className="py-2.5 px-3 sm:px-4 text-right">Total Net Dû</th>
+                    <th className="py-2.5 px-3 sm:px-4 text-center">Action de Paiement</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {paginatedList.map((arrear) => {
+                    const initials = `${arrear.staff?.first_name?.charAt(0) || ''}${arrear.staff?.last_name?.charAt(0) || ''}`;
+                    const formattedName = formatStudentName(arrear.staff?.last_name, arrear.staff?.first_name).fullName;
+                    
+                    // Calcul des avances totales déduites pour cet employé
+                    const totalDeductionsForStaff = arrear.slips.reduce((sum, s) => sum + (s.deductions || 0), 0);
 
                     return (
-                      <div key={slip.id} className={`flex flex-col p-3 rounded-lg border transition-all ${hasDiscrepancy ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}>
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="font-medium text-slate-800">
-                              {slip.period ? getPeriodName(slip.period) : 'Période inconnue'}
-                            </p>
-                            <div className="flex items-center gap-2">
-                              <p className="text-xs text-slate-500">Net: {slip.net_salary.toLocaleString()} HTG</p>
-                              {hasDiscrepancy && (
-                                <span className="text-[10px] font-bold text-rose-600 flex items-center gap-1 animate-pulse">
-                                  <AlertCircle size={10} /> Écart d'avance détecté
-                                </span>
-                              )}
+                      <tr key={arrear.staff?.id} className="hover:bg-slate-50/70 transition-colors group">
+                        {/* Employé */}
+                        <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0">
+                              {initials}
+                            </div>
+                            <div>
+                              <div className="font-bold text-slate-900 text-xs sm:text-sm group-hover:text-indigo-600 transition-colors">
+                                {formattedName}
+                              </div>
+                              <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
+                                {arrear.staff?.role || 'Personnel'}
+                              </div>
                             </div>
                           </div>
-                          {canValidate && (
+                        </td>
+
+                        {/* Périodes Impayées */}
+                        <td className="py-2.5 px-3 sm:px-4 align-middle">
+                          <div className="flex flex-wrap gap-1 max-w-xs">
+                            {arrear.slips.map((slip) => (
+                              <span
+                                key={slip.id}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] sm:text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs"
+                              >
+                                <Calendar size={10} className="text-amber-600 shrink-0" />
+                                <span>{slip.period ? getPeriodName(slip.period) : 'Période'}</span>
+                                <span className="font-bold text-amber-950">({slip.net_salary.toLocaleString()} G)</span>
+                              </span>
+                            ))}
+                            {arrear.slips.length > 1 && (
+                              <span className="text-[10px] font-bold text-slate-500 self-center">
+                                ({arrear.slips.length} mois)
+                              </span>
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Déductions & Avances - EXPERT PAIE INTERACTIF */}
+                        <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+                          {totalDeductionsForStaff > 0 ? (
                             <button
+                              type="button"
                               onClick={() => {
-                                setSelectedSlip(slip);
-                                setShowPaymentModal(true);
+                                setExpertAdvanceData({
+                                  staff: arrear.staff,
+                                  slip: arrear.slips[0],
+                                  advances: advances.filter(a => a.staff_id === arrear.staff.id)
+                                });
                               }}
-                              className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg text-sm font-medium transition-colors"
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-black bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200/90 shadow-2xs transition-all cursor-pointer group/adv"
+                              title="Audit Expert Paie : Voir détail de l'avance déduite pour cet employé"
                             >
-                              <DollarSign className="w-4 h-4" />
-                              Payer
+                              <HandCoins size={11} className="text-emerald-600" />
+                              <span>- {totalDeductionsForStaff.toLocaleString()} HTG</span>
+                              <Sparkles size={10} className="text-amber-500 group-hover/adv:scale-125 transition-transform" />
+                            </button>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-medium italic">Aucune déduction</span>
+                          )}
+                        </td>
+
+                        {/* Total Net Dû */}
+                        <td className="py-2.5 px-3 sm:px-4 text-right whitespace-nowrap align-middle">
+                          <div className="font-black text-xs sm:text-sm text-rose-600 tabular-nums">
+                            {arrear.totalOwed.toLocaleString()} <span className="text-[10px] font-bold text-rose-500">HTG</span>
+                          </div>
+                          {totalDeductionsForStaff > 0 ? (
+                            <div className="text-[9px] sm:text-[10px] font-medium text-slate-400">
+                              Brut : {(arrear.totalOwed + totalDeductionsForStaff).toLocaleString()} G
+                            </div>
+                          ) : (
+                            <div className="text-[9px] sm:text-[10px] font-medium text-slate-400">
+                              {arrear.slips.length === 1 ? '1 versement' : `${arrear.slips.length} versements`}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Actions */}
+                        <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap align-middle">
+                          {canValidate ? (
+                            <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                              {arrear.slips.map((slip) => (
+                                <button
+                                  key={slip.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSlip(slip);
+                                    setShowPaymentModal(true);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-2xs hover:shadow transition-all cursor-pointer"
+                                  title={`Payer ${slip.period ? getPeriodName(slip.period) : 'la période'}`}
+                                >
+                                  <DollarSign size={12} />
+                                  <span>Payer {slip.period ? MONTHS[slip.period.month - 1]?.slice(0, 4) : ''}</span>
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-slate-400 italic">Lecture seule</span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ) : (
+          /* 2. VUE CARTES / LISTE MODERNE & ÉPURÉE */
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-3.5">
+            {paginatedList.map((arrear) => {
+              const initials = `${arrear.staff?.first_name?.charAt(0) || ''}${arrear.staff?.last_name?.charAt(0) || ''}`;
+              const formattedName = formatStudentName(arrear.staff?.last_name, arrear.staff?.first_name).fullName;
+              const totalDeductionsForStaff = arrear.slips.reduce((sum, s) => sum + (s.deductions || 0), 0);
+
+              return (
+                <div 
+                  key={arrear.staff?.id} 
+                  className="bg-white rounded-xl sm:rounded-2xl shadow-2xs border border-slate-200/80 hover:border-slate-300 hover:shadow-xs transition-all overflow-hidden flex flex-col justify-between"
+                >
+                  {/* Carte Header */}
+                  <div className="p-3 sm:p-3.5 bg-gradient-to-b from-slate-50/80 to-white border-b border-slate-100 flex items-center justify-between gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-9 h-9 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-xl flex items-center justify-center font-black text-xs shrink-0 shadow-2xs">
+                        {initials}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                          {formattedName}
+                        </h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="inline-block text-[10px] font-semibold text-slate-600 bg-slate-100/90 px-1.5 py-0.2 rounded">
+                            {arrear.staff?.role || 'Personnel'}
+                          </span>
+                          {totalDeductionsForStaff > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setExpertAdvanceData({
+                                  staff: arrear.staff,
+                                  slip: arrear.slips[0],
+                                  advances: advances.filter(a => a.staff_id === arrear.staff.id)
+                                });
+                              }}
+                              className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 transition-colors cursor-pointer"
+                              title="Audit Avance Déduite (Expert Paie)"
+                            >
+                              <HandCoins size={10} className="text-emerald-600" />
+                              <span>-{totalDeductionsForStaff.toLocaleString()} G</span>
+                              <Sparkles size={9} className="text-amber-500" />
                             </button>
                           )}
                         </div>
-                        
-                        {/* Show Advance info if any exist */}
-                        {(totalCurrentAdvanceAmount > 0 || totalFutureAdvanceAmount > 0) && (
-                          <div className="mt-2 pt-2 border-t border-slate-200/50 flex flex-wrap gap-2">
-                            {totalCurrentAdvanceAmount > 0 && (
-                              <span className="text-[9px] font-bold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded border border-amber-200">
-                                Déduction incluse: {totalCurrentAdvanceAmount.toLocaleString()} HTG
-                              </span>
-                            )}
-                            {totalFutureAdvanceAmount > 0 && (
-                              <span className="text-[9px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded border border-blue-200">
-                                Avance reportée: {totalFutureAdvanceAmount.toLocaleString()} HTG (Prochaine paie)
-                              </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Total Net Dû</p>
+                      <p className="text-sm sm:text-base font-black text-rose-600 tabular-nums">
+                        {arrear.totalOwed.toLocaleString()} <span className="text-[10px] font-bold text-rose-500">HTG</span>
+                      </p>
+                      {totalDeductionsForStaff > 0 && (
+                        <p className="text-[9px] font-semibold text-slate-400">
+                          Brut : {(arrear.totalOwed + totalDeductionsForStaff).toLocaleString()} G
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Carte Corps : Liste des mois impayés */}
+                  <div className="p-3 sm:p-3.5 space-y-2 flex-1">
+                    <div className="flex items-center justify-between text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                      <span>Mois impayés</span>
+                      <span>{arrear.slips.length} bulletin{arrear.slips.length > 1 ? 's' : ''}</span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      {arrear.slips.map((slip) => {
+                        const memberAdvances = advances.filter(a => 
+                          a.staff_id === slip.staff_id && 
+                          (a.status === 'APPROVED' || a.status === 'PAID')
+                        );
+                        const currentAdvances = memberAdvances.filter(a => 
+                          !slip.created_at || new Date(a.approved_at || a.requested_at).getTime() <= new Date(slip.created_at).getTime()
+                        );
+                        const futureAdvances = memberAdvances.filter(a => 
+                          slip.created_at && new Date(a.approved_at || a.requested_at).getTime() > new Date(slip.created_at).getTime()
+                        );
+
+                        const totalCurrentAdvanceAmount = currentAdvances.reduce((sum, a) => sum + a.amount, 0);
+                        const totalFutureAdvanceAmount = futureAdvances.reduce((sum, a) => sum + a.amount, 0);
+                        const hasDiscrepancy = slip.deductions !== totalCurrentAdvanceAmount;
+
+                        return (
+                          <div 
+                            key={slip.id} 
+                            className={`p-2.5 rounded-xl border transition-all ${
+                              hasDiscrepancy 
+                                ? 'bg-rose-50/70 border-rose-200' 
+                                : 'bg-slate-50/80 hover:bg-white border-slate-200/70 hover:border-indigo-200 shadow-2xs'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <div className="flex items-center gap-1.5">
+                                  <Calendar size={12} className="text-slate-400" />
+                                  <span className="font-bold text-slate-800 text-xs">
+                                    {slip.period ? getPeriodName(slip.period) : 'Période inconnue'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                  <span className="text-[11px] font-semibold text-slate-600">
+                                    Net : <strong className="text-slate-900">{slip.net_salary.toLocaleString()} HTG</strong>
+                                  </span>
+                                  {slip.deductions > 0 && (
+                                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded border border-emerald-200">
+                                      -{slip.deductions.toLocaleString()} G
+                                    </span>
+                                  )}
+                                  {hasDiscrepancy && (
+                                    <span className="text-[10px] font-bold text-rose-600 flex items-center gap-0.5 animate-pulse">
+                                      <AlertCircle size={9} /> Écart avance
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              {canValidate && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedSlip(slip);
+                                    setShowPaymentModal(true);
+                                  }}
+                                  className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-2xs hover:shadow cursor-pointer"
+                                >
+                                  <DollarSign size={12} />
+                                  <span>Payer</span>
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Informations sur les avances */}
+                            {(totalCurrentAdvanceAmount > 0 || totalFutureAdvanceAmount > 0) && (
+                              <div className="mt-1.5 pt-1.5 border-t border-slate-200/60 flex flex-wrap gap-1.5">
+                                {totalCurrentAdvanceAmount > 0 && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setExpertAdvanceData({
+                                        staff: arrear.staff,
+                                        slip: slip,
+                                        advances: memberAdvances
+                                      });
+                                    }}
+                                    className="text-[10px] font-bold bg-amber-50 hover:bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded-md border border-amber-200 flex items-center gap-1 cursor-pointer"
+                                    title="Voir détail de l'avance"
+                                  >
+                                    <HandCoins size={10} className="text-amber-600" />
+                                    <span>Avance déduite : {totalCurrentAdvanceAmount.toLocaleString()} HTG</span>
+                                  </button>
+                                )}
+                                {totalFutureAdvanceAmount > 0 && (
+                                  <span className="text-[10px] font-bold bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded-md border border-blue-200">
+                                    Report : {totalFutureAdvanceAmount.toLocaleString()} HTG
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-                        )}
-                      </div>
-                    );
-                  })}
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* BARRE DE PAGINATION MODERNE (COMMUNE AUX 2 VUES) */}
+        {arrearsList.length > 0 && (
+          <div className="px-3.5 sm:px-5 py-2.5 bg-white rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+            <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2.5 w-full sm:w-auto text-slate-600 font-medium">
+              <span>
+                Affichage de <strong className="text-slate-900">{arrearsList.length === 0 ? 0 : (safeCurrentPage - 1) * arrearsItemsPerPage + 1}</strong> à <strong className="text-slate-900">{Math.min(safeCurrentPage * arrearsItemsPerPage, arrearsList.length)}</strong> sur <strong className="text-slate-900">{arrearsList.length}</strong> employé{arrearsList.length > 1 ? 's' : ''}
+              </span>
+
+              {/* Sélecteur de pagination avec SelectPill */}
+              <div className="flex items-center gap-1.5 pl-2 sm:border-l sm:border-slate-200">
+                <span className="text-slate-500 text-[11px]">Afficher :</span>
+                <SelectPill
+                  options={[
+                    { value: '6', label: '6 / page' },
+                    { value: '10', label: '10 / page' },
+                    { value: '15', label: '15 / page' },
+                    { value: '25', label: '25 / page' },
+                    { value: '50', label: '50 / page' },
+                  ]}
+                  value={arrearsItemsPerPage.toString()}
+                  onChange={(val) => {
+                    setArrearsItemsPerPage(Number(val));
+                    setArrearsCurrentPage(1);
+                  }}
+                  variant="pill"
+                  size="xs"
+                  colorScheme="slate"
+                  portal={true}
+                />
               </div>
             </div>
-          ))}
-          {arrearsList.length === 0 && (
-            <div className="col-span-full text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200">
-              <CheckCircle className="w-12 h-12 text-emerald-400 mx-auto mb-3" />
-              <h3 className="text-lg font-medium text-slate-800">Aucun arriéré</h3>
-              <p className="text-slate-500">Tous les salaires préparés ont été payés.</p>
-            </div>
-          )}
-        </div>
+
+            {totalPages > 1 && (
+              <div className="flex items-center gap-1">
+                {/* Première page */}
+                <button
+                  type="button"
+                  onClick={() => setArrearsCurrentPage(1)}
+                  disabled={safeCurrentPage === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                  title="Première page"
+                >
+                  <ChevronsLeft size={15} />
+                </button>
+
+                {/* Page précédente */}
+                <button
+                  type="button"
+                  onClick={() => setArrearsCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={safeCurrentPage === 1}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                  title="Page précédente"
+                >
+                  <ChevronLeft size={15} />
+                </button>
+
+                {/* Numéros de page avec fenêtre dynamique */}
+                <div className="flex items-center gap-1 mx-1">
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(page => {
+                      if (totalPages <= 7) return true;
+                      if (page === 1 || page === totalPages) return true;
+                      return Math.abs(page - safeCurrentPage) <= 1;
+                    })
+                    .reduce<(number | string)[]>((acc, page, index, arr) => {
+                      if (index > 0 && (page as number) - (arr[index - 1] as number) > 1) {
+                        acc.push('...');
+                      }
+                      acc.push(page);
+                      return acc;
+                    }, [])
+                    .map((item, idx) => {
+                      if (typeof item === 'string') {
+                        return (
+                          <span key={`ellipsis-${idx}`} className="px-1 text-xs font-bold text-slate-400">
+                            ...
+                          </span>
+                        );
+                      }
+                      return (
+                        <button
+                          key={item}
+                          type="button"
+                          onClick={() => setArrearsCurrentPage(item as number)}
+                          className={`min-w-[28px] h-7 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                            safeCurrentPage === item
+                              ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                              : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 shadow-2xs'
+                          }`}
+                        >
+                          {item}
+                        </button>
+                      );
+                    })}
+                </div>
+
+                {/* Page suivante */}
+                <button
+                  type="button"
+                  onClick={() => setArrearsCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={safeCurrentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                  title="Page suivante"
+                >
+                  <ChevronRight size={15} />
+                </button>
+
+                {/* Dernière page */}
+                <button
+                  type="button"
+                  onClick={() => setArrearsCurrentPage(totalPages)}
+                  disabled={safeCurrentPage === totalPages}
+                  className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                  title="Dernière page"
+                >
+                  <ChevronsRight size={15} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     );
   };
 
   const renderHistoryTab = () => {
-    let paidSlips = slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).sort((a, b) => 
-      new Date(b.payment_date || 0).getTime() - new Date(a.payment_date || 0).getTime()
-    );
+    // All paid slips in current campus
+    const allPaidSlips = slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId));
+    
+    // Global KPI metrics
+    const totalPaidGlobal = allPaidSlips.reduce((sum, s) => sum + s.net_salary, 0);
+    const totalPaidCount = allPaidSlips.length;
+    const averagePayment = totalPaidCount > 0 ? Math.round(totalPaidGlobal / totalPaidCount) : 0;
+
+    // Distinct periods for filter dropdown
+    const distinctPeriods = Array.from(new Set(allPaidSlips.map(s => s.period_id))).map(periodId => {
+      const pObj = periods.find(p => p.id === periodId) || allPaidSlips.find(s => s.period_id === periodId)?.period;
+      return {
+        id: periodId,
+        label: pObj ? getPeriodName(pObj) : 'Période inconnue'
+      };
+    });
+
+    // Distinct payment methods for filter dropdown
+    const distinctMethods = Array.from(new Set(allPaidSlips.map(s => s.payment_method).filter(Boolean))) as string[];
+
+    // Filtering
+    let paidSlips = [...allPaidSlips];
 
     if (searchTerm) {
+      const q = searchTerm.toLowerCase().trim();
       paidSlips = paidSlips.filter(slip => 
-        slip.staff?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        slip.staff?.last_name.toLowerCase().includes(searchTerm.toLowerCase())
+        slip.staff?.first_name?.toLowerCase().includes(q) ||
+        slip.staff?.last_name?.toLowerCase().includes(q) ||
+        slip.staff?.role?.toLowerCase().includes(q) ||
+        slip.payment_method?.toLowerCase().includes(q) ||
+        slip.notes?.toLowerCase().includes(q) ||
+        slip.paid_by_user?.full_name?.toLowerCase().includes(q) ||
+        (slip.period && getPeriodName(slip.period).toLowerCase().includes(q))
       );
     }
 
+    if (historyPeriodFilter !== 'ALL') {
+      paidSlips = paidSlips.filter(slip => slip.period_id === historyPeriodFilter);
+    }
+
+    if (historyMethodFilter !== 'ALL') {
+      paidSlips = paidSlips.filter(slip => slip.payment_method === historyMethodFilter);
+    }
+
+    // Sorting
+    paidSlips.sort((a, b) => {
+      if (historySortBy === 'date-desc') {
+        return new Date(b.payment_date || 0).getTime() - new Date(a.payment_date || 0).getTime();
+      }
+      if (historySortBy === 'date-asc') {
+        return new Date(a.payment_date || 0).getTime() - new Date(b.payment_date || 0).getTime();
+      }
+      if (historySortBy === 'amount-desc') {
+        return b.net_salary - a.net_salary;
+      }
+      if (historySortBy === 'amount-asc') {
+        return a.net_salary - b.net_salary;
+      }
+      if (historySortBy === 'name-asc') {
+        const nameA = `${a.staff?.last_name || ''} ${a.staff?.first_name || ''}`;
+        const nameB = `${b.staff?.last_name || ''} ${b.staff?.first_name || ''}`;
+        return nameA.localeCompare(nameB);
+      }
+      return 0;
+    });
+
+    const filteredTotalPaid = paidSlips.reduce((sum, s) => sum + s.net_salary, 0);
+
+    // Pagination calculations
+    const totalPages = Math.max(1, Math.ceil(paidSlips.length / historyItemsPerPage));
+    const safeCurrentPage = Math.min(historyCurrentPage, totalPages);
+    const startIndex = (safeCurrentPage - 1) * historyItemsPerPage;
+    const paginatedSlips = paidSlips.slice(startIndex, startIndex + historyItemsPerPage);
+
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-        <div className="p-4 sm:p-5 border-b border-slate-200 bg-white flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <h2 className="text-lg font-black text-slate-900 tracking-tight">Historique des Paiements</h2>
-          <div className="relative w-full sm:w-72">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-600 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Rechercher un employé..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-8 py-2.5 bg-white border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-950 placeholder:text-slate-600 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 outline-none transition-all shadow-2xs"
+      <div className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-300">
+        {/* KPI DASHBOARD CARDS - SYNTHÈSE DES DÉCAISSEMENTS COMPACTE */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* Total Décaissé */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-emerald-100 shadow-2xs flex items-center justify-between hover:border-emerald-200 transition-all">
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Décaissé (Paies)</p>
+              <h4 className="text-lg sm:text-xl font-black text-emerald-600 mt-0.5 tabular-nums">
+                {totalPaidGlobal.toLocaleString()} <span className="text-xs font-bold text-emerald-500">HTG</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">
+                Sur {totalPaidCount} versement{totalPaidCount > 1 ? 's' : ''} enregistré{totalPaidCount > 1 ? 's' : ''}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 border border-emerald-100/80 flex items-center justify-center text-emerald-600 shrink-0">
+              <DollarSign className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Nombre de Versements */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between hover:border-indigo-200 transition-all">
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Versements Effectués</p>
+              <h4 className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 tabular-nums">
+                {totalPaidCount} <span className="text-xs font-bold text-slate-500">bulletin{totalPaidCount > 1 ? 's' : ''}</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">Salaires réglés et archivés</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-indigo-50 border border-indigo-100/80 flex items-center justify-center text-indigo-600 shrink-0">
+              <CheckCircle2 className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Moyenne par versement */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between hover:border-blue-200 transition-all">
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Moyenne par Versement</p>
+              <h4 className="text-lg sm:text-xl font-black text-blue-600 mt-0.5 tabular-nums">
+                {averagePayment.toLocaleString()} <span className="text-xs font-bold text-blue-500">HTG</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5">Salaire net moyen versé</p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100/80 flex items-center justify-center text-blue-600 shrink-0">
+              <BarChart3 className="w-5 h-5" />
+            </div>
+          </div>
+
+          {/* Périodes couvertes */}
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex items-center justify-between hover:border-amber-200 transition-all">
+            <div>
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Périodes Couvertes</p>
+              <h4 className="text-lg sm:text-xl font-black text-amber-600 mt-0.5 tabular-nums">
+                {distinctPeriods.length} <span className="text-xs font-bold text-amber-600">période{distinctPeriods.length > 1 ? 's' : ''}</span>
+              </h4>
+              <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium mt-0.5 truncate max-w-[140px] sm:max-w-[180px]">
+                {distinctPeriods.map(p => p.label).slice(0, 2).join(', ')}{distinctPeriods.length > 2 ? '...' : ''}
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-100/80 flex items-center justify-center text-amber-600 shrink-0">
+              <Calendar className="w-5 h-5" />
+            </div>
+          </div>
+        </div>
+
+        {/* BARRE D'OUTILS MODERNE - RECHERCHE PILL, SELECTPILL HARMONISÉ, TRI & RÉSUMÉ */}
+        <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex flex-wrap items-center gap-2 flex-1">
+            {/* Recherche Pill */}
+            <div className="relative flex-1 min-w-[200px] sm:min-w-[240px] max-w-md">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Rechercher par employé, rôle, mode, notes..."
+                value={searchTerm}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setHistoryCurrentPage(1);
+                }}
+                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+              />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchTerm('');
+                    setHistoryCurrentPage(1);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+
+            {/* Filtre par Période avec SelectPill */}
+            {distinctPeriods.length > 0 && (
+              <SelectPill
+                options={[
+                  { value: 'ALL', label: `Toutes les périodes (${distinctPeriods.length})`, icon: Calendar },
+                  ...distinctPeriods.map(p => ({ value: p.id, label: p.label, icon: Calendar }))
+                ]}
+                value={historyPeriodFilter}
+                onChange={(val) => {
+                  setHistoryPeriodFilter(val);
+                  setHistoryCurrentPage(1);
+                }}
+                variant="pill"
+                size="sm"
+                colorScheme="slate"
+                icon={Calendar}
+                portal={true}
+              />
+            )}
+
+            {/* Filtre par Méthode de paiement avec SelectPill */}
+            {distinctMethods.length > 0 && (
+              <SelectPill
+                options={[
+                  { value: 'ALL', label: `Tous les modes (${distinctMethods.length})`, icon: CreditCard },
+                  ...distinctMethods.map(m => ({ value: m, label: m, icon: CreditCard }))
+                ]}
+                value={historyMethodFilter}
+                onChange={(val) => {
+                  setHistoryMethodFilter(val);
+                  setHistoryCurrentPage(1);
+                }}
+                variant="pill"
+                size="sm"
+                colorScheme="slate"
+                icon={CreditCard}
+                portal={true}
+              />
+            )}
+
+            {/* Tri avec SelectPill */}
+            <SelectPill
+              options={[
+                { value: 'date-desc', label: 'Date de paiement (Plus récent)', icon: ArrowUpDown },
+                { value: 'date-asc', label: 'Date de paiement (Plus ancien)', icon: ArrowUpDown },
+                { value: 'amount-desc', label: 'Montant payé (Plus élevé)', icon: ArrowUpDown },
+                { value: 'amount-asc', label: 'Montant payé (Plus faible)', icon: ArrowUpDown },
+                { value: 'name-asc', label: "Nom de l'employé (A-Z)", icon: ArrowUpDown },
+              ]}
+              value={historySortBy}
+              onChange={(val) => setHistorySortBy(val as any)}
+              variant="pill"
+              size="sm"
+              colorScheme="slate"
+              icon={ArrowUpDown}
+              portal={true}
             />
-            {searchTerm && (
+          </div>
+
+          {/* Indicateur de total sélectionné */}
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+            {filteredTotalPaid > 0 && (
+              <span className="text-xs font-bold text-slate-500">
+                Total : <strong className="text-emerald-600 ml-1">{filteredTotalPaid.toLocaleString()} HTG</strong>
+              </span>
+            )}
+
+            {(searchTerm || historyPeriodFilter !== 'ALL' || historyMethodFilter !== 'ALL') && (
               <button
                 type="button"
-                onClick={() => setSearchTerm('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+                onClick={() => {
+                  setSearchTerm('');
+                  setHistoryPeriodFilter('ALL');
+                  setHistoryMethodFilter('ALL');
+                  setHistoryCurrentPage(1);
+                }}
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5"
+                title="Réinitialiser tous les filtres"
               >
-                <X size={14} />
+                <RefreshCcw size={11} />
+                <span>Effacer filtres</span>
               </button>
             )}
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-50 text-slate-600 font-medium border-b border-slate-200">
-              <tr>
-                <th className="px-4 py-3">Date de Paiement</th>
-                <th className="px-4 py-3">Employé</th>
-                <th className="px-4 py-3">Période</th>
-                <th className="px-4 py-3">Montant Payé</th>
-                <th className="px-4 py-3">Méthode</th>
-                <th className="px-4 py-3">Traité par</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {paidSlips.map(slip => (
-                <tr key={slip.id} className="hover:bg-slate-50">
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-800">
-                      {slip.payment_date ? new Date(slip.payment_date).toLocaleDateString('fr-FR') : '-'}
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {slip.payment_date ? new Date(slip.payment_date).toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'}) : ''}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-900">{formatStudentName(slip.staff?.last_name, slip.staff?.first_name).fullName}</div>
-                    <div className="text-xs text-slate-500">{slip.staff?.role}</div>
-                  </td>
-                  <td className="px-4 py-3 text-slate-700">
-                    {slip.period ? getPeriodName(slip.period) : '-'}
-                  </td>
-                  <td className="px-4 py-3 font-bold text-emerald-600">
-                    {slip.net_salary.toLocaleString()} HTG
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="font-medium text-slate-700">
-                      {slip.payment_method}
-                    </div>
-                    {slip.notes && (
-                      <div className="text-[10px] text-slate-500 italic max-w-[150px] truncate" title={slip.notes}>
-                        {slip.notes}
+
+        {/* TABLEAU DES PAIEMENTS COMPACT & ÉPURÉ */}
+        <div className="bg-white rounded-xl sm:rounded-2xl shadow-2xs border border-slate-200/80 overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-slate-50/90 border-b border-slate-200/80 text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <th className="py-2.5 px-3 sm:px-4">Date & Heure</th>
+                  <th className="py-2.5 px-3 sm:px-4">Employé</th>
+                  <th className="py-2.5 px-3 sm:px-4">Période</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-right">Montant Net Payé</th>
+                  <th className="py-2.5 px-3 sm:px-4">Mode de Règlement</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Traité par</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {paginatedSlips.map((slip) => {
+                  const initials = `${slip.staff?.first_name?.charAt(0) || ''}${slip.staff?.last_name?.charAt(0) || ''}`;
+                  const formattedName = formatStudentName(slip.staff?.last_name, slip.staff?.first_name).fullName;
+
+                  // Méthode badge color
+                  const methodStr = slip.payment_method || 'Espèces';
+                  let methodBadgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
+                  if (methodStr.toLowerCase().includes('espèce')) {
+                    methodBadgeClass = 'bg-emerald-50 text-emerald-800 border-emerald-200';
+                  } else if (methodStr.toLowerCase().includes('chèque')) {
+                    methodBadgeClass = 'bg-indigo-50 text-indigo-800 border-indigo-200';
+                  } else if (methodStr.toLowerCase().includes('moncash')) {
+                    methodBadgeClass = 'bg-rose-50 text-rose-800 border-rose-200';
+                  } else if (methodStr.toLowerCase().includes('virement') || methodStr.toLowerCase().includes('transfert')) {
+                    methodBadgeClass = 'bg-blue-50 text-blue-800 border-blue-200';
+                  }
+
+                  return (
+                    <tr key={slip.id} className="hover:bg-slate-50/70 transition-colors group">
+                      {/* Date & Heure */}
+                      <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+                        <div className="font-bold text-slate-800 flex items-center gap-1.5">
+                          <Calendar size={12} className="text-slate-400" />
+                          <span>{slip.payment_date ? new Date(slip.payment_date).toLocaleDateString('fr-FR') : '-'}</span>
+                        </div>
+                        {slip.payment_date && (
+                          <div className="text-[10px] text-slate-400 font-medium pl-4.5">
+                            {new Date(slip.payment_date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Employé */}
+                      <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-700 font-black text-xs flex items-center justify-center shrink-0">
+                            {initials}
+                          </div>
+                          <div>
+                            <div className="font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">
+                              {formattedName}
+                            </div>
+                            <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium">
+                              {slip.staff?.role || 'Personnel'}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+
+                      {/* Période */}
+                      <td className="py-2.5 px-3 sm:px-4 whitespace-nowrap align-middle">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200/80 shadow-2xs">
+                          <Calendar size={11} className="text-amber-600 shrink-0" />
+                          <span>{slip.period ? getPeriodName(slip.period) : 'Période'}</span>
+                        </span>
+                      </td>
+
+                      {/* Montant Net Payé */}
+                      <td className="py-2.5 px-3 sm:px-4 text-right whitespace-nowrap align-middle">
+                        <div className="font-black text-xs sm:text-sm text-emerald-600 tabular-nums">
+                          {slip.net_salary.toLocaleString()} <span className="text-[10px] font-bold text-emerald-500">HTG</span>
+                        </div>
+                        {slip.deductions > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (slip.staff) {
+                                setExpertAdvanceData({
+                                  staff: slip.staff,
+                                  slip: slip,
+                                  advances: advances.filter(a => a.staff_id === slip.staff?.id)
+                                });
+                              }
+                            }}
+                            className="text-[9px] sm:text-[10px] font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.2 rounded border border-emerald-200 inline-flex items-center gap-1 cursor-pointer transition-colors"
+                            title="Audit de l'avance déduite pour cette paie"
+                          >
+                            <HandCoins size={9} />
+                            <span>Déduction : -{slip.deductions.toLocaleString()} G</span>
+                            <Sparkles size={8} className="text-amber-500" />
+                          </button>
+                        )}
+                      </td>
+
+                      {/* Mode de Règlement & Référence */}
+                      <td className="py-2.5 px-3 sm:px-4 align-middle">
+                        <div className="flex flex-col gap-0.5">
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.2 rounded-md text-[10px] sm:text-[11px] font-bold border w-fit shadow-2xs ${methodBadgeClass}`}>
+                            <CreditCard size={10} />
+                            <span>{methodStr}</span>
+                          </span>
+                          {slip.notes && (
+                            <span className="text-[10px] text-slate-500 font-medium max-w-xs truncate" title={slip.notes}>
+                              {slip.notes}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+
+                      {/* Traité par */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap align-middle">
+                        <span className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-700 bg-indigo-50/80 border border-indigo-100 px-2 py-0.5 rounded-lg shadow-2xs">
+                          <User size={11} className="text-indigo-500" />
+                          <span>{slip.paid_by_user?.full_name || slip.paid_by || 'Système'}</span>
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+
+                {paginatedSlips.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-10 px-4 text-center">
+                      <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
+                        <Clock className="w-5 h-5" />
                       </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3">
-                     <span className="flex items-center gap-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 px-2 py-1 rounded-full w-fit">
-                        <User size={12} /> {slip.paid_by_user?.full_name || slip.paid_by || 'Système'}
-                     </span>
-                  </td>
-                </tr>
-              ))}
-              {paidSlips.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center text-slate-500">
-                    Aucun historique de paiement disponible.
-                  </td>
-                </tr>
+                      <h4 className="text-sm font-bold text-slate-800">
+                        {allPaidSlips.length === 0 ? 'Aucun historique de paiement' : 'Aucun versement correspondant'}
+                      </h4>
+                      <p className="text-xs text-slate-500 max-w-sm mx-auto mt-0.5">
+                        {allPaidSlips.length === 0
+                          ? 'Les paiements validés apparaîtront automatiquement dans ce journal d’historique.'
+                          : 'Modifiez vos filtres ou termes de recherche pour afficher les enregistrements.'}
+                      </p>
+                      {(searchTerm || historyPeriodFilter !== 'ALL' || historyMethodFilter !== 'ALL') && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setHistoryPeriodFilter('ALL');
+                            setHistoryMethodFilter('ALL');
+                            setHistoryCurrentPage(1);
+                          }}
+                          className="mt-2.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-full transition-all cursor-pointer inline-flex items-center gap-1"
+                        >
+                          <RefreshCcw size={11} />
+                          Réinitialiser les filtres
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* BARRE DE PAGINATION MODERNE COMPACTE AVEC SELECTPILL */}
+          {paidSlips.length > 0 && (
+            <div className="px-3.5 sm:px-5 py-2.5 bg-white border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-2.5 text-xs">
+              <div className="flex flex-wrap items-center justify-between sm:justify-start gap-2.5 w-full sm:w-auto text-slate-600 font-medium">
+                <span>
+                  Affichage de <strong className="text-slate-900">{paidSlips.length === 0 ? 0 : (safeCurrentPage - 1) * historyItemsPerPage + 1}</strong> à <strong className="text-slate-900">{Math.min(safeCurrentPage * historyItemsPerPage, paidSlips.length)}</strong> sur <strong className="text-slate-900">{paidSlips.length}</strong> versement{paidSlips.length > 1 ? 's' : ''}
+                </span>
+
+                {/* Sélecteur de pagination avec SelectPill */}
+                <div className="flex items-center gap-1.5 pl-2 sm:border-l sm:border-slate-200">
+                  <span className="text-slate-500 text-[11px]">Afficher :</span>
+                  <SelectPill
+                    options={[
+                      { value: '10', label: '10 / page' },
+                      { value: '15', label: '15 / page' },
+                      { value: '25', label: '25 / page' },
+                      { value: '50', label: '50 / page' },
+                      { value: '100', label: '100 / page' },
+                    ]}
+                    value={historyItemsPerPage.toString()}
+                    onChange={(val) => {
+                      setHistoryItemsPerPage(Number(val));
+                      setHistoryCurrentPage(1);
+                    }}
+                    variant="pill"
+                    size="xs"
+                    colorScheme="slate"
+                    portal={true}
+                  />
+                </div>
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  {/* Première page */}
+                  <button
+                    type="button"
+                    onClick={() => setHistoryCurrentPage(1)}
+                    disabled={safeCurrentPage === 1}
+                    className="p-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                    title="Première page"
+                  >
+                    <ChevronsLeft size={14} />
+                  </button>
+
+                  {/* Page précédente */}
+                  <button
+                    type="button"
+                    onClick={() => setHistoryCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="p-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                    title="Page précédente"
+                  >
+                    <ChevronLeft size={14} />
+                  </button>
+
+                  {/* Numéros de page avec fenêtre dynamique */}
+                  <div className="flex items-center gap-1 mx-1">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(page => {
+                        if (totalPages <= 7) return true;
+                        if (page === 1 || page === totalPages) return true;
+                        return Math.abs(page - safeCurrentPage) <= 1;
+                      })
+                      .reduce<(number | string)[]>((acc, page, index, arr) => {
+                        if (index > 0 && (page as number) - (arr[index - 1] as number) > 1) {
+                          acc.push('...');
+                        }
+                        acc.push(page);
+                        return acc;
+                      }, [])
+                      .map((item, idx) => {
+                        if (typeof item === 'string') {
+                          return (
+                            <span key={`ellipsis-${idx}`} className="px-1 text-xs font-bold text-slate-400">
+                              ...
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => setHistoryCurrentPage(item as number)}
+                            className={`min-w-[26px] h-6 px-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                              safeCurrentPage === item
+                                ? 'bg-indigo-600 text-white shadow-2xs font-black'
+                                : 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 shadow-2xs'
+                            }`}
+                          >
+                            {item}
+                          </button>
+                        );
+                      })}
+                  </div>
+
+                  {/* Page suivante */}
+                  <button
+                    type="button"
+                    onClick={() => setHistoryCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className="p-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                    title="Page suivante"
+                  >
+                    <ChevronRight size={14} />
+                  </button>
+
+                  {/* Dernière page */}
+                  <button
+                    type="button"
+                    onClick={() => setHistoryCurrentPage(totalPages)}
+                    disabled={safeCurrentPage === totalPages}
+                    className="p-1 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shadow-2xs"
+                    title="Dernière page"
+                  >
+                    <ChevronsRight size={14} />
+                  </button>
+                </div>
               )}
-            </tbody>
-          </table>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2460,83 +3530,93 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   };
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-4 sm:space-y-5 relative">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed bottom-4 right-4 z-[100] flex items-center gap-2 px-4 py-3 rounded-lg shadow-lg text-white animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
-          {toast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+        <div className={`fixed bottom-4 right-4 z-[100] flex items-center gap-2 px-3.5 py-2.5 rounded-xl shadow-lg text-white text-xs sm:text-sm font-medium animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
+          {toast.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
           <span className="font-medium">{toast.message}</span>
-          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80">
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-80 cursor-pointer">
             <X className="w-4 h-4" />
           </button>
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-800">Gestion Payroll</h1>
-          <p className="text-slate-500">Préparez les salaires, gérez les arriérés et suivez les paiements.</p>
+          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Gestion Payroll</h1>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium">Préparez les salaires, gérez les arriérés et suivez les paiements.</p>
         </div>
       </div>
 
-      <div className="flex overflow-x-auto border-b border-slate-200 hide-scrollbar">
+      <div className="flex overflow-x-auto border-b border-slate-200 hide-scrollbar -mb-px">
         <button
           onClick={() => { setActiveTab('periods'); setSearchTerm(''); }}
-          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
             activeTab === 'periods' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
           }`}
         >
           <Calendar className="w-4 h-4" />
-          Périodes
+          <span>Périodes</span>
         </button>
         <button
           onClick={() => { setActiveTab('preparation'); setSearchTerm(''); }}
-          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
             activeTab === 'preparation' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
           }`}
         >
           <FileText className="w-4 h-4" />
-          Préparation
+          <span>Préparation</span>
         </button>
         <button
           onClick={() => { setActiveTab('arrears'); setSearchTerm(''); }}
-          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
             activeTab === 'arrears' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
           }`}
         >
           <AlertCircle className="w-4 h-4" />
-          Arriérés & Paiements
+          <span>Arriérés & Paiements</span>
+          {slips.filter(s => s.status === 'UNPAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length > 0 && (
+            <span className="ml-1 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
+              {slips.filter(s => s.status === 'UNPAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => { setActiveTab('advances'); setSearchTerm(''); }}
-          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
             activeTab === 'advances' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
           }`}
         >
           <HandCoins className="w-4 h-4" />
-          Avances
+          <span>Avances</span>
         </button>
         <button
-          onClick={() => { setActiveTab('history'); setSearchTerm(''); }}
-          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
+          onClick={() => { setActiveTab('history'); setSearchTerm(''); setHistoryCurrentPage(1); }}
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
             activeTab === 'history' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
           }`}
         >
           <Clock className="w-4 h-4" />
-          Historique
+          <span>Historique</span>
+          {slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length > 0 && (
+            <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+              {slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length}
+            </span>
+          )}
         </button>
         <button
           onClick={() => { setActiveTab('reports'); setSearchTerm(''); }}
-          className={`flex items-center gap-2 px-4 py-3 font-medium text-sm whitespace-nowrap border-b-2 transition-colors ${
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
             activeTab === 'reports' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
           }`}
         >
           <BarChart3 className="w-4 h-4" />
-          Rapports
+          <span>Rapports</span>
         </button>
       </div>
 
-      <div className="mt-6">
+      <div className="mt-3 sm:mt-4">
         {activeTab === 'periods' && renderPeriodsTab()}
         {activeTab === 'preparation' && renderPreparationTab()}
         {activeTab === 'arrears' && renderArrearsTab()}
@@ -2545,65 +3625,82 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         {activeTab === 'reports' && renderReportsTab()}
       </div>
 
-      {/* Modal Nouvelle Période */}
+      {/* Modal Nouvelle Période Harmonisé & Compact */}
       {showPeriodModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100">
-              <h3 className="font-bold text-lg text-slate-800">Nouvelle Période de Paie</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+                  <Calendar className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-slate-900 tracking-tight leading-tight">
+                    Nouvelle Période de Paie
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">
+                    Ouvrir un nouveau cycle mensuel
+                  </p>
+                </div>
+              </div>
               <button 
+                type="button"
                 onClick={() => { setShowPeriodModal(false); setModalError(null); setModalSuccess(false); }} 
-                className="text-slate-400 hover:text-slate-600"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
               >
-                <X className="w-5 h-5" />
+                <X className="w-4 h-4" />
               </button>
             </div>
             
             {modalSuccess ? (
-              <div className="p-8 text-center space-y-4 animate-in zoom-in-95 duration-300">
-                <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="w-10 h-10" />
+              <div className="p-6 sm:p-8 text-center space-y-3.5 animate-in zoom-in-95 duration-300">
+                <div className="w-14 h-14 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center mx-auto mb-2 shadow-2xs">
+                  <CheckCircle className="w-8 h-8" />
                 </div>
-                <h4 className="text-xl font-bold text-slate-900">Période Créée !</h4>
-                <p className="text-slate-500">La période de paie a été configurée avec succès. Vous allez être redirigé vers la préparation.</p>
+                <h4 className="text-lg font-black text-slate-900">Période Créée !</h4>
+                <p className="text-xs sm:text-sm text-slate-500">La période de paie a été configurée avec succès. Vous allez être redirigé vers la préparation.</p>
                 <button
                   onClick={() => { setShowPeriodModal(false); setModalSuccess(false); setActiveTab('preparation'); }}
-                  className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold hover:bg-emerald-700 transition-all shadow-md active:scale-95"
+                  className="w-full py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-emerald-700 transition-all shadow-xs active:scale-98 cursor-pointer"
                 >
                   Continuer
                 </button>
               </div>
             ) : (
-              <form onSubmit={handleCreatePeriod} className="p-4 space-y-4">
+              <form onSubmit={handleCreatePeriod} className="p-3.5 sm:p-4.5 space-y-3 sm:space-y-3.5">
                 {modalError && (
-                  <div className="p-3 bg-rose-50 border border-rose-100 rounded-lg flex items-start gap-2 text-rose-600 animate-in fade-in slide-in-from-top-1">
+                  <div className="p-2.5 bg-rose-50 border border-rose-200/80 rounded-xl flex items-start gap-2 text-rose-600 animate-in fade-in slide-in-from-top-1">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                    <p className="text-xs font-medium">{modalError}</p>
+                    <p className="text-xs font-semibold">{modalError}</p>
                   </div>
                 )}
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Mois</label>
-                    <select
-                      value={newPeriodMonth}
-                      onChange={(e) => setNewPeriodMonth(Number(e.target.value))}
-                      className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
-                      required
-                      disabled={modalLoading}
-                    >
-                      {MONTHS.map((m, i) => (
-                        <option key={i} value={i + 1}>{m}</option>
-                      ))}
-                    </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate">
+                      Mois
+                    </label>
+                    <SelectPill
+                      options={monthOptions}
+                      value={String(newPeriodMonth)}
+                      onChange={(val) => setNewPeriodMonth(Number(val))}
+                      icon={Calendar}
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      placeholder="Mois..."
+                      className="w-full"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Année</label>
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate">
+                      Année
+                    </label>
                     <input
                       type="number"
                       value={newPeriodYear}
                       onChange={(e) => setNewPeriodYear(Number(e.target.value))}
-                      className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white outline-none transition-all shadow-2xs"
                       required
                       min="2020"
                       max="2050"
@@ -2611,11 +3708,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                     />
                   </div>
                 </div>
-                <div className="pt-4 flex justify-end gap-3">
+                <div className="pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-end gap-2 sm:gap-2.5">
                   <button
                     type="button"
                     onClick={() => { setShowPeriodModal(false); setModalError(null); }}
-                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                    className="px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                     disabled={modalLoading}
                   >
                     Annuler
@@ -2623,14 +3720,14 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   <button
                     type="submit"
                     disabled={modalLoading}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                    className="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-xs hover:shadow flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                   >
                     {modalLoading ? (
                       <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     ) : (
                       <Plus className="w-4 h-4" />
                     )}
-                    Créer la période
+                    <span>Créer la période</span>
                   </button>
                 </div>
               </form>
@@ -2639,30 +3736,60 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         </div>
       )}
 
-      {/* Modal Paiement */}
+      {/* Modal Paiement Harmonisé & Compact Responsive */}
       {showPaymentModal && selectedSlip && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-emerald-50">
-              <h3 className="font-bold text-lg text-emerald-800 flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Enregistrer un Paiement
-              </h3>
-              <button onClick={() => setShowPaymentModal(false)} className="text-emerald-600 hover:text-emerald-800">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header Compact */}
+            <div className="flex justify-between items-center px-4 py-3 sm:px-5 sm:py-3.5 border-b border-emerald-100 bg-gradient-to-r from-emerald-50 via-teal-50/50 to-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-emerald-950 tracking-tight leading-tight">
+                    Enregistrer un Paiement
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-emerald-700/80">
+                    Règlement du salaire individuel
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPaymentModal(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleProcessPayment} className="p-4 space-y-4">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-200">
-                <p className="text-sm text-slate-500">Employé</p>
-                <p className="font-bold text-slate-800">{formatStudentName(selectedSlip.staff?.last_name, selectedSlip.staff?.first_name).fullName}</p>
-                <div className="flex justify-between mt-2 pt-2 border-t border-slate-200">
-                  <span className="text-sm text-slate-500">Période: {selectedSlip.period ? getPeriodName(selectedSlip.period) : ''}</span>
-                  <span className="font-bold text-red-600">{selectedSlip.net_salary.toLocaleString()} HTG</span>
+
+            <form onSubmit={handleProcessPayment} className="p-3.5 sm:p-4.5 space-y-3 sm:space-y-3.5">
+              {/* Carte Employé Compacte */}
+              <div className="bg-slate-50/90 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Employé Bénéficiaire</span>
+                  {selectedSlip.staff?.role && (
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-md">
+                      {selectedSlip.staff.role}
+                    </span>
+                  )}
+                </div>
+                <p className="font-black text-sm sm:text-base text-slate-900 mt-0.5 truncate">
+                  {formatStudentName(selectedSlip.staff?.last_name, selectedSlip.staff?.first_name).fullName}
+                </p>
+                <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/70">
+                  <span className="inline-flex items-center gap-1.5 text-xs text-slate-600 font-medium">
+                    <Calendar size={13} className="text-blue-600 shrink-0" />
+                    <span>Période : {selectedSlip.period ? getPeriodName(selectedSlip.period) : 'N/A'}</span>
+                  </span>
+                  <span className="font-black text-sm sm:text-base text-emerald-600 tabular-nums">
+                    {selectedSlip.net_salary.toLocaleString()} <span className="text-xs font-bold text-emerald-500">HTG</span>
+                  </span>
                 </div>
               </div>
 
-              {/* Discrepancy Warning and Advance Info in Modal */}
+              {/* Avertissements & Alertes Déductions */}
               {(() => {
                 const memberAdvances = advances.filter(a => 
                   a.staff_id === selectedSlip.staff_id && 
@@ -2683,14 +3810,14 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 return (
                   <div className="space-y-2">
                     {hasDiscrepancy && (
-                      <div className="bg-rose-50 border border-rose-200 p-3 rounded-lg flex items-start gap-3 animate-in fade-in slide-in-from-top-2 duration-300">
-                        <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                      <div className="bg-rose-50 border border-rose-200/80 p-2.5 sm:p-3 rounded-xl flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-bold text-rose-800">Attention : Écart de déduction</p>
-                          <p className="text-[10px] text-rose-700 mt-1">
+                          <p className="text-[10px] sm:text-[11px] text-rose-700 mt-0.5 leading-snug">
                             Cette fiche déduit {selectedSlip.deductions.toLocaleString()} HTG, mais l'employé a {totalCurrentAdvanceAmount.toLocaleString()} HTG d'avances approuvées avant préparation.
                           </p>
-                          <p className="text-[10px] font-bold text-rose-900 mt-2 uppercase tracking-wider">
+                          <p className="text-[10px] font-bold text-rose-900 mt-1.5 uppercase tracking-wider">
                             Synchronisez la déduction dans l'onglet "Préparation" si nécessaire.
                           </p>
                         </div>
@@ -2698,12 +3825,12 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                     )}
                     
                     {totalFutureAdvanceAmount > 0 && (
-                      <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg flex items-start gap-3">
-                        <Info className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" />
+                      <div className="bg-blue-50 border border-blue-200/80 p-2.5 sm:p-3 rounded-xl flex items-start gap-2.5">
+                        <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-bold text-blue-800">Avance reportée</p>
-                          <p className="text-[10px] text-blue-700 mt-1">
-                            L'employé a une avance de {totalFutureAdvanceAmount.toLocaleString()} HTG approuvée APRÈS la préparation de cette paie. Elle sera déduite automatiquement le mois prochain.
+                          <p className="text-[10px] sm:text-[11px] text-blue-700 mt-0.5 leading-snug">
+                            Avance de {totalFutureAdvanceAmount.toLocaleString()} HTG approuvée après la paie (déduite au cycle suivant).
                           </p>
                         </div>
                       </div>
@@ -2712,46 +3839,57 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 );
               })()}
 
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Méthode de paiement</label>
-                <select
+              {/* Méthode de paiement harmonisée avec SelectPill */}
+              <div className="space-y-1 sm:space-y-1.5">
+                <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Méthode de paiement
+                </label>
+                <SelectPill
+                  options={payrollPaymentMethodOptions}
                   value={paymentMethod}
-                  onChange={(e) => setPaymentMethod(e.target.value)}
-                  className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-emerald-500"
-                  required
-                >
-                  <option value="Espèces">Espèces</option>
-                  <option value="Chèque">Chèque</option>
-                  <option value="MonCash">MonCash</option>
-                </select>
+                  onChange={(val) => {
+                    setPaymentMethod(val);
+                    if (val !== 'Chèque') {
+                      setPaymentBank('');
+                      setPaymentRefNumber('');
+                      setPaymentRefError(null);
+                    }
+                  }}
+                  icon={CreditCard}
+                  variant="field"
+                  size="md"
+                  colorScheme="blue"
+                  placeholder="Sélectionner le mode..."
+                  className="w-full"
+                />
               </div>
 
+              {/* Champs conditionnels Chèque Bancaire */}
               {paymentMethod === 'Chèque' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Banque émettrice</label>
-                    <select
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-0.5">
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate" title="Banque émettrice">
+                      Banque émettrice
+                    </label>
+                    <SelectPill
+                      options={bankOptions}
                       value={paymentBank}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      onChange={(val) => {
                         setPaymentBank(val);
                         if (paymentRefNumber) verifyPayrollReference(paymentRefNumber, false, val);
                       }}
-                      className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-emerald-500"
-                      required
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      {(globalSettings?.banks && globalSettings?.banks?.length > 0) ? (
-                        globalSettings.banks.map((b: string) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))
-                      ) : (
-                        <option value="" disabled>Aucune banque configurée (Voir Paramètres)</option>
-                      )}
-                    </select>
+                      icon={Building2}
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      placeholder="Choisir banque..."
+                      className="w-full"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Numéro du chèque</label>
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate" title="Numéro du chèque">
+                      Numéro du chèque
+                    </label>
                     <div className="relative">
                       <input
                         type="text"
@@ -2761,44 +3899,49 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                           setPaymentRefNumber(val);
                           verifyPayrollReference(val, false, paymentBank);
                         }}
-                        className={`w-full p-2 border ${paymentRefError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-300 focus:ring-emerald-500'} rounded-lg text-slate-900 focus:ring-2`}
+                        className={`w-full px-3 py-2 border ${paymentRefError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'} rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white outline-none transition-all shadow-2xs`}
                         required
-                        placeholder="Ex: 123456"
+                        placeholder="Ex: 004589"
                       />
-                      {isCheckingPaymentRef && <RefreshCcw className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400 w-4 h-4" />}
+                      {isCheckingPaymentRef && <RefreshCcw className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400 w-3.5 h-3.5" />}
                     </div>
-                    {paymentRefError && <p className="text-xs text-rose-600 mt-1">{paymentRefError}</p>}
+                    {paymentRefError && <p className="text-[10px] font-semibold text-rose-600 mt-0.5">{paymentRefError}</p>}
                   </div>
                 </div>
               )}
 
+              {/* Notes / Référence additionnelle */}
               {paymentMethod !== 'Chèque' && (
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Notes (Optionnel)</label>
+                <div className="space-y-1 sm:space-y-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                    {paymentMethod === 'MonCash' ? 'Référence Transaction MonCash (Optionnel)' : 'Notes / Référence (Optionnel)'}
+                  </label>
                   <textarea
                     value={paymentNotes}
                     onChange={(e) => setPaymentNotes(e.target.value)}
-                    className="w-full p-2 border border-slate-300 rounded-lg text-slate-900 focus:ring-2 focus:ring-emerald-500"
-                    rows={3}
-                    placeholder="Informations supplémentaires..."
+                    className="w-full p-2.5 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-xs sm:text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 bg-white shadow-2xs"
+                    rows={2}
+                    placeholder={paymentMethod === 'MonCash' ? 'Ex: Ref #MC-984210' : 'Informations ou observation sur le règlement...'}
                   />
                 </div>
               )}
 
-              <div className="pt-4 flex justify-end gap-3">
+              {/* Actions de validation compactes */}
+              <div className="pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowPaymentModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors flex items-center gap-2"
+                  disabled={loading || (paymentMethod === 'Chèque' && (!!paymentRefError || !paymentRefNumber || !paymentBank))}
+                  className="px-4 py-2 sm:py-2.5 bg-emerald-600 hover:bg-emerald-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-xs hover:shadow flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Confirmer le paiement
+                  <span>Confirmer le paiement</span>
                 </button>
               </div>
             </form>
@@ -2806,43 +3949,61 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         </div>
       )}
 
-      {/* Modal Demande d'Avance */}
+      {/* Modal Demande d'Avance Harmonisé & Compact Responsive */}
       {showAdvanceModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 sm:p-5 border-b border-slate-100">
-              <h3 className="font-black text-lg text-slate-900 flex items-center gap-2 tracking-tight">
-                <HandCoins className="w-5 h-5 text-blue-600" />
-                Nouvelle Demande d'Avance
-              </h3>
-              <button onClick={() => setShowAdvanceModal(false)} className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition-colors">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+                  <HandCoins className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-slate-900 tracking-tight leading-tight">
+                    Nouvelle Demande d'Avance
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-slate-500">
+                    Acompte ou prêt sur salaire
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowAdvanceModal(false)} 
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleRequestAdvance} className="p-4 sm:p-6 space-y-4">
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Employé</label>
-                <select
+            <form onSubmit={handleRequestAdvance} className="p-3.5 sm:p-4.5 space-y-3 sm:space-y-3.5">
+              <div className="space-y-1 sm:space-y-1.5">
+                <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Employé
+                </label>
+                <SelectPill
+                  options={advanceStaffOptions}
                   value={advanceStaffId}
-                  onChange={(e) => setAdvanceStaffId(e.target.value)}
-                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  required
-                >
-                  <option value="">Sélectionner un employé</option>
-                  {staff.map(s => (
-                    <option key={s.id} value={s.id}>{formatStudentName(s.last_name, s.first_name).fullName} ({s.role})</option>
-                  ))}
-                </select>
+                  onChange={setAdvanceStaffId}
+                  icon={User}
+                  variant="field"
+                  size="md"
+                  colorScheme="blue"
+                  placeholder="Sélectionner un employé..."
+                  searchable={true}
+                  className="w-full"
+                />
                 {advanceStaffId && (() => {
                   const activeAdvances = advances.filter(a => a.staff_id === advanceStaffId && ['PENDING', 'APPROVED', 'PAID'].includes(a.status));
                   if (activeAdvances.length > 0) {
                     const totalRemaining = activeAdvances.reduce((acc, a) => acc + a.amount, 0);
                     return (
-                      <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-xl flex gap-3 text-amber-900">
-                        <AlertCircle className="w-5 h-5 shrink-0 text-amber-600" />
+                      <div className="mt-2 p-2.5 bg-amber-50 border border-amber-200/80 rounded-xl flex gap-2.5 text-amber-900">
+                        <AlertCircle className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
                         <div>
-                          <p className="text-sm font-bold text-amber-950 leading-tight">Avance(s) en cours existante(s)</p>
-                          <p className="text-xs font-semibold text-amber-800 mt-0.5">Cet employé a déjà {activeAdvances.length} avance(s) en cours, pour un reste totalisé à payer de <strong>{totalRemaining.toLocaleString('fr-HT', { style: 'currency', currency: 'HTG' })}</strong>.</p>
+                          <p className="text-xs font-bold text-amber-950 leading-tight">Avance(s) existante(s)</p>
+                          <p className="text-[10px] sm:text-[11px] font-medium text-amber-800 mt-0.5 leading-snug">
+                            {activeAdvances.length} avance(s) en cours, reste total à payer : <strong>{totalRemaining.toLocaleString('fr-HT', { style: 'currency', currency: 'HTG' })}</strong>.
+                          </p>
                         </div>
                       </div>
                     );
@@ -2851,43 +4012,50 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 })()}
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Montant (HTG)</label>
+              <div className="space-y-1 sm:space-y-1.5">
+                <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Montant (HTG)
+                </label>
                 <input
                   type="number"
-                  value={advanceAmount}
+                  value={advanceAmount || ''}
                   onChange={(e) => setAdvanceAmount(Number(e.target.value))}
-                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  className="w-full px-3 py-2 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white outline-none transition-all shadow-2xs"
                   required
                   min="1"
+                  placeholder="Ex: 5000"
                 />
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Raison / Motif</label>
+              <div className="space-y-1 sm:space-y-1.5">
+                <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Raison / Motif
+                </label>
                 <textarea
                   value={advanceReason}
                   onChange={(e) => setAdvanceReason(e.target.value)}
-                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-600 bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none"
-                  rows={3}
-                  placeholder="Ex: Urgence médicale, frais scolaires..."
+                  className="w-full p-2.5 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-xs sm:text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 bg-white shadow-2xs"
+                  rows={2}
+                  placeholder="Ex: Urgence médicale, avance exceptionnelle..."
                   required
                 />
               </div>
 
-              <div className="pt-4 flex justify-end gap-3">
+              <div className="pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAdvanceModal(false)}
-                  className="px-4 py-2.5 text-xs sm:text-sm font-bold text-slate-700 hover:text-slate-900 border border-slate-300 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-blue-600 text-white rounded-xl font-bold text-xs sm:text-sm hover:bg-blue-700 transition-colors shadow-xs cursor-pointer"
+                  disabled={!advanceStaffId || advanceAmount <= 0}
+                  className="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-xs hover:shadow flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
-                  Enregistrer la demande
+                  <HandCoins className="w-4 h-4" />
+                  <span>Enregistrer la demande</span>
                 </button>
               </div>
             </form>
@@ -2895,69 +4063,102 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         </div>
       )}
 
-      {/* Modal Paiement Avance */}
+      {/* Modal Paiement Avance Harmonisé & Compact Responsive */}
       {showAdvancePaymentModal && selectedAdvance && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-slate-100 bg-blue-50">
-              <h3 className="font-bold text-lg text-blue-800 flex items-center gap-2">
-                <DollarSign className="w-5 h-5" />
-                Payer l'Avance de Fonds
-              </h3>
-              <button onClick={() => setShowAdvancePaymentModal(false)} className="text-blue-600 hover:text-blue-800">
-                <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md border border-slate-200/90 overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center px-4 py-3 sm:px-5 sm:py-3.5 border-b border-blue-100 bg-gradient-to-r from-blue-50 via-indigo-50/50 to-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+                  <DollarSign className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base text-blue-950 tracking-tight leading-tight">
+                    Payer l'Avance de Fonds
+                  </h3>
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-blue-700/80">
+                    Décaissement direct de trésorerie
+                  </p>
+                </div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => setShowAdvancePaymentModal(false)} 
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
               </button>
             </div>
-            <form onSubmit={handleProcessAdvancePayment} className="p-4 space-y-4">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
-                <p className="text-xs font-bold text-slate-700">Employé</p>
-                <p className="font-black text-slate-900">{formatStudentName(selectedAdvance.staff?.last_name, selectedAdvance.staff?.first_name).fullName}</p>
-                <div className="flex justify-between mt-2 pt-2 border-t border-slate-200">
-                  <span className="text-xs font-bold text-slate-700">Montant de l'avance :</span>
-                  <span className="font-black text-blue-600">{selectedAdvance.amount.toLocaleString()} HTG</span>
+            <form onSubmit={handleProcessAdvancePayment} className="p-3.5 sm:p-4.5 space-y-3 sm:space-y-3.5">
+              <div className="bg-slate-50/90 p-3 sm:p-3.5 rounded-xl border border-slate-200/80 shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider">Employé Bénéficiaire</span>
+                  {selectedAdvance.staff?.role && (
+                    <span className="text-[10px] font-bold text-slate-600 bg-slate-200/70 px-2 py-0.5 rounded-md">
+                      {selectedAdvance.staff.role}
+                    </span>
+                  )}
+                </div>
+                <p className="font-black text-sm sm:text-base text-slate-900 mt-0.5 truncate">
+                  {formatStudentName(selectedAdvance.staff?.last_name, selectedAdvance.staff?.first_name).fullName}
+                </p>
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-slate-200/70">
+                  <span className="text-xs font-bold text-slate-600">Montant décaissé :</span>
+                  <span className="font-black text-sm sm:text-base text-blue-600 tabular-nums">
+                    {selectedAdvance.amount.toLocaleString()} <span className="text-xs font-bold text-blue-500">HTG</span>
+                  </span>
                 </div>
               </div>
 
-              <div>
-                <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Méthode de paiement</label>
-                <select
+              <div className="space-y-1 sm:space-y-1.5">
+                <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                  Méthode de paiement
+                </label>
+                <SelectPill
+                  options={payrollPaymentMethodOptions}
                   value={advancePaymentMethod}
-                  onChange={(e) => setAdvancePaymentMethod(e.target.value)}
-                  className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                  required
-                >
-                  <option value="Espèces">Espèces</option>
-                  <option value="Chèque">Chèque</option>
-                  <option value="MonCash">MonCash</option>
-                </select>
+                  onChange={(val) => {
+                    setAdvancePaymentMethod(val);
+                    if (val !== 'Chèque') {
+                      setAdvancePaymentBank('');
+                      setAdvancePaymentRefNumber('');
+                      setAdvancePaymentRefError(null);
+                    }
+                  }}
+                  icon={CreditCard}
+                  variant="field"
+                  size="md"
+                  colorScheme="blue"
+                  placeholder="Sélectionner le mode..."
+                  className="w-full"
+                />
               </div>
 
               {advancePaymentMethod === 'Chèque' && (
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Banque émettrice</label>
-                    <select
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 pt-0.5">
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate" title="Banque émettrice">
+                      Banque émettrice
+                    </label>
+                    <SelectPill
+                      options={bankOptions}
                       value={advancePaymentBank}
-                      onChange={(e) => {
-                        const val = e.target.value;
+                      onChange={(val) => {
                         setAdvancePaymentBank(val);
                         if (advancePaymentRefNumber) verifyPayrollReference(advancePaymentRefNumber, true, val);
                       }}
-                      className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                      required
-                    >
-                      <option value="">-- Sélectionner --</option>
-                      {(globalSettings?.banks && globalSettings?.banks?.length > 0) ? (
-                        globalSettings.banks.map((b: string) => (
-                          <option key={b} value={b}>{b}</option>
-                        ))
-                      ) : (
-                        <option value="" disabled>Aucune banque configurée (Voir Paramètres)</option>
-                      )}
-                    </select>
+                      icon={Building2}
+                      variant="field"
+                      size="sm"
+                      colorScheme="blue"
+                      placeholder="Choisir banque..."
+                      className="w-full"
+                    />
                   </div>
-                  <div>
-                    <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">Numéro du chèque</label>
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate" title="Numéro du chèque">
+                      Numéro du chèque
+                    </label>
                     <div className="relative">
                       <input
                         type="text"
@@ -2967,47 +4168,48 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                           setAdvancePaymentRefNumber(val);
                           verifyPayrollReference(val, true, advancePaymentBank);
                         }}
-                        className={`w-full p-2.5 border ${advancePaymentRefError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-300 focus:ring-blue-500'} rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white focus:ring-2 outline-none`}
+                        className={`w-full px-3 py-2 border ${advancePaymentRefError ? 'border-rose-500 focus:ring-rose-500' : 'border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20'} rounded-xl text-xs sm:text-sm font-bold text-slate-900 bg-white outline-none transition-all shadow-2xs`}
                         required
-                        placeholder="Ex: 123456"
+                        placeholder="Ex: 004589"
                       />
-                      {isCheckingAdvanceRef && <RefreshCcw className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400 w-4 h-4" />}
+                      {isCheckingAdvanceRef && <RefreshCcw className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400 w-3.5 h-3.5" />}
                     </div>
-                    {advancePaymentRefError && <p className="text-xs text-rose-600 mt-1">{advancePaymentRefError}</p>}
+                    {advancePaymentRefError && <p className="text-[10px] font-semibold text-rose-600 mt-0.5">{advancePaymentRefError}</p>}
                   </div>
                 </div>
               )}
 
               {advancePaymentMethod !== 'Chèque' && (
-                <div>
-                  <label className="block text-xs sm:text-sm font-bold text-slate-800 mb-1">
-                    {advancePaymentMethod === 'MonCash' ? 'ID Transaction MonCash' : 'Notes (Optionnel)'}
+                <div className="space-y-1 sm:space-y-1.5">
+                  <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">
+                    {advancePaymentMethod === 'MonCash' ? 'ID Transaction MonCash' : 'Notes / Référence (Optionnel)'}
                   </label>
                   <textarea
                     value={advancePaymentNotes}
                     onChange={(e) => setAdvancePaymentNotes(e.target.value)}
-                    className="w-full p-2.5 border border-slate-300 rounded-xl text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 bg-white focus:ring-2 focus:ring-blue-500 outline-none"
-                    rows={3}
+                    className="w-full p-2.5 border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-xl text-xs sm:text-sm text-slate-900 outline-none transition-all placeholder:text-slate-400 bg-white shadow-2xs"
+                    rows={2}
                     placeholder="Informations complémentaires..."
                     required={advancePaymentMethod === 'MonCash'}
                   />
                 </div>
               )}
 
-              <div className="pt-4 flex justify-end gap-3">
+              <div className="pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-end gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setShowAdvancePaymentModal(false)}
-                  className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
+                  className="px-3.5 py-2 text-xs sm:text-sm font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                  disabled={advancePaymentMethod === 'Chèque' && (!!advancePaymentRefError || !advancePaymentRefNumber || !advancePaymentBank)}
+                  className="px-4 py-2 sm:py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white rounded-xl font-bold text-xs sm:text-sm transition-all shadow-xs hover:shadow flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 >
                   <CheckCircle className="w-4 h-4" />
-                  Confirmer le paiement
+                  <span>Confirmer le paiement</span>
                 </button>
               </div>
             </form>
@@ -3076,6 +4278,245 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   {loading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : "Supprimer"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Expert Paie - Audit Avances & Prêts */}
+      {expertAdvanceData && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-100 bg-gradient-to-r from-indigo-900 via-indigo-800 to-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white/10 border border-white/20 flex items-center justify-center text-amber-400">
+                  <Award className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-black text-base sm:text-lg tracking-tight text-white">
+                      Expert Paie — Audit des Avances & Prêts
+                    </h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-400/20 text-amber-300 border border-amber-300/30">
+                      Audit Salarié
+                    </span>
+                  </div>
+                  <p className="text-xs text-indigo-200 mt-0.5">
+                    Consultation des retenues, avances accordées et historique des déductions
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setExpertAdvanceData(null)}
+                className="p-1.5 text-white/70 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Content body */}
+            <div className="p-4 sm:p-5 overflow-y-auto space-y-4">
+              {/* Profil Salarié Card */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 font-black text-sm flex items-center justify-center shrink-0 border border-indigo-200">
+                    {expertAdvanceData.staff.first_name?.charAt(0)}{expertAdvanceData.staff.last_name?.charAt(0)}
+                  </div>
+                  <div>
+                    <h4 className="font-black text-sm sm:text-base text-slate-900">
+                      {formatStudentName(expertAdvanceData.staff.last_name, expertAdvanceData.staff.first_name).fullName}
+                    </h4>
+                    <p className="text-xs font-semibold text-slate-500">
+                      Poste : <strong className="text-indigo-600">{expertAdvanceData.staff.role || 'Personnel'}</strong>
+                    </p>
+                  </div>
+                </div>
+
+                {/* Synthèse du bulletin associé */}
+                {expertAdvanceData.slip && (
+                  <div className="flex items-center gap-3 text-right bg-white px-3 py-2 rounded-xl border border-slate-200/70 shadow-2xs self-stretch sm:self-auto justify-between sm:justify-end">
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Bulletin actuel</p>
+                      <p className="text-xs font-bold text-slate-700">
+                        Brut: {expertAdvanceData.slip.base_salary.toLocaleString()} G
+                      </p>
+                    </div>
+                    <div className="border-l border-slate-200 pl-3">
+                      <p className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">Avance retenue</p>
+                      <p className="text-xs sm:text-sm font-black text-amber-700 tabular-nums">
+                        -{expertAdvanceData.slip.deductions.toLocaleString()} HTG
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* KPIs Avances de l'employé */}
+              {(() => {
+                const advList = expertAdvanceData.advances || [];
+                const totalGranted = advList
+                  .filter(a => ['APPROVED', 'PAID', 'DEDUCTED'].includes(a.status))
+                  .reduce((sum, a) => sum + a.amount, 0);
+                const totalPending = advList
+                  .filter(a => a.status === 'PENDING')
+                  .reduce((sum, a) => sum + a.amount, 0);
+                const totalPaidOut = advList
+                  .filter(a => ['PAID', 'APPROVED'].includes(a.status))
+                  .reduce((sum, a) => sum + a.amount, 0);
+
+                return (
+                  <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                    <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-2.5 sm:p-3 text-center">
+                      <p className="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Avances / Prêts Validés</p>
+                      <p className="text-sm sm:text-base font-black text-blue-800 mt-0.5 tabular-nums">
+                        {totalGranted.toLocaleString()} <span className="text-[10px]">HTG</span>
+                      </p>
+                      <p className="text-[10px] text-blue-600 font-medium mt-0.5">{advList.filter(a => ['APPROVED', 'PAID', 'DEDUCTED'].includes(a.status)).length} demande(s)</p>
+                    </div>
+
+                    <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-2.5 sm:p-3 text-center">
+                      <p className="text-[10px] font-bold text-amber-700 uppercase tracking-wider">En cours / Restant</p>
+                      <p className="text-sm sm:text-base font-black text-amber-800 mt-0.5 tabular-nums">
+                        {totalPaidOut.toLocaleString()} <span className="text-[10px]">HTG</span>
+                      </p>
+                      <p className="text-[10px] text-amber-600 font-medium mt-0.5">À déduire sur salaires</p>
+                    </div>
+
+                    <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-2.5 sm:p-3 text-center">
+                      <p className="text-[10px] font-bold text-purple-700 uppercase tracking-wider">En Attente Validation</p>
+                      <p className="text-sm sm:text-base font-black text-purple-800 mt-0.5 tabular-nums">
+                        {totalPending.toLocaleString()} <span className="text-[10px]">HTG</span>
+                      </p>
+                      <p className="text-[10px] text-purple-600 font-medium mt-0.5">{advList.filter(a => a.status === 'PENDING').length} en attente</p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Tableau détaillé des avances */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <h5 className="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1.5">
+                    <HandCoins size={14} className="text-indigo-600" />
+                    Historique des avances & prêts accordés
+                  </h5>
+                  <span className="text-[11px] font-medium text-slate-500">
+                    {(expertAdvanceData.advances || []).length} enregistrement(s)
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead>
+                        <tr className="bg-slate-50 text-[10px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200">
+                          <th className="py-2 px-3">Date Demande</th>
+                          <th className="py-2 px-3">Motif</th>
+                          <th className="py-2 px-3 text-right">Montant</th>
+                          <th className="py-2 px-3 text-center">Statut</th>
+                          <th className="py-2 px-3">Règlement / Notes</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {(expertAdvanceData.advances || []).map((adv) => {
+                          let statusBadge = (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock size={10} /> En attente
+                            </span>
+                          );
+                          if (adv.status === 'APPROVED') {
+                            statusBadge = (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">
+                                <Check size={10} /> Approuvée
+                              </span>
+                            );
+                          } else if (adv.status === 'PAID') {
+                            statusBadge = (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                <CheckCircle size={10} /> Payée
+                              </span>
+                            );
+                          } else if (adv.status === 'DEDUCTED') {
+                            statusBadge = (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                                <CheckCircle2 size={10} /> Déduite
+                              </span>
+                            );
+                          } else if (adv.status === 'REJECTED') {
+                            statusBadge = (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <Ban size={10} /> Rejetée
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <tr key={adv.id} className="hover:bg-slate-50/70 transition-colors">
+                              <td className="py-2 px-3 whitespace-nowrap text-slate-700 font-semibold">
+                                {adv.requested_at ? new Date(adv.requested_at).toLocaleDateString('fr-FR') : '-'}
+                              </td>
+                              <td className="py-2 px-3 text-slate-800 font-medium max-w-[180px] truncate" title={adv.reason}>
+                                {adv.reason || 'Avance sur salaire'}
+                              </td>
+                              <td className="py-2 px-3 text-right font-black text-slate-900 tabular-nums">
+                                {adv.amount.toLocaleString()} <span className="text-[10px] font-semibold text-slate-400">HTG</span>
+                              </td>
+                              <td className="py-2 px-3 text-center whitespace-nowrap">
+                                {statusBadge}
+                              </td>
+                              <td className="py-2 px-3 text-slate-500 text-[11px] whitespace-nowrap">
+                                {adv.payment_method ? (
+                                  <span className="inline-flex items-center gap-1 text-slate-600 font-semibold">
+                                    <CreditCard size={11} className="text-slate-400" />
+                                    {adv.payment_method}
+                                  </span>
+                                ) : (
+                                  <span>{adv.notes || '-'}</span>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+
+                        {(!expertAdvanceData.advances || expertAdvanceData.advances.length === 0) && (
+                          <tr>
+                            <td colSpan={5} className="py-6 text-center text-slate-400 text-xs">
+                              Aucune avance enregistrée pour cet employé.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 sm:p-4 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3 shrink-0">
+              <button
+                type="button"
+                onClick={() => {
+                  setAdvanceStaffId(expertAdvanceData.staff.id);
+                  setAdvanceAmount(0);
+                  setAdvanceReason('');
+                  setShowAdvanceModal(true);
+                }}
+                className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all inline-flex items-center gap-1.5 shadow-2xs cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>Nouvelle avance pour ce salarié</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setExpertAdvanceData(null)}
+                className="px-4 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Fermer
+              </button>
             </div>
           </div>
         </div>
