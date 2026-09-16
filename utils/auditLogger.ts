@@ -27,7 +27,11 @@ export type AuditAction =
   | 'UPDATE_USER'
   | 'UPDATE_ROLE'
   | 'UNBLOCK_USER'
-  | 'LOGIN_FAILED';
+  | 'LOGIN_FAILED'
+  | 'PAYROLL_UPDATE'
+  | 'PAYROLL_CREATE'
+  | 'PAYROLL_DELETE'
+  | 'PAYROLL_PAYMENT';
 
 export type EntityType = 
   | 'auth' 
@@ -49,7 +53,9 @@ export type EntityType =
   | 'payment_gateway'
   | 'exchange_rate'
   | 'fee_plan'
-  | 'enrollment';
+  | 'enrollment'
+  | 'payroll_slip'
+  | 'payroll_period';
 
 export interface AuditLogPayload {
   school_id: string | null;
