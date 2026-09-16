@@ -31,7 +31,8 @@ export type AuditAction =
   | 'PAYROLL_UPDATE'
   | 'PAYROLL_CREATE'
   | 'PAYROLL_DELETE'
-  | 'PAYROLL_PAYMENT';
+  | 'PAYROLL_PAYMENT'
+  | 'PAYROLL_SENSITIVE_UPDATE';
 
 export type EntityType = 
   | 'auth' 

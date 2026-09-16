@@ -7,13 +7,15 @@ import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
 import { Terminology } from '../lib/terminology';
 import { PayrollIntegrityAudit } from './PayrollIntegrityAudit';
+import { PayrollAuditModal } from './PayrollAuditModal';
+import { evaluatePayrollSensitivity } from '../utils/payrollSensitivity';
 import { 
   Wallet, Calendar, CheckCircle, Clock, AlertCircle, 
   FileText, User, Plus, Search, DollarSign, Save, X,
   HandCoins, Check, Ban, Info, RefreshCcw, BarChart3, Trash2,
   Download, Building2, ChevronDown, ChevronUp, Award, Sparkles, Filter, Users, CheckCircle2,
   LayoutGrid, Table, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CreditCard,
-  Zap, Landmark, ShieldCheck, AlertTriangle, UserCheck, UserX, CheckSquare
+  Zap, Landmark, ShieldCheck, AlertTriangle, UserCheck, UserX, CheckSquare, History, ShieldAlert
 } from 'lucide-react';
 
 interface PayrollManagementViewProps {
@@ -31,12 +33,13 @@ interface StaffPayrollRowProps {
   memberAdvances?: SalaryAdvance[];
   onSave: (staffId: string, base: number, bonus: number, deduction: number) => void;
   onDelete?: (slip: PayrollSlip) => void;
+  onShowAudit?: (slip: PayrollSlip, member: StaffMember) => void;
   campusName?: string;
   terminology?: Terminology;
   duplicateCount?: number;
 }
 
-const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete, campusName, terminology, duplicateCount }) => {
+const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete, onShowAudit, campusName, terminology, duplicateCount }) => {
   const isPaid = slip?.status === 'PAID';
   const totalAdvanceAmount = (memberAdvances || []).filter(a => 
     !slip || !slip.created_at || new Date(a.approved_at || a.requested_at).getTime() <= new Date(slip.created_at).getTime()
@@ -169,34 +172,47 @@ const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, member
           </span>
         </div>
 
-        {!isDisabled && (
-          <div className="flex items-center gap-2">
-            {slip && onDelete && (
-              <button
-                type="button"
-                onClick={() => onDelete(slip)}
-                className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors"
-                title="Supprimer la fiche"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            )}
+        <div className="flex items-center gap-1.5">
+          {slip && onShowAudit && (
             <button
               type="button"
-              onClick={() => onSave(member.id, base, bonus, deduction)}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              onClick={() => onShowAudit(slip, member)}
+              className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl border border-slate-200 hover:border-indigo-200 transition-colors cursor-pointer shadow-2xs"
+              title="Historique des modifications de cette fiche"
             >
-              <Save className="w-3.5 h-3.5" />
-              <span>{slip ? 'Mettre à jour' : 'Enregistrer'}</span>
+              <History className="w-4 h-4" />
             </button>
-          </div>
-        )}
+          )}
+
+          {!isDisabled && (
+            <div className="flex items-center gap-2">
+              {slip && onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(slip)}
+                  className="p-2 text-rose-600 hover:bg-rose-50 rounded-lg border border-rose-200 transition-colors"
+                  title="Supprimer la fiche"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => onSave(member.id, base, bonus, deduction)}
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl text-xs font-bold transition-all shadow-2xs cursor-pointer"
+              >
+                <Save className="w-3.5 h-3.5" />
+                <span>{slip ? 'Mettre à jour' : 'Enregistrer'}</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
 };
 
-const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete, campusName, terminology, duplicateCount }) => {
+const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete, onShowAudit, campusName, terminology, duplicateCount }) => {
   const isPaid = slip?.status === 'PAID';
   
   const totalAdvanceAmount = (memberAdvances || []).filter(a => 
@@ -305,25 +321,61 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
       </td>
       <td className="px-4 py-3 text-right">
         {isPaid ? (
-          <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
-            <CheckCircle className="w-3 h-3" /> Payé
-          </span>
+          <div className="flex items-center justify-end gap-1.5">
+            {slip && onShowAudit && (
+              <button
+                type="button"
+                onClick={() => onShowAudit(slip, member)}
+                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100"
+                title="Historique des modifications de cette fiche"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            )}
+            <span className="inline-flex items-center gap-1 text-emerald-800 text-xs font-bold bg-emerald-50 px-2 py-1 rounded-full border border-emerald-200">
+              <CheckCircle className="w-3 h-3" /> Payé
+            </span>
+          </div>
         ) : slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED' ? (
-          <span className="inline-flex items-center gap-1 text-slate-800 text-xs font-bold bg-slate-100 px-2 py-1 rounded-full border border-slate-300">
-            <Check className="w-3 h-3" /> Validé
-          </span>
+          <div className="flex items-center justify-end gap-1.5">
+            {slip && onShowAudit && (
+              <button
+                type="button"
+                onClick={() => onShowAudit(slip, member)}
+                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100"
+                title="Historique des modifications de cette fiche"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            )}
+            <span className="inline-flex items-center gap-1 text-slate-800 text-xs font-bold bg-slate-100 px-2 py-1 rounded-full border border-slate-300">
+              <Check className="w-3 h-3" /> Validé
+            </span>
+          </div>
         ) : (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-1.5">
+            {slip && onShowAudit && (
+              <button
+                type="button"
+                onClick={() => onShowAudit(slip, member)}
+                className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100"
+                title="Historique des modifications de cette fiche"
+              >
+                <History className="w-4 h-4" />
+              </button>
+            )}
             {slip && onDelete && (
               <button
+                type="button"
                 onClick={() => onDelete(slip)}
-                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
+                className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                 title="Supprimer la fiche"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             )}
             <button
+              type="button"
               onClick={() => onSave(member.id, base, bonus, deduction)}
               className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white hover:bg-blue-700 rounded-lg text-sm font-bold transition-colors cursor-pointer shadow-2xs"
             >
@@ -365,8 +417,26 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     return s.campus_id === campusId || (!s.campus_id && s.staff?.campus_id === campusId);
   };
 
-  const [activeTab, setActiveTab] = useState<'periods' | 'preparation' | 'arrears' | 'history' | 'advances' | 'reports'>('periods');
+  const [activeTab, setActiveTab] = useState<'periods' | 'preparation' | 'arrears' | 'history' | 'advances' | 'reports' | 'audit'>('periods');
   const [loading, setLoading] = useState(true);
+
+  // États pour le modal d'audit ciblé ou global
+  const [showPayrollAuditModal, setShowPayrollAuditModal] = useState<boolean>(false);
+  const [auditTargetSlip, setAuditTargetSlip] = useState<PayrollSlip | null>(null);
+  const [auditTargetStaff, setAuditTargetStaff] = useState<StaffMember | null>(null);
+
+  const handleOpenAuditForSlip = (slip: PayrollSlip, staffMember?: StaffMember | null) => {
+    setAuditTargetSlip(slip);
+    setAuditTargetStaff(staffMember || staff.find(s => s.id === slip.staff_id) || (slip.staff as StaffMember) || null);
+    setShowPayrollAuditModal(true);
+  };
+
+  const handleOpenGlobalAudit = () => {
+    setAuditTargetSlip(null);
+    setAuditTargetStaff(null);
+    setShowPayrollAuditModal(true);
+  };
+
   const [staff, setStaff] = useState<StaffMember[]>([]);
   const [allSchoolStaff, setAllSchoolStaff] = useState<StaffMember[]>([]);
   const [preparationStatusFilter, setPreparationStatusFilter] = useState<'ALL' | 'PREPARED' | 'MISSING' | 'DUPLICATE'>('ALL');
@@ -378,6 +448,68 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const [expandedPeriodId, setExpandedPeriodId] = useState<string | null>(null);
   const [periodSearchTerm, setPeriodSearchTerm] = useState<string>('');
   const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
+
+  // Alertes sensibles récentes et écoute des notifications temps réel
+  const [recentSensitiveAlerts, setRecentSensitiveAlerts] = useState<any[]>([]);
+  const [isAlertsBannerDismissed, setIsAlertsBannerDismissed] = useState<boolean>(false);
+
+  const fetchRecentSensitiveAlerts = async () => {
+    if (!user.school_id) return;
+    try {
+      const { data } = await supabase
+        .from('audit_logs')
+        .select(`
+          id,
+          action,
+          entity_type,
+          entity_id,
+          details,
+          created_at,
+          profiles:user_id(full_name, email, role)
+        `)
+        .eq('school_id', user.school_id)
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const sensitiveLogs = (data || []).filter((log: any) => {
+        const d = log.details || {};
+        const isPayroll = d.type?.includes('payroll') || log.entity_type === 'payroll_slip' || log.action?.includes('PAYROLL');
+        return isPayroll && (d.is_sensitive === true || log.action === 'PAYROLL_SENSITIVE_UPDATE' || (log.action === 'PAYROLL_DELETE' && d.is_sensitive));
+      });
+      setRecentSensitiveAlerts(sensitiveLogs);
+    } catch (e) {
+      console.warn("Erreur chargement alertes sensibles:", e);
+    }
+  };
+
+  useEffect(() => {
+    fetchRecentSensitiveAlerts();
+
+    const handleAlertReceived = () => {
+      fetchRecentSensitiveAlerts();
+    };
+
+    const handleOpenTargetAudit = (e: any) => {
+      const detail = e.detail || {};
+      const targetSlip = slips.find(s => s.id === detail.slipId) || null;
+      const targetMember = staff.find(s => s.id === detail.staffId) || targetSlip?.staff || null;
+      if (targetSlip) {
+        handleOpenAuditForSlip(targetSlip, targetMember as StaffMember);
+      } else {
+        setAuditTargetSlip(null);
+        setAuditTargetStaff(targetMember as StaffMember);
+        setShowPayrollAuditModal(true);
+      }
+    };
+
+    window.addEventListener('edunova-sensitive-payroll-alert', handleAlertReceived);
+    window.addEventListener('open-target-payroll-audit', handleOpenTargetAudit);
+
+    return () => {
+      window.removeEventListener('edunova-sensitive-payroll-alert', handleAlertReceived);
+      window.removeEventListener('open-target-payroll-audit', handleOpenTargetAudit);
+    };
+  }, [user.school_id, slips, staff]);
 
   // États modernes pour la section Arriérés & Paiements (Vue Tableau & Cartes)
   const [arrearsViewMode, setArrearsViewMode] = useState<'cards' | 'table'>('table');
@@ -764,6 +896,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handleUpdatePeriodStatus = async (periodId: string, status: 'DRAFT' | 'VALIDATED' | 'CLOSED') => {
     try {
+      const targetPeriod = periods.find(p => p.id === periodId);
       const { error } = await supabase
         .from('payroll_periods')
         .update({ status })
@@ -772,6 +905,28 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       if (error) throw error;
       setPeriods(periods.map(p => p.id === periodId ? { ...p, status } : p));
       showToast(`Période marquée comme ${status === 'VALIDATED' ? 'validée' : status === 'CLOSED' ? 'clôturée' : 'brouillon'}.`);
+
+      // Audit log
+      import('../utils/auditLogger').then(({ AuditLogger }) => {
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: 'UPDATE',
+          entity_type: 'payroll_period',
+          entity_id: periodId,
+          details: { 
+            type: 'payroll_period',
+            action_type: 'PERIOD_STATUS_UPDATED',
+            status: status,
+            period_id: periodId,
+            period_name: targetPeriod ? getPeriodName(targetPeriod) : 'Période',
+            admin_name: user.full_name,
+            admin_email: user.email,
+            admin_role: user.role,
+            summary: `Statut de la période ${targetPeriod ? getPeriodName(targetPeriod) : ''} changé en "${status}" par ${user.full_name} (${user.role})`
+          }
+        });
+      });
     } catch (error: any) {
       console.error("Error updating period status:", error);
       showToast("Erreur lors de la mise à jour du statut.", 'error');
@@ -875,6 +1030,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
     setLoading(true);
     try {
+      const sensitivity = evaluatePayrollSensitivity({
+        isDeletion: true,
+        deletedSlip: slipToDelete
+      });
+
       const { error } = await supabase
         .from('payroll_slips')
         .delete()
@@ -883,22 +1043,46 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       if (error) throw error;
 
       setSlips(slips.filter(s => s.id !== slipToDelete.id));
-      showToast("Fiche de paie supprimée.");
+      showToast(
+        sensitivity.isSensitive 
+          ? "Fiche supprimée — Alerte transmise aux administrateurs." 
+          : "Fiche de paie supprimée."
+      );
       setSlipToDelete(null);
 
-      // Log the action
+      // Log the action with full audit & sensitivity context
       import('../utils/auditLogger').then(({ AuditLogger }) => {
         AuditLogger.log({
           school_id: user.school_id,
           user_id: user.id,
-          action: 'DELETE',
-          entity_type: 'staff',
-          entity_id: slipToDelete.staff_id,
+          action: 'PAYROLL_DELETE',
+          entity_type: 'payroll_slip',
+          entity_id: slipToDelete.id,
           details: { 
             type: 'payroll_slip',
+            action_type: 'PAYROLL_SLIP_DELETED',
+            is_sensitive: true,
+            severity: sensitivity.severity,
+            sensitivity_reasons: sensitivity.reasons,
+            summary: sensitivity.summary,
+            slip_id: slipToDelete.id,
+            staff_id: slipToDelete.staff_id,
             staff_name: `${slipToDelete.staff?.first_name} ${slipToDelete.staff?.last_name}`,
+            staff_role: slipToDelete.staff?.role || '',
+            previous_values: {
+              base_salary: slipToDelete.base_salary,
+              bonuses: slipToDelete.bonuses || 0,
+              deductions: slipToDelete.deductions || 0,
+              net_salary: slipToDelete.net_salary,
+              status: slipToDelete.status
+            },
+            diff: sensitivity.diff,
+            admin_name: user.full_name || 'Administrateur',
+            admin_email: user.email,
+            admin_role: user.role,
             campus_id: slipToDelete.campus_id || slipToDelete.staff?.campus_id || null,
-            campus_name: getCampusName(slipToDelete.campus_id || slipToDelete.staff?.campus_id, slipToDelete.staff)
+            campus_name: getCampusName(slipToDelete.campus_id || slipToDelete.staff?.campus_id, slipToDelete.staff),
+            period_name: slipToDelete.period ? `${MONTHS[slipToDelete.period.month - 1]} ${slipToDelete.period.year}` : 'Inconnue'
           }
         });
       });
@@ -917,6 +1101,18 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     const existingSlip = slips.find(s => s.period_id === selectedPeriodId && s.staff_id === staffId);
     const staffMember = staff.find(s => s.id === staffId);
     const targetCampusId = staffMember?.campus_id || user.campus_id || effectiveCampusId || null;
+
+    // Évaluation en amont de la sensibilité de la modification
+    const sensitivity = evaluatePayrollSensitivity({
+      existingSlip,
+      newValues: {
+        base_salary: base,
+        bonuses: bonus,
+        deductions: deduction,
+        net_salary: net
+      },
+      staffName: staffMember ? `${staffMember.first_name} ${staffMember.last_name}` : undefined
+    });
 
     try {
       if (existingSlip) {
@@ -939,19 +1135,50 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           AuditLogger.log({
             school_id: user.school_id,
             user_id: user.id,
-            action: 'UPDATE',
-            entity_type: 'staff',
-            entity_id: staffId,
+            action: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_UPDATE',
+            entity_type: 'payroll_slip',
+            entity_id: existingSlip.id,
             details: { 
               type: 'payroll_slip',
+              action_type: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_SLIP_UPDATED',
+              slip_id: existingSlip.id,
+              staff_id: staffId,
+              is_sensitive: sensitivity.isSensitive,
+              severity: sensitivity.severity,
+              sensitivity_reasons: sensitivity.reasons,
+              summary: sensitivity.summary,
+              previous_values: {
+                base_salary: existingSlip.base_salary,
+                bonuses: existingSlip.bonuses || 0,
+                deductions: existingSlip.deductions || 0,
+                net_salary: existingSlip.net_salary
+              },
+              new_values: {
+                base_salary: base,
+                bonuses: bonus,
+                deductions: deduction,
+                net_salary: net
+              },
+              diff: sensitivity.diff,
+              admin_name: user.full_name || 'Administrateur',
+              admin_email: user.email,
+              admin_role: user.role,
               net_salary: net,
               staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
+              staff_role: data.staff?.role || '',
               campus_id: data.campus_id || targetCampusId,
               campus_name: getCampusName(data.campus_id || targetCampusId, data.staff),
-              period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
+              period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue',
+              period_name: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
             }
           });
         });
+
+        if (sensitivity.isSensitive) {
+          showToast("Modification sensible enregistrée — Alerte transmise en temps réel aux administrateurs.");
+        } else {
+          showToast("Fiche de paie enregistrée avec succès !");
+        }
       } else {
         const { data, error } = await supabase
           .from('payroll_slips')
@@ -975,21 +1202,44 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           AuditLogger.log({
             school_id: user.school_id,
             user_id: user.id,
-            action: 'CREATE',
-            entity_type: 'staff',
-            entity_id: staffId,
+            action: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_CREATE',
+            entity_type: 'payroll_slip',
+            entity_id: data.id,
             details: { 
               type: 'payroll_slip',
+              action_type: 'PAYROLL_SLIP_CREATED',
+              slip_id: data.id,
+              staff_id: staffId,
+              is_sensitive: sensitivity.isSensitive,
+              severity: sensitivity.severity,
+              sensitivity_reasons: sensitivity.reasons,
+              summary: sensitivity.summary,
+              new_values: {
+                base_salary: base,
+                bonuses: bonus,
+                deductions: deduction,
+                net_salary: net
+              },
+              admin_name: user.full_name || 'Administrateur',
+              admin_email: user.email,
+              admin_role: user.role,
               net_salary: net,
               staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
+              staff_role: data.staff?.role || '',
               campus_id: targetCampusId,
               campus_name: getCampusName(targetCampusId, data.staff),
-              period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
+              period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue',
+              period_name: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
             }
           });
         });
+
+        if (sensitivity.isSensitive) {
+          showToast("Fiche créée — Alerte transmise en temps réel aux administrateurs.");
+        } else {
+          showToast("Fiche de paie enregistrée avec succès !");
+        }
       }
-      showToast("Fiche de paie enregistrée avec succès !");
     } catch (error: any) {
       console.error("Error saving slip:", error);
       showToast("Erreur lors de l'enregistrement de la fiche de paie.", 'error');
@@ -1826,6 +2076,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                       duplicateCount={slipCountByStaff[member.id] || 0}
                       onSave={handleSaveSlip} 
                       onDelete={setSlipToDelete}
+                      onShowAudit={handleOpenAuditForSlip}
                     />
                   );
                 })}
@@ -1868,6 +2119,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   duplicateCount={slipCountByStaff[member.id] || 0}
                   onSave={handleSaveSlip} 
                   onDelete={setSlipToDelete}
+                  onShowAudit={handleOpenAuditForSlip}
                 />
               );
             })}
@@ -2300,23 +2552,44 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                           {canValidate ? (
                             <div className="flex items-center justify-center gap-1.5 flex-wrap">
                               {arrear.slips.map((slip) => (
-                                <button
-                                  key={slip.id}
-                                  type="button"
-                                  onClick={() => {
-                                    setSelectedSlip(slip);
-                                    setShowPaymentModal(true);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-2xs hover:shadow transition-all cursor-pointer"
-                                  title={`Payer ${slip.period ? getPeriodName(slip.period) : 'la période'}`}
-                                >
-                                  <DollarSign size={12} />
-                                  <span>Payer {slip.period ? MONTHS[slip.period.month - 1]?.slice(0, 4) : ''}</span>
-                                </button>
+                                <div key={slip.id} className="inline-flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedSlip(slip);
+                                      setShowPaymentModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs rounded-lg shadow-2xs hover:shadow transition-all cursor-pointer"
+                                    title={`Payer ${slip.period ? getPeriodName(slip.period) : 'la période'}`}
+                                  >
+                                    <DollarSign size={12} />
+                                    <span>Payer {slip.period ? MONTHS[slip.period.month - 1]?.slice(0, 4) : ''}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleOpenAuditForSlip(slip, arrear.staff)}
+                                    className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100"
+                                    title="Historique d'audit des modifications de cette fiche"
+                                  >
+                                    <History size={13} />
+                                  </button>
+                                </div>
                               ))}
                             </div>
                           ) : (
-                            <span className="text-xs text-slate-400 italic">Lecture seule</span>
+                            <div className="flex items-center justify-center gap-1">
+                              <span className="text-xs text-slate-400 italic">Lecture seule</span>
+                              {arrear.slips[0] && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleOpenAuditForSlip(arrear.slips[0], arrear.staff)}
+                                  className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                                  title="Historique d'audit des modifications"
+                                >
+                                  <History size={13} />
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                       </tr>
@@ -2446,19 +2719,29 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                                 </div>
                               </div>
 
-                              {canValidate && (
+                              <div className="flex items-center gap-1">
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setSelectedSlip(slip);
-                                    setShowPaymentModal(true);
-                                  }}
-                                  className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-2xs hover:shadow cursor-pointer"
+                                  onClick={() => handleOpenAuditForSlip(slip, arrear.staff)}
+                                  className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100"
+                                  title="Historique des modifications de cette fiche"
                                 >
-                                  <DollarSign size={12} />
-                                  <span>Payer</span>
+                                  <History size={13} />
                                 </button>
-                              )}
+                                {canValidate && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedSlip(slip);
+                                      setShowPaymentModal(true);
+                                    }}
+                                    className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-lg text-xs font-bold transition-all shadow-2xs hover:shadow cursor-pointer"
+                                  >
+                                    <DollarSign size={12} />
+                                    <span>Payer</span>
+                                  </button>
+                                )}
+                              </div>
                             </div>
 
                             {/* Informations sur les avances */}
@@ -2860,7 +3143,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
             </div>
           </div>
 
-          {/* Indicateur de total sélectionné & reset */}
+          {/* Indicateur de total sélectionné & reset & bouton Audit */}
           <div className="flex items-center justify-between md:justify-end gap-2 shrink-0 pt-1.5 md:pt-0 border-t md:border-t-0 border-slate-100">
             {filteredTotalPaid > 0 && (
               <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50/80 border border-emerald-200/80 rounded-full text-xs font-bold text-emerald-800 whitespace-nowrap shrink-0">
@@ -2869,6 +3152,16 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                 <strong className="text-emerald-700 tabular-nums">{filteredTotalPaid.toLocaleString()} HTG</strong>
               </div>
             )}
+
+            <button
+              type="button"
+              onClick={handleOpenGlobalAudit}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/90 rounded-full text-xs font-bold transition-all shadow-2xs cursor-pointer whitespace-nowrap"
+              title="Consulter l'historique complet d'audit et traçabilité des fiches de paie"
+            >
+              <History size={13} className="text-indigo-600" />
+              <span>Traçabilité & Audit</span>
+            </button>
 
             {(searchTerm || historyPeriodFilter !== 'ALL' || historyMethodFilter !== 'ALL') && (
               <button
@@ -2901,6 +3194,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   <th className="py-2.5 px-3 sm:px-4 text-right">Montant Net Payé</th>
                   <th className="py-2.5 px-3 sm:px-4">Mode de Règlement</th>
                   <th className="py-2.5 px-3 sm:px-4 text-center">Traité par</th>
+                  <th className="py-2.5 px-3 sm:px-4 text-center">Audit</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -3010,13 +3304,25 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                           <span>{slip.paid_by_user?.full_name || slip.paid_by || 'Système'}</span>
                         </span>
                       </td>
+
+                      {/* Audit */}
+                      <td className="py-2.5 px-3 sm:px-4 text-center whitespace-nowrap align-middle">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAuditForSlip(slip, slip.staff)}
+                          className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer border border-transparent hover:border-indigo-100 shadow-2xs"
+                          title="Historique des modifications de cette fiche"
+                        >
+                          <History size={14} className="inline" />
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
 
                 {paginatedSlips.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="py-10 px-4 text-center">
+                    <td colSpan={7} className="py-10 px-4 text-center">
                       <div className="w-10 h-10 bg-slate-100 text-slate-400 rounded-xl flex items-center justify-center mx-auto mb-2">
                         <Clock className="w-5 h-5" />
                       </div>
@@ -3930,6 +4236,51 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         )}
       </div>
 
+      {/* BANNIÈRE D'ALERTE EN TEMPS RÉEL - MODIFICATIONS SENSIBLES */}
+      {recentSensitiveAlerts.length > 0 && !isAlertsBannerDismissed && (
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-50/70 to-rose-500/10 border border-amber-200/90 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs animate-in fade-in duration-200">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs mt-0.5">
+              <ShieldAlert className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h4 className="text-xs sm:text-sm font-black text-amber-950">
+                  {recentSensitiveAlerts.length} modification{recentSensitiveAlerts.length > 1 ? 's sensibles récentes' : ' sensible récente'} détectée{recentSensitiveAlerts.length > 1 ? 's' : ''}
+                </h4>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase bg-amber-200/80 text-amber-900 border border-amber-300">
+                  Alerte Direction
+                </span>
+              </div>
+              <p className="text-xs text-amber-900/80 mt-0.5">
+                Dernière alerte : {recentSensitiveAlerts[0]?.details?.summary || recentSensitiveAlerts[0]?.details?.staff_name || 'Ajustement de salaire'}
+                {recentSensitiveAlerts[0]?.profiles?.full_name ? ` par ${recentSensitiveAlerts[0].profiles.full_name}` : ''}.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('audit');
+              }}
+              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Consulter le journal</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsAlertsBannerDismissed(true)}
+              className="p-1.5 text-amber-700/70 hover:text-amber-900 rounded-lg hover:bg-amber-100/60 transition-all cursor-pointer"
+              title="Fermer cette notification"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex overflow-x-auto border-b border-slate-200 hide-scrollbar -mb-px">
         <button
           onClick={() => { setActiveTab('periods'); setSearchTerm(''); }}
@@ -3995,6 +4346,21 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           <BarChart3 className="w-4 h-4" />
           <span>Rapports</span>
         </button>
+        <button
+          onClick={() => { setActiveTab('audit'); setSearchTerm(''); }}
+          className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 font-bold text-xs sm:text-sm whitespace-nowrap border-b-2 transition-colors cursor-pointer ${
+            activeTab === 'audit' ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'
+          }`}
+        >
+          <History className="w-4 h-4" />
+          <span>Journal d'audit</span>
+          {recentSensitiveAlerts.length > 0 && (
+            <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-black bg-amber-500 text-white flex items-center gap-1 animate-pulse">
+              <ShieldAlert className="w-2.5 h-2.5" />
+              <span>{recentSensitiveAlerts.length}</span>
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="mt-3 sm:mt-4">
@@ -4004,6 +4370,16 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         {activeTab === 'advances' && renderAdvancesTab()}
         {activeTab === 'history' && renderHistoryTab()}
         {activeTab === 'reports' && renderReportsTab()}
+        {activeTab === 'audit' && (
+          <div className="space-y-4 animate-in fade-in duration-300">
+            <PayrollAuditModal
+              embedded={true}
+              schoolId={user.school_id}
+              currentUser={user}
+              allPeriods={periods}
+            />
+          </div>
+        )}
       </div>
 
       {/* Modal Nouvelle Période Harmonisé & Compact */}
@@ -4922,6 +5298,24 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal d'audit ciblé (Fiche spécifique ou employé ciblé) */}
+      {showPayrollAuditModal && (
+        <PayrollAuditModal
+          isOpen={showPayrollAuditModal}
+          onClose={() => {
+            setShowPayrollAuditModal(false);
+            setAuditTargetSlip(null);
+            setAuditTargetStaff(null);
+          }}
+          schoolId={user.school_id}
+          currentUser={user}
+          slip={auditTargetSlip}
+          staffMember={auditTargetStaff}
+          period={periods.find(p => p.id === auditTargetSlip?.period_id) || auditTargetSlip?.period || null}
+          allPeriods={periods}
+        />
       )}
     </div>
   );

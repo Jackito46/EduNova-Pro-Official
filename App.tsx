@@ -82,6 +82,7 @@ import AppFooter from './components/AppFooter';
 
 import { NotificationBanner } from './components/NotificationBanner';
 import { AiQuotaAlertBanner } from './components/AiQuotaAlertBanner';
+import { PayrollSensitiveNotificationListener } from './components/PayrollSensitiveNotificationListener';
 import { GlobalShortcuts } from './components/GlobalShortcuts';
 import { ModernDashboardSkeleton } from './components/SkeletonLoader';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
@@ -229,6 +230,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
           {user.role === UserRole.STUDENT && <StudentHeader user={user} />}
           <ConnectivityBanner />
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
+          <PayrollSensitiveNotificationListener user={user} />
           <AiQuotaAlertBanner user={user} />
           <AddressBarInstallHint />
           <ErrorBoundary key={location.pathname}>
