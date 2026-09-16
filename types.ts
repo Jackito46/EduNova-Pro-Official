@@ -286,6 +286,7 @@ export interface CommunicationSettings {
 export interface SalaryAdvance {
   id: string;
   school_id: string;
+  campus_id?: string;
   staff_id: string;
   amount: number;
   reason: string;

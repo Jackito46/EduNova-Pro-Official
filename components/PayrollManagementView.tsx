@@ -5,13 +5,15 @@ import { UserProfile, StaffMember, PayrollPeriod, PayrollSlip, SalaryAdvance } f
 import { formatStudentName } from '../utils/formatters';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
+import { Terminology } from '../lib/terminology';
+import { PayrollIntegrityAudit } from './PayrollIntegrityAudit';
 import { 
   Wallet, Calendar, CheckCircle, Clock, AlertCircle, 
   FileText, User, Plus, Search, DollarSign, Save, X,
   HandCoins, Check, Ban, Info, RefreshCcw, BarChart3, Trash2,
   Download, Building2, ChevronDown, ChevronUp, Award, Sparkles, Filter, Users, CheckCircle2,
   LayoutGrid, Table, ArrowUpDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, CreditCard,
-  Zap, Landmark
+  Zap, Landmark, ShieldCheck, AlertTriangle, UserCheck, UserX, CheckSquare
 } from 'lucide-react';
 
 interface PayrollManagementViewProps {
@@ -29,9 +31,12 @@ interface StaffPayrollRowProps {
   memberAdvances?: SalaryAdvance[];
   onSave: (staffId: string, base: number, bonus: number, deduction: number) => void;
   onDelete?: (slip: PayrollSlip) => void;
+  campusName?: string;
+  terminology?: Terminology;
+  duplicateCount?: number;
 }
 
-const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete }) => {
+const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete, campusName, terminology, duplicateCount }) => {
   const isPaid = slip?.status === 'PAID';
   const totalAdvanceAmount = (memberAdvances || []).filter(a => 
     !slip || !slip.created_at || new Date(a.approved_at || a.requested_at).getTime() <= new Date(slip.created_at).getTime()
@@ -56,13 +61,31 @@ const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, member
 
   const isDisabled = isPaid || slip?.period?.status === 'VALIDATED' || slip?.period?.status === 'CLOSED';
 
+  const roleLabel = (member.role?.toLowerCase().includes('prof') || member.role?.toLowerCase().includes('enseignant'))
+    ? (terminology?.teacher || member.role)
+    : member.role;
+
   return (
     <div className="p-4 bg-white rounded-2xl border border-slate-200 shadow-2xs space-y-3.5">
       <div className="flex items-start justify-between gap-3">
         <div>
           <h4 className="font-bold text-slate-900 text-sm">{formatStudentName(member.last_name, member.first_name).fullName}</h4>
-          <div className="flex flex-wrap items-center gap-2 mt-1">
-            <span className="px-2 py-0.5 bg-slate-100 text-slate-900 text-xs font-bold rounded-lg border border-slate-200">{member.role}</span>
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className="px-2 py-0.5 bg-slate-100 text-slate-900 text-xs font-bold rounded-lg border border-slate-200">
+              {roleLabel}
+            </span>
+            {campusName && (
+              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200 flex items-center gap-1">
+                <Building2 className="w-3 h-3 text-indigo-500" />
+                <span>{campusName}</span>
+              </span>
+            )}
+            {duplicateCount && duplicateCount > 1 && (
+              <span className="px-2 py-0.5 bg-rose-50 text-rose-700 text-xs font-black rounded-lg border border-rose-200 flex items-center gap-1">
+                <AlertTriangle className="w-3 h-3 text-rose-600" />
+                <span>Doublon ({duplicateCount} fiches)</span>
+              </span>
+            )}
             <span className="text-xs font-bold text-slate-800">{member.pay_type}</span>
             {member.phone && <span className="text-xs font-semibold text-slate-700">• {member.phone}</span>}
           </div>
@@ -173,7 +196,7 @@ const StaffPayrollCard: React.FC<StaffPayrollRowProps> = ({ member, slip, member
   );
 };
 
-const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete }) => {
+const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberAdvances, onSave, onDelete, campusName, terminology, duplicateCount }) => {
   const isPaid = slip?.status === 'PAID';
   
   const totalAdvanceAmount = (memberAdvances || []).filter(a => 
@@ -199,14 +222,34 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
     setDeduction(getInitialDeduction());
   }, [slip, member.calculated_base_salary, member.amount, totalAdvanceAmount]);
 
+  const roleLabel = (member.role?.toLowerCase().includes('prof') || member.role?.toLowerCase().includes('enseignant'))
+    ? (terminology?.teacher || member.role)
+    : member.role;
+
   return (
     <tr className="hover:bg-slate-50 transition-colors">
       <td className="px-4 py-3">
-        <div className="font-bold text-slate-900">{formatStudentName(member.last_name, member.first_name).fullName}</div>
-        <div className="text-xs font-semibold text-slate-700">{member.phone}</div>
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-slate-900">{formatStudentName(member.last_name, member.first_name).fullName}</span>
+          {duplicateCount && duplicateCount > 1 && (
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-black bg-rose-100 text-rose-800 border border-rose-200 inline-flex items-center gap-1">
+              <AlertTriangle className="w-2.5 h-2.5 text-rose-600" />
+              Doublon ({duplicateCount})
+            </span>
+          )}
+        </div>
+        <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 flex-wrap">
+          {campusName && (
+            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200/80 flex items-center gap-1">
+              <Building2 className="w-2.5 h-2.5 text-indigo-500" />
+              <span>{campusName}</span>
+            </span>
+          )}
+          {member.phone && <span>{member.phone}</span>}
+        </div>
       </td>
       <td className="px-4 py-3">
-        <div className="font-bold text-slate-900">{member.role}</div>
+        <div className="font-bold text-slate-900">{roleLabel}</div>
         <div className="text-xs font-bold text-slate-700">{member.pay_type}</div>
       </td>
       <td className="px-4 py-3">
@@ -295,10 +338,38 @@ const StaffPayrollRow: React.FC<StaffPayrollRowProps> = ({ member, slip, memberA
 };
 
 const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) => {
-  const { school, currentCampusId, campuses } = useSchool();
+  const { school, currentCampusId, setCurrentCampusId, campuses, terminology } = useSchool();
+  const hasMultipleCampuses = Boolean((school?.has_multi_campus || (campuses && campuses.length > 1)) && campuses && campuses.length > 0);
+
+  const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>(() => {
+    if (user.campus_id) return user.campus_id;
+    if (currentCampusId && currentCampusId !== 'GLOBAL') return currentCampusId;
+    return 'ALL';
+  });
+
+  const effectiveCampusId = user.campus_id 
+    ? user.campus_id 
+    : (!selectedCampusFilter || selectedCampusFilter === 'ALL' || selectedCampusFilter === 'all' || selectedCampusFilter === 'GLOBAL' ? null : selectedCampusFilter);
+
+  const [newPeriodCampusId, setNewPeriodCampusId] = useState<string>('ALL');
+
+  const getCampusName = (campusId?: string | null, staffMember?: StaffMember | null) => {
+    const cId = campusId || staffMember?.campus_id;
+    if (!cId) return 'Toutes les Annexes (Réseau)';
+    const found = campuses?.find(c => c.id === cId);
+    return found ? found.name : 'Annexe';
+  };
+
+  const isSlipInCampus = (s: PayrollSlip, campusId: string | null) => {
+    if (!campusId) return true;
+    return s.campus_id === campusId || (!s.campus_id && s.staff?.campus_id === campusId);
+  };
+
   const [activeTab, setActiveTab] = useState<'periods' | 'preparation' | 'arrears' | 'history' | 'advances' | 'reports'>('periods');
   const [loading, setLoading] = useState(true);
   const [staff, setStaff] = useState<StaffMember[]>([]);
+  const [allSchoolStaff, setAllSchoolStaff] = useState<StaffMember[]>([]);
+  const [preparationStatusFilter, setPreparationStatusFilter] = useState<'ALL' | 'PREPARED' | 'MISSING' | 'DUPLICATE'>('ALL');
   const [periods, setPeriods] = useState<PayrollPeriod[]>([]);
   const [slips, setSlips] = useState<PayrollSlip[]>([]);
   const [advances, setAdvances] = useState<SalaryAdvance[]>([]);
@@ -461,11 +532,21 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
 
   useEffect(() => {
+    if (user.campus_id) {
+      setSelectedCampusFilter(user.campus_id);
+    } else if (currentCampusId && currentCampusId !== 'GLOBAL' && selectedCampusFilter === 'ALL') {
+      setSelectedCampusFilter(currentCampusId);
+    }
+  }, [user.campus_id, currentCampusId]);
+
+  useEffect(() => {
     // Clear the selected period when switching campuses to avoid displaying a period from another campus
     setSelectedPeriodId('');
     fetchData();
     setSearchTerm('');
-  }, [user.school_id, currentCampusId]);
+    setArrearsCurrentPage(1);
+    setHistoryCurrentPage(1);
+  }, [user.school_id, effectiveCampusId]);
 
   useEffect(() => {
     if (selectedPeriodId) {
@@ -480,39 +561,31 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       const { data: schoolData } = await supabase.from('schools').select('global_settings').eq('id', user.school_id).single();
       if (schoolData) setGlobalSettings(schoolData.global_settings);
 
-      // 1. Fetch Staff
-      let staffQuery = supabase
+      // 1. Fetch Staff (All active staff for whole school to enable cross-annexe integrity audit)
+      const { data: allStaffData, error: staffError } = await supabase
         .from('staff')
         .select('*')
         .eq('school_id', user.school_id)
-        .eq('status', 'Actif');
-      const activeCampusId = user.campus_id || currentCampusId;
-      if (activeCampusId) {
-        staffQuery = staffQuery.eq('campus_id', activeCampusId);
-      }
-      const { data: staffData, error: staffError } = await staffQuery.order('last_name');
+        .eq('status', 'Actif')
+        .order('last_name');
       if (staffError) throw staffError;
 
       // Fetch active academic year
       const { data: years } = await supabase.from('academic_years').select('id, status, is_active').eq('school_id', user.school_id);
       const activeYear = years?.find(y => y.is_active || y.status === 'ACTIVE') || years?.[0];
 
-      // Fetch assignments to calculate teaching hours
+      // Fetch assignments to calculate teaching hours across all school staff
       let assignmentsQuery = supabase
         .from('staff_assignments')
-        .select('staff_id, duration_hours, hourly_rate, staff!inner(school_id, campus_id)')
+        .select('staff_id, duration_hours, hourly_rate')
         .eq('school_id', user.school_id);
       
       if (activeYear) {
         assignmentsQuery = assignmentsQuery.eq('academic_year_id', activeYear.id);
       }
-
-      if (currentCampusId) {
-        assignmentsQuery = assignmentsQuery.eq('staff.campus_id', currentCampusId);
-      }
       const { data: assignmentsData } = await assignmentsQuery;
 
-      const staffWithCalculatedSalary = (staffData || [])
+      const allStaffWithCalculatedSalary = (allStaffData || [])
         .filter(member => {
           const isTeacher = member.role?.toLowerCase().includes('prof') || member.role?.toLowerCase().includes('enseignant') || member.role?.toLowerCase().includes('teacher');
           const memberAssignments = assignmentsData?.filter(a => a.staff_id === member.id) || [];
@@ -531,7 +604,15 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           const calculated_base_salary = fixedSalary + teachingSalary;
           return { ...member, calculated_base_salary };
         });
-      setStaff(staffWithCalculatedSalary);
+
+      setAllSchoolStaff(allStaffWithCalculatedSalary);
+
+      const activeCampusId = effectiveCampusId;
+      const staffForCurrentView = activeCampusId 
+        ? allStaffWithCalculatedSalary.filter(s => s.campus_id === activeCampusId)
+        : allStaffWithCalculatedSalary;
+
+      setStaff(staffForCurrentView);
 
       // 2. Fetch Periods
       let periodsQuery = supabase
@@ -586,7 +667,12 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
       const { data: slipsData, error: slipsError } = await slipsQuery;
       if (slipsError) throw slipsError;
-      setSlips(slipsData || []);
+      
+      let slipsResult = slipsData || [];
+      if (activeCampusId) {
+        slipsResult = slipsResult.filter(s => s.campus_id === activeCampusId || (!s.campus_id && (!s.staff || s.staff.campus_id === activeCampusId)));
+      }
+      setSlips(slipsResult);
 
       // 4. Fetch Advances
       const { data: advancesData, error: advancesError } = await supabase
@@ -622,11 +708,13 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     setModalLoading(true);
     setModalError(null);
     try {
+      const targetCampus = user.campus_id || (newPeriodCampusId !== 'ALL' ? newPeriodCampusId : null);
+
       const { data, error } = await supabase
         .from('payroll_periods')
         .insert([{
           school_id: user.school_id,
-          campus_id: user.campus_id || currentCampusId || null,
+          campus_id: targetCampus,
           month: newPeriodMonth,
           year: newPeriodYear,
           status: 'DRAFT'
@@ -642,12 +730,10 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       
       // We don't close immediately to let the user see the success
       setTimeout(() => {
-        if (modalSuccess) {
-          setShowPeriodModal(false);
-          setModalSuccess(false);
-          setActiveTab('preparation');
-        }
-      }, 2000);
+        setShowPeriodModal(false);
+        setModalSuccess(false);
+        setActiveTab('preparation');
+      }, 1500);
 
       import('../utils/auditLogger').then(({ AuditLogger }) => {
         AuditLogger.log({
@@ -658,7 +744,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           entity_id: data.id,
           details: { 
             type: 'payroll_period',
-            period: `${MONTHS[newPeriodMonth - 1]} ${newPeriodYear}`
+            period: `${MONTHS[newPeriodMonth - 1]} ${newPeriodYear}`,
+            campus_id: targetCampus,
+            campus_name: getCampusName(targetCampus)
           }
         });
       });
@@ -706,7 +794,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         })
         .eq('deduction_period_id', periodId);
       
-      if (currentCampusId && activeStaffIds.length > 0) {
+      if (effectiveCampusId && activeStaffIds.length > 0) {
         advancesResetQuery = advancesResetQuery.in('staff_id', activeStaffIds);
       }
       const { error: resetError } = await advancesResetQuery;
@@ -718,7 +806,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         .delete()
         .eq('period_id', periodId);
       
-      const targetCampusIdForDelete = user.campus_id || currentCampusId;
+      const targetCampusIdForDelete = effectiveCampusId;
       if (targetCampusIdForDelete) {
         slipsDeleteQuery = slipsDeleteQuery.eq('campus_id', targetCampusIdForDelete);
       }
@@ -727,7 +815,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
       // 3. Delete period record itself if not shared, or if no campus selected
       let shouldDeletePeriodRecord = true;
-      const activeCampusIdForDelete = user.campus_id || currentCampusId;
+      const activeCampusIdForDelete = effectiveCampusId;
       if (activeCampusIdForDelete && !periodToDelete.campus_id) {
         // If a campus is selected but the period is centralized (has no campus_id), do not delete the period itself
         shouldDeletePeriodRecord = false;
@@ -746,12 +834,12 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         }
       }
 
-      const deletedSlips = slips.filter(s => s.period_id === periodId && (!currentCampusId || s.staff?.campus_id === currentCampusId));
+      const deletedSlips = slips.filter(s => s.period_id === periodId && (!effectiveCampusId || s.campus_id === effectiveCampusId || s.staff?.campus_id === effectiveCampusId));
       const deletedSlipIds = deletedSlips.map(s => s.id);
 
       // 4. Update local state
       setSlips(slips.filter(s => !deletedSlipIds.includes(s.id)));
-      setAdvances(advances.map(a => (a.deduction_period_id === periodId && (!currentCampusId || activeStaffIds.includes(a.staff_id))) ? { ...a, status: 'PAID', deduction_period_id: null } : a));
+      setAdvances(advances.map(a => (a.deduction_period_id === periodId && (!effectiveCampusId || activeStaffIds.includes(a.staff_id))) ? { ...a, status: 'PAID', deduction_period_id: null } : a));
       
       showToast(shouldDeletePeriodRecord ? "Période et toutes ses traces supprimées avec succès." : "Fiches de paie pour cette période supprimées avec succès.");
       setPeriodToDelete(null);
@@ -767,7 +855,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           details: { 
             type: 'payroll_period',
             period: getPeriodName(periodToDelete),
-            slips_count: deletedSlips.length
+            slips_count: deletedSlips.length,
+            campus_id: effectiveCampusId || null,
+            campus_name: getCampusName(effectiveCampusId)
           }
         });
       });
@@ -806,7 +896,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           entity_id: slipToDelete.staff_id,
           details: { 
             type: 'payroll_slip',
-            staff_name: `${slipToDelete.staff?.first_name} ${slipToDelete.staff?.last_name}`
+            staff_name: `${slipToDelete.staff?.first_name} ${slipToDelete.staff?.last_name}`,
+            campus_id: slipToDelete.campus_id || slipToDelete.staff?.campus_id || null,
+            campus_name: getCampusName(slipToDelete.campus_id || slipToDelete.staff?.campus_id, slipToDelete.staff)
           }
         });
       });
@@ -823,6 +915,8 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     
     const net = base + bonus - deduction;
     const existingSlip = slips.find(s => s.period_id === selectedPeriodId && s.staff_id === staffId);
+    const staffMember = staff.find(s => s.id === staffId);
+    const targetCampusId = staffMember?.campus_id || user.campus_id || effectiveCampusId || null;
 
     try {
       if (existingSlip) {
@@ -832,7 +926,8 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
             base_salary: base,
             bonuses: bonus,
             deductions: deduction,
-            net_salary: net
+            net_salary: net,
+            campus_id: existingSlip.campus_id || targetCampusId
           })
           .eq('id', existingSlip.id)
           .select('*, staff:staff(*), period:payroll_periods(*)')
@@ -851,6 +946,8 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               type: 'payroll_slip',
               net_salary: net,
               staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
+              campus_id: data.campus_id || targetCampusId,
+              campus_name: getCampusName(data.campus_id || targetCampusId, data.staff),
               period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
             }
           });
@@ -860,7 +957,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           .from('payroll_slips')
           .insert([{
             school_id: user.school_id,
-            campus_id: user.campus_id || currentCampusId || null,
+            campus_id: targetCampusId,
             period_id: selectedPeriodId,
             staff_id: staffId,
             base_salary: base,
@@ -885,6 +982,8 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               type: 'payroll_slip',
               net_salary: net,
               staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
+              campus_id: targetCampusId,
+              campus_name: getCampusName(targetCampusId, data.staff),
               period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
             }
           });
@@ -927,7 +1026,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
         return {
           school_id: user.school_id,
-          campus_id: user.campus_id || currentCampusId || null,
+          campus_id: member.campus_id || user.campus_id || effectiveCampusId || null,
           period_id: selectedPeriodId,
           staff_id: member.id,
           base_salary: base,
@@ -964,6 +1063,114 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     } catch (error: any) {
       console.error("Error preparing all slips:", error);
       showToast("Erreur lors de la génération des fiches de paie.", 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrepareCampus = async (targetCampusId: string | null, targetCampusName: string) => {
+    if (!selectedPeriodId) return;
+
+    setLoading(true);
+    try {
+      const targetStaff = (allSchoolStaff.length > 0 ? allSchoolStaff : staff).filter(member => {
+        const isInCampus = targetCampusId ? member.campus_id === targetCampusId : true;
+        const alreadyHasSlip = slips.some(s => s.period_id === selectedPeriodId && s.staff_id === member.id);
+        return isInCampus && !alreadyHasSlip;
+      });
+
+      if (targetStaff.length === 0) {
+        showToast(`Tous les employés de ${targetCampusName} ont déjà une fiche pour cette période.`);
+        setLoading(false);
+        return;
+      }
+
+      const newSlips = targetStaff.map(member => {
+        const memberAdvances = advances.filter(a => 
+          a.staff_id === member.id && 
+          (a.status === 'PAID' || a.status === 'APPROVED') &&
+          (!a.deduction_period_id || a.deduction_period_id === selectedPeriodId)
+        );
+        const base = member.calculated_base_salary ?? member.amount ?? 0;
+        const requestedTotalDeduction = memberAdvances.reduce((sum, a) => sum + a.amount, 0);
+        const totalDeductionAllowed = Math.min(requestedTotalDeduction, base);
+
+        return {
+          school_id: user.school_id,
+          campus_id: member.campus_id || targetCampusId || null,
+          period_id: selectedPeriodId,
+          staff_id: member.id,
+          base_salary: base,
+          bonuses: 0,
+          deductions: totalDeductionAllowed,
+          net_salary: base - totalDeductionAllowed,
+          status: 'UNPAID'
+        };
+      });
+
+      const { data, error } = await supabase
+        .from('payroll_slips')
+        .insert(newSlips)
+        .select('*, staff:staff(*), period:payroll_periods(*)');
+
+      if (error) throw error;
+
+      setSlips(prev => [...prev, ...(data || [])]);
+      showToast(`${data?.length || 0} fiches de paie générées pour ${targetCampusName} !`);
+
+      import('../utils/auditLogger').then(({ AuditLogger }) => {
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: 'CREATE',
+          entity_type: 'staff',
+          details: { 
+            type: 'payroll_batch_campus',
+            campus_id: targetCampusId,
+            campus_name: targetCampusName,
+            count: data?.length || 0
+          }
+        });
+      });
+    } catch (error: any) {
+      console.error("Error preparing slips for campus:", error);
+      showToast("Erreur lors de la préparation des fiches de l'annexe.", 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePurgeDuplicate = async (slipToPurge: PayrollSlip, staffName: string) => {
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from('payroll_slips')
+        .delete()
+        .eq('id', slipToPurge.id);
+
+      if (error) throw error;
+
+      setSlips(prev => prev.filter(s => s.id !== slipToPurge.id));
+      showToast(`Doublon de fiche pour ${staffName} supprimé avec succès.`);
+
+      import('../utils/auditLogger').then(({ AuditLogger }) => {
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: 'DELETE',
+          entity_type: 'staff',
+          entity_id: slipToPurge.staff_id,
+          details: { 
+            type: 'payroll_slip_duplicate_purge',
+            slip_id: slipToPurge.id,
+            staff_name: staffName,
+            campus_id: slipToPurge.campus_id || null
+          }
+        });
+      });
+    } catch (error: any) {
+      console.error("Error purging duplicate slip:", error);
+      showToast("Erreur lors de la suppression du doublon.", 'error');
     } finally {
       setLoading(false);
     }
@@ -1024,6 +1231,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         const remainingAdvanceAmount = adv.amount - remainingDeductionToApply;
         const { data: newAdv } = await supabase.from('salary_advances').insert([{
           school_id: adv.school_id,
+          campus_id: adv.campus_id || adv.staff?.campus_id || null,
           staff_id: adv.staff_id,
           amount: remainingAdvanceAmount,
           reason: adv.reason + " (Solde restant)",
@@ -1052,6 +1260,8 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           currency: 'HTG', 
           staff_name: formatStudentName(updatedSlip.staff?.last_name, updatedSlip.staff?.first_name).fullName,
           period: updatedSlip.period ? `${MONTHS[updatedSlip.period.month - 1]} ${updatedSlip.period.year}` : 'Inconnue',
+          campus_id: updatedSlip.campus_id || updatedSlip.staff?.campus_id || null,
+          campus_name: getCampusName(updatedSlip.campus_id || updatedSlip.staff?.campus_id, updatedSlip.staff),
           type: 'payroll'
         }
       });
@@ -1289,7 +1499,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {periods.map(period => {
-          const periodSlips = slips.filter(s => s.period_id === period.id && (!currentCampusId || s.staff?.campus_id === currentCampusId));
+          const periodSlips = slips.filter(s => s.period_id === period.id && isSlipInCampus(s, effectiveCampusId));
           const totalToPay = periodSlips.reduce((sum, s) => sum + s.net_salary, 0);
           const totalPaid = periodSlips.filter(s => s.status === 'PAID').reduce((sum, s) => sum + s.net_salary, 0);
           const progress = totalToPay > 0 ? (totalPaid / totalToPay) * 100 : 0;
@@ -1299,13 +1509,21 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               <div className="flex justify-between items-start mb-4">
                 <div>
                   <h3 className="text-lg font-bold text-slate-800">{getPeriodName(period)}</h3>
-                  <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mt-2 ${
-                    period.status === 'DRAFT' ? 'bg-slate-100 text-slate-800' :
-                    period.status === 'VALIDATED' ? 'bg-blue-100 text-blue-800' :
-                    'bg-emerald-100 text-emerald-800'
-                  }`}>
-                    {period.status}
-                  </span>
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                      period.status === 'DRAFT' ? 'bg-slate-100 text-slate-800' :
+                      period.status === 'VALIDATED' ? 'bg-blue-100 text-blue-800' :
+                      'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {period.status}
+                    </span>
+                    {hasMultipleCampuses && (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                        <Building2 className="w-3 h-3" />
+                        {getCampusName(period.campus_id)}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-1">
                   <button 
@@ -1409,10 +1627,27 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     }
 
     const currentPeriod = periods.find(p => p.id === selectedPeriodId);
-    const filteredStaff = staff.filter(s => 
-      s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-      s.last_name.toLowerCase().includes(searchTerm.toLowerCase())
+    const periodSlips = slips.filter(s => s.period_id === selectedPeriodId);
+    const slipCountByStaff: Record<string, number> = {};
+    periodSlips.forEach(s => {
+      slipCountByStaff[s.staff_id] = (slipCountByStaff[s.staff_id] || 0) + 1;
+    });
+    const duplicateStaffIds = new Set(
+      Object.keys(slipCountByStaff).filter(id => slipCountByStaff[id] > 1)
     );
+
+    const filteredStaff = staff.filter(s => {
+      const matchesSearch = s.first_name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        s.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (s.role && s.role.toLowerCase().includes(searchTerm.toLowerCase()));
+      if (!matchesSearch) return false;
+
+      const memberSlipCount = slipCountByStaff[s.id] || 0;
+      if (preparationStatusFilter === 'PREPARED') return memberSlipCount > 0;
+      if (preparationStatusFilter === 'MISSING') return memberSlipCount === 0;
+      if (preparationStatusFilter === 'DUPLICATE') return memberSlipCount > 1;
+      return true;
+    });
 
     return (
       <div className="space-y-6">
@@ -1454,12 +1689,88 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           </div>
         </div>
 
+        {/* Section d'Audit d'Intégrité des Données & Couverture des Annexes */}
+        {currentPeriod && (
+          <PayrollIntegrityAudit
+            currentPeriod={currentPeriod}
+            periodName={getPeriodName(currentPeriod)}
+            allSchoolStaff={allSchoolStaff.length > 0 ? allSchoolStaff : staff}
+            campuses={campuses || []}
+            hasMultipleCampuses={hasMultipleCampuses}
+            slips={slips}
+            advances={advances}
+            terminology={terminology}
+            loading={loading}
+            onPrepareCampus={handlePrepareCampus}
+            onPurgeDuplicate={handlePurgeDuplicate}
+            onFilterMissingStaff={() => setPreparationStatusFilter('MISSING')}
+            onFilterDuplicates={() => setPreparationStatusFilter('DUPLICATE')}
+          />
+        )}
+
         {currentPeriod?.status === 'VALIDATED' && (
           <div className="bg-blue-50 border border-blue-200 p-4 rounded-xl flex items-center gap-3 text-blue-900">
             <Info className="w-5 h-5 shrink-0 text-blue-600" />
             <p className="text-sm font-bold">Cette période est <strong>validée</strong>. Les fiches ne peuvent plus être modifiées.</p>
           </div>
         )}
+
+        {/* Barre de filtrage par état de préparation */}
+        <div className="flex flex-wrap items-center justify-between gap-2.5">
+          <div className="flex flex-wrap items-center gap-1.5 p-1 bg-slate-100 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setPreparationStatusFilter('ALL')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                preparationStatusFilter === 'ALL'
+                  ? 'bg-white text-slate-900 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Tous ({staff.length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreparationStatusFilter('PREPARED')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                preparationStatusFilter === 'PREPARED'
+                  ? 'bg-white text-emerald-800 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Avec Fiche ({staff.filter(s => (slipCountByStaff[s.id] || 0) > 0).length})
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreparationStatusFilter('MISSING')}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                preparationStatusFilter === 'MISSING'
+                  ? 'bg-white text-amber-800 shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Sans Fiche ({staff.filter(s => (slipCountByStaff[s.id] || 0) === 0).length})
+            </button>
+            {duplicateStaffIds.size > 0 && (
+              <button
+                type="button"
+                onClick={() => setPreparationStatusFilter('DUPLICATE')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                  preparationStatusFilter === 'DUPLICATE'
+                    ? 'bg-rose-600 text-white shadow-2xs'
+                    : 'text-rose-700 bg-rose-50 hover:bg-rose-100'
+                }`}
+              >
+                <AlertTriangle className="w-3 h-3" />
+                <span>Doublons ({duplicateStaffIds.size})</span>
+              </button>
+            )}
+          </div>
+
+          <div className="text-xs font-bold text-slate-500">
+            Affichage : {filteredStaff.length} / {staff.length} employé(s)
+          </div>
+        </div>
 
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
           {/* Desktop Table View */}
@@ -1510,6 +1821,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                       member={member} 
                       slip={slip} 
                       memberAdvances={eligibleAdvances}
+                      campusName={hasMultipleCampuses ? getCampusName(member.campus_id, member) : undefined}
+                      terminology={terminology}
+                      duplicateCount={slipCountByStaff[member.id] || 0}
                       onSave={handleSaveSlip} 
                       onDelete={setSlipToDelete}
                     />
@@ -1549,6 +1863,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   member={member} 
                   slip={slip} 
                   memberAdvances={eligibleAdvances}
+                  campusName={hasMultipleCampuses ? getCampusName(member.campus_id, member) : undefined}
+                  terminology={terminology}
+                  duplicateCount={slipCountByStaff[member.id] || 0}
                   onSave={handleSaveSlip} 
                   onDelete={setSlipToDelete}
                 />
@@ -1562,7 +1879,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const renderArrearsTab = () => {
     // Group unpaid slips by employee
-    const unpaidSlips = slips.filter(s => s.status === 'UNPAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId));
+    const unpaidSlips = slips.filter(s => s.status === 'UNPAID' && isSlipInCampus(s, effectiveCampusId));
     
     // Global metrics across all unpaid slips
     const totalArrearsGlobal = unpaidSlips.reduce((sum, s) => sum + s.net_salary, 0);
@@ -1704,21 +2021,22 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           </div>
         </div>
 
-        {/* BARRE D'OUTILS MODERNE - RECHERCHE PILL, SELECTPILL HARMONISÉ, TRI & COMMUTATEUR DE VUE */}
-        <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
-          <div className="flex flex-wrap items-center gap-2 flex-1">
-            {/* Recherche Pill */}
-            <div className="relative flex-1 min-w-[200px] sm:min-w-[240px] max-w-md">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        {/* BARRE D'OUTILS MODERNE ADAPTATIVE SUR UNE SEULE LIGNE & ULTRA-RESPONSIVE */}
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-2.5">
+          {/* Groupe Filtres & Recherche : s'adapte sur une seule ligne fluide sans décrochage intempestif */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
+            {/* Recherche Pill avec largeur contrôlée et flexible */}
+            <div className="relative w-full sm:w-44 md:w-48 lg:w-56 xl:w-64 shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Rechercher par nom, rôle, période..."
+                placeholder="Rechercher nom, rôle..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setArrearsCurrentPage(1);
                 }}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                className="w-full pl-8 pr-7 py-1.5 sm:py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
               />
               {searchTerm && (
                 <button
@@ -1727,84 +2045,92 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                     setSearchTerm('');
                     setArrearsCurrentPage(1);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
                 >
-                  <X size={13} />
+                  <X size={12} />
                 </button>
               )}
             </div>
 
             {/* Filtre par Poste / Rôle avec SelectPill */}
             {distinctRoles.length > 0 && (
-              <SelectPill
-                options={[
-                  { value: 'ALL', label: `Tous les rôles (${distinctRoles.length})`, icon: Users },
-                  ...distinctRoles.map(role => ({ value: role, label: role, icon: Award }))
-                ]}
-                value={arrearsRoleFilter}
-                onChange={(val) => {
-                  setArrearsRoleFilter(val);
-                  setArrearsCurrentPage(1);
-                }}
-                variant="pill"
-                size="sm"
-                colorScheme="slate"
-                icon={Users}
-                searchable={distinctRoles.length > 6}
-                portal={true}
-              />
+              <div className="shrink-0">
+                <SelectPill
+                  options={[
+                    { value: 'ALL', label: `Tous les rôles (${distinctRoles.length})`, icon: Users },
+                    ...distinctRoles.map(role => ({ value: role, label: role, icon: Award }))
+                  ]}
+                  value={arrearsRoleFilter}
+                  onChange={(val) => {
+                    setArrearsRoleFilter(val);
+                    setArrearsCurrentPage(1);
+                  }}
+                  variant="pill"
+                  size="sm"
+                  colorScheme="slate"
+                  icon={Users}
+                  searchable={distinctRoles.length > 6}
+                  portal={true}
+                />
+              </div>
             )}
 
             {/* Filtre par Période avec SelectPill */}
             {distinctPeriods.length > 1 && (
+              <div className="shrink-0">
+                <SelectPill
+                  options={[
+                    { value: 'ALL', label: `Toutes périodes (${distinctPeriods.length})`, icon: Calendar },
+                    ...distinctPeriods.map(period => ({ value: period.id, label: period.label, icon: Calendar }))
+                  ]}
+                  value={arrearsPeriodFilter}
+                  onChange={(val) => {
+                    setArrearsPeriodFilter(val);
+                    setArrearsCurrentPage(1);
+                  }}
+                  variant="pill"
+                  size="sm"
+                  colorScheme="slate"
+                  icon={Calendar}
+                  portal={true}
+                />
+              </div>
+            )}
+
+            {/* Tri avec SelectPill compact */}
+            <div className="shrink-0">
               <SelectPill
                 options={[
-                  { value: 'ALL', label: `Toutes les périodes (${distinctPeriods.length})`, icon: Calendar },
-                  ...distinctPeriods.map(period => ({ value: period.id, label: period.label, icon: Calendar }))
+                  { value: 'amount-desc', label: 'Montant dû (Max)', icon: ArrowUpDown },
+                  { value: 'amount-asc', label: 'Montant dû (Min)', icon: ArrowUpDown },
+                  { value: 'name-asc', label: "Nom (A-Z)", icon: ArrowUpDown },
                 ]}
-                value={arrearsPeriodFilter}
-                onChange={(val) => {
-                  setArrearsPeriodFilter(val);
-                  setArrearsCurrentPage(1);
-                }}
+                value={arrearsSortBy}
+                onChange={(val) => setArrearsSortBy(val as any)}
                 variant="pill"
                 size="sm"
                 colorScheme="slate"
-                icon={Calendar}
+                icon={ArrowUpDown}
                 portal={true}
               />
-            )}
-
-            {/* Tri avec SelectPill */}
-            <SelectPill
-              options={[
-                { value: 'amount-desc', label: 'Montant dû (Plus élevé)', icon: ArrowUpDown },
-                { value: 'amount-asc', label: 'Montant dû (Plus faible)', icon: ArrowUpDown },
-                { value: 'name-asc', label: "Nom employé (A-Z)", icon: ArrowUpDown },
-              ]}
-              value={arrearsSortBy}
-              onChange={(val) => setArrearsSortBy(val as any)}
-              variant="pill"
-              size="sm"
-              colorScheme="slate"
-              icon={ArrowUpDown}
-              portal={true}
-            />
+            </div>
           </div>
 
-          {/* COMMUTATEUR DE VUE : TABLEAU & CARTES / LISTE */}
-          <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+          {/* COMMUTATEUR DE VUE & TOTAL SÉLECTIONNÉ */}
+          <div className="flex items-center justify-between md:justify-end gap-2 shrink-0 pt-1.5 md:pt-0 border-t md:border-t-0 border-slate-100">
             {filteredTotalOwed > 0 && (
-              <span className="hidden sm:inline-flex text-xs font-bold text-slate-500">
-                Total sélection : <strong className="text-rose-600 ml-1">{filteredTotalOwed.toLocaleString()} HTG</strong>
-              </span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-rose-50/80 border border-rose-200/80 rounded-full text-xs font-bold text-rose-700 whitespace-nowrap shrink-0">
+                <span className="text-slate-400 font-medium hidden xl:inline">Total sélection :</span>
+                <span className="text-slate-400 font-medium xl:hidden">Total :</span>
+                <strong className="text-rose-600 tabular-nums">{filteredTotalOwed.toLocaleString()} HTG</strong>
+              </div>
             )}
 
-            <div className="flex items-center p-0.5 bg-slate-100/90 border border-slate-200 rounded-full">
+            <div className="flex items-center p-0.5 bg-slate-100/90 border border-slate-200 rounded-full shrink-0">
               <button
                 type="button"
                 onClick={() => setArrearsViewMode('table')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   arrearsViewMode === 'table'
                     ? 'bg-white text-indigo-600 shadow-2xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
@@ -1818,7 +2144,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
               <button
                 type="button"
                 onClick={() => setArrearsViewMode('cards')}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1 rounded-full text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
                   arrearsViewMode === 'cards'
                     ? 'bg-white text-indigo-600 shadow-2xs font-black'
                     : 'text-slate-600 hover:text-slate-900'
@@ -2300,7 +2626,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const renderHistoryTab = () => {
     // All paid slips in current campus
-    const allPaidSlips = slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId));
+    const allPaidSlips = slips.filter(s => s.status === 'PAID' && isSlipInCampus(s, effectiveCampusId));
     
     // Global KPI metrics
     const totalPaidGlobal = allPaidSlips.reduce((sum, s) => sum + s.net_salary, 0);
@@ -2438,21 +2764,22 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           </div>
         </div>
 
-        {/* BARRE D'OUTILS MODERNE - RECHERCHE PILL, SELECTPILL HARMONISÉ, TRI & RÉSUMÉ */}
-        <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-2.5 sm:gap-3">
-          <div className="flex flex-wrap items-center gap-2 flex-1">
-            {/* Recherche Pill */}
-            <div className="relative flex-1 min-w-[200px] sm:min-w-[240px] max-w-md">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
+        {/* BARRE D'OUTILS MODERNE ADAPTATIVE SUR UNE SEULE LIGNE & ULTRA-RESPONSIVE */}
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-2.5">
+          {/* Groupe Filtres & Recherche : s'adapte sur une seule ligne fluide sans décrochage intempestif */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-1 min-w-0 overflow-x-auto no-scrollbar py-0.5">
+            {/* Recherche Pill avec largeur contrôlée et flexible */}
+            <div className="relative w-full sm:w-44 md:w-48 lg:w-56 xl:w-64 shrink-0">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Rechercher par employé, rôle, mode, notes..."
+                placeholder="Rechercher employé, rôle, mode..."
                 value={searchTerm}
                 onChange={(e) => {
                   setSearchTerm(e.target.value);
                   setHistoryCurrentPage(1);
                 }}
-                className="w-full pl-9 pr-8 py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                className="w-full pl-8 pr-7 py-1.5 sm:py-2 bg-slate-50 hover:bg-slate-100/60 focus:bg-white border border-slate-200 rounded-full text-xs font-semibold text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
               />
               {searchTerm && (
                 <button
@@ -2461,78 +2788,86 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                     setSearchTerm('');
                     setHistoryCurrentPage(1);
                   }}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-700 rounded-full transition-colors cursor-pointer"
                 >
-                  <X size={13} />
+                  <X size={12} />
                 </button>
               )}
             </div>
 
             {/* Filtre par Période avec SelectPill */}
             {distinctPeriods.length > 0 && (
-              <SelectPill
-                options={[
-                  { value: 'ALL', label: `Toutes les périodes (${distinctPeriods.length})`, icon: Calendar },
-                  ...distinctPeriods.map(p => ({ value: p.id, label: p.label, icon: Calendar }))
-                ]}
-                value={historyPeriodFilter}
-                onChange={(val) => {
-                  setHistoryPeriodFilter(val);
-                  setHistoryCurrentPage(1);
-                }}
-                variant="pill"
-                size="sm"
-                colorScheme="slate"
-                icon={Calendar}
-                portal={true}
-              />
+              <div className="shrink-0">
+                <SelectPill
+                  options={[
+                    { value: 'ALL', label: `Toutes périodes (${distinctPeriods.length})`, icon: Calendar },
+                    ...distinctPeriods.map(p => ({ value: p.id, label: p.label, icon: Calendar }))
+                  ]}
+                  value={historyPeriodFilter}
+                  onChange={(val) => {
+                    setHistoryPeriodFilter(val);
+                    setHistoryCurrentPage(1);
+                  }}
+                  variant="pill"
+                  size="sm"
+                  colorScheme="slate"
+                  icon={Calendar}
+                  portal={true}
+                />
+              </div>
             )}
 
             {/* Filtre par Méthode de paiement avec SelectPill */}
             {distinctMethods.length > 0 && (
+              <div className="shrink-0">
+                <SelectPill
+                  options={[
+                    { value: 'ALL', label: `Tous les modes (${distinctMethods.length})`, icon: CreditCard },
+                    ...distinctMethods.map(m => ({ value: m, label: m, icon: CreditCard }))
+                  ]}
+                  value={historyMethodFilter}
+                  onChange={(val) => {
+                    setHistoryMethodFilter(val);
+                    setHistoryCurrentPage(1);
+                  }}
+                  variant="pill"
+                  size="sm"
+                  colorScheme="slate"
+                  icon={CreditCard}
+                  portal={true}
+                />
+              </div>
+            )}
+
+            {/* Tri avec SelectPill compact */}
+            <div className="shrink-0">
               <SelectPill
                 options={[
-                  { value: 'ALL', label: `Tous les modes (${distinctMethods.length})`, icon: CreditCard },
-                  ...distinctMethods.map(m => ({ value: m, label: m, icon: CreditCard }))
+                  { value: 'date-desc', label: 'Date (Plus récent)', icon: ArrowUpDown },
+                  { value: 'date-asc', label: 'Date (Plus ancien)', icon: ArrowUpDown },
+                  { value: 'amount-desc', label: 'Montant (Plus élevé)', icon: ArrowUpDown },
+                  { value: 'amount-asc', label: 'Montant (Plus faible)', icon: ArrowUpDown },
+                  { value: 'name-asc', label: "Nom (A-Z)", icon: ArrowUpDown },
                 ]}
-                value={historyMethodFilter}
-                onChange={(val) => {
-                  setHistoryMethodFilter(val);
-                  setHistoryCurrentPage(1);
-                }}
+                value={historySortBy}
+                onChange={(val) => setHistorySortBy(val as any)}
                 variant="pill"
                 size="sm"
                 colorScheme="slate"
-                icon={CreditCard}
+                icon={ArrowUpDown}
                 portal={true}
               />
-            )}
-
-            {/* Tri avec SelectPill */}
-            <SelectPill
-              options={[
-                { value: 'date-desc', label: 'Date de paiement (Plus récent)', icon: ArrowUpDown },
-                { value: 'date-asc', label: 'Date de paiement (Plus ancien)', icon: ArrowUpDown },
-                { value: 'amount-desc', label: 'Montant payé (Plus élevé)', icon: ArrowUpDown },
-                { value: 'amount-asc', label: 'Montant payé (Plus faible)', icon: ArrowUpDown },
-                { value: 'name-asc', label: "Nom de l'employé (A-Z)", icon: ArrowUpDown },
-              ]}
-              value={historySortBy}
-              onChange={(val) => setHistorySortBy(val as any)}
-              variant="pill"
-              size="sm"
-              colorScheme="slate"
-              icon={ArrowUpDown}
-              portal={true}
-            />
+            </div>
           </div>
 
-          {/* Indicateur de total sélectionné */}
-          <div className="flex items-center justify-between sm:justify-end gap-2.5 pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
+          {/* Indicateur de total sélectionné & reset */}
+          <div className="flex items-center justify-between md:justify-end gap-2 shrink-0 pt-1.5 md:pt-0 border-t md:border-t-0 border-slate-100">
             {filteredTotalPaid > 0 && (
-              <span className="text-xs font-bold text-slate-500">
-                Total : <strong className="text-emerald-600 ml-1">{filteredTotalPaid.toLocaleString()} HTG</strong>
-              </span>
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50/80 border border-emerald-200/80 rounded-full text-xs font-bold text-emerald-800 whitespace-nowrap shrink-0">
+                <span className="text-slate-400 font-medium hidden xl:inline">Total payé :</span>
+                <span className="text-slate-400 font-medium xl:hidden">Total :</span>
+                <strong className="text-emerald-700 tabular-nums">{filteredTotalPaid.toLocaleString()} HTG</strong>
+              </div>
             )}
 
             {(searchTerm || historyPeriodFilter !== 'ALL' || historyMethodFilter !== 'ALL') && (
@@ -2544,11 +2879,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   setHistoryMethodFilter('ALL');
                   setHistoryCurrentPage(1);
                 }}
-                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5"
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-full transition-all cursor-pointer inline-flex items-center gap-1.5 shrink-0 whitespace-nowrap"
                 title="Réinitialiser tous les filtres"
               >
                 <RefreshCcw size={11} />
-                <span>Effacer filtres</span>
+                <span className="hidden sm:inline">Effacer</span>
               </button>
             )}
           </div>
@@ -2845,7 +3180,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     const filteredAdvances = advances.filter(a => {
       const matchSearch = a.staff?.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.staff?.last_name.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchCampus = !currentCampusId || a.staff?.campus_id === currentCampusId;
+      const matchCampus = !effectiveCampusId || a.staff?.campus_id === effectiveCampusId || a.campus_id === effectiveCampusId;
       return matchSearch && matchCampus;
     });
 
@@ -3120,7 +3455,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const renderReportsTab = () => {
     // Group slips by period
     const periodSummary = periods.map(p => {
-      const periodSlips = slips.filter(s => s.period_id === p.id);
+      const periodSlips = slips.filter(s => s.period_id === p.id && isSlipInCampus(s, effectiveCampusId));
       const totalNet = periodSlips.reduce((sum, s) => sum + (s.net_salary || 0), 0);
       const totalBase = periodSlips.reduce((sum, s) => sum + (s.base_salary || 0), 0);
       const totalBonuses = periodSlips.reduce((sum, s) => sum + (s.bonuses || 0), 0);
@@ -3139,18 +3474,18 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       };
     });
 
-    const activeCampus = campuses?.find(c => c.id === currentCampusId);
+    const activeCampus = effectiveCampusId ? campuses?.find(c => c.id === effectiveCampusId) : null;
 
     const getStaffCampusName = (member?: StaffMember | null, campusId?: string | null) => {
       const cId = campusId || member?.campus_id;
-      if (!cId) return activeCampus ? activeCampus.name : 'Campus Principal';
+      if (!cId) return activeCampus ? activeCampus.name : 'Toutes les Annexes (Réseau)';
       const found = campuses?.find(c => c.id === cId);
-      return found ? found.name : 'Campus Principal';
+      return found ? found.name : 'Annexe';
     };
 
     // All bonus recipients across all periods for quick auditing
     const allBonusRecipients = slips
-      .filter(s => (s.bonuses || 0) > 0)
+      .filter(s => (s.bonuses || 0) > 0 && isSlipInCampus(s, effectiveCampusId))
       .map(s => {
         const member = s.staff || staff.find(m => m.id === s.staff_id);
         const period = periods.find(p => p.id === s.period_id);
@@ -3166,7 +3501,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       const headers = ["Période", "Nom Employé", "Fonction", "Campus/Annexe", "Statut Période", "Salaire Base (HTG)", "Prime (HTG)", "Déductions (HTG)", "Total Net Versé (HTG)", "Mode Paiement"];
       const rows: string[][] = [];
 
-      slips.forEach(s => {
+      slips.filter(s => isSlipInCampus(s, effectiveCampusId)).forEach(s => {
         const member = s.staff || staff.find(m => m.id === s.staff_id);
         const period = periods.find(p => p.id === s.period_id);
         const fullName = member ? formatStudentName(member.last_name, member.first_name).fullName : 'Inconnu';
@@ -3542,11 +3877,57 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-xs">
         <div>
-          <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Gestion Payroll</h1>
-          <p className="text-xs sm:text-sm text-slate-500 font-medium">Préparez les salaires, gérez les arriérés et suivez les paiements.</p>
+          <div className="flex items-center gap-2">
+            <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Gestion Payroll</h1>
+            {hasMultipleCampuses && (
+              <span className="hidden sm:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <Building2 className="w-3 h-3 text-indigo-600" />
+                Multi-Annexes
+              </span>
+            )}
+          </div>
+          <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">Préparez les salaires, gérez les arriérés et suivez les paiements.</p>
         </div>
+
+        {/* Multi-Tenant / Campus Selector Header */}
+        {hasMultipleCampuses && (
+          <div className="flex items-center gap-2 w-full sm:w-auto self-stretch sm:self-auto justify-between sm:justify-end">
+            {user.campus_id ? (
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold">
+                <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
+                <span>Annexe assignée :</span>
+                <strong className="text-slate-900">{getCampusName(user.campus_id)}</strong>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <span className="text-xs font-bold text-slate-600 whitespace-nowrap flex items-center gap-1.5">
+                  <Building2 className="w-3.5 h-3.5 text-indigo-600" />
+                  <span className="hidden md:inline">Filtrer par</span> Annexe :
+                </span>
+                <div className="min-w-[170px] sm:min-w-[200px]">
+                  <SelectPill
+                    options={[
+                      { value: 'ALL', label: 'Toutes les Annexes (Réseau)' },
+                      ...(campuses || []).map(c => ({ value: c.id, label: c.name }))
+                    ]}
+                    value={selectedCampusFilter}
+                    onChange={(val) => {
+                      setSelectedCampusFilter(val);
+                      setCurrentCampusId(val !== 'ALL' ? val : null);
+                    }}
+                    variant="pill"
+                    size="sm"
+                    colorScheme="indigo"
+                    portal={true}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex overflow-x-auto border-b border-slate-200 hide-scrollbar -mb-px">
@@ -3576,9 +3957,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         >
           <AlertCircle className="w-4 h-4" />
           <span>Arriérés & Paiements</span>
-          {slips.filter(s => s.status === 'UNPAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length > 0 && (
+          {slips.filter(s => s.status === 'UNPAID' && isSlipInCampus(s, effectiveCampusId)).length > 0 && (
             <span className="ml-1 text-[10px] font-black px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 border border-rose-200">
-              {slips.filter(s => s.status === 'UNPAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length}
+              {slips.filter(s => s.status === 'UNPAID' && isSlipInCampus(s, effectiveCampusId)).length}
             </span>
           )}
         </button>
@@ -3599,9 +3980,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         >
           <Clock className="w-4 h-4" />
           <span>Historique</span>
-          {slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length > 0 && (
+          {slips.filter(s => s.status === 'PAID' && isSlipInCampus(s, effectiveCampusId)).length > 0 && (
             <span className="ml-1 text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
-              {slips.filter(s => s.status === 'PAID' && (!currentCampusId || s.staff?.campus_id === currentCampusId)).length}
+              {slips.filter(s => s.status === 'PAID' && isSlipInCampus(s, effectiveCampusId)).length}
             </span>
           )}
         </button>
@@ -3708,6 +4089,27 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                     />
                   </div>
                 </div>
+
+                {hasMultipleCampuses && !user.campus_id && (
+                  <div className="space-y-1 sm:space-y-1.5 min-w-0 pt-1">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate">
+                      Annexe / Campus concerné
+                    </label>
+                    <SelectPill
+                      options={[
+                        { value: 'ALL', label: 'Toutes les Annexes (Réseau complet)' },
+                        ...(campuses || []).map(c => ({ value: c.id, label: c.name }))
+                      ]}
+                      value={newPeriodCampusId}
+                      onChange={(val) => setNewPeriodCampusId(val)}
+                      icon={Building2}
+                      variant="field"
+                      size="sm"
+                      colorScheme="indigo"
+                      className="w-full"
+                    />
+                  </div>
+                )}
                 <div className="pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-end gap-2 sm:gap-2.5">
                   <button
                     type="button"
