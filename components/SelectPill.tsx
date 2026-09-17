@@ -17,6 +17,7 @@ export interface SelectPillProps {
   onChange: (value: string) => void;
   labelPrefix?: string;
   placeholder?: string;
+  searchPlaceholder?: string;
   icon?: LucideIcon;
   variant?: 'pill' | 'field' | 'compact';
   size?: 'xs' | 'sm' | 'md' | 'lg';
@@ -37,6 +38,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   onChange,
   labelPrefix = '',
   placeholder = 'Sélectionner...',
+  searchPlaceholder,
   icon: IconComponent,
   variant = 'pill',
   size = 'sm',
@@ -286,7 +288,27 @@ export const SelectPill: React.FC<SelectPillProps> = ({
               type="text"
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Rechercher une option..."
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (search.trim()) {
+                    if (filteredOptions.length > 0) {
+                      onChange(filteredOptions[0].value);
+                      setSearch('');
+                      setIsOpen(false);
+                    } else if (allowCustom) {
+                      if (onCreateCustom) {
+                        onCreateCustom(search.trim());
+                      } else {
+                        onChange(search.trim());
+                      }
+                      setSearch('');
+                      setIsOpen(false);
+                    }
+                  }
+                }
+              }}
+              placeholder={searchPlaceholder || "Rechercher une option..."}
               autoFocus
               className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
             />
@@ -322,10 +344,10 @@ export const SelectPill: React.FC<SelectPillProps> = ({
                   setSearch('');
                   setIsOpen(false);
                 }}
-                className="w-full py-2 px-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                className="w-full py-2 px-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
               >
                 <Plus size={13} />
-                <span>{customActionLabel ? customActionLabel(search.trim()) : `Créer "${search.trim()}"`}</span>
+                <span>{customActionLabel ? customActionLabel(search.trim()) : `Utiliser "${search.trim()}"`}</span>
               </button>
             )}
           </div>
@@ -390,10 +412,10 @@ export const SelectPill: React.FC<SelectPillProps> = ({
                     setSearch('');
                     setIsOpen(false);
                   }}
-                  className="w-full py-1.5 px-2.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                  className="w-full py-1.5 px-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 >
                   <Plus size={12} />
-                  <span>{customActionLabel ? customActionLabel(search.trim()) : `Créer "${search.trim()}"`}</span>
+                  <span>{customActionLabel ? customActionLabel(search.trim()) : `Utiliser "${search.trim()}"`}</span>
                 </button>
               </div>
             )}

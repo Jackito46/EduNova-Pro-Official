@@ -11,7 +11,7 @@ import {
   Truck, FileText, Building2, Layers, Zap, Wrench, Lock, LayoutGrid,
   SlidersHorizontal, BarChart3, Sliders, ArrowUpDown, ClipboardCheck,
   BookOpen, Shirt, PenTool, FlaskConical, Laptop, Armchair, Trophy,
-  FileSpreadsheet, Eye, Minus
+  FileSpreadsheet, Eye, Minus, Globe, Coins, GraduationCap, AlertTriangle
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
@@ -28,6 +28,7 @@ import { formatStudentName } from '../utils/formatters';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { SelectPill, SelectOption } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
+import { TablePagination } from './TablePagination';
 
 interface CatalogItem {
   id: string;
@@ -83,6 +84,8 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   );
   const siegeCampusId = siegeCampus ? siegeCampus.id : null;
   const isSiegeActive = !user.campus_id && (!currentCampusId || currentCampusId === siegeCampusId);
+  const isSingleCampus = (campuses?.length || 0) <= 1;
+  const activeCampusName = campuses?.find((c) => c.id === currentCampusId)?.name;
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'sales' | 'catalog' | 'pos' | 'inventory'>('sales');
   const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
@@ -123,6 +126,12 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [inventorySearch, setInventorySearch] = useState('');
   const [inventorySubTab, setInventorySubTab] = useState<'stock' | 'purchases' | 'deliveries' | 'combined'>('stock');
   const [inventoryViewMode, setInventoryViewMode] = useState<'table' | 'grid'>('table');
+  const [inventoryPage, setInventoryPage] = useState(1);
+  const [inventoryPerPage, setInventoryPerPage] = useState(25);
+
+  useEffect(() => {
+    setInventoryPage(1);
+  }, [inventoryFilter, inventoryCategoryFilter, inventorySearch, inventoryPerPage]);
   const [adjustingStockItem, setAdjustingStockItem] = useState<CatalogItem | null>(null);
   const [showInventorySheetModal, setShowInventorySheetModal] = useState<boolean>(false);
   const [editingPriceItem, setEditingPriceItem] = useState<{ id: string; label: string; current_price: number; new_price: string } | null>(null);
@@ -598,6 +607,10 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleRecordPurchase = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!purchaseFormData.supplier?.trim()) {
+      toast.error("Veuillez indiquer ou sélectionner le partenaire fournisseur.");
+      return;
+    }
     setIsSubmitting(true);
     try {
       const item = catalog.find(i => i.id === purchaseFormData.item_id);
@@ -1283,6 +1296,32 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return Object.values(groups).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   }, [filteredRecords]);
 
+  // Filtrage par statut de paiement pour le tableau des transactions
+  const filteredGroupedRecords = useMemo(() => {
+    return groupedRecords.filter(group => {
+      const balance = group.total_amount - group.paid_amount;
+      if (statusFilter === 'paid') return balance <= 0;
+      if (statusFilter === 'unpaid') return balance > 0;
+      return true;
+    });
+  }, [groupedRecords, statusFilter]);
+
+  // Pagination pour les transactions (données volumineuses)
+  const [salesPage, setSalesPage] = useState(1);
+  const [salesPerPage, setSalesPerPage] = useState(25);
+
+  useEffect(() => {
+    setSalesPage(1);
+  }, [searchTerm, dateFilterFrom, dateFilterTo, statusFilter, salesPerPage]);
+
+  const totalSalesPages = Math.max(1, Math.ceil(filteredGroupedRecords.length / salesPerPage));
+  const safeSalesPage = Math.min(salesPage, totalSalesPages);
+
+  const paginatedGroupedRecords = useMemo(() => {
+    const start = (safeSalesPage - 1) * salesPerPage;
+    return filteredGroupedRecords.slice(start, start + salesPerPage);
+  }, [filteredGroupedRecords, safeSalesPage, salesPerPage]);
+
   const displayedStats = useMemo(() => {
     return {
       totalVendu: groupedRecords.reduce((acc, g) => acc + g.total_amount, 0),
@@ -1390,13 +1429,30 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
-  const filteredCatalog = catalog.filter(i => 
-    (activeCatalogCat === 'Tous' || i.category === activeCatalogCat) &&
-    (selectedDisciplineFilter === 'Tous' || !i.discipline_name || i.discipline_name === 'Toutes' || i.discipline_name === selectedDisciplineFilter) &&
-    (i.label.toLowerCase().includes(catalogSearchTerm.toLowerCase()) || 
-     i.category.toLowerCase().includes(catalogSearchTerm.toLowerCase()) ||
-     (i.discipline_name && i.discipline_name.toLowerCase().includes(catalogSearchTerm.toLowerCase())))
-  );
+  const filteredCatalog = useMemo(() => {
+    return catalog.filter(i => 
+      (activeCatalogCat === 'Tous' || i.category === activeCatalogCat) &&
+      (selectedDisciplineFilter === 'Tous' || !i.discipline_name || i.discipline_name === 'Toutes' || i.discipline_name === selectedDisciplineFilter) &&
+      (i.label.toLowerCase().includes(catalogSearchTerm.toLowerCase()) || 
+       i.category.toLowerCase().includes(catalogSearchTerm.toLowerCase()) ||
+       (i.discipline_name && i.discipline_name.toLowerCase().includes(catalogSearchTerm.toLowerCase())))
+    );
+  }, [catalog, activeCatalogCat, selectedDisciplineFilter, catalogSearchTerm]);
+
+  const [catalogPage, setCatalogPage] = useState(1);
+  const [catalogPerPage, setCatalogPerPage] = useState(24);
+
+  useEffect(() => {
+    setCatalogPage(1);
+  }, [activeCatalogCat, selectedDisciplineFilter, catalogSearchTerm, catalogPerPage]);
+
+  const totalCatalogPages = Math.max(1, Math.ceil(filteredCatalog.length / catalogPerPage));
+  const safeCatalogPage = Math.min(catalogPage, totalCatalogPages);
+
+  const paginatedCatalog = useMemo(() => {
+    const start = (safeCatalogPage - 1) * catalogPerPage;
+    return filteredCatalog.slice(start, start + catalogPerPage);
+  }, [filteredCatalog, safeCatalogPage, catalogPerPage]);
 
   const deferredDeliveries = useMemo(() => {
     return records.filter(r => 
@@ -1506,6 +1562,14 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     
     const lowStockCount = lowStockItems.length + outOfStockItems.length;
     
+    // Pagination de l'inventaire
+    const totalInventoryPages = Math.max(1, Math.ceil(filteredInventory.length / inventoryPerPage));
+    const safeInventoryPage = Math.min(inventoryPage, totalInventoryPages);
+    const paginatedInventory = filteredInventory.slice(
+      (safeInventoryPage - 1) * inventoryPerPage,
+      safeInventoryPage * inventoryPerPage
+    );
+
     // Filter purchase history by selected supplier
     const filteredHistory = purchaseHistory.filter(p => {
       if (supplierHistoryFilter === 'Tous') return true;
@@ -1857,7 +1921,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
-                    {filteredInventory.map((item) => {
+                    {paginatedInventory.map((item) => {
                       const isOut = (item.stock_quantity || 0) <= 0;
                       const isLow = !isOut && item.stock_quantity !== undefined && item.stock_quantity <= (item.low_stock_threshold || 0);
                       const lastInfo = getLastPurchaseInfo(item.id);
@@ -2035,7 +2099,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             ) : (
               /* VUE GRILLE DE CARTES ERGONOMIQUE */
               <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {filteredInventory.map(item => {
+                {paginatedInventory.map(item => {
                   const isOut = (item.stock_quantity || 0) <= 0;
                   const isLow = !isOut && item.stock_quantity !== undefined && item.stock_quantity <= (item.low_stock_threshold || 0);
                   const lastInfo = getLastPurchaseInfo(item.id);
@@ -2123,6 +2187,19 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   );
                 })}
               </div>
+            )}
+
+            {/* Pagination Stock & Inventaire */}
+            {filteredInventory.length > 0 && (
+              <TablePagination
+                currentPage={safeInventoryPage}
+                totalItems={filteredInventory.length}
+                itemsPerPage={inventoryPerPage}
+                onPageChange={(page) => setInventoryPage(page)}
+                onItemsPerPageChange={(size) => setInventoryPerPage(size)}
+                itemsPerPageOptions={[12, 25, 50, 100]}
+                itemLabel="articles en stock"
+              />
             )}
           </div>
         )}
@@ -2408,49 +2485,81 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20 px-4 md:px-0">
       
-      {/* HEADER DE PILOTAGE */}
-      <div className="bg-white p-4 md:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 md:gap-6 print:hidden">
-        <div className="flex items-center gap-3 sm:gap-4 w-full xl:w-auto">
+      {/* NAVIGATION & HEADER MULTI-CAMPUS (ALIGNÉ SUR RELEVÉ DE COMPTE) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 print:hidden bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80">
+        <div className="flex items-center gap-3 sm:gap-4">
           <button 
             onClick={() => window.history.back()}
-            className="p-2.5 sm:p-3 hover:bg-slate-100 transition-all text-slate-500 rounded-xl border border-slate-200 flex items-center justify-center shrink-0"
+            className="p-2.5 hover:bg-slate-100 transition-all text-slate-500 rounded-2xl border border-slate-200 flex items-center justify-center shrink-0 cursor-pointer shadow-2xs hover:text-slate-900"
             title="Retour"
+            aria-label="Retour"
           >
             <ArrowLeft size={18} />
           </button>
-          <div className="space-y-0.5 text-left min-w-0 flex-1">
-            <div className="flex items-center gap-2 text-slate-600 font-bold text-[10px] tracking-wider uppercase">
-              <ShoppingBag size={14} className="text-indigo-600 shrink-0" /> UNITÉ COMMERCIALE SCOLAIRE
+          <div className="space-y-1">
+            <div className="flex items-center gap-2 text-indigo-600 font-extrabold text-[10px] uppercase tracking-[0.2em]">
+              <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+              <span>ÉCONOMAT • FOURNITURES & SERVICES</span>
+              {!isSingleCampus && activeCampusName && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="bg-indigo-50 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-100 font-extrabold flex items-center gap-1.5 shadow-2xs">
+                    <Globe size={11} className="text-indigo-600" />
+                    {activeCampusName}
+                  </span>
+                </>
+              )}
             </div>
-            <h2 className="text-xl sm:text-2xl lg:text-3xl font-extrabold text-slate-900 tracking-tight truncate">Fournitures & Services</h2>
-            <p className="text-slate-500 text-xs sm:text-sm line-clamp-1">Gérez le catalogue et les ventes de fournitures scolaires.</p>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+              Fournitures & Services
+            </h2>
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row bg-slate-100 p-1.5 rounded-2xl border border-slate-200/80 w-full xl:w-auto gap-1 shrink-0 overflow-x-auto max-w-full">
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap gap-1">
           <button 
             onClick={() => setViewMode("sales")} 
-            className={`flex-1 xl:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 whitespace-nowrap ${viewMode === "sales" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"}`}
+            className={`flex-1 lg:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${
+              viewMode === "sales" 
+                ? "bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black" 
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/70"
+            }`}
           >
-            <ShoppingBag size={15} className="shrink-0" />
+            <ShoppingBag size={16} className="shrink-0" />
             <span>Transactions</span>
-            <span className="px-1.5 py-0.5 text-[10px] font-mono bg-slate-100 text-slate-700 rounded-md font-bold">{groupedRecords.length}</span>
+            <span className={`px-1.5 py-0.5 text-[10px] font-mono rounded-md font-bold ${
+              viewMode === "sales" ? "bg-indigo-50 text-indigo-700" : "bg-white/80 text-slate-600"
+            }`}>
+              {groupedRecords.length}
+            </span>
           </button>
           
           <button 
             onClick={() => setViewMode("catalog")} 
-            className={`flex-1 xl:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 whitespace-nowrap ${viewMode === "catalog" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"}`}
+            className={`flex-1 lg:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${
+              viewMode === "catalog" 
+                ? "bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black" 
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/70"
+            }`}
           >
-            <Tag size={15} className="shrink-0" />
+            <Tag size={16} className="shrink-0" />
             <span>Catalogue Officiel</span>
-            <span className="px-1.5 py-0.5 text-[10px] font-mono bg-slate-100 text-slate-700 rounded-md font-bold">{catalog.length}</span>
+            <span className={`px-1.5 py-0.5 text-[10px] font-mono rounded-md font-bold ${
+              viewMode === "catalog" ? "bg-indigo-50 text-indigo-700" : "bg-white/80 text-slate-600"
+            }`}>
+              {catalog.length}
+            </span>
           </button>
           
           <button 
             onClick={() => setViewMode("inventory")} 
-            className={`flex-1 xl:flex-none px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center justify-center gap-2 whitespace-nowrap ${viewMode === "inventory" ? "bg-white text-slate-900 shadow-sm border border-slate-200" : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/50"}`}
+            className={`flex-1 lg:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${
+              viewMode === "inventory" 
+                ? "bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black" 
+                : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/70"
+            }`}
           >
-            <Package size={15} className="shrink-0" />
+            <Package size={16} className="shrink-0" />
             <span>Inventaire & Stocks</span>
             {catalog.some(i => (i.stock_quantity || 0) <= (i.low_stock_threshold || 5)) && (
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse shrink-0" title="Stock Bas présent" />
@@ -2652,21 +2761,14 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </tr>
                    </thead>
                    <tbody className="divide-y divide-slate-100">
-                      {groupedRecords.length === 0 ? (
+                      {filteredGroupedRecords.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-6 py-20 text-center text-slate-400 font-bold text-xs">
                             Aucune transaction de fournitures enregistrée pour cette sélection.
                           </td>
                         </tr>
                       ) : (
-                        groupedRecords
-                          .filter(group => {
-                          const balance = group.total_amount - group.paid_amount;
-                          if (statusFilter === 'paid') return balance <= 0;
-                          if (statusFilter === 'unpaid') return balance > 0;
-                          return true;
-                        })
-                        .map((group) => {
+                        paginatedGroupedRecords.map((group) => {
                         const balance = group.total_amount - group.paid_amount;
                         const isExpanded = expandedGroups[group.group_key];
                         const studentName = formatStudentName(group.student?.last_name, group.student?.first_name).fullName;
@@ -2747,6 +2849,19 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                    </tbody>
                 </table>
              </div>
+             )}
+
+             {/* PAGINATION DES TRANSACTIONS */}
+             {!loading && filteredGroupedRecords.length > 0 && (
+               <TablePagination
+                 currentPage={safeSalesPage}
+                 totalItems={filteredGroupedRecords.length}
+                 itemsPerPage={salesPerPage}
+                 onPageChange={(page) => setSalesPage(page)}
+                 onItemsPerPageChange={(size) => setSalesPerPage(size)}
+                 itemsPerPageOptions={[10, 25, 50, 100]}
+                 itemLabel="transactions"
+               />
              )}
           </div>
         </>
@@ -2882,8 +2997,9 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
            {catalogViewMode === 'grid' ? (
              /* VUE GRILLE DE CARTES ERGONOMIQUE */
-             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-               {filteredCatalog.map(item => (
+             <div className="space-y-4">
+               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                 {paginatedCatalog.map(item => (
                  <div key={item.id} className="bg-white rounded-2xl p-5 border border-slate-200 shadow-sm hover:shadow-md transition-all flex flex-col justify-between group">
                    <div>
                      <div className="flex items-center justify-between gap-2 mb-3">
@@ -2940,6 +3056,22 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                  </div>
                )}
              </div>
+
+             {/* PAGINATION CATALOGUE GRILLE */}
+             {filteredCatalog.length > 0 && (
+               <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
+                 <TablePagination
+                   currentPage={safeCatalogPage}
+                   totalItems={filteredCatalog.length}
+                   itemsPerPage={catalogPerPage}
+                   onPageChange={(page) => setCatalogPage(page)}
+                   onItemsPerPageChange={(size) => setCatalogPerPage(size)}
+                   itemsPerPageOptions={[12, 24, 48, 96]}
+                   itemLabel="articles"
+                 />
+               </div>
+             )}
+           </div>
            ) : (
              /* VUE TABLEAU RESTRUCTURÉE ET ÉPURÉE */
              <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden min-h-[400px]">
@@ -2956,7 +3088,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                          </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                         {filteredCatalog.map(item => (
+                         {paginatedCatalog.map(item => (
                            <tr key={item.id} className="group hover:bg-slate-50/70 transition-colors">
                              <td className="px-6 py-4">
                                 <span className="px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg font-extrabold text-[10px] tracking-wider uppercase border border-slate-200">{item.category}</span>
@@ -3009,6 +3141,19 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </tbody>
                    </table>
                 </div>
+
+                {/* PAGINATION CATALOGUE TABLEAU */}
+                {filteredCatalog.length > 0 && (
+                  <TablePagination
+                    currentPage={safeCatalogPage}
+                    totalItems={filteredCatalog.length}
+                    itemsPerPage={catalogPerPage}
+                    onPageChange={(page) => setCatalogPage(page)}
+                    onItemsPerPageChange={(size) => setCatalogPerPage(size)}
+                    itemsPerPageOptions={[10, 25, 50, 100]}
+                    itemLabel="articles"
+                  />
+                )}
              </div>
            )}
         </div>
@@ -3031,158 +3176,328 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         />
       )}
 
-      {/* MODALE CATALOGUE (ÉDITEUR D'ARTICLES) */}
+      {/* MODALE CATALOGUE (ÉDITEUR D'ARTICLES - HARMONISÉ ÉCOLE CONNECTÉE) */}
       {showCatalogModal && (
-        <div className="fixed inset-0 z-[300] bg-slate-950/90 backdrop-blur-xl flex items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
-           <div className="bg-white w-full h-full md:h-auto md:max-h-[90vh] md:max-w-2xl md:rounded-xl shadow-sm overflow-y-auto flex flex-col animate-in zoom-in-95">
-              <div className="p-4 md:p-6 lg:p-8 bg-white border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between sticky top-0 z-10 gap-4">
-                <div className="flex items-center justify-between w-full md:w-auto">
-                  <div className="flex items-center gap-4">
-                     <div className="w-12 h-12 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-indigo-100"><Sparkles size={24} /></div>
-                     <div>
-                       <h3 className="text-xl font-black text-slate-900 tracking-tight leading-none">{catalogFormData.id ? 'Ajuster Tarification' : 'Nouvel Article'}</h3>
-                       <p className="text-xs font-semibold text-slate-500 mt-1">Catalogue Officiel</p>
+        <div className="fixed inset-0 z-[300] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-200">
+           <div className="bg-white w-full max-w-2xl lg:max-w-3xl rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200">
+              
+              {/* EN-TÊTE DENSE & ÉLÉGANT (STYLE FEUILLE DE PRÉSENCE / POS) */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0">
+                <div className="flex items-center gap-3">
+                   <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-500/30 shrink-0 shadow-2xs">
+                     <Sparkles size={18} className="text-indigo-400" />
+                   </div>
+                   <div>
+                     <div className="flex items-center gap-2">
+                       <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[9px] font-extrabold tracking-wider uppercase">
+                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                         Économat Scolaire
+                       </span>
+                       <span className="text-slate-400 text-[10px] hidden sm:inline">• Référentiel Officiel</span>
                      </div>
-                  </div>
-                  <button onClick={() => setShowCatalogModal(false)} className="p-2 md:hidden text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors flex items-center justify-center">
-                    <X size={24} />
-                  </button>
+                     <h3 className="text-sm sm:text-base font-black text-white tracking-tight leading-tight mt-0.5">
+                       {catalogFormData.id ? 'Ajuster Tarification & Fiche Article' : 'Nouvel Article au Référentiel'}
+                     </h3>
+                   </div>
                 </div>
-                <button onClick={() => setShowCatalogModal(false)} className="hidden md:flex px-4 py-2.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-colors items-center gap-2 font-bold border border-transparent">
-                  <span className="text-sm font-bold tracking-tight">Fermer</span>
-                  <X size={20} />
+                
+                <button 
+                  type="button"
+                  onClick={() => setShowCatalogModal(false)} 
+                  className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-700"
+                  title="Fermer la boîte de dialogue"
+                >
+                  <X size={18} />
                 </button>
               </div>
-              <form onSubmit={handleSaveCatalog} className="p-4 md:p-6 lg:p-8 space-y-8 flex-1">
-                 <div className="space-y-3">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Libellé de l'Article</label>
-                    <input required type="text" placeholder="Ex: Uniforme Complet Secondaire" className="w-full px-5 py-3.5 bg-slate-50 text-slate-900 border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 shadow-sm transition-all" value={catalogFormData.label} onChange={e => setCatalogFormData({...catalogFormData, label: e.target.value})} />
-                 </div>
-                 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Catégorie</label>
-                       <SelectPill
-                         options={CATEGORIES.map(c => ({ value: c, label: c }))}
-                         value={catalogFormData.category}
-                         onChange={(val) => setCatalogFormData({ ...catalogFormData, category: val })}
-                         variant="field"
-                         size="md"
-                         colorScheme="indigo"
-                         className="w-full"
-                       />
-                    </div>
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Discipline Associée (Optionnel)</label>
-                       <SelectPill
-                         options={[
-                           { value: '', label: 'Tous programmes / Générique' },
-                           ...disciplinesList.map(disc => ({ value: disc, label: disc }))
-                         ]}
-                         value={catalogFormData.discipline_name || ''}
-                         onChange={(val) => setCatalogFormData({ ...catalogFormData, discipline_name: val })}
-                         variant="field"
-                         size="md"
-                         colorScheme="indigo"
-                         className="w-full"
-                         searchable={disciplinesList.length > 5}
-                       />
-                    </div>
-                 </div>
 
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 bg-slate-50/50 p-5 rounded-2xl border border-slate-100">
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
-                          <DollarSign size={14} /> Prix Unitaire
+              {/* CORPS DU FORMULAIRE COMPACT, DENSE ET ERGONOMIQUE */}
+              <form onSubmit={handleSaveCatalog} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3.5 flex flex-col justify-between">
+                 <div className="space-y-3.5">
+                   
+                   {/* GROUPE 1 : RÉFÉRENCEMENT & IDENTIFICATION PÉDAGOGIQUE */}
+                   <div className="space-y-2.5">
+                     <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-500">
+                       <Tag size={12} className="text-indigo-600" />
+                       <span>Identification & Catégorisation Officielle</span>
+                     </div>
+
+                     <div className="space-y-1">
+                       <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                         <span className="flex items-center gap-1">
+                           <span>Libellé / Désignation de l'Article</span>
+                           <span className="text-rose-500 font-black">*</span>
+                         </span>
+                         <span className="text-[10px] text-slate-400 font-normal">Requis pour l'élève et la caisse</span>
                        </label>
-                       <input required type="number" step="0.01" className="w-full px-5 py-3.5 bg-white border-2 border-slate-200 rounded-xl text-xl font-bold text-slate-900 outline-none focus:border-indigo-500 shadow-sm font-mono transition-all" value={catalogFormData.unit_price} onChange={e => setCatalogFormData({...catalogFormData, unit_price: e.target.value})} />
-                    </div>
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Devise de Vente</label>
-                       <SelectPill
-                         options={[
-                           { value: 'HTG', label: 'Gourdes (HTG)' },
-                           { value: 'USD', label: 'Dollars (USD)' }
-                         ]}
-                         value={catalogFormData.currency || 'HTG'}
-                         onChange={(val) => setCatalogFormData({ ...catalogFormData, currency: val })}
-                         variant="field"
-                         size="md"
-                         colorScheme="indigo"
-                         className="w-full"
+                       <input 
+                         required 
+                         type="text" 
+                         placeholder="Ex: Uniforme Complet (Chemise + Pantalon), Cahier d'Activités 6e AF..." 
+                         className="w-full px-3.5 py-2 bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-bold outline-none transition-all shadow-2xs placeholder:text-slate-400 placeholder:font-normal" 
+                         value={catalogFormData.label} 
+                         onChange={e => setCatalogFormData({...catalogFormData, label: e.target.value})} 
                        />
-                    </div>
-                 </div>
+                     </div>
 
-                 {catalogFormData.currency === 'USD' && (
-                   <div className="space-y-3">
-                      <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1 flex items-center gap-2">
-                         <DollarSign size={14} /> Taux de change planifié (USD vers HTG)
-                      </label>
-                      <input required type="number" step="0.01" className="w-full px-5 py-3.5 bg-slate-50 border-2 border-slate-200 rounded-xl text-lg font-bold text-slate-900 outline-none focus:border-indigo-500 shadow-sm font-mono transition-all" value={catalogFormData.planned_exchange_rate} onChange={e => setCatalogFormData({...catalogFormData, planned_exchange_rate: e.target.value})} />
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                       {/* Catégorie - Style Pilule Harmonisé Feuille de Présence */}
+                       <div className="space-y-1 min-w-0">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                           <span>Catégorie Économat</span>
+                           <span className="text-rose-500 font-black">*</span>
+                         </label>
+                         <SelectPill
+                           options={CATEGORIES.map(c => ({ 
+                             value: c, 
+                             label: c,
+                             icon: c === 'Uniforme' ? Sparkles : c === 'Manuel' ? BookOpen : c === 'Fourniture' ? Package : c === 'Papeterie' ? FileText : c === 'Service' ? CheckCircle : Tag
+                           }))}
+                           value={catalogFormData.category}
+                           onChange={(val) => setCatalogFormData({ ...catalogFormData, category: val })}
+                           variant="field"
+                           size="sm"
+                           colorScheme="indigo"
+                           searchable={false}
+                           placeholder="Sélectionner une catégorie..."
+                           className="w-full"
+                         />
+                       </div>
+
+                       {/* Discipline - Style Pilule Harmonisé Feuille de Présence */}
+                       <div className="space-y-1 min-w-0">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                           <span>Programme / Discipline</span>
+                           <span className="text-slate-400 font-normal text-[10px]">(Optionnel)</span>
+                         </label>
+                         <SelectPill
+                           options={[
+                             { value: '', label: 'Tous programmes / Général', icon: Globe },
+                             ...disciplinesList.map(disc => ({ value: disc, label: disc, icon: GraduationCap }))
+                           ]}
+                           value={catalogFormData.discipline_name || ''}
+                           onChange={(val) => setCatalogFormData({ ...catalogFormData, discipline_name: val })}
+                           variant="field"
+                           size="sm"
+                           colorScheme="indigo"
+                           searchable={disciplinesList.length > 5}
+                           placeholder="Filtrer par discipline..."
+                           className="w-full"
+                         />
+                       </div>
+                     </div>
                    </div>
-                 )}
 
-                 <div className="space-y-3">
-                    <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Unité de Vente / Mesure</label>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      <SelectPill
-                        options={[
-                          { value: 'Pièce', label: 'Pièce / Article individuel' },
-                          { value: 'Aune', label: 'Aune (Tissu / Uniforme)' },
-                          { value: 'Paquet', label: 'Paquet / Ramette' },
-                          { value: 'Mètre', label: 'Mètre (Ruban, Tissu)' },
-                          { value: 'Paire', label: 'Paire (Chaussettes, Chaussures)' },
-                          { value: 'Ensemble', label: 'Ensemble complet' },
-                          { value: 'Unité', label: 'Unité générale' },
-                          { value: 'Carton', label: 'Carton' },
-                          { value: 'Boîte', label: 'Boîte' },
-                          { value: 'Rouleau', label: 'Rouleau' },
-                          { value: 'Dozaine', label: 'Dozaine' },
-                          { value: 'Autre', label: 'Autre (Saisie libre...)' }
-                        ]}
-                        value={['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure) ? catalogFormData.unit_measure : 'Autre'}
-                        onChange={(val) => {
-                          if (val !== 'Autre') {
-                            setCatalogFormData({ ...catalogFormData, unit_measure: val });
-                          } else {
-                            setCatalogFormData({ ...catalogFormData, unit_measure: '' });
-                          }
-                        }}
-                        variant="field"
-                        size="md"
-                        colorScheme="indigo"
-                        className="w-full"
-                      />
+                   {/* GROUPE 2 : TARIFICATION OFFICIELLE & UNITÉ COMMERCIALE */}
+                   <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                     <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
+                       <DollarSign size={13} className="text-emerald-600" />
+                       <span>Tarification & Unité Commerciale</span>
+                     </div>
 
-                      {(!['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure)) && (
-                        <input
-                          type="text"
-                          placeholder="Nom de l'unité (ex: Sac, Livre, etc.)"
-                          className="w-full px-5 py-3.5 bg-white text-slate-900 border-2 border-indigo-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 shadow-sm transition-all"
-                          value={catalogFormData.unit_measure}
-                          onChange={e => setCatalogFormData({...catalogFormData, unit_measure: e.target.value})}
-                        />
-                      )}
-                    </div>
+                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-2.5 items-start">
+                       {/* Prix Unitaire */}
+                       <div className="sm:col-span-1 lg:col-span-4 space-y-1">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                           <span>Prix Unitaire de Vente</span>
+                           <span className="text-rose-500 font-black">*</span>
+                         </label>
+                         <div className="relative flex items-center">
+                           <input 
+                             required 
+                             type="number" 
+                             step="0.01" 
+                             min="0"
+                             placeholder="0.00"
+                             className="w-full pl-3 pr-12 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black text-slate-900 font-mono outline-none transition-all shadow-2xs" 
+                             value={catalogFormData.unit_price} 
+                             onChange={e => setCatalogFormData({...catalogFormData, unit_price: e.target.value})} 
+                           />
+                           <span className="absolute right-2.5 text-[10px] font-black text-slate-500 font-mono pointer-events-none">
+                             {catalogFormData.currency || 'HTG'}
+                           </span>
+                         </div>
+                       </div>
+
+                       {/* Devise Officielle (Style Pilule) */}
+                       <div className="sm:col-span-1 lg:col-span-3 space-y-1 min-w-0">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                           Devise Officielle
+                         </label>
+                         <SelectPill
+                           options={[
+                             { value: 'HTG', label: 'Gourdes (HTG)', badge: 'G' },
+                             { value: 'USD', label: 'Dollars (USD)', badge: '$' }
+                           ]}
+                           value={catalogFormData.currency || 'HTG'}
+                           onChange={(val) => setCatalogFormData({ ...catalogFormData, currency: val })}
+                           variant="field"
+                           size="sm"
+                           colorScheme="indigo"
+                           searchable={false}
+                           className="w-full"
+                         />
+                       </div>
+
+                       {/* Unité de Vente (Style Pilule) */}
+                       <div className="sm:col-span-2 lg:col-span-5 space-y-1 min-w-0">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                           Unité de Conditionnement
+                         </label>
+                         <SelectPill
+                           options={[
+                             { value: 'Pièce', label: 'Pièce / Article individuel' },
+                             { value: 'Aune', label: 'Aune (Tissu / Uniforme)' },
+                             { value: 'Paquet', label: 'Paquet / Ramette' },
+                             { value: 'Mètre', label: 'Mètre (Ruban, Tissu)' },
+                             { value: 'Paire', label: 'Paire (Chaussettes, Chaussures)' },
+                             { value: 'Ensemble', label: 'Ensemble complet' },
+                             { value: 'Unité', label: 'Unité générale' },
+                             { value: 'Carton', label: 'Carton' },
+                             { value: 'Boîte', label: 'Boîte' },
+                             { value: 'Rouleau', label: 'Rouleau' },
+                             { value: 'Dozaine', label: 'Dozaine' },
+                             { value: 'Autre', label: 'Autre (Saisie personnalisée...)' }
+                           ]}
+                           value={['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure) ? catalogFormData.unit_measure : 'Autre'}
+                           onChange={(val) => {
+                             if (val !== 'Autre') {
+                               setCatalogFormData({ ...catalogFormData, unit_measure: val });
+                             } else {
+                               setCatalogFormData({ ...catalogFormData, unit_measure: '' });
+                             }
+                           }}
+                           variant="field"
+                           size="sm"
+                           colorScheme="indigo"
+                           searchable={false}
+                           placeholder="Sélectionner l'unité..."
+                           className="w-full"
+                         />
+
+                         {(!['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure)) && (
+                           <input
+                             autoFocus
+                             type="text"
+                             placeholder="Préciser l'unité (ex: Sac, Livre, Bidon...)"
+                             className="mt-1.5 w-full px-3 py-1.5 bg-white text-slate-900 border border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs font-bold outline-none transition-all shadow-2xs"
+                             value={catalogFormData.unit_measure}
+                             onChange={e => setCatalogFormData({...catalogFormData, unit_measure: e.target.value})}
+                           />
+                         )}
+                       </div>
+                     </div>
+
+                     {/* Taux de Change Planifié (Affiché conditionnellement si USD) */}
+                     {catalogFormData.currency === 'USD' && (
+                       <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 animate-in fade-in duration-200">
+                         <div className="space-y-0.5">
+                           <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                             <Coins size={12} className="text-amber-600" />
+                             <span>Taux de change budgété (USD vers HTG)</span>
+                           </label>
+                           <p className="text-[10px] text-slate-400">Permet la conversion automatique lors des encaissements mixtes</p>
+                         </div>
+                         <div className="relative w-full sm:w-44">
+                           <input 
+                             required 
+                             type="number" 
+                             step="0.01" 
+                             min="0"
+                             className="w-full pl-3 pr-12 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-bold text-slate-900 font-mono outline-none transition-all shadow-2xs" 
+                             value={catalogFormData.planned_exchange_rate} 
+                             onChange={e => setCatalogFormData({...catalogFormData, planned_exchange_rate: e.target.value})} 
+                           />
+                           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] font-bold text-slate-500 font-mono">HTG</span>
+                         </div>
+                       </div>
+                     )}
+                   </div>
+
+                   {/* GROUPE 3 : CONTRÔLE DES STOCKS & SEUILS DE VIGILANCE */}
+                   <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                     <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
+                       <Package size={13} className="text-indigo-600" />
+                       <span>Gestion de l'Inventaire & Alertes de Stock</span>
+                     </div>
+
+                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                       {/* Quantité en Stock Initial / Actuel */}
+                       <div className="space-y-1">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                           <span className="flex items-center gap-1">
+                             <span>Quantité en Stock</span>
+                             <span className="text-rose-500 font-black">*</span>
+                           </span>
+                           {Number(catalogFormData.stock_quantity || 0) <= Number(catalogFormData.low_stock_threshold || 5) && (
+                             <span className="text-[9px] font-extrabold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-md">
+                               Alerte active
+                             </span>
+                           )}
+                         </label>
+                         <input 
+                           required 
+                           type="number" 
+                           step="any" 
+                           placeholder="0"
+                           className="w-full px-3 py-1.5 bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
+                           value={catalogFormData.stock_quantity} 
+                           onChange={e => setCatalogFormData({...catalogFormData, stock_quantity: e.target.value})} 
+                         />
+                         <p className="text-[10px] text-slate-400">Unités physiquement disponibles à l'économat</p>
+                       </div>
+
+                       {/* Seuil Alerte (Stock Bas) */}
+                       <div className="space-y-1">
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-700 flex items-center justify-between">
+                           <span className="flex items-center gap-1">
+                             <AlertTriangle size={11} className="text-rose-500" />
+                             <span>Seuil de Réapprovisionnement</span>
+                             <span className="text-rose-500 font-black">*</span>
+                           </span>
+                           <span className="text-[10px] text-slate-400 font-normal">Alerte stock</span>
+                         </label>
+                         <input 
+                           required 
+                           type="number" 
+                           step="any" 
+                           placeholder="5"
+                           className="w-full px-3 py-1.5 bg-white text-rose-900 border border-rose-200 hover:border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
+                           value={catalogFormData.low_stock_threshold} 
+                           onChange={e => setCatalogFormData({...catalogFormData, low_stock_threshold: e.target.value})} 
+                         />
+                         <p className="text-[10px] text-rose-500/80">Déclenche un signal visuel dès que le stock atteint ce niveau</p>
+                       </div>
+                     </div>
+                   </div>
+
                  </div>
 
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 bg-slate-50 p-5 rounded-2xl border border-slate-200">
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider ml-1">Quantité (Stock Initial/Actuel)</label>
-                       <input required type="number" step="any" className="w-full px-5 py-3.5 bg-white text-slate-900 border-2 border-slate-200 rounded-xl text-sm font-bold outline-none focus:border-indigo-500 shadow-sm transition-all" value={catalogFormData.stock_quantity} onChange={e => setCatalogFormData({...catalogFormData, stock_quantity: e.target.value})} />
-                    </div>
-                    <div className="space-y-3">
-                       <label className="text-[11px] font-bold text-rose-500 uppercase tracking-wider ml-1">Seuil Alerte (Stock Bas)</label>
-                       <input required type="number" step="any" className="w-full px-5 py-3.5 bg-white text-rose-900 border-2 border-rose-200 focus:border-rose-500 focus:ring-4 focus:ring-rose-500/10 rounded-xl text-sm font-bold outline-none shadow-sm transition-all" value={catalogFormData.low_stock_threshold} onChange={e => setCatalogFormData({...catalogFormData, low_stock_threshold: e.target.value})} />
-                    </div>
-                 </div>
+                 {/* PIED DE FORMULAIRE HARMONISÉ & COMPACT */}
+                 <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+                   <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                     <ShieldCheck size={13} className="text-emerald-600" />
+                     <span>Enregistrement certifié dans le référentiel de l'établissement</span>
+                   </div>
 
-                 <div className="pt-2">
-                    <button disabled={isSubmitting} type="submit" className="w-full py-4 bg-indigo-600 text-white rounded-xl text-sm font-bold tracking-tight shadow-md shadow-indigo-600/20 hover:bg-indigo-700 hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-3">
-                      {isSubmitting ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
-                      Enregistrer au Registre
-                    </button>
+                   <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                     <button 
+                       type="button"
+                       onClick={() => setShowCatalogModal(false)} 
+                       className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
+                     >
+                       Annuler
+                     </button>
+                     
+                     <button 
+                       disabled={isSubmitting} 
+                       type="submit" 
+                       className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                     >
+                       {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                       <span>{catalogFormData.id ? 'Mettre à Jour la Fiche' : 'Enregistrer au Référentiel'}</span>
+                     </button>
+                   </div>
                  </div>
               </form>
            </div>
@@ -3277,294 +3592,425 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </Modal>
 
       <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={performDelete} type="danger" title="Confirmation" message={deleteType === 'catalog' ? "Voulez-vous retirer cet article du catalogue ? Cela n'effacera pas les ventes passées mais bloquera les futures." : "Voulez-vous annuler ce dossier de vente ?"} />
-      {/* MODALE DE RÉAPPROVISIONNEMENT & COMMANDES FOURNISSEURS */}
+      {/* MODALE DE RÉAPPROVISIONNEMENT & COMMANDES FOURNISSEURS (HARMONISÉ ÉCOLE CONNECTÉE) */}
       {showPurchaseModal && (
-        <div className="fixed inset-0 z-[1000] bg-slate-950/60 backdrop-blur-md flex items-center justify-center p-3 md:p-6 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+        <div className="fixed inset-0 z-[1000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl lg:max-w-3xl rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200">
             
-            {/* HEADER DE LA MODALE */}
-            <div className="p-5 bg-slate-900 text-white flex items-center justify-between shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-500/20 text-indigo-300 rounded-xl flex items-center justify-center border border-indigo-500/30">
-                  <Truck size={20} />
+            {/* EN-TÊTE DENSE & HARMONISÉ (STYLE FEUILLE DE PRÉSENCE / POS) */}
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0 gap-2">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-500/30 shrink-0 shadow-2xs">
+                  <Truck size={18} className="text-indigo-400" />
                 </div>
-                <div>
-                  <h3 className="font-extrabold text-base text-white tracking-tight leading-none">Réapprovisionnement des Stocks</h3>
-                  <p className="text-[11px] text-slate-300 mt-1">Fournisseurs, coûts d'achat & sorties de caisse</p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[9px] font-extrabold tracking-wider uppercase">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Économat Scolaire
+                    </span>
+                    <span className="text-slate-400 text-[10px] hidden sm:inline">• Bon d'Entrée & Réapprovisionnement</span>
+                  </div>
+                  <h3 className="text-sm sm:text-base font-black text-white tracking-tight leading-tight mt-0.5 truncate">
+                    {purchaseMode === 'single' ? "Réapprovisionnement d'Article" : "Bon de Commande Fournisseur Groupé"}
+                  </h3>
                 </div>
               </div>
               
-              {/* SELECTEUR DE MODE : UNITAIRE vs EN LOT */}
-              <div className="flex items-center gap-1 bg-slate-800/80 p-1 rounded-xl border border-slate-700">
-                <button
+              <div className="flex items-center gap-2 shrink-0">
+                {/* SÉLECTEUR DE MODE EN PILULES */}
+                <div className="flex items-center bg-slate-800/90 p-0.5 sm:p-1 rounded-xl border border-slate-700/80">
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseMode('single')}
+                    className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${purchaseMode === 'single' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    Unitaire
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPurchaseMode('batch')}
+                    className={`px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-all cursor-pointer ${purchaseMode === 'batch' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-400 hover:text-white'}`}
+                  >
+                    En Lot
+                  </button>
+                </div>
+
+                <button 
                   type="button"
-                  onClick={() => setPurchaseMode('single')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${purchaseMode === 'single' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
+                  onClick={() => setShowPurchaseModal(false)} 
+                  className="p-1.5 sm:p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-700"
+                  title="Fermer la boîte de dialogue"
                 >
-                  Unitaire
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPurchaseMode('batch')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${purchaseMode === 'batch' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-400 hover:text-white'}`}
-                >
-                  En Lot / Groupé
+                  <X size={18} />
                 </button>
               </div>
-
-              <button onClick={() => setShowPurchaseModal(false)} className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors ml-2">
-                <X size={20} />
-              </button>
             </div>
 
-            {/* FORMULAIRE UNITAIRE */}
+            {/* FORMULAIRE UNITAIRE HARMONISÉ */}
             {purchaseMode === 'single' ? (
-              <form onSubmit={handleRecordPurchase} className="p-6 overflow-y-auto space-y-5">
-                
-                {/* ARTICLE CONCERNÉ */}
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
-                    <span>Article à Réapprovisionner</span>
-                    {purchaseFormData.item_id && (
-                      <span className="text-indigo-600 font-bold">
-                        Stock actuel: {catalog.find(i => i.id === purchaseFormData.item_id)?.stock_quantity || 0}
+              <form onSubmit={handleRecordPurchase} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-3.5 flex flex-col justify-between">
+                <div className="space-y-3 sm:space-y-3.5">
+                  
+                  {/* GROUPE 1 : ARTICLE AU RÉFÉRENTIEL */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                      <span className="flex items-center gap-1">
+                        <Package size={12} className="text-indigo-600" />
+                        <span>Article du Référentiel à Réapprovisionner</span>
+                        <span className="text-rose-500 font-black">*</span>
                       </span>
-                    )}
-                  </label>
-                  <SelectPill
-                    options={[
-                      { value: '', label: 'Sélectionner un article du catalogue...' },
-                      ...catalog.map(item => ({
-                        value: item.id,
-                        label: `${item.label} — (Prix Vente: ${item.unit_price} HTG | Stock: ${item.stock_quantity || 0})`
-                      }))
-                    ]}
-                    value={purchaseFormData.item_id}
-                    onChange={(val) => handleSelectPurchaseItem(val)}
-                    placeholder="Sélectionner un article du catalogue..."
-                    variant="field"
-                    size="md"
-                    colorScheme="indigo"
-                    className="w-full"
-                    searchable={catalog.length > 5}
-                  />
-                </div>
-
-                {/* FOURNISSEUR ET DATE */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fournisseur</label>
-                    <div className="space-y-2">
-                      <SelectPill
-                        options={[
-                          { value: 'AUTRE', label: '--- Saisir un fournisseur personnalisé ---' },
-                          ...knownSuppliers.map(s => ({ value: s, label: s }))
-                        ]}
-                        value={knownSuppliers.includes(purchaseFormData.supplier) ? purchaseFormData.supplier : 'AUTRE'}
-                        onChange={(val) => {
-                          if (val !== 'AUTRE') {
-                            setPurchaseFormData({ ...purchaseFormData, supplier: val });
-                          }
-                        }}
-                        variant="field"
-                        size="sm"
-                        colorScheme="slate"
-                        className="w-full"
-                        searchable={knownSuppliers.length > 5}
-                      />
-
-                      <input 
-                        required
-                        type="text"
-                        placeholder="Nom du fournisseur (ex: Maison Deschamps)..."
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none"
-                        value={purchaseFormData.supplier}
-                        onChange={(e) => setPurchaseFormData({ ...purchaseFormData, supplier: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date d'Achat & Décaissement</label>
-                    <DatePickerPill
-                      selectedDate={purchaseFormData.date}
-                      onSelectDate={(d) => setPurchaseFormData({ ...purchaseFormData, date: d })}
-                      variant="field"
-                      size="md"
-                      colorScheme="indigo"
-                      className="w-full"
-                    />
-                  </div>
-                </div>
-
-                {/* TARIFICATION ET COMPARAISON ACHAT / VENTE */}
-                <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200/80 space-y-4">
-                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
-                    <span className="text-xs font-black uppercase tracking-wider text-slate-600">Analyse Prix & Marge</span>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-lg">
-                      Devise: HTG (Gourdes)
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Prix d'Achat Fournisseur</label>
-                      <div className="relative mt-1">
-                        <input 
-                          required
-                          type="number"
-                          step="0.01"
-                          placeholder="0.00"
-                          className="w-full pl-3 pr-8 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-black font-mono text-slate-900 outline-none focus:border-indigo-600"
-                          value={purchaseFormData.unit_cost}
-                          onChange={(e) => setPurchaseFormData({ ...purchaseFormData, unit_cost: e.target.value })}
-                        />
-                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">G</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Prix Vente Élèves</label>
-                      <div className="relative mt-1">
-                        <input 
-                          disabled
-                          type="text"
-                          className="w-full pl-3 pr-8 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-sm font-black font-mono text-slate-700 cursor-not-allowed"
-                          value={catalog.find(i => i.id === purchaseFormData.item_id)?.unit_price || 0}
-                        />
-                        <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">G</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-bold text-slate-400 uppercase">Quantité Achetée</label>
-                      <input 
-                        required
-                        type="number"
-                        min="1"
-                        className="w-full px-3 py-2.5 mt-1 bg-white border border-slate-200 rounded-xl text-sm font-black font-mono text-slate-900 outline-none focus:border-indigo-600"
-                        value={purchaseFormData.quantity}
-                        onChange={(e) => setPurchaseFormData({ ...purchaseFormData, quantity: e.target.value })}
-                      />
-                    </div>
-                  </div>
-
-                  {/* CALCUL DE MARGE STIMÉE */}
-                  {purchaseFormData.item_id && (
-                    <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-xs">
-                      <span className="font-bold text-slate-600">Marge Brute par Unité :</span>
-                      {(() => {
-                        const sell = catalog.find(i => i.id === purchaseFormData.item_id)?.unit_price || 0;
-                        const buy = parseFloat(purchaseFormData.unit_cost) || 0;
-                        const margin = sell - buy;
-                        const pct = buy > 0 ? ((margin / buy) * 100).toFixed(1) : '0';
+                      {purchaseFormData.item_id && (() => {
+                        const sel = catalog.find(i => i.id === purchaseFormData.item_id);
+                        if (!sel) return null;
+                        const qty = sel.stock_quantity || 0;
+                        const low = sel.low_stock_threshold || 5;
+                        const isLow = qty <= low;
                         return (
-                          <span className={`font-mono font-black ${margin >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                            {margin >= 0 ? '+' : ''}{margin.toLocaleString()} HTG ({pct}%)
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isLow ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                            Stock actuel : <strong className="font-mono font-black">{qty}</strong> {getItemUnitMeasure(sel)}
                           </span>
                         );
                       })()}
                     </div>
-                  )}
-                </div>
-
-                <div className="bg-gradient-to-br from-rose-50 via-rose-50/90 to-amber-50/40 p-4 rounded-2xl border border-rose-200 shadow-sm flex items-center justify-between">
-                  <div className="space-y-1">
-                    <span className="text-xs font-black uppercase tracking-wider text-rose-950">
-                      Sortie de Caisse
-                    </span>
-                    <div className="text-2xl font-black font-mono text-rose-700 tracking-tight flex items-baseline gap-1.5">
-                      <span>-{((parseInt(purchaseFormData.quantity) || 0) * (parseFloat(purchaseFormData.unit_cost) || 0)).toLocaleString()}</span>
-                      <span className="text-xs font-bold font-sans text-rose-900/80">HTG</span>
-                    </div>
-                  </div>
-                  <div className="w-10 h-10 bg-rose-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-rose-600/20 shrink-0">
-                    <DollarSign size={20} />
-                  </div>
-                </div>
-
-                {/* BOUTONS D'ACTION */}
-                <div className="pt-2 flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => setShowPurchaseModal(false)}
-                    className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 transition-all"
-                  >
-                    Annuler
-                  </button>
-                  <button 
-                    disabled={isSubmitting || !purchaseFormData.item_id || !purchaseFormData.supplier.trim()}
-                    type="submit"
-                    className="flex-1 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                    Enregistrer & Valider Décaissement
-                  </button>
-                </div>
-              </form>
-            ) : (
-              /* FORMULAIRE GROUPÉ / BON DE COMMANDE */
-              <form onSubmit={handleRecordBatchPurchase} className="p-6 overflow-y-auto space-y-5">
-                
-                {/* FOURNISSEUR & DATE BATCH */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Fournisseur du Lot</label>
-                    <div className="space-y-2">
-                      <SelectPill
-                        options={[
-                          { value: 'AUTRE', label: '--- Choisir un fournisseur connu ---' },
-                          ...knownSuppliers.map(s => ({ value: s, label: s }))
-                        ]}
-                        value={knownSuppliers.includes(batchSupplier) ? batchSupplier : 'AUTRE'}
-                        onChange={(val) => {
-                          if (val !== 'AUTRE') setBatchSupplier(val);
-                        }}
-                        variant="field"
-                        size="sm"
-                        colorScheme="slate"
-                        className="w-full"
-                        searchable={knownSuppliers.length > 5}
-                      />
-
-                      <input 
-                        required
-                        type="text"
-                        placeholder="Fournisseur principal..."
-                        className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-slate-900/10 focus:border-slate-900 outline-none"
-                        value={batchSupplier}
-                        onChange={(e) => setBatchSupplier(e.target.value)}
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Date de Commande</label>
-                    <DatePickerPill
-                      selectedDate={batchDate}
-                      onSelectDate={(d) => setBatchDate(d)}
+                    <SelectPill
+                      options={[
+                        { value: '', label: 'Sélectionner un article du référentiel...' },
+                        ...catalog.map(item => ({
+                          value: item.id,
+                          label: item.label,
+                          badge: `${item.stock_quantity || 0} ${getItemUnitMeasure(item)}`,
+                          badgeColor: (item.stock_quantity || 0) <= (item.low_stock_threshold || 5) ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-slate-100 text-slate-700 border-slate-200',
+                          description: `${item.category} • Prix Vente: ${(item.unit_price || 0).toLocaleString()} ${item.currency || 'HTG'}`,
+                          icon: item.category === 'Uniforme' ? Sparkles : item.category === 'Manuel' ? BookOpen : item.category === 'Fourniture' ? Package : item.category === 'Papeterie' ? FileText : item.category === 'Service' ? CheckCircle : Tag
+                        }))
+                      ]}
+                      value={purchaseFormData.item_id}
+                      onChange={(val) => handleSelectPurchaseItem(val)}
+                      placeholder="Sélectionner un article du référentiel..."
                       variant="field"
-                      size="md"
+                      size="sm"
                       colorScheme="indigo"
+                      searchable={catalog.length > 5}
                       className="w-full"
                     />
                   </div>
-                </div>
 
-                {/* TABLE DES ARTICLES DU LOT */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-slate-400">Articles à Commander en Lot ({batchItems.length})</span>
-                    <button
-                      type="button"
-                      onClick={() => setBatchItems([...batchItems, { item_id: '', quantity: '10', unit_cost: '' }])}
-                      className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
-                    >
-                      <Plus size={14} /> Ajouter une ligne
-                    </button>
+                  {/* GROUPE 2 : PARTENAIRE FOURNISSEUR & DATE */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Fournisseur */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                        <span className="flex items-center gap-1">
+                          <Building2 size={12} className="text-indigo-600" />
+                          <span>Fournisseur Agréé / Partenaire</span>
+                          <span className="text-rose-500 font-black">*</span>
+                        </span>
+                      </label>
+                      <SelectPill
+                        options={Array.from(new Set([
+                          ...knownSuppliers,
+                          ...(purchaseFormData.supplier ? [purchaseFormData.supplier] : [])
+                        ])).map(s => ({ value: s, label: s, icon: Building2 }))}
+                        value={purchaseFormData.supplier}
+                        onChange={(val) => setPurchaseFormData({ ...purchaseFormData, supplier: val })}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        searchable={true}
+                        allowCustom={true}
+                        customActionLabel={(query) => `Utiliser "${query}"`}
+                        searchPlaceholder="Rechercher ou saisir un fournisseur..."
+                        placeholder="Sélectionner ou saisir un fournisseur..."
+                        className="w-full"
+                      />
+                    </div>
+
+                    {/* Date d'Entrée & Décaissement */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                        <Calendar size={12} className="text-indigo-600" />
+                        <span>Date d'Entrée & Décaissement</span>
+                      </label>
+                      <DatePickerPill
+                        selectedDate={purchaseFormData.date}
+                        onSelectDate={(d) => setPurchaseFormData({ ...purchaseFormData, date: d })}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        className="w-full"
+                      />
+                    </div>
                   </div>
 
-                  <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
+                  {/* GROUPE 3 : TARIFICATION, QUANTITÉS & MARGE */}
+                  <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
+                        <DollarSign size={13} className="text-emerald-600" />
+                        <span>Tarification d'Acquisition & Contrôle de Marge</span>
+                      </div>
+                      <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
+                        Devise : HTG (Gourdes)
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* Coût Unitaire d'Achat */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                          <span>Coût Unitaire d'Achat</span>
+                          <span className="text-rose-500 font-black">*</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <input 
+                            required
+                            type="number"
+                            step="0.01"
+                            min="0"
+                            placeholder="0.00"
+                            className="w-full pl-3 pr-10 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
+                            value={purchaseFormData.unit_cost}
+                            onChange={(e) => setPurchaseFormData({ ...purchaseFormData, unit_cost: e.target.value })}
+                          />
+                          <span className="absolute right-2.5 text-[10px] font-black text-slate-500 font-mono pointer-events-none">HTG</span>
+                        </div>
+                      </div>
+
+                      {/* Quantité Réapprovisionnée */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                          <span>Quantité Réceptionnée</span>
+                          <span className="text-rose-500 font-black">*</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <input 
+                            required
+                            type="number"
+                            min="1"
+                            placeholder="10"
+                            className="w-full pl-3 pr-14 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
+                            value={purchaseFormData.quantity}
+                            onChange={(e) => setPurchaseFormData({ ...purchaseFormData, quantity: e.target.value })}
+                          />
+                          <span className="absolute right-2 text-[10px] font-bold text-slate-500 truncate max-w-[50px] pointer-events-none">
+                            {(() => {
+                              const sel = catalog.find(i => i.id === purchaseFormData.item_id);
+                              return sel ? getItemUnitMeasure(sel) : 'Unités';
+                            })()}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Prix de Vente Élèves (Actuel au Catalogue) */}
+                      <div className="space-y-1">
+                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                          <span>Prix de Cession Élève</span>
+                          <span className="text-[10px] text-slate-400 font-normal">Référentiel</span>
+                        </label>
+                        <div className="relative flex items-center">
+                          <input 
+                            disabled
+                            type="text"
+                            className="w-full pl-3 pr-10 py-1.5 bg-slate-100/90 border border-slate-200 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-700 cursor-not-allowed shadow-2xs"
+                            value={(catalog.find(i => i.id === purchaseFormData.item_id)?.unit_price || 0).toLocaleString()}
+                          />
+                          <span className="absolute right-2.5 text-[10px] font-bold text-slate-400 font-mono">HTG</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Analyse de Marge en Temps Réel */}
+                    {purchaseFormData.item_id && (() => {
+                      const selItem = catalog.find(i => i.id === purchaseFormData.item_id);
+                      if (!selItem) return null;
+                      const sell = selItem.unit_price || 0;
+                      const buy = parseFloat(purchaseFormData.unit_cost) || 0;
+                      const qty = parseInt(purchaseFormData.quantity) || 0;
+                      const unitMargin = sell - buy;
+                      const totalMargin = unitMargin * qty;
+                      const pct = buy > 0 ? ((unitMargin / buy) * 100).toFixed(1) : '0';
+                      const isProfitable = unitMargin >= 0;
+                      const unitStr = getItemUnitMeasure(selItem);
+                      return (
+                        <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                          <span className="text-[11px] text-slate-600 font-bold">Marge brute d'exploitation :</span>
+                          <div className="flex items-center gap-2">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-black ${isProfitable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                              {isProfitable ? '+' : ''}{unitMargin.toLocaleString()} HTG / {unitStr} ({pct}%)
+                            </span>
+                            {qty > 1 && (
+                              <span className="text-[10px] text-slate-500 font-medium">
+                                Total : <strong className={`font-mono ${isProfitable ? 'text-emerald-700' : 'text-rose-700'}`}>{isProfitable ? '+' : ''}{totalMargin.toLocaleString()} HTG</strong>
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Ajustement Optionnel du Prix de Vente Élèves si habilité */}
+                    {canEditPrices && purchaseFormData.item_id && (
+                      <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input 
+                            type="checkbox" 
+                            checked={updateCatalogPriceInPurchase} 
+                            onChange={e => setUpdateCatalogPriceInPurchase(e.target.checked)}
+                            className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-bold text-slate-700">
+                            Ajuster simultanément le prix de cession au référentiel
+                          </span>
+                        </label>
+                        {updateCatalogPriceInPurchase && (
+                          <div className="relative w-full sm:w-44 flex items-center animate-in fade-in duration-200">
+                            <input 
+                              type="number"
+                              step="0.01"
+                              min="0"
+                              placeholder="Nouveau prix..."
+                              className="w-full pl-3 pr-10 py-1 bg-white border border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs font-bold font-mono text-slate-900 outline-none shadow-2xs"
+                              value={newSellingPriceInPurchase}
+                              onChange={e => setNewSellingPriceInPurchase(e.target.value)}
+                            />
+                            <span className="absolute right-2.5 text-[10px] font-bold text-slate-500 font-mono">HTG</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* GROUPE 4 : BANDEAU SORTIE DE CAISSE */}
+                  <div className="bg-gradient-to-br from-rose-50/90 via-slate-50 to-amber-50/40 p-3 sm:p-3.5 rounded-2xl border border-rose-200/80 shadow-2xs flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-rose-950">
+                          Imputation Budgétaire • Décaissement Immédiat
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        {(parseInt(purchaseFormData.quantity) || 0).toLocaleString()} unité(s) × {(parseFloat(purchaseFormData.unit_cost) || 0).toLocaleString()} HTG
+                      </p>
+                    </div>
+                    
+                    <div className="text-right shrink-0">
+                      <div className="text-lg sm:text-xl font-black font-mono text-rose-700 tracking-tight flex items-baseline gap-1">
+                        <span>-{((parseInt(purchaseFormData.quantity) || 0) * (parseFloat(purchaseFormData.unit_cost) || 0)).toLocaleString()}</span>
+                        <span className="text-xs font-bold font-sans text-rose-900">HTG</span>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+                {/* PIED DU FORMULAIRE UNITAIRE */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+                  <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                    <ShieldCheck size={13} className="text-emerald-600" />
+                    <span>Mise à jour immédiate du stock et inscription au journal des dépenses</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button 
+                      type="button"
+                      onClick={() => setShowPurchaseModal(false)} 
+                      className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
+                    >
+                      Annuler
+                    </button>
+                    
+                    <button 
+                      disabled={isSubmitting || !purchaseFormData.item_id || !purchaseFormData.supplier.trim() || (parseInt(purchaseFormData.quantity) || 0) <= 0} 
+                      type="submit" 
+                      className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-slate-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      <span>Valider le Bon d'Entrée</span>
+                    </button>
+                  </div>
+                </div>
+              </form>
+            ) : (
+              /* FORMULAIRE GROUPÉ / BON DE COMMANDE FOURNISSEUR HARMONISÉ */
+              <form onSubmit={handleRecordBatchPurchase} className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3 sm:space-y-3.5 flex flex-col justify-between">
+                <div className="space-y-3 sm:space-y-3.5">
+                  
+                  {/* EN-TÊTE FOURNISSEUR & DATE DE COMMANDE GROUPÉE */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div className="space-y-1">
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                        <Building2 size={12} className="text-indigo-600" />
+                        <span>Fournisseur du Lot</span>
+                        <span className="text-rose-500 font-black">*</span>
+                      </label>
+                      <SelectPill
+                        options={Array.from(new Set([
+                          ...knownSuppliers,
+                          ...(batchSupplier ? [batchSupplier] : [])
+                        ])).map(s => ({ value: s, label: s, icon: Building2 }))}
+                        value={batchSupplier}
+                        onChange={(val) => setBatchSupplier(val)}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        searchable={true}
+                        allowCustom={true}
+                        customActionLabel={(query) => `Utiliser "${query}"`}
+                        searchPlaceholder="Rechercher ou saisir un fournisseur..."
+                        placeholder="Sélectionner ou saisir le fournisseur du lot..."
+                        className="w-full"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
+                        <Calendar size={12} className="text-indigo-600" />
+                        <span>Date de Commande</span>
+                      </label>
+                      <DatePickerPill
+                        selectedDate={batchDate}
+                        onSelectDate={(d) => setBatchDate(d)}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        className="w-full"
+                      />
+                    </div>
+                  </div>
+
+                  {/* BARRE D'ACTIONS DU LOT */}
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
+                      <Layers size={13} className="text-indigo-600" />
+                      <span>Articles du Bon de Commande ({batchItems.length})</span>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleFillLowStockBatch}
+                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        title="Importer tous les articles sous leur seuil d'alerte"
+                      >
+                        <AlertTriangle size={12} className="text-amber-600" />
+                        <span className="hidden sm:inline">Importer</span> Stocks Bas
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setBatchItems([...batchItems, { item_id: '', quantity: '10', unit_cost: '' }])}
+                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                      >
+                        <Plus size={12} className="text-indigo-600" />
+                        <span>Ajouter une ligne</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* LISTE DENSE DES LIGNES DU LOT */}
+                  <div className="space-y-2 max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-1">
                     {batchItems.map((row, idx) => {
                       const selItem = catalog.find(i => i.id === row.item_id);
                       const cost = parseFloat(row.unit_cost) || 0;
@@ -3572,14 +4018,18 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       const lineTotal = cost * qty;
 
                       return (
-                        <div key={idx} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex flex-col sm:flex-row items-center gap-2">
-                          <div className="flex-1 w-full">
+                        <div key={idx} className="p-2 sm:p-2.5 bg-slate-50/90 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 transition-all hover:border-slate-300">
+                          {/* Article SelectPill */}
+                          <div className="flex-1 min-w-0">
                             <SelectPill
                               options={[
                                 { value: '', label: 'Sélectionner un article...' },
                                 ...catalog.map(cat => ({
                                   value: cat.id,
-                                  label: `${cat.label} (Stock: ${cat.stock_quantity || 0})`
+                                  label: cat.label,
+                                  badge: `Stock: ${cat.stock_quantity || 0}`,
+                                  badgeColor: (cat.stock_quantity || 0) <= (cat.low_stock_threshold || 5) ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-slate-100 text-slate-700 border-slate-200',
+                                  icon: cat.category === 'Uniforme' ? Sparkles : cat.category === 'Manuel' ? BookOpen : cat.category === 'Fourniture' ? Package : cat.category === 'Papeterie' ? FileText : cat.category === 'Service' ? CheckCircle : Tag
                                 }))
                               ]}
                               value={row.item_id}
@@ -3600,89 +4050,116 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             />
                           </div>
 
-                          <div className="w-full sm:w-24">
-                            <input
-                              required
-                              type="number"
-                              min="1"
-                              placeholder="Qte"
-                              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none"
-                              value={row.quantity}
-                              onChange={(e) => {
-                                const newRows = [...batchItems];
-                                newRows[idx].quantity = e.target.value;
-                                setBatchItems(newRows);
-                              }}
-                            />
-                          </div>
+                          {/* Champs Numériques & Sous-total */}
+                          <div className="flex items-center gap-2 shrink-0">
+                            {/* Quantité */}
+                            <div className="w-20 sm:w-24">
+                              <input
+                                required
+                                type="number"
+                                min="1"
+                                placeholder="Qté"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs"
+                                value={row.quantity}
+                                onChange={(e) => {
+                                  const newRows = [...batchItems];
+                                  newRows[idx].quantity = e.target.value;
+                                  setBatchItems(newRows);
+                                }}
+                              />
+                            </div>
 
-                          <div className="w-full sm:w-28">
-                            <input
-                              required
-                              type="number"
-                              step="0.01"
-                              placeholder="Coût Achat (G)"
-                              className="w-full px-2.5 py-2 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none"
-                              value={row.unit_cost}
-                              onChange={(e) => {
-                                const newRows = [...batchItems];
-                                newRows[idx].unit_cost = e.target.value;
-                                setBatchItems(newRows);
-                              }}
-                            />
-                          </div>
+                            {/* Coût Unitaire Achat */}
+                            <div className="w-24 sm:w-28 relative">
+                              <input
+                                required
+                                type="number"
+                                step="0.01"
+                                placeholder="Coût (HTG)"
+                                className="w-full pl-2.5 pr-6 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs"
+                                value={row.unit_cost}
+                                onChange={(e) => {
+                                  const newRows = [...batchItems];
+                                  newRows[idx].unit_cost = e.target.value;
+                                  setBatchItems(newRows);
+                                }}
+                              />
+                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 font-mono pointer-events-none">G</span>
+                            </div>
 
-                          <div className="w-full sm:w-28 text-right font-mono font-bold text-xs text-rose-600">
-                            -{lineTotal.toLocaleString()} G
-                          </div>
+                            {/* Sous-total */}
+                            <div className="w-24 text-right font-mono font-black text-xs text-rose-600">
+                              -{lineTotal.toLocaleString()} G
+                            </div>
 
-                          {batchItems.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => setBatchItems(batchItems.filter((_, i) => i !== idx))}
-                              className="p-1 text-slate-400 hover:text-rose-600 transition-colors"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          )}
+                            {/* Bouton suppression de ligne */}
+                            {batchItems.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => setBatchItems(batchItems.filter((_, i) => i !== idx))}
+                                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                title="Supprimer cette ligne"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            ) : (
+                              <div className="w-[27px]" />
+                            )}
+                          </div>
                         </div>
                       );
                     })}
                   </div>
-                </div>
 
-                <div className="bg-gradient-to-br from-rose-50 via-rose-50/90 to-amber-50/40 p-4 rounded-2xl border border-rose-200 shadow-sm flex items-center justify-between">
-                  <div className="space-y-1">
-                    <span className="text-xs font-black uppercase tracking-wider text-rose-950">
-                      Total Sortie de Caisse
-                    </span>
-                    <div className="text-2xl font-black font-mono text-rose-700 tracking-tight flex items-baseline gap-1.5">
-                      <span>-{batchItems.reduce((acc, r) => acc + (parseInt(r.quantity) || 0) * (parseFloat(r.unit_cost) || 0), 0).toLocaleString()}</span>
-                      <span className="text-xs font-bold font-sans text-rose-900/80">HTG</span>
+                  {/* RÉCAPITULATIF BUDGÉTAIRE GROUPÉ */}
+                  <div className="bg-gradient-to-br from-rose-50/90 via-slate-50 to-amber-50/40 p-3 sm:p-3.5 rounded-2xl border border-rose-200/80 shadow-2xs flex items-center justify-between gap-3">
+                    <div className="space-y-0.5">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                        <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-rose-950">
+                          Total Décaissement Fournisseur
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-medium">
+                        {batchItems.filter(r => r.item_id).length} référence(s) • {batchItems.reduce((acc, r) => acc + (parseInt(r.quantity) || 0), 0).toLocaleString()} unité(s) au total
+                      </p>
+                    </div>
+                    
+                    <div className="text-right shrink-0">
+                      <div className="text-lg sm:text-xl font-black font-mono text-rose-700 tracking-tight flex items-baseline gap-1">
+                        <span>-{batchItems.reduce((acc, r) => acc + (parseInt(r.quantity) || 0) * (parseFloat(r.unit_cost) || 0), 0).toLocaleString()}</span>
+                        <span className="text-xs font-bold font-sans text-rose-900">HTG</span>
+                      </div>
                     </div>
                   </div>
-                  <div className="w-10 h-10 bg-rose-600 text-white rounded-xl flex items-center justify-center shadow-md shadow-rose-600/20 shrink-0">
-                    <Receipt size={20} />
-                  </div>
+
                 </div>
 
-                {/* BOUTONS D'ACTION */}
-                <div className="pt-2 flex gap-3">
-                  <button 
-                    type="button"
-                    onClick={() => setShowPurchaseModal(false)}
-                    className="flex-1 py-3 border border-slate-200 text-slate-600 font-bold text-xs rounded-xl hover:bg-slate-50 transition-all"
-                  >
-                    Annuler
-                  </button>
-                  <button 
-                    disabled={isSubmitting || !batchSupplier.trim() || batchItems.every(r => !r.item_id)}
-                    type="submit"
-                    className="flex-1 py-3 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? <RefreshCw size={16} className="animate-spin" /> : <Save size={16} />}
-                    Valider la Commande Groupée
-                  </button>
+                {/* PIED DU FORMULAIRE EN LOT */}
+                <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+                  <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                    <ShieldCheck size={13} className="text-emerald-600" />
+                    <span>Réapprovisionnement multi-lignes certifié dans le registre scolaire</span>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button 
+                      type="button"
+                      onClick={() => setShowPurchaseModal(false)} 
+                      className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
+                    >
+                      Annuler
+                    </button>
+                    
+                    <button 
+                      disabled={isSubmitting || !batchSupplier.trim() || batchItems.every(r => !r.item_id)} 
+                      type="submit" 
+                      className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-slate-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                    >
+                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                      <span>Valider la Commande Groupée</span>
+                    </button>
+                  </div>
                 </div>
               </form>
             )}
