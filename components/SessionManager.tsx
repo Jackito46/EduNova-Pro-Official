@@ -444,15 +444,17 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         ) : (
           <button 
             onClick={() => setShowPassationGuide(true)}
-            className="px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 transition-all active:scale-95 flex items-center gap-1.5 whitespace-nowrap self-start sm:self-center cursor-pointer"
+            className="px-3 py-1.5 sm:py-2 rounded-xl text-xs font-extrabold bg-gradient-to-r from-indigo-50 to-blue-50 hover:from-indigo-100 hover:to-blue-100 border border-indigo-200/80 text-indigo-700 transition-all active:scale-95 flex items-center gap-2 whitespace-nowrap self-start sm:self-center cursor-pointer shadow-2xs group"
+            title="Consulter les principes officiels de passation d'année scolaire"
           >
-            <HelpCircle size={14} className="text-indigo-600" />
-            <span>Principes de Passation ?</span>
+            <ShieldCheck size={14} className="text-indigo-600 group-hover:scale-110 transition-transform" />
+            <span>Principes de Passation</span>
+            <span className="px-1.5 py-0.5 rounded-md bg-indigo-100/90 text-indigo-800 text-[10px] font-black font-mono">Guide</span>
           </button>
         )}
       </div>
 
-      {/* Modale Guide de Passation (École Classique) */}
+      {/* Modale Guide de Passation (École Connectée / Cycle Classique) */}
       <Modal
         isOpen={showPassationGuide}
         onClose={() => setShowPassationGuide(false)}
@@ -461,204 +463,237 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         hideTitle={true}
         hideDefaultActions={true}
         hideCloseButton={true}
-        containerClassName="max-w-xl sm:max-w-2xl md:max-w-3xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col"
+        containerClassName="max-w-xl sm:max-w-2xl md:max-w-3xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90 max-h-[92vh] sm:max-h-[88vh] flex flex-col"
         contentClassName="p-0 flex-1 min-h-0 flex flex-col overflow-hidden"
       >
         <div className="flex flex-col h-full overflow-hidden bg-white">
-          {/* Header Banner - Fixed */}
-          <div className="bg-gradient-to-br from-indigo-950 via-slate-900 to-indigo-900 p-5 sm:p-6 md:p-7 text-white relative shrink-0">
+          {/* Header Banner - Sleek & Compact */}
+          <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 px-4 py-3 sm:px-6 sm:py-4 border-b border-indigo-900/40 text-white relative shrink-0">
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-indigo-500/15 rounded-full blur-2xl pointer-events-none" />
             
             {/* Dedicated High-Contrast Close Button */}
             <button
               onClick={() => setShowPassationGuide(false)}
-              className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 text-white/75 hover:text-white hover:bg-white/10 active:scale-95 rounded-xl transition-all z-20 cursor-pointer"
+              className="absolute top-3 right-3 sm:top-3.5 sm:right-4 p-1.5 text-white/70 hover:text-white hover:bg-white/10 active:scale-95 rounded-xl transition-all z-20 cursor-pointer"
               title="Fermer le guide"
               aria-label="Fermer"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
 
-            <div className="relative z-10 space-y-2 pr-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/25 border border-indigo-400/30 text-indigo-200 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest">
-                <ShieldCheck size={14} className="text-indigo-400" />
-                <span>Guide de Gouvernance Académique</span>
+            <div className="relative z-10 space-y-1 pr-8">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-indigo-500/25 border border-indigo-400/30 text-indigo-200 text-[10px] font-extrabold uppercase tracking-wider font-mono">
+                <ShieldCheck size={13} className="text-indigo-400" />
+                <span>Gouvernance Digitale • École Connectée</span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">
+              <h3 className="text-base sm:text-xl font-black text-white tracking-tight leading-tight">
                 Principes de Passation d'Année
               </h3>
-              <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-xl">
-                4 règles essentielles pour garantir la sécurité et la continuité des données lors du changement d'année scolaire.
+              <p className="text-slate-300 text-xs font-normal leading-snug max-w-xl">
+                4 règles fondamentales pour garantir la continuité académique et sceller les registres scolaires.
               </p>
             </div>
           </div>
 
-          {/* Body Content - Scrollable on Tablets, Mobiles & Laptops */}
-          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-7 space-y-4 sm:space-y-5 bg-slate-50/70">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+          {/* Body Content - Compact, dense, fluid and scrollable */}
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3.5 sm:p-4 md:p-5 space-y-2.5 sm:space-y-3 bg-slate-50/75">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               
               {/* Card 1 */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-indigo-300 transition-all space-y-2 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-xl">
-                      <CalendarCheck size={18} className="sm:w-5 sm:h-5" />
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col justify-between gap-2 group">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-blue-50 text-blue-600 rounded-lg flex items-center justify-center shrink-0 border border-blue-100/80">
+                        <CalendarCheck size={15} />
+                      </div>
+                      <h4 className="text-xs sm:text-[13px] font-black text-slate-900 tracking-tight">Unicité Active</h4>
                     </div>
-                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100">
+                    <span className="text-[9px] font-black text-blue-700 uppercase tracking-wider bg-blue-50 px-2 py-0.5 rounded-md border border-blue-100 font-mono shrink-0">
                       Règle 01
                     </span>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Unicité Active</h4>
                   <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-normal">
-                    Une seule année scolaire est active à la fois. L'ouverture de la nouvelle session archive automatiquement la précédente.
+                    <strong className="font-bold text-slate-800">Une seule session active :</strong> L'activation de la nouvelle session archive automatiquement la précédente en lecture seule pour éviter tout conflit de saisie.
                   </p>
+                </div>
+                <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-blue-700 font-bold">
+                  <span className="flex items-center gap-1"><CheckCircle2 size={11} className="text-blue-500" /> Continuité opérationnelle</span>
+                  <span className="text-[9px] font-mono text-slate-600 font-medium">Session unique</span>
                 </div>
               </div>
 
               {/* Card 2 */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-indigo-300 transition-all space-y-2 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="p-2 sm:p-2.5 bg-amber-50 text-amber-600 rounded-xl">
-                      <Lock size={18} className="sm:w-5 sm:h-5" />
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col justify-between gap-2 group">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-amber-50 text-amber-600 rounded-lg flex items-center justify-center shrink-0 border border-amber-100/80">
+                        <Lock size={15} />
+                      </div>
+                      <h4 className="text-xs sm:text-[13px] font-black text-slate-900 tracking-tight">Gel Historique & Scellement</h4>
                     </div>
-                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100">
+                    <span className="text-[9px] font-black text-amber-700 uppercase tracking-wider bg-amber-50 px-2 py-0.5 rounded-md border border-amber-100 font-mono shrink-0">
                       Règle 02
                     </span>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Gel Historique</h4>
                   <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-normal">
-                    Toutes les notes, paiements et reçus de l'année précédente sont scellés et archivés en consultation sécurisée.
+                    <strong className="font-bold text-slate-800">Données immuables :</strong> Notes, relevés, transactions et reçus de l'année écoulée sont verrouillés et restent consultables en archives sécurisées.
                   </p>
+                </div>
+                <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-amber-700 font-bold">
+                  <span className="flex items-center gap-1"><ShieldCheck size={11} className="text-amber-500" /> Archives sécurisées</span>
+                  <span className="text-[9px] font-mono text-slate-600 font-medium">Audit garanti</span>
                 </div>
               </div>
 
               {/* Card 3 */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-indigo-300 transition-all space-y-2 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="p-2 sm:p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
-                      <GraduationCap size={18} className="sm:w-5 sm:h-5" />
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col justify-between gap-2 group">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center shrink-0 border border-emerald-100/80">
+                        <GraduationCap size={15} />
+                      </div>
+                      <h4 className="text-xs sm:text-[13px] font-black text-slate-900 tracking-tight">Promotions & Dossiers</h4>
                     </div>
-                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+                    <span className="text-[9px] font-black text-emerald-700 uppercase tracking-wider bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100 font-mono shrink-0">
                       Règle 03
                     </span>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Promotions & Réinscriptions</h4>
                   <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-normal">
-                    Les élèves admis sont automatiquement orientés vers leurs classes d'accueil supérieures via le module dédié.
+                    <strong className="font-bold text-slate-800">Bascule de niveau :</strong> Les élèves admis sont orientés vers leur classe supérieure via le module des admissions tout en préservant leur historique.
                   </p>
+                </div>
+                <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-emerald-700 font-bold">
+                  <span className="flex items-center gap-1"><TrendingUp size={11} className="text-emerald-500" /> Continuité d'effectif</span>
+                  <span className="text-[9px] font-mono text-slate-600 font-medium">Réinscription fluide</span>
                 </div>
               </div>
 
               {/* Card 4 */}
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs hover:border-indigo-300 transition-all space-y-2 flex flex-col justify-between">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
-                      <Receipt size={18} className="sm:w-5 sm:h-5" />
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col justify-between gap-2 group">
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0 border border-indigo-100/80">
+                        <Receipt size={15} />
+                      </div>
+                      <h4 className="text-xs sm:text-[13px] font-black text-slate-900 tracking-tight">Tarification & Scolarité</h4>
                     </div>
-                    <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                    <span className="text-[9px] font-black text-indigo-700 uppercase tracking-wider bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 font-mono shrink-0">
                       Règle 04
                     </span>
                   </div>
-                  <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 tracking-tight">Tarification & Inscription</h4>
                   <p className="text-[11px] sm:text-xs text-slate-600 leading-relaxed font-normal">
-                    Configurez la grille tarifaire (frais d'inscription, écolages) de la nouvelle année avant la réinscription globale.
+                    <strong className="font-bold text-slate-800">Grille tarifaire :</strong> Configurez les frais d'inscription et échéanciers d'écolage sur la session en préparation avant de démarrer les encaissements.
                   </p>
+                </div>
+                <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-indigo-700 font-bold">
+                  <span className="flex items-center gap-1"><Sparkles size={11} className="text-indigo-500" /> Écolages paramétrés</span>
+                  <span className="text-[9px] font-mono text-slate-600 font-medium">Finances saines</span>
                 </div>
               </div>
 
             </div>
 
-            {/* Tip Callout */}
-            <div className="p-3.5 sm:p-4 bg-indigo-50/80 border border-indigo-100 rounded-2xl flex items-start gap-3">
-              <Lightbulb size={18} className="text-indigo-600 shrink-0 mt-0.5" />
-              <p className="text-xs text-indigo-950 leading-relaxed font-medium">
-                <strong className="font-extrabold text-indigo-900">Recommandation EduNova :</strong> Clôturez la saisie des notes et la remise des bulletins scolaires avant d'activer officiellement la nouvelle année.
+            {/* Tip Callout - Dense & Sleek */}
+            <div className="p-2.5 sm:p-3 bg-gradient-to-r from-indigo-50/90 to-blue-50/70 border border-indigo-100/90 rounded-xl flex items-center gap-2.5 text-indigo-950 shadow-2xs">
+              <Lightbulb size={16} className="text-indigo-600 shrink-0" />
+              <p className="text-[11px] sm:text-xs text-indigo-950 leading-snug font-medium">
+                <strong className="font-bold text-indigo-900">Recommandation École Connectée :</strong> Clôturez la saisie des notes et la remise des bulletins scolaires avant d'activer officiellement la nouvelle année.
               </p>
             </div>
 
             {/* Confirmation Button */}
-            <div className="pt-2 pb-1">
+            <div className="pt-1 pb-0.5">
               <button
                 onClick={() => setShowPassationGuide(false)}
-                className="w-full py-3.5 sm:py-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-2xl font-bold text-xs sm:text-sm tracking-tight transition-all shadow-md shadow-indigo-200 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 sm:py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm tracking-tight transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
-                <CheckCircle2 size={18} />
-                <span>J'ai compris les principes</span>
+                <CheckCircle2 size={16} />
+                <span>J'ai compris les principes de passation</span>
               </button>
             </div>
           </div>
         </div>
       </Modal>
 
-      {/* 1.1 Archiving Quick Guide (Modal) */}
+      {/* 1.1 Archiving Quick Guide (Modal École Supérieure) */}
       <Modal
         isOpen={showArchivingGuide}
         onClose={() => setShowArchivingGuide(false)}
-        title="Guide d'Archivage"
+        title="Guide d'Archivage des Sessions"
         hideIcon={true}
         hideTitle={true}
         hideDefaultActions={true}
         hideCloseButton={true}
-        containerClassName="max-w-xl sm:max-w-2xl md:max-w-3xl rounded-3xl overflow-hidden shadow-2xl border border-slate-100 max-h-[90vh] flex flex-col"
+        containerClassName="max-w-xl sm:max-w-2xl md:max-w-3xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90 max-h-[92vh] sm:max-h-[88vh] flex flex-col"
         contentClassName="p-0 flex-1 min-h-0 flex flex-col overflow-hidden"
       >
         <div className="flex flex-col h-full overflow-hidden bg-white">
-          {/* Header Banner - Fixed */}
-          <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-5 sm:p-6 md:p-7 text-white relative shrink-0">
+          {/* Header Banner - Sleek & Compact */}
+          <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 px-4 py-3 sm:px-6 sm:py-4 border-b border-slate-800 text-white relative shrink-0">
             {/* Dedicated High-Contrast Close Button */}
             <button
               onClick={() => setShowArchivingGuide(false)}
-              className="absolute top-4 right-4 sm:top-5 sm:right-5 p-2 text-white/75 hover:text-white hover:bg-white/10 active:scale-95 rounded-xl transition-all z-20 cursor-pointer"
+              className="absolute top-3 right-3 sm:top-3.5 sm:right-4 p-1.5 text-white/70 hover:text-white hover:bg-white/10 active:scale-95 rounded-xl transition-all z-20 cursor-pointer"
               title="Fermer le guide"
               aria-label="Fermer"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
 
-            <div className="relative z-10 space-y-2 pr-10">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-indigo-300 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-widest">
-                <Bookmark size={14} className="text-indigo-400" />
+            <div className="relative z-10 space-y-1 pr-8">
+              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-slate-800/90 border border-slate-700 text-indigo-300 text-[10px] font-extrabold uppercase tracking-wider font-mono">
+                <Bookmark size={13} className="text-indigo-400" />
                 <span>Mode Universitaire & Supérieur</span>
               </div>
-              <h3 className="text-lg sm:text-2xl font-black text-white tracking-tight leading-tight">
+              <h3 className="text-base sm:text-xl font-black text-white tracking-tight leading-tight">
                 Guide d'Archivage des Sessions
               </h3>
-              <p className="text-slate-300 text-xs sm:text-sm font-normal leading-relaxed max-w-xl">
+              <p className="text-slate-300 text-xs font-normal leading-snug max-w-xl">
                 Fonctionnement autonome des sessions académiques et trimestres universitaires.
               </p>
             </div>
           </div>
 
-          {/* Body Content - Scrollable */}
-          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 sm:p-6 md:p-7 space-y-4 bg-slate-50/70">
-            <div className="space-y-3">
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-600">1. Clôture Autonome</h4>
+          {/* Body Content - Compact & dense */}
+          <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-3.5 sm:p-4 md:p-5 space-y-2.5 sm:space-y-3 bg-slate-50/75">
+            <div className="space-y-2.5">
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-indigo-700">1. Clôture Autonome</h4>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-500 font-mono">Indépendant</span>
                 </div>
                 <p className="text-xs text-slate-700 font-medium leading-relaxed pl-4">
                   Chaque session possède son propre contrôle <span className="font-bold text-slate-900">"Archiver"</span>. Vous l'archivez manuellement une fois ses cours et évaluations finalisés.
                 </p>
               </div>
 
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-600">2. Indépendance des Sessions</h4>
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-indigo-700">2. Indépendance des Sessions</h4>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-500 font-mono">Multi-tenant</span>
                 </div>
                 <p className="text-xs text-slate-700 font-medium leading-relaxed pl-4">
                   Archiver une session d'été ou un semestre n'impacte pas les autres sessions ouvertes qui demeurent actives et opérationnelles.
                 </p>
               </div>
 
-              <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-2xs space-y-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-indigo-600">3. Historisation Immuable</h4>
+              <div className="bg-white p-3 sm:p-3.5 rounded-xl border border-slate-200/90 shadow-2xs space-y-1">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    <h4 className="text-xs font-black uppercase tracking-wider text-indigo-700">3. Historisation Immuable</h4>
+                  </div>
+                  <span className="text-[9px] font-bold text-slate-500 font-mono">Permanent</span>
                 </div>
                 <p className="text-xs text-slate-700 font-medium leading-relaxed pl-4">
                   Toutes les notes, procès-verbaux d'examen et règlements demeurent scellés et disponibles pour la génération de relevés de notes officiels.
@@ -667,12 +702,12 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             </div>
 
             {/* Confirmation Button */}
-            <div className="pt-2 pb-1">
+            <div className="pt-1 pb-0.5">
               <button
                 onClick={() => setShowArchivingGuide(false)}
-                className="w-full py-3.5 sm:py-4 bg-slate-900 hover:bg-black active:scale-[0.99] text-white rounded-2xl font-bold text-xs sm:text-sm tracking-tight transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-2.5 sm:py-3 bg-slate-900 hover:bg-black active:scale-[0.99] text-white rounded-xl font-bold text-xs sm:text-sm tracking-tight transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer"
               >
-                <CheckCircle2 size={18} />
+                <CheckCircle2 size={16} />
                 <span>J'ai compris le fonctionnement</span>
               </button>
             </div>
@@ -736,17 +771,17 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
       </div>
 
       {/* 3. New Session Creation Block */}
-      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-2.5">
-            <div className="p-1.5 bg-indigo-50 text-indigo-700 rounded-xl border border-indigo-100 shadow-2xs">
+      <div className="bg-white p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 bg-indigo-50 text-indigo-700 rounded-lg flex items-center justify-center border border-indigo-100 shadow-2xs shrink-0">
               <Plus size={15} />
             </div>
             <div>
-              <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
+              <h3 className="text-xs sm:text-sm font-black tracking-tight text-slate-900">
                 {isHigherEd ? "Ajouter une Nouvelle Session Universitaire" : "Initialisation d'une Nouvelle Année Scolaire"}
               </h3>
-              <p className="text-[11px] sm:text-xs text-slate-600 font-medium">
+              <p className="text-[11px] sm:text-xs text-slate-500 font-medium">
                 {isHigherEd 
                   ? "Configurez les dates et le type pour votre prochaine session académique."
                   : "Définissez le libellé et les dates officielles pour entamer la passation administrative."}
@@ -756,9 +791,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
 
           {/* Current Active Badge for context */}
           {currentYears.find(y => y.status === 'ACTIVE' || y.is_active) && (
-            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200/80 rounded-xl text-emerald-800 text-xs font-semibold self-start sm:self-auto">
+            <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-emerald-50 border border-emerald-200/80 rounded-lg text-emerald-800 text-xs font-semibold self-start sm:self-auto shrink-0 shadow-2xs">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-              <span>{isHigherEd ? 'Session Active' : 'Année Active'} : <strong className="font-bold">{currentYears.find(y => y.status === 'ACTIVE' || y.is_active)?.label}</strong></span>
+              <span className="text-[11px]">{isHigherEd ? 'Session Active' : 'Année Active'} : <strong className="font-bold">{currentYears.find(y => y.status === 'ACTIVE' || y.is_active)?.label}</strong></span>
             </div>
           )}
         </div>
@@ -766,10 +801,10 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         {/* Higher-Ed Only: Templates Quick Select Pills */}
         {isHigherEd && (
           <div className="space-y-1">
-            <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-1 block">
+            <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider ml-0.5 block">
               ⚡ Modèles Universitaires & Durées Rapides
             </label>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {templates.map(tpl => {
                 const isSelected = selectedPreset === tpl.id;
                 return (
@@ -804,40 +839,41 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         )}
 
         {/* Inputs Form */}
-        <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 pt-0.5">
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-2 sm:gap-2.5 pt-0.5 items-end">
           {/* Libellé */}
-          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-4' : 'md:col-span-4'} space-y-0.5`}>
+          <div className={`col-span-12 ${isHigherEd ? 'md:col-span-4' : 'md:col-span-4'} space-y-1`}>
             <div className="flex items-center justify-between">
-              <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5">
-                {isHigherEd ? "Libellé de la session" : "Libellé de l'année scolaire *"}
+              <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 truncate">
+                {isHigherEd ? "Libellé de session" : "Libellé de l'année scolaire *"}
               </label>
-              {isHigherEd && (
-                <span className="text-[9px] text-indigo-600 font-extrabold uppercase tracking-wider mr-1 bg-indigo-50 px-1 py-0.5 rounded">
+              {isHigherEd ? (
+                <span className="text-[9px] text-indigo-600 font-extrabold uppercase tracking-wider mr-0.5 bg-indigo-50 px-1 py-0.2 rounded">
                   Optionnel
+                </span>
+              ) : (
+                <span className="text-[9px] text-slate-500 font-mono font-bold">
+                  Format AAAA-AAAA
                 </span>
               )}
             </div>
             <input 
               type="text" 
               placeholder={isHigherEd ? "Ex: Session Automne 2026" : "Ex: 2025-2026"} 
-              className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold text-slate-900 placeholder:text-slate-500 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-sans"
+              className="w-full h-[38px] px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all font-sans"
               value={newYearData.label}
               onChange={e => {
                 setNewYearData({...newYearData, label: e.target.value});
                 if (selectedPreset) setSelectedPreset('');
               }}
             />
-            <p className="text-[10px] text-slate-500 font-medium ml-0.5">
-              {isHigherEd ? "Sera généré d'après les dates si laissé vide" : "Format obligatoire : AAAA-AAAA (ex: 2025-2026)"}
-            </p>
           </div>
 
           {/* Type of Session (Higher Ed Only) */}
           {isHigherEd && (
-            <div className="col-span-12 md:col-span-4 space-y-0.5">
-              <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5">Type de session</label>
+            <div className="col-span-12 md:col-span-4 space-y-1">
+              <label className="text-[10px] font-black text-slate-800 uppercase tracking-wider ml-0.5 block truncate">Type de session</label>
               <select
-                className="w-full px-3 py-1.5 sm:py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
+                className="w-full h-[38px] px-3 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-[13px] font-bold text-slate-900 outline-none focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all"
                 value={newYearData.sessionType}
                 onChange={e => {
                   setNewYearData({...newYearData, sessionType: e.target.value as any});
@@ -900,9 +936,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 pt-2 border-t border-slate-100">
-          <p className="text-xs text-slate-600 font-medium flex items-center gap-1.5">
-            <Info size={13} className="text-indigo-600 shrink-0" />
+        <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-100">
+          <p className="text-[11px] sm:text-xs text-slate-600 font-medium flex items-center gap-1.5">
+            <ShieldCheck size={13} className="text-indigo-600 shrink-0" />
             <span>
               {isHigherEd 
                 ? "La nouvelle session sera créée avec le statut Nouvelle (Vierge) prête pour la préparation."
@@ -913,7 +949,7 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
           <button 
             onClick={handleAddYear} 
             disabled={actionLoading === 'add_year'} 
-            className="w-full sm:w-auto px-4 h-[36px] bg-slate-900 hover:bg-black text-white rounded-xl transition-all shadow-xs active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="w-full sm:w-auto px-4 h-[36px] bg-slate-900 hover:bg-black text-white rounded-xl transition-all shadow-xs active:scale-95 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shrink-0"
           >
             {actionLoading === 'add_year' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
             <span className="text-xs font-bold whitespace-nowrap">
@@ -1166,30 +1202,30 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         hideIcon={true}
         hideTitle={true}
         hideDefaultActions={true}
-        containerClassName="max-w-xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-100"
+        containerClassName="max-w-lg sm:max-w-xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90"
         contentClassName="p-0"
       >
         {confirmState && (
           <div className="flex flex-col bg-white">
-            {/* Modal Header Banner */}
-            <div className={`p-4 sm:p-5 md:p-6 text-white relative overflow-hidden ${
+            {/* Modal Header Banner - Compact & Modern */}
+            <div className={`px-4 py-3 sm:px-5 sm:py-3.5 text-white relative overflow-hidden ${
               confirmState.status === 'ACTIVE'
-                ? 'bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900'
+                ? 'bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900'
                 : confirmState.status === 'PAST'
-                ? 'bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900'
-                : 'bg-gradient-to-br from-indigo-900 via-blue-950 to-slate-900'
+                ? 'bg-gradient-to-r from-slate-950 via-slate-900 to-slate-950'
+                : 'bg-gradient-to-r from-indigo-950 via-blue-950 to-slate-900'
             }`}>
-              <div className="relative z-10 flex items-center gap-3">
-                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
-                  {confirmState.status === 'ACTIVE' ? <CheckCircle2 size={24} className="text-indigo-300" /> : 
-                   confirmState.status === 'PAST' ? <Bookmark size={22} className="text-indigo-300" /> : 
-                   <Sparkles size={22} className="text-amber-300" />}
+              <div className="relative z-10 flex items-center gap-2.5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
+                  {confirmState.status === 'ACTIVE' ? <CheckCircle2 size={20} className="text-indigo-300" /> : 
+                   confirmState.status === 'PAST' ? <Bookmark size={18} className="text-indigo-300" /> : 
+                   <Sparkles size={18} className="text-amber-300" />}
                 </div>
-                <div>
+                <div className="min-w-0">
                   <span className="inline-block px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-[9px] font-black uppercase tracking-widest text-white/90 mb-0.5">
-                    Passation Académique
+                    Gouvernance • École Connectée
                   </span>
-                  <h3 className="text-base sm:text-lg md:text-xl font-black text-white tracking-tight leading-tight">
+                  <h3 className="text-sm sm:text-base font-black text-white tracking-tight leading-tight truncate">
                     {confirmState.status === 'ACTIVE' 
                       ? (isHigherEd ? 'Lancer la Session Active ?' : "Activer cette Année Scolaire ?") 
                       : confirmState.status === 'PAST' 
@@ -1200,16 +1236,16 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
               </div>
             </div>
 
-            {/* Modal Content Body */}
-            <div className="p-4 sm:p-5 space-y-3.5 bg-slate-50/50">
+            {/* Modal Content Body - Dense & Ergonomic */}
+            <div className="p-3.5 sm:p-4 space-y-2.5 bg-slate-50/70">
               {/* Target Session Detail Card */}
-              <div className="p-3.5 bg-white border border-slate-200/90 rounded-xl shadow-2xs space-y-2">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+              <div className="p-3 bg-white border border-slate-200/90 rounded-xl shadow-2xs space-y-2">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
                   <div>
                     <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 block">
-                      {isHigherEd ? "Session Sélectionnée" : "Année Scolaire Sélectionnée"}
+                      {isHigherEd ? "Session Ciblée" : "Année Scolaire Ciblée"}
                     </span>
-                    <h4 className="text-base font-black text-slate-900">{confirmState.year.label}</h4>
+                    <h4 className="text-sm sm:text-base font-black text-slate-900">{confirmState.year.label}</h4>
                   </div>
                   {isHigherEd && (
                     <span className={`px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${getSessionTypeBadge(confirmState.year.session_type).classes}`}>
@@ -1218,25 +1254,25 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs font-semibold text-slate-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-semibold text-slate-700">
                   {(() => {
                     const confirmRange = formatAcademicDateRange(confirmState.year.start_date, confirmState.year.end_date);
                     return (
                       <>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <span className="text-slate-500 text-[9px] uppercase font-bold tracking-wider block">
                             Date d'ouverture (Début) :
                           </span>
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-800 rounded-lg border border-slate-200/90 font-bold text-xs shadow-2xs">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 font-bold text-xs shadow-2xs">
                             <Calendar size={12} className="text-indigo-600 shrink-0 stroke-[2.2]" />
                             <span>{confirmRange.startText}</span>
                           </div>
                         </div>
-                        <div className="space-y-1">
+                        <div className="space-y-0.5">
                           <span className="text-slate-500 text-[9px] uppercase font-bold tracking-wider block">
                             Date de clôture (Fin) :
                           </span>
-                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-800 rounded-lg border border-slate-200/90 font-bold text-xs shadow-2xs">
+                          <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 text-slate-800 rounded-lg border border-slate-200 font-bold text-xs shadow-2xs">
                             <Calendar size={12} className="text-indigo-600 shrink-0 stroke-[2.2]" />
                             <span>{confirmRange.endText}</span>
                             {confirmRange.duration && (
@@ -1256,10 +1292,10 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
               </div>
 
               {/* Impact / Explanation box */}
-              <div className="p-3 bg-white border border-slate-200/80 rounded-xl space-y-1.5">
+              <div className="p-2.5 sm:p-3 bg-white border border-slate-200/90 rounded-xl space-y-1 shadow-2xs">
                 <div className="flex items-center gap-1.5 text-slate-900 font-extrabold text-xs">
                   <ShieldCheck size={14} className="text-indigo-600" />
-                  <span>Conséquences de l'action :</span>
+                  <span>Conséquences de l'opération :</span>
                 </div>
 
                 <p className="text-[11px] sm:text-xs text-slate-600 font-normal leading-relaxed">
@@ -1280,31 +1316,31 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
               </div>
 
               {/* Action buttons */}
-              <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-                <button 
-                  onClick={() => handleUpdateStatus(confirmState.year.id, confirmState.status)}
-                  disabled={actionLoading !== null}
-                  className={`w-full py-2.5 sm:py-3 rounded-xl text-xs font-black uppercase tracking-wider text-white transition-all active:scale-[0.98] disabled:opacity-50 shadow-md flex items-center justify-center gap-2 cursor-pointer ${
-                    confirmState.status === 'ACTIVE' 
-                      ? 'bg-slate-900 hover:bg-black shadow-slate-950/20' 
-                      : confirmState.status === 'PAST' 
-                      ? 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-950/20' 
-                      : 'bg-slate-900 hover:bg-black shadow-slate-950/20'
-                  }`}
-                >
-                  {actionLoading !== null ? <Loader2 size={15} className="animate-spin" /> : <CheckCircle2 size={15} />}
-                  <span>
-                    {confirmState.status === 'ACTIVE' ? (isHigherEd ? 'Confirmer et Lancer la Session' : "Confirmer et Activer l'Année") : 
-                     confirmState.status === 'PAST' ? (isHigherEd ? 'Oui, Archiver la Session' : "Oui, Archiver l'Année Scolaire") : 'Confirmer la Préparation'}
-                  </span>
-                </button>
-                
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-1">
                 <button 
                   onClick={() => setConfirmState(null)}
                   disabled={actionLoading !== null}
-                  className="w-full sm:w-auto px-5 py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer"
                 >
                   Annuler
+                </button>
+
+                <button 
+                  onClick={() => handleUpdateStatus(confirmState.year.id, confirmState.status)}
+                  disabled={actionLoading !== null}
+                  className={`w-full sm:w-auto px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-wider text-white transition-all active:scale-[0.98] disabled:opacity-50 shadow-xs flex items-center justify-center gap-2 cursor-pointer ${
+                    confirmState.status === 'ACTIVE' 
+                      ? 'bg-slate-900 hover:bg-black' 
+                      : confirmState.status === 'PAST' 
+                      ? 'bg-indigo-600 hover:bg-indigo-700' 
+                      : 'bg-slate-900 hover:bg-black'
+                  }`}
+                >
+                  {actionLoading !== null ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  <span>
+                    {confirmState.status === 'ACTIVE' ? (isHigherEd ? 'Confirmer et Lancer' : "Confirmer et Activer") : 
+                     confirmState.status === 'PAST' ? (isHigherEd ? 'Archiver la Session' : "Archiver l'Année Scolaire") : 'Confirmer la Préparation'}
+                  </span>
                 </button>
               </div>
             </div>
@@ -1320,32 +1356,32 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         hideIcon={true}
         hideTitle={true}
         hideDefaultActions={true}
-        containerClassName="max-w-xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-100"
+        containerClassName="max-w-lg sm:max-w-xl rounded-2xl sm:rounded-3xl overflow-hidden shadow-2xl border border-slate-200/90"
         contentClassName="p-0"
       >
         {sessionToDelete && (
           <div className="flex flex-col bg-white">
-            {/* Header Banner */}
-            <div className="bg-gradient-to-br from-rose-600 via-rose-700 to-slate-900 p-4 sm:p-5 md:p-6 text-white relative overflow-hidden">
-              <div className="relative z-10 flex items-center gap-3">
-                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
-                  <Trash2 size={24} className="text-rose-200" />
+            {/* Header Banner - Compact */}
+            <div className="bg-gradient-to-r from-rose-600 via-rose-700 to-slate-900 px-4 py-3 sm:px-5 sm:py-3.5 text-white relative overflow-hidden">
+              <div className="relative z-10 flex items-center gap-2.5">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shrink-0 shadow-inner">
+                  <Trash2 size={20} className="text-rose-200" />
                 </div>
                 <div>
                   <span className="inline-block px-2 py-0.5 rounded-full bg-white/15 border border-white/20 text-[9px] font-black uppercase tracking-widest text-white/90 mb-0.5">
-                    Zone Danger
+                    Zone de Sécurité
                   </span>
-                  <h3 className="text-base sm:text-lg md:text-xl font-black text-white tracking-tight leading-tight">
+                  <h3 className="text-sm sm:text-base font-black text-white tracking-tight leading-tight">
                     {isHigherEd ? 'Supprimer la Session ?' : "Supprimer l'Année Scolaire ?"}
                   </h3>
                 </div>
               </div>
             </div>
 
-            {/* Content Body */}
-            <div className="p-4 sm:p-5 space-y-3 bg-slate-50/50">
-              <div className="space-y-2">
-                <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-relaxed">
+            {/* Content Body - Compact */}
+            <div className="p-3.5 sm:p-4 space-y-2.5 bg-slate-50/70">
+              <div className="space-y-1.5">
+                <p className="text-xs sm:text-sm font-medium text-slate-800 leading-relaxed">
                   Vous êtes sur le point de supprimer définitivement {isHigherEd ? 'la session' : "l'année scolaire"} <strong className="text-slate-950 font-black">{sessionToDelete.label}</strong>.
                 </p>
 
@@ -1373,9 +1409,9 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                 })()}
               </div>
 
-              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs font-medium text-rose-950 space-y-1.5">
-                <span className="font-extrabold uppercase tracking-wide text-rose-900 block text-[10px]">⚠️ ATTENTION : ACTION IRRÉVERSIBLE</span>
-                <p className="text-[11px]">Cette opération supprimera irrévocablement :</p>
+              <div className="p-2.5 sm:p-3 bg-rose-50/90 border border-rose-200 rounded-xl text-xs font-medium text-rose-950 space-y-1 shadow-2xs">
+                <span className="font-black uppercase tracking-wider text-rose-900 block text-[10px]">⚠️ Attention : Action Irréversible</span>
+                <p className="text-[11px] leading-snug">Cette opération supprimera irrévocablement :</p>
                 <ul className="list-disc list-inside space-y-0.5 font-bold text-rose-800 text-[11px]">
                   <li>Toutes les inscriptions enregistrées sur cette session/année</li>
                   <li>Toutes les grilles tarifaires et paiements associés</li>
@@ -1383,22 +1419,23 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
                 </ul>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center gap-2 pt-1">
-                <button 
-                  onClick={handleDeleteYear}
-                  disabled={isDeleting}
-                  className="w-full py-2.5 sm:py-3 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 shadow-md shadow-rose-200 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isDeleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
-                  <span>Oui, Supprimer Définitivement</span>
-                </button>
-                
+              {/* Action buttons */}
+              <div className="flex flex-col-reverse sm:flex-row items-center justify-end gap-2 pt-1">
                 <button 
                   onClick={() => setSessionToDelete(null)}
                   disabled={isDeleting}
-                  className="w-full sm:w-auto px-5 py-2.5 sm:py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200/80 cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2 sm:py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer"
                 >
                   Annuler
+                </button>
+
+                <button 
+                  onClick={handleDeleteYear}
+                  disabled={isDeleting}
+                  className="w-full sm:w-auto px-5 py-2 sm:py-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-black uppercase tracking-wider transition-all active:scale-[0.98] disabled:opacity-50 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  {isDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
+                  <span>Oui, Supprimer Définitivement</span>
                 </button>
               </div>
             </div>
