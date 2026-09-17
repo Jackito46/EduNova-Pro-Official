@@ -23,6 +23,14 @@ import SuppliesPOS from './SuppliesPOS';
 import { ModernSaleReceiptModal } from './ModernSaleReceiptModal';
 import { InventoryAdjustmentModal } from './InventoryAdjustmentModal';
 import { PrintableInventoryModal } from './PrintableInventoryModal';
+import { UnitHarmonizationModal } from './UnitHarmonizationModal';
+import { 
+  resolveItemUnit, 
+  formatQuantityWithUnit, 
+  extractCleanDiscipline, 
+  encodeDisciplineWithUnit, 
+  STANDARD_SUPPLY_UNITS 
+} from '../utils/supplyUnits';
 import { AuditLogger } from '../utils/auditLogger';
 import { formatStudentName } from '../utils/formatters';
 import { AcademicSessionPill } from './AcademicSessionPill';
@@ -135,6 +143,9 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [adjustingStockItem, setAdjustingStockItem] = useState<CatalogItem | null>(null);
   const [showInventorySheetModal, setShowInventorySheetModal] = useState<boolean>(false);
   const [showSupplyMenu, setShowSupplyMenu] = useState<boolean>(false);
+  const [showUnitHarmonizerModal, setShowUnitHarmonizerModal] = useState<boolean>(false);
+  const [quickUnitItem, setQuickUnitItem] = useState<CatalogItem | null>(null);
+  const [quickUnitValue, setQuickUnitValue] = useState<string>('Pièce');
   const [editingPriceItem, setEditingPriceItem] = useState<{ id: string; label: string; current_price: number; new_price: string } | null>(null);
   const [updateCatalogPriceInPurchase, setUpdateCatalogPriceInPurchase] = useState<boolean>(false);
   const [newSellingPriceInPurchase, setNewSellingPriceInPurchase] = useState<string>('');
@@ -704,18 +715,56 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   const getItemUnitMeasure = (item: any) => {
-    if (item.unit_measure) return item.unit_measure;
-    if (item.discipline_name) {
-      const match = item.discipline_name.match(/\[Unité:\s*([^\]]+)\]/i);
-      if (match && match[1]) return match[1].trim();
-    }
-    return 'Pièce';
+    return resolveItemUnit(item);
   };
 
   const getItemCleanDiscipline = (item: any) => {
-    if (!item.discipline_name) return null;
-    const clean = item.discipline_name.replace(/\[Unité:[^\]]+\]/gi, '').trim();
-    return clean || null;
+    return extractCleanDiscipline(item.discipline_name);
+  };
+
+  const distinctUnitsSummary = useMemo(() => {
+    const unitsMap = new Map<string, number>();
+    catalog.forEach(item => {
+      const u = resolveItemUnit(item);
+      unitsMap.set(u, (unitsMap.get(u) || 0) + (item.stock_quantity || 0));
+    });
+    return Array.from(unitsMap.entries()).filter(([_, count]) => count > 0);
+  }, [catalog]);
+
+  const handleQuickSaveUnit = async (item: CatalogItem, newUnit: string) => {
+    try {
+      const cleanDisc = extractCleanDiscipline(item.discipline_name) || '';
+      const encodedDisc = encodeDisciplineWithUnit(cleanDisc, newUnit);
+
+      const payloadWithUnit: any = {
+        discipline_name: encodedDisc,
+        unit_measure: newUnit
+      };
+
+      const payloadFallback: any = {
+        discipline_name: encodedDisc
+      };
+
+      const { error: err1 } = await supabase
+        .from('supply_catalog')
+        .update(payloadWithUnit)
+        .eq('id', item.id)
+        .eq('school_id', user.school_id);
+
+      if (err1) {
+        await supabase
+          .from('supply_catalog')
+          .update(payloadFallback)
+          .eq('id', item.id)
+          .eq('school_id', user.school_id);
+      }
+
+      setCatalog(prev => prev.map(i => i.id === item.id ? { ...i, unit_measure: newUnit, discipline_name: encodedDisc } : i));
+      toast.success(`Unité de "${item.label}" mise à jour en "${newUnit}" !`);
+      setQuickUnitItem(null);
+    } catch (err: any) {
+      toast.error("Erreur lors de la mise à jour de l'unité: " + (err.message || 'Échec'));
+    }
   };
 
   const handleMigrateCatalogUnits = async () => {
@@ -738,9 +787,9 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       let updatedCount = 0;
       for (const item of items) {
-        const unit = getItemUnitMeasure(item);
-        const cleanDisc = getItemCleanDiscipline(item) || '';
-        const encodedDisc = cleanDisc ? `${cleanDisc} [Unité: ${unit}]` : `[Unité: ${unit}]`;
+        const unit = resolveItemUnit(item);
+        const cleanDisc = extractCleanDiscipline(item.discipline_name) || '';
+        const encodedDisc = encodeDisciplineWithUnit(cleanDisc, unit);
 
         const basePayload: any = {
           discipline_name: encodedDisc
@@ -770,11 +819,11 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         details: { type: 'migrate_catalog_units', count: updatedCount }
       });
 
-      toast.success(`✅ Outil Migration Unités : ${updatedCount} article(s) du catalogue harmonisés avec succès !`);
+      toast.success(`✅ Harmonisation : ${updatedCount} article(s) dotés de leur unité réelle (Aunes, Rames, Exemplaires, Boîtes...) !`);
       fetchData();
     } catch (err: any) {
-      console.error("Erreur migration unités catalogue:", err);
-      toast.error("Erreur outil migration : " + (err.message || "Échec de l'harmonisation"));
+      console.error("Erreur harmonisation unités catalogue:", err);
+      toast.error("Erreur harmonisation : " + (err.message || "Échec de l'harmonisation"));
     } finally {
       setIsMigratingUnits(false);
     }
@@ -808,8 +857,8 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       // Progression of fallback payloads if table columns do not exist in schema cache
       const payloadAttempts = [
-        // 1. Primary attempt: Direct unit_measure column
-        { ...basePayload, unit_measure: selectedUnit },
+        // 1. Primary attempt: Direct unit_measure column + encoded discipline
+        { ...basePayload, unit_measure: selectedUnit, discipline_name: encodedDiscipline },
 
         // 2. Fallback: Strip unit_measure, encode in discipline_name
         { ...basePayload, discipline_name: encodedDiscipline },
@@ -1634,6 +1683,16 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           <div className="flex items-center gap-2.5 w-full md:w-auto">
+            {/* Re-vérification & Harmonisation des Unités */}
+            <button
+              onClick={() => setShowUnitHarmonizerModal(true)}
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
+              title="Re-vérifier et harmoniser les unités de mesure de chaque article (Aunes, Rames, Exemplaires, Boîtes, etc.)"
+            >
+              <Layers size={14} className="text-amber-400" />
+              <span>Unités</span>
+            </button>
+
             {/* Fiche A4 (Impression inventaire physique) */}
             <button
               onClick={() => setShowInventorySheetModal(true)}
@@ -1759,6 +1818,21 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <div className="text-[10px] text-slate-400 font-normal">Entrée simple d'un seul article</div>
                       </div>
                     </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowUnitHarmonizerModal(true);
+                        setShowSupplyMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white hover:bg-slate-800/90 rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer mt-0.5 border-t border-slate-800/80 pt-2"
+                    >
+                      <Layers size={15} className="text-amber-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold">Re-vérifier les Unités</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Harmoniser les unités de tous les articles</div>
+                      </div>
+                    </button>
                   </div>
                 </>
               )}
@@ -1780,7 +1854,19 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <p className="text-2xl font-black text-slate-900 font-mono">{catalog.length}</p>
               <span className="text-xs text-slate-500">articles</span>
             </div>
-            <p className="text-[11px] text-slate-500 mt-1 font-medium">{totalUnitsInStock.toLocaleString()} pièces au total</p>
+            <p className="text-[11px] text-slate-500 mt-1 font-medium truncate">{totalUnitsInStock.toLocaleString()} unités & articles au total</p>
+            {distinctUnitsSummary.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1 mt-1 text-[10px] text-slate-500 font-medium">
+                {distinctUnitsSummary.slice(0, 2).map(([u, count]) => (
+                  <span key={u} className="bg-slate-100 text-slate-700 px-1.5 py-0.2 rounded font-mono font-bold">
+                    {count} {u}
+                  </span>
+                ))}
+                {distinctUnitsSummary.length > 2 && (
+                  <span className="text-slate-400 text-[10px]">+{distinctUnitsSummary.length - 2}</span>
+                )}
+              </div>
+            )}
           </div>
 
           <div 
@@ -2045,21 +2131,28 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       return (
                         <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
                           <td className="px-5 py-3.5">
-                            <div className="font-extrabold text-slate-900 text-sm flex items-center gap-2">
+                            <div className="font-extrabold text-slate-900 text-sm flex items-center gap-2 flex-wrap">
                               <span>{item.label}</span>
-                              {item.unit_measure && (
-                                <span className="text-[10px] font-semibold text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200">
-                                  /{item.unit_measure}
-                                </span>
-                              )}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setQuickUnitItem(item);
+                                  setQuickUnitValue(getItemUnitMeasure(item));
+                                }}
+                                className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-2 py-0.5 rounded-md border border-indigo-200 transition-colors flex items-center gap-1 cursor-pointer"
+                                title={`Unité : ${getItemUnitMeasure(item)} — Cliquer pour changer`}
+                              >
+                                <span>{getItemUnitMeasure(item)}</span>
+                                <Edit2 size={9} className="opacity-60" />
+                              </button>
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 mt-1">
                               <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
                                 {item.category}
                               </span>
-                              {item.discipline_name && (
-                                <span className="text-[10px] text-indigo-700 font-bold bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                                  {item.discipline_name}
+                              {getItemCleanDiscipline(item) && (
+                                <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100">
+                                  {getItemCleanDiscipline(item)}
                                 </span>
                               )}
                             </div>
@@ -2136,7 +2229,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <div className="space-y-1">
                               <div className="flex items-center justify-between font-mono text-xs">
                                 <span className={`font-black ${isOut ? 'text-rose-600' : isLow ? 'text-amber-600' : 'text-slate-900'}`}>
-                                  {stockQty} {item.unit_measure ? `/${item.unit_measure}` : 'unités'}
+                                  {formatQuantityWithUnit(stockQty, getItemUnitMeasure(item))}
                                 </span>
                                 <span className="text-[10px] text-slate-400 font-sans font-bold">
                                   Min: {threshold}
@@ -2244,12 +2337,26 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </div>
 
                         <div>
-                          <h5 className="font-black text-slate-900 text-sm leading-snug">
-                            {item.label}
-                          </h5>
-                          {item.discipline_name && (
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <h5 className="font-black text-slate-900 text-sm leading-snug">
+                              {item.label}
+                            </h5>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setQuickUnitItem(item);
+                                setQuickUnitValue(getItemUnitMeasure(item));
+                              }}
+                              className="text-[10px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 px-1.5 py-0.2 rounded border border-indigo-200 transition-colors flex items-center gap-0.5 cursor-pointer"
+                              title={`Unité : ${getItemUnitMeasure(item)} — Cliquer pour changer`}
+                            >
+                              <span>{getItemUnitMeasure(item)}</span>
+                              <Edit2 size={8} className="opacity-60" />
+                            </button>
+                          </div>
+                          {getItemCleanDiscipline(item) && (
                             <p className="text-[11px] font-semibold text-indigo-600 mt-0.5">
-                              {item.discipline_name}
+                              {getItemCleanDiscipline(item)}
                             </p>
                           )}
                         </div>
@@ -2264,7 +2371,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <div className="flex items-center justify-between">
                           <span className="text-slate-500 font-medium">Stock Physique :</span>
                           <span className={`font-black font-mono text-sm ${isOut ? 'text-rose-600' : isLow ? 'text-amber-600' : 'text-slate-900'}`}>
-                            {stockQty} {item.unit_measure ? `/${item.unit_measure}` : 'unités'}
+                            {formatQuantityWithUnit(stockQty, getItemUnitMeasure(item))}
                           </span>
                         </div>
                         {buyCost > 0 && (
@@ -3118,7 +3225,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                            ? 'bg-rose-50 text-rose-600 border border-rose-200'
                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                        }`}>
-                         {(item.stock_quantity || 0)} en stock
+                         {formatQuantityWithUnit(item.stock_quantity || 0, getItemUnitMeasure(item))}
                        </span>
                      </div>
                      
@@ -3215,7 +3322,18 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 )}
                              </td>
                              <td className="px-6 py-4 font-bold text-xs text-indigo-700">
-                                <span className="px-2.5 py-1 bg-indigo-50 rounded-lg border border-indigo-100">{getItemUnitMeasure(item)}</span>
+                                <button
+                                   type="button"
+                                   onClick={() => {
+                                     setQuickUnitItem(item);
+                                     setQuickUnitValue(getItemUnitMeasure(item));
+                                   }}
+                                   className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg border border-indigo-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                                   title={`Unité : ${getItemUnitMeasure(item)} — Cliquer pour changer`}
+                                 >
+                                   <span>{getItemUnitMeasure(item)}</span>
+                                   <Edit2 size={10} className="opacity-60" />
+                                 </button>
                              </td>
                              <td className="px-6 py-4 text-right">
                                 <span className={`px-2.5 py-1 rounded-lg text-[10px] font-bold font-mono ${
@@ -3223,7 +3341,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                     ? 'bg-rose-50 text-rose-600 border border-rose-100' 
                                     : 'bg-emerald-50 text-emerald-700 border border-emerald-100'
                                 }`}>
-                                  {item.stock_quantity || 0} en stock
+                                  {formatQuantityWithUnit(item.stock_quantity || 0, getItemUnitMeasure(item))}
                                 </span>
                              </td>
                              <td className="px-6 py-4 text-right">
