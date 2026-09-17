@@ -11,7 +11,7 @@ import {
   Truck, FileText, Building2, Layers, Zap, Wrench, Lock, LayoutGrid,
   SlidersHorizontal, BarChart3, Sliders, ArrowUpDown, ClipboardCheck,
   BookOpen, Shirt, PenTool, FlaskConical, Laptop, Armchair, Trophy,
-  FileSpreadsheet, Eye, Minus, Globe, Coins, GraduationCap, AlertTriangle
+  FileSpreadsheet, Eye, Minus, Globe, Coins, GraduationCap, AlertTriangle, Info
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
@@ -134,6 +134,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [inventoryFilter, inventoryCategoryFilter, inventorySearch, inventoryPerPage]);
   const [adjustingStockItem, setAdjustingStockItem] = useState<CatalogItem | null>(null);
   const [showInventorySheetModal, setShowInventorySheetModal] = useState<boolean>(false);
+  const [showSupplyMenu, setShowSupplyMenu] = useState<boolean>(false);
   const [editingPriceItem, setEditingPriceItem] = useState<{ id: string; label: string; current_price: number; new_price: string } | null>(null);
   const [updateCatalogPriceInPurchase, setUpdateCatalogPriceInPurchase] = useState<boolean>(false);
   const [newSellingPriceInPurchase, setNewSellingPriceInPurchase] = useState<string>('');
@@ -422,6 +423,30 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return Array.from(set).sort();
   }, [purchaseHistory]);
 
+  const lowStockEligibleItems = useMemo(() => {
+    return catalog.filter(i => i.category !== 'Service' && (i.stock_quantity || 0) <= (i.low_stock_threshold || 5));
+  }, [catalog]);
+
+  const batchTotalOrderQuantity = useMemo(() => {
+    return batchItems.reduce((acc, r) => acc + (Math.max(0, parseInt(r.quantity, 10)) || 0), 0);
+  }, [batchItems]);
+
+  const batchTotalDisbursement = useMemo(() => {
+    return batchItems.reduce((acc, r) => {
+      const q = Math.max(0, parseInt(r.quantity, 10)) || 0;
+      const c = Math.max(0, parseFloat(r.unit_cost)) || 0;
+      return acc + (q * c);
+    }, 0);
+  }, [batchItems]);
+
+  const batchTotalCurrentStock = useMemo(() => {
+    return batchItems.reduce((acc, r) => {
+      if (!r.item_id) return acc;
+      const item = catalog.find(i => i.id === r.item_id);
+      return acc + (item?.stock_quantity || 0);
+    }, 0);
+  }, [batchItems, catalog]);
+
   const getLastPurchaseInfo = useCallback((itemId: string) => {
     const item = catalog.find(i => i.id === itemId);
     if (!item) return null;
@@ -516,14 +541,18 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   const handleFillLowStockBatch = () => {
-    const lowOrOut = catalog.filter(i => (i.stock_quantity || 0) <= (i.low_stock_threshold || 5));
+    const lowOrOut = catalog.filter(i => i.category !== 'Service' && (i.stock_quantity || 0) <= (i.low_stock_threshold || 5));
     if (lowOrOut.length === 0) {
-      toast.info("Aucun article en alerte de stock bas ou en rupture !");
+      toast.info("Aucun article physique en alerte de stock bas ou en rupture !");
       return;
     }
     const rows = lowOrOut.map(i => {
       const lastInfo = getLastPurchaseInfo(i.id);
-      const needed = Math.max(10, (i.low_stock_threshold || 5) * 3 - (i.stock_quantity || 0));
+      const threshold = i.low_stock_threshold || 5;
+      const currentStock = i.stock_quantity || 0;
+      // Objectif de sécurité : couvrir 3x le seuil minimal
+      const targetStock = Math.max(10, threshold * 3);
+      const needed = Math.max(5, targetStock - currentStock);
       return {
         item_id: i.id,
         quantity: needed.toString(),
@@ -536,6 +565,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       setBatchSupplier(knownSuppliers[0]);
     }
     setShowPurchaseModal(true);
+    toast.success(`✨ ${rows.length} article(s) en alerte de stock importé(s) dans le bon de commande !`);
   };
 
   const handleRecordBatchPurchase = async (e: React.FormEvent) => {
@@ -1603,57 +1633,136 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {lowStockCount > 0 && (
-              <button
-                onClick={handleFillLowStockBatch}
-                className="px-3.5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
-              >
-                <Zap size={14} />
-                <span>Ruptures ({lowStockCount})</span>
-              </button>
-            )}
-
+          <div className="flex items-center gap-2.5 w-full md:w-auto">
+            {/* Fiche A4 (Impression inventaire physique) */}
             <button
               onClick={() => setShowInventorySheetModal(true)}
-              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 active:scale-95"
+              className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-medium text-xs rounded-xl border border-slate-700 transition-all flex items-center gap-1.5 active:scale-95 shadow-2xs cursor-pointer"
+              title="Imprimer la fiche d'inventaire A4 pour comptage physique"
             >
               <Printer size={14} className="text-indigo-300" />
               <span>Fiche A4</span>
             </button>
 
-            <button
-              onClick={() => {
-                setPurchaseMode('batch');
-                if (batchItems.length === 0 || (batchItems.length === 1 && !batchItems[0].item_id)) {
-                  setBatchItems([{ item_id: '', quantity: '10', unit_cost: '' }]);
-                }
-                if (!batchSupplier && knownSuppliers.length > 0) setBatchSupplier(knownSuppliers[0]);
-                setShowPurchaseModal(true);
-              }}
-              className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 active:scale-95"
-            >
-              <FileText size={14} />
-              <span>Bon de Commande</span>
-            </button>
+            {/* BOUTON FUSIONNÉ : BON DE COMMANDE & APPROVISIONNEMENT */}
+            <div className="relative inline-flex items-stretch rounded-xl shadow-sm">
+              {/* Action Principale : Ouvre le Bon de Commande */}
+              <button
+                onClick={() => {
+                  setPurchaseMode('batch');
+                  if (batchItems.length === 0 || (batchItems.length === 1 && !batchItems[0].item_id)) {
+                    setBatchItems([{ item_id: '', quantity: '10', unit_cost: '' }]);
+                  }
+                  if (!batchSupplier && knownSuppliers.length > 0) setBatchSupplier(knownSuppliers[0]);
+                  setShowPurchaseModal(true);
+                  setShowSupplyMenu(false);
+                }}
+                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-l-xl transition-all flex items-center gap-2 active:scale-95 cursor-pointer border-r border-indigo-700/60"
+                title="Créer un bon de commande ou réapprovisionner le stock"
+              >
+                <Plus size={14} className="text-white" />
+                <span>Bon de Commande</span>
+                {lowStockCount > 0 && (
+                  <span 
+                    className="bg-amber-400 text-slate-950 font-black text-[10px] px-1.5 py-0.2 rounded-full shadow-2xs animate-pulse ml-0.5"
+                    title={`${lowStockCount} article(s) sous le seuil critique d'alerte`}
+                  >
+                    {lowStockCount}
+                  </span>
+                )}
+              </button>
 
-            <button
-              onClick={() => {
-                setPurchaseMode('single');
-                setPurchaseFormData({
-                  item_id: '',
-                  quantity: '10',
-                  unit_cost: '',
-                  supplier: knownSuppliers[0] || '',
-                  date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
-                });
-                setShowPurchaseModal(true);
-              }}
-              className="px-3 py-2 bg-white/10 hover:bg-white/20 text-white font-medium text-xs rounded-xl border border-white/20 transition-all flex items-center gap-1.5 active:scale-95"
-            >
-              <Plus size={14} />
-              <span>Achat Direct</span>
-            </button>
+              {/* Menu déroulant pour accès rapide (Ruptures ou Unitaire) */}
+              <button
+                type="button"
+                onClick={() => setShowSupplyMenu(!showSupplyMenu)}
+                className="px-2.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-indigo-100 hover:text-white rounded-r-xl transition-all flex items-center justify-center cursor-pointer active:scale-95"
+                title="Options rapides d'approvisionnement"
+                aria-expanded={showSupplyMenu}
+              >
+                <ChevronDown size={14} className={`transition-transform duration-200 ${showSupplyMenu ? 'rotate-180' : ''}`} />
+              </button>
+
+              {/* MENU DÉROULANT DES ACTIONS D'APPROVISIONNEMENT */}
+              {showSupplyMenu && (
+                <>
+                  <div 
+                    className="fixed inset-0 z-40" 
+                    onClick={() => setShowSupplyMenu(false)} 
+                  />
+                  <div className="absolute right-0 top-full mt-2 w-64 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-50 p-1.5 animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 border-b border-slate-800">
+                      Modes d'Approvisionnement
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPurchaseMode('batch');
+                        if (batchItems.length === 0 || (batchItems.length === 1 && !batchItems[0].item_id)) {
+                          setBatchItems([{ item_id: '', quantity: '10', unit_cost: '' }]);
+                        }
+                        if (!batchSupplier && knownSuppliers.length > 0) setBatchSupplier(knownSuppliers[0]);
+                        setShowPurchaseModal(true);
+                        setShowSupplyMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white hover:bg-slate-800/90 rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer"
+                    >
+                      <FileText size={15} className="text-indigo-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold">Bon de Commande Groupé</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Multi-articles avec totaux en temps réel</div>
+                      </div>
+                    </button>
+
+                    {lowStockCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowSupplyMenu(false);
+                          handleFillLowStockBatch();
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs font-semibold text-amber-300 hover:text-amber-200 hover:bg-amber-950/40 rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer mt-0.5 border border-amber-500/20"
+                      >
+                        <Zap size={15} className="text-amber-400 shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="font-bold flex items-center gap-1.5">
+                            <span>Pré-remplir Ruptures</span>
+                            <span className="bg-amber-400 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                              {lowStockCount}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-amber-400/70 font-normal">Charge tous les articles sous seuil</div>
+                        </div>
+                      </button>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPurchaseMode('single');
+                        setPurchaseFormData({
+                          item_id: '',
+                          quantity: '10',
+                          unit_cost: '',
+                          supplier: knownSuppliers[0] || '',
+                          date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0]
+                        });
+                        setShowPurchaseModal(true);
+                        setShowSupplyMenu(false);
+                      }}
+                      className="w-full text-left px-3 py-2 text-xs font-semibold text-slate-200 hover:text-white hover:bg-slate-800/90 rounded-xl transition-colors flex items-center gap-2.5 cursor-pointer mt-0.5"
+                    >
+                      <Plus size={15} className="text-slate-400 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="font-bold">Achat Direct Rapide</div>
+                        <div className="text-[10px] text-slate-400 font-normal">Entrée simple d'un seul article</div>
+                      </div>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
 
@@ -3595,7 +3704,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       {/* MODALE DE RÉAPPROVISIONNEMENT & COMMANDES FOURNISSEURS (HARMONISÉ ÉCOLE CONNECTÉE) */}
       {showPurchaseModal && (
         <div className="fixed inset-0 z-[1000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl lg:max-w-3xl rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200">
+          <div className={`bg-white w-full ${purchaseMode === 'batch' ? 'max-w-4xl lg:max-w-5xl' : 'max-w-2xl lg:max-w-3xl'} rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200 transition-all`}>
             
             {/* EN-TÊTE DENSE & HARMONISÉ (STYLE FEUILLE DE PRÉSENCE / POS) */}
             <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0 gap-2">
@@ -3991,17 +4100,17 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <button
                         type="button"
                         onClick={handleFillLowStockBatch}
-                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
-                        title="Importer tous les articles sous leur seuil d'alerte"
+                        className="px-2.5 py-1 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                        title="Importer tous les articles physiques sous leur seuil d'alerte"
                       >
                         <AlertTriangle size={12} className="text-amber-600" />
-                        <span className="hidden sm:inline">Importer</span> Stocks Bas
+                        <span>Importer Stocks Bas ({lowStockEligibleItems.length})</span>
                       </button>
 
                       <button
                         type="button"
                         onClick={() => setBatchItems([...batchItems, { item_id: '', quantity: '10', unit_cost: '' }])}
-                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
                       >
                         <Plus size={12} className="text-indigo-600" />
                         <span>Ajouter une ligne</span>
@@ -4009,18 +4118,112 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
 
+                  {/* EN-TÊTE DE COLONNES EXPLICITE SANS LA COLONNE SEUIL (ESPACE OPTIMISÉ POUR L'ARTICLE ET LES CHIFFRES) */}
+                  <div className="hidden md:grid md:grid-cols-[minmax(220px,2fr)_100px_115px_115px_135px_36px] gap-2 px-3 py-2 bg-slate-100/90 rounded-xl text-[10px] font-black uppercase tracking-wider text-slate-600 border border-slate-200/90 items-center">
+                    {/* Colonne 1: Article */}
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Package size={13} className="text-slate-500 shrink-0" />
+                      <span className="truncate">Article Référentiel</span>
+                    </div>
+
+                    {/* Colonne 2: Qté en Stock avec Info-bulle */}
+                    <div className="text-center">
+                      <div 
+                        className="group/tip relative inline-flex items-center justify-center gap-1 cursor-help w-full"
+                        title="Quantité physique actuellement disponible en réserve dans l'économat scolaire"
+                      >
+                        <span className="whitespace-nowrap font-black">Qté Stock</span>
+                        <Info size={11} className="text-slate-400 group-hover/tip:text-indigo-600 shrink-0 transition-colors" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50 pointer-events-none w-48 text-center">
+                          <div className="bg-slate-900 text-slate-100 text-[11px] font-medium leading-tight py-1.5 px-2.5 rounded-lg shadow-xl border border-slate-700/80">
+                            Quantité physique disponible actuellement en stock dans l'économat
+                          </div>
+                          <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700/80" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Colonne 3: Qté à Commander avec Info-bulle */}
+                    <div className="text-center">
+                      <div 
+                        className="group/tip relative inline-flex items-center justify-center gap-1 cursor-help w-full"
+                        title="Nombre d'unités à commander auprès du fournisseur pour cette livraison"
+                      >
+                        <span className="whitespace-nowrap text-indigo-950 font-black">À Commander</span>
+                        <Info size={11} className="text-indigo-500 group-hover/tip:text-indigo-700 shrink-0 transition-colors" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50 pointer-events-none w-48 text-center">
+                          <div className="bg-slate-900 text-slate-100 text-[11px] font-medium leading-tight py-1.5 px-2.5 rounded-lg shadow-xl border border-slate-700/80">
+                            Volume d'unités à commander auprès du fournisseur partenaire
+                          </div>
+                          <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700/80" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Colonne 4: Prix Achat Unit. avec Info-bulle */}
+                    <div className="text-center">
+                      <div 
+                        className="group/tip relative inline-flex items-center justify-center gap-1 cursor-help w-full"
+                        title="Prix d'achat unitaire négocié auprès du fournisseur en Gourdes HTG"
+                      >
+                        <span className="whitespace-nowrap font-black">Prix Unit.</span>
+                        <Info size={11} className="text-slate-400 group-hover/tip:text-indigo-600 shrink-0 transition-colors" />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/tip:flex flex-col items-center z-50 pointer-events-none w-48 text-center">
+                          <div className="bg-slate-900 text-slate-100 text-[11px] font-medium leading-tight py-1.5 px-2.5 rounded-lg shadow-xl border border-slate-700/80">
+                            Prix d'achat unitaire négocié avec le fournisseur (HTG)
+                          </div>
+                          <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700/80" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Colonne 5: Total Décaissement avec Info-bulle */}
+                    <div className="text-right pr-2">
+                      <div 
+                        className="group/tip relative inline-flex items-center justify-end gap-1 cursor-help w-full"
+                        title="Montant total décaissé pour cette ligne (Qté commandée × Coût d'achat)"
+                      >
+                        <span className="whitespace-nowrap font-black">Total Ligne</span>
+                        <Info size={11} className="text-rose-400 group-hover/tip:text-rose-600 shrink-0 transition-colors" />
+                        <div className="absolute bottom-full right-0 mb-2 hidden group-hover/tip:flex flex-col items-end z-50 pointer-events-none w-48 text-right">
+                          <div className="bg-slate-900 text-slate-100 text-[11px] font-medium leading-tight py-1.5 px-2.5 rounded-lg shadow-xl border border-slate-700/80">
+                            Total débité pour cette ligne (Qté × Coût Unit.)
+                          </div>
+                          <div className="w-2 h-2 bg-slate-900 rotate-45 -mt-1 border-r border-b border-slate-700/80 mr-2" />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Colonne 6: Action */}
+                    <div className="text-center">
+                      <span className="sr-only">Action</span>
+                    </div>
+                  </div>
+
                   {/* LISTE DENSE DES LIGNES DU LOT */}
-                  <div className="space-y-2 max-h-[220px] sm:max-h-[260px] overflow-y-auto pr-1">
+                  <div className="space-y-2 max-h-[230px] sm:max-h-[270px] overflow-y-auto pr-1">
                     {batchItems.map((row, idx) => {
                       const selItem = catalog.find(i => i.id === row.item_id);
                       const cost = parseFloat(row.unit_cost) || 0;
                       const qty = parseInt(row.quantity) || 0;
                       const lineTotal = cost * qty;
+                      const unitMeasure = selItem ? getItemUnitMeasure(selItem) : 'Unités';
+                      const isLowStock = selItem && (selItem.stock_quantity || 0) <= (selItem.low_stock_threshold || 5);
 
                       return (
-                        <div key={idx} className="p-2 sm:p-2.5 bg-slate-50/90 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 transition-all hover:border-slate-300">
-                          {/* Article SelectPill */}
-                          <div className="flex-1 min-w-0">
+                        <div key={idx} className="p-2 sm:p-2.5 bg-slate-50/90 hover:bg-white rounded-2xl border border-slate-200/80 flex flex-col md:grid md:grid-cols-[minmax(220px,2fr)_100px_115px_115px_135px_36px] md:items-center gap-2 transition-all hover:border-slate-300 shadow-2xs">
+                          {/* Colonne 1 : Article SelectPill & infos enrichies */}
+                          <div className="min-w-0">
+                            <div className="flex items-center justify-between mb-1 md:hidden">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Article #{idx + 1}</span>
+                              {selItem && (
+                                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                  isLowStock ? 'bg-rose-100 text-rose-800' : 'bg-slate-100 text-slate-700'
+                                }`}>
+                                  Stock: {selItem.stock_quantity || 0} {unitMeasure}
+                                </span>
+                              )}
+                            </div>
                             <SelectPill
                               options={[
                                 { value: '', label: 'Sélectionner un article...' },
@@ -4048,18 +4251,62 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               className="w-full"
                               searchable={catalog.length > 5}
                             />
+                            {selItem && (
+                              <div className="hidden md:flex items-center gap-1.5 mt-1 text-[10px] text-slate-500 font-medium truncate">
+                                <span className="text-slate-400">Réf : {selItem.category}</span>
+                                <span>•</span>
+                                <span className="text-slate-600 font-bold">{unitMeasure}</span>
+                                <span>•</span>
+                                <span 
+                                  className={`inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded font-medium ${
+                                    isLowStock 
+                                      ? 'bg-amber-100/90 text-amber-900 border border-amber-300/80 font-bold' 
+                                      : 'text-slate-400'
+                                  }`}
+                                  title={`Seuil d'alerte configuré pour cet article : ${selItem.low_stock_threshold || 5} ${unitMeasure}`}
+                                >
+                                  Seuil : ≤ {selItem.low_stock_threshold || 5}
+                                </span>
+                              </div>
+                            )}
                           </div>
 
-                          {/* Champs Numériques & Sous-total */}
-                          <div className="flex items-center gap-2 shrink-0">
-                            {/* Quantité */}
-                            <div className="w-20 sm:w-24">
+                          {/* AFFICHAGE DES 2 VALEURS SUR MOBILE (STOCK & COMMANDE) */}
+                          <div className="grid grid-cols-2 gap-2 p-2 bg-slate-100/70 rounded-xl border border-slate-200/80 md:hidden text-center">
+                            {/* Mobile 1: Qté en Stock */}
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-[9px] font-black uppercase text-slate-500 flex items-center gap-0.5 mb-1" title="Stock physique actuellement en magasin">
+                                Stock Actuel
+                                <Info size={9} className="text-slate-400" />
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-md text-[11px] font-mono font-black ${
+                                !selItem 
+                                  ? 'bg-slate-200 text-slate-400' 
+                                  : isLowStock 
+                                    ? 'bg-rose-100 text-rose-800' 
+                                    : 'bg-emerald-100 text-emerald-800'
+                              }`}>
+                                {selItem ? `${selItem.stock_quantity ?? 0} ${unitMeasure.slice(0, 3)}` : '—'}
+                              </span>
+                              {selItem && (
+                                <span className={`text-[9px] mt-0.5 font-medium ${isLowStock ? 'text-amber-700 font-bold' : 'text-slate-400'}`}>
+                                  Seuil: ≤{selItem.low_stock_threshold || 5}
+                                </span>
+                              )}
+                            </div>
+
+                            {/* Mobile 2: Qté à Commander */}
+                            <div className="flex flex-col items-center justify-center">
+                              <span className="text-[9px] font-black uppercase text-indigo-700 flex items-center gap-0.5 mb-1" title="Quantité à commander au fournisseur">
+                                À Commander
+                                <Info size={9} className="text-indigo-500" />
+                              </span>
                               <input
                                 required
                                 type="number"
                                 min="1"
                                 placeholder="Qté"
-                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs"
+                                className="w-full px-2 py-0.5 bg-white border border-indigo-200 focus:border-indigo-500 rounded-md text-xs font-mono font-bold text-center text-slate-900 outline-none"
                                 value={row.quantity}
                                 onChange={(e) => {
                                   const newRows = [...batchItems];
@@ -4068,31 +4315,124 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 }}
                               />
                             </div>
+                          </div>
 
-                            {/* Coût Unitaire Achat */}
-                            <div className="w-24 sm:w-28 relative">
+                          {/* Colonne 2 (Desktop) : Qté en Stock avec largeur confortable */}
+                          <div className="hidden md:flex flex-col items-center justify-center">
+                            <div 
+                              className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-black text-center shadow-2xs border transition-all cursor-help group/stock relative w-full ${
+                                !selItem 
+                                  ? 'bg-slate-100 text-slate-400 border-slate-200' 
+                                  : isLowStock 
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' 
+                                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                              }`}
+                              title={selItem ? `Stock actuel en magasin : ${selItem.stock_quantity ?? 0} ${unitMeasure} (Seuil d'alerte: ≤ ${selItem.low_stock_threshold || 5})` : "Sélectionnez un article"}
+                            >
+                              <span>{selItem ? (selItem.stock_quantity ?? 0) : '—'}</span>
+                              {selItem && <span className="text-[9px] font-sans font-semibold ml-0.5 opacity-75">{unitMeasure.slice(0, 3)}</span>}
+
+                              {/* Tooltip au survol */}
+                              {selItem && (
+                                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/stock:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
+                                  <span className="bg-slate-900 text-white text-[10px] font-medium py-1 px-2 rounded-md shadow-lg">
+                                    Stock disponible : {selItem.stock_quantity ?? 0} {unitMeasure} • Seuil : ≤{selItem.low_stock_threshold || 5}
+                                  </span>
+                                  <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Colonne 3 (Desktop) : Qté à Commander avec saisie ergonomique */}
+                          <div className="hidden md:flex flex-col items-center justify-center">
+                            <div className="relative flex items-center w-full group/order">
+                              <input
+                                required
+                                type="number"
+                                min="1"
+                                placeholder="Qté"
+                                className="w-full pl-2.5 pr-7 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs text-center hover:border-indigo-300 transition-colors"
+                                value={row.quantity}
+                                title="Volume d'unités à commander auprès du fournisseur"
+                                onChange={(e) => {
+                                  const newRows = [...batchItems];
+                                  newRows[idx].quantity = e.target.value;
+                                  setBatchItems(newRows);
+                                }}
+                              />
+                              <span className="absolute right-2 text-[9px] font-bold text-slate-400 font-sans pointer-events-none uppercase">
+                                {unitMeasure.slice(0, 3)}
+                              </span>
+
+                              {/* Tooltip au survol */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/order:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
+                                <span className="bg-slate-900 text-white text-[10px] font-medium py-1 px-2 rounded-md shadow-lg">
+                                  Volume à commander ({unitMeasure})
+                                </span>
+                                <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Colonne 4 (Desktop) : Coût unitaire achat HTG */}
+                          <div className="flex-1 md:flex-none">
+                            <div className="flex items-center justify-between mb-1 md:hidden">
+                              <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Prix Achat Unit.</span>
+                              <span className="text-[9px] text-indigo-600 font-bold">HTG</span>
+                            </div>
+                            <div className="relative flex items-center group/cost">
                               <input
                                 required
                                 type="number"
                                 step="0.01"
-                                placeholder="Coût (HTG)"
-                                className="w-full pl-2.5 pr-6 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs"
+                                placeholder="0.00"
+                                className="w-full pl-2.5 pr-7 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs text-right hover:border-indigo-300 transition-colors"
                                 value={row.unit_cost}
+                                title="Prix d'achat unitaire négocié en HTG"
                                 onChange={(e) => {
                                   const newRows = [...batchItems];
                                   newRows[idx].unit_cost = e.target.value;
                                   setBatchItems(newRows);
                                 }}
                               />
-                              <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-slate-400 font-mono pointer-events-none">G</span>
-                            </div>
+                              <span className="absolute right-2 text-[9px] font-bold text-indigo-600 font-mono pointer-events-none">
+                                G
+                              </span>
 
-                            {/* Sous-total */}
-                            <div className="w-24 text-right font-mono font-black text-xs text-rose-600">
-                              -{lineTotal.toLocaleString()} G
+                              {/* Tooltip au survol */}
+                              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/cost:flex flex-col items-center z-40 pointer-events-none whitespace-nowrap">
+                                <span className="bg-slate-900 text-white text-[10px] font-medium py-1 px-2 rounded-md shadow-lg">
+                                  Coût unitaire négocié HTG
+                                </span>
+                                <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
+                              </div>
                             </div>
+                          </div>
 
-                            {/* Bouton suppression de ligne */}
+                          {/* Colonne 5 (Desktop) : Sous-total ligne HTG avec affichage spacieux */}
+                          <div className="flex items-center justify-between md:justify-end gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 md:hidden">Total Ligne</span>
+                            <div className="text-right group/subtotal relative">
+                              <div className="px-2.5 py-1.5 bg-rose-50 border border-rose-200/80 rounded-xl font-mono font-black text-xs text-rose-700 whitespace-nowrap shadow-2xs cursor-help">
+                                -{lineTotal.toLocaleString()} <span className="text-[9px] font-sans font-bold text-rose-900">G</span>
+                              </div>
+                              <div className="hidden md:block text-[9px] text-slate-400 font-medium mt-0.5">
+                                {qty} × {cost.toLocaleString()} G
+                              </div>
+
+                              {/* Tooltip au survol */}
+                              <div className="absolute bottom-full right-0 mb-1.5 hidden group-hover/subtotal:flex flex-col items-end z-40 pointer-events-none whitespace-nowrap">
+                                <span className="bg-slate-900 text-white text-[10px] font-medium py-1 px-2 rounded-md shadow-lg">
+                                  Total décaissé : {lineTotal.toLocaleString()} Gourdes
+                                </span>
+                                <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5 mr-2" />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Colonne 6 (Desktop) : Action suppression */}
+                          <div className="flex items-center justify-end md:justify-center">
                             {batchItems.length > 1 ? (
                               <button
                                 type="button"
@@ -4100,10 +4440,10 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                                 title="Supprimer cette ligne"
                               >
-                                <Trash2 size={15} />
+                                <Trash2 size={16} />
                               </button>
                             ) : (
-                              <div className="w-[27px]" />
+                              <div className="w-[28px]" />
                             )}
                           </div>
                         </div>
@@ -4111,23 +4451,137 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     })}
                   </div>
 
+                  {/* PIED DE PAGE DU TABLEAU DU BON DE COMMANDE FOURNISSEUR GROUPÉ (CALCUL & AFFICHAGE EN TEMPS RÉEL) */}
+                  <div className="bg-slate-900 text-white rounded-2xl p-2.5 sm:px-3 sm:py-2.5 border border-slate-800 shadow-md">
+                    {/* Grille Desktop / Tablette : alignée colonne par colonne sur la nouvelle grille sans seuil */}
+                    <div className="hidden md:grid md:grid-cols-[minmax(220px,2fr)_100px_115px_115px_135px_36px] gap-2 items-center">
+                      {/* Colonne 1 : Libellé Totaux */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse shrink-0" />
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-[11px] font-black uppercase tracking-wider text-slate-100 truncate">
+                            Total du Bon de Commande
+                          </span>
+                          <span className="text-[9px] text-slate-400 font-medium truncate">
+                            {batchItems.filter(r => r.item_id).length} réf. active(s) sur {batchItems.length} ligne(s)
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Colonne 2 : Stock physique actuel total en réserve */}
+                      <div className="text-center">
+                        <div 
+                          className="text-[11px] font-mono font-bold text-slate-300 cursor-help group/totstock relative inline-flex items-center justify-center gap-0.5"
+                          title={`Stock cumulé des articles sélectionnés : ${batchTotalCurrentStock.toLocaleString()} unités`}
+                        >
+                          <span>{batchTotalCurrentStock.toLocaleString()}</span>
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 hidden group-hover/totstock:flex flex-col items-center z-50 pointer-events-none whitespace-nowrap">
+                            <span className="bg-slate-950 text-slate-200 text-[10px] font-medium py-1 px-2 rounded-md shadow-xl border border-slate-800">
+                              Stock physique cumulé en magasin : {batchTotalCurrentStock.toLocaleString()}
+                            </span>
+                            <div className="w-1.5 h-1.5 bg-slate-950 rotate-45 -mt-0.5 border-r border-b border-slate-800" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Colonne 3 : TOTAL DES QUANTITÉS À COMMANDER (EN TEMPS RÉEL) */}
+                      <div className="flex flex-col items-center justify-center">
+                        <div 
+                          className="w-full px-2 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-mono font-black shadow-sm text-center flex items-center justify-center gap-1 cursor-help group/totqty relative border border-indigo-400/40 transition-colors"
+                          title={`Total général des quantités à commander : ${batchTotalOrderQuantity.toLocaleString()} unités`}
+                        >
+                          <span>{batchTotalOrderQuantity.toLocaleString()}</span>
+                          <span className="text-[9px] font-sans font-bold text-indigo-200 uppercase">U</span>
+
+                          {/* Info-bulle explicative au survol */}
+                          <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover/totqty:flex flex-col items-center z-50 pointer-events-none whitespace-nowrap">
+                            <div className="bg-slate-950 text-white text-[10px] font-medium py-1.5 px-2.5 rounded-lg shadow-2xl border border-slate-700 leading-tight text-center">
+                              <span className="text-indigo-400 font-black tracking-wider uppercase text-[9px] block">Total Quantités à Commander</span>
+                              <div className="text-slate-100 font-mono font-bold text-xs mt-0.5">{batchTotalOrderQuantity.toLocaleString()} unité(s) au fournisseur</div>
+                            </div>
+                            <div className="w-2 h-2 bg-slate-950 rotate-45 -mt-1 border-r border-b border-slate-700" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Colonne 4 : Coût unitaire moyen (neutre) */}
+                      <div className="text-center text-slate-500 text-xs font-mono font-bold">
+                        —
+                      </div>
+
+                      {/* Colonne 5 : Total général du décaissement */}
+                      <div className="text-right pr-2">
+                        <div 
+                          className="px-2.5 py-1.5 bg-rose-950/80 border border-rose-800/80 rounded-xl text-rose-300 font-mono font-black text-xs whitespace-nowrap inline-block cursor-help group/totcost relative"
+                          title={`Montant total décaissé : ${batchTotalDisbursement.toLocaleString()} HTG`}
+                        >
+                          -{batchTotalDisbursement.toLocaleString()} <span className="text-[9px] font-sans font-bold text-rose-400">G</span>
+
+                          {/* Info-bulle explicative */}
+                          <div className="absolute bottom-full right-0 mb-2 hidden group-hover/totcost:flex flex-col items-end z-50 pointer-events-none whitespace-nowrap">
+                            <div className="bg-slate-950 text-white text-[10px] font-medium py-1.5 px-2.5 rounded-lg shadow-2xl border border-slate-700 text-right">
+                              <span className="text-rose-400 font-black tracking-wider uppercase text-[9px] block">Décaissement Global HTG</span>
+                              <div className="text-slate-100 font-mono font-bold text-xs mt-0.5">-{batchTotalDisbursement.toLocaleString()} HTG</div>
+                            </div>
+                            <div className="w-2 h-2 bg-slate-950 rotate-45 -mt-1 border-r border-b border-slate-700 mr-2" />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Colonne 6 : Espace action */}
+                      <div className="w-[28px]" />
+                    </div>
+
+                    {/* Affichage Mobile Responsive du pied de tableau */}
+                    <div className="md:hidden flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-indigo-400 animate-pulse" />
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-200">
+                            Pied de Page • Totaux
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 font-medium">
+                          {batchItems.filter(r => r.item_id).length} réf. sélectionnée(s)
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 bg-slate-950/60 p-2 rounded-xl border border-slate-800/80">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-bold text-indigo-300">Total à Commander :</span>
+                          <span className="px-2 py-0.5 bg-indigo-600 text-white rounded-md font-mono text-xs font-black">
+                            {batchTotalOrderQuantity.toLocaleString()} unités
+                          </span>
+                        </div>
+                        <div className="font-mono font-black text-xs text-rose-400">
+                          -{batchTotalDisbursement.toLocaleString()} G
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* RÉCAPITULATIF BUDGÉTAIRE GROUPÉ */}
-                  <div className="bg-gradient-to-br from-rose-50/90 via-slate-50 to-amber-50/40 p-3 sm:p-3.5 rounded-2xl border border-rose-200/80 shadow-2xs flex items-center justify-between gap-3">
-                    <div className="space-y-0.5">
+                  <div className="bg-gradient-to-br from-rose-50/90 via-slate-50 to-indigo-50/40 p-3 sm:p-3.5 rounded-2xl border border-rose-200/80 shadow-2xs flex items-center justify-between gap-3">
+                    <div className="space-y-1">
                       <div className="flex items-center gap-1.5">
                         <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
                         <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-rose-950">
                           Total Décaissement Fournisseur
                         </span>
                       </div>
-                      <p className="text-[10px] text-slate-500 font-medium">
-                        {batchItems.filter(r => r.item_id).length} référence(s) • {batchItems.reduce((acc, r) => acc + (parseInt(r.quantity) || 0), 0).toLocaleString()} unité(s) au total
-                      </p>
+                      <div className="flex items-center gap-2 text-[10px] text-slate-600 font-medium flex-wrap">
+                        <span>{batchItems.filter(r => r.item_id).length} référence(s)</span>
+                        <span>•</span>
+                        <span className="inline-flex items-center gap-1 bg-indigo-100/90 text-indigo-950 px-2 py-0.5 rounded-md font-bold border border-indigo-200/60">
+                          <span className="text-indigo-800">Total Quantités à Commander :</span>
+                          <strong className="font-mono text-indigo-950">{batchTotalOrderQuantity.toLocaleString()}</strong> unité(s)
+                        </span>
+                      </div>
                     </div>
                     
                     <div className="text-right shrink-0">
                       <div className="text-lg sm:text-xl font-black font-mono text-rose-700 tracking-tight flex items-baseline gap-1">
-                        <span>-{batchItems.reduce((acc, r) => acc + (parseInt(r.quantity) || 0) * (parseFloat(r.unit_cost) || 0), 0).toLocaleString()}</span>
+                        <span>-{batchTotalDisbursement.toLocaleString()}</span>
                         <span className="text-xs font-bold font-sans text-rose-900">HTG</span>
                       </div>
                     </div>
