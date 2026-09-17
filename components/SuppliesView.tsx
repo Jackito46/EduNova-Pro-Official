@@ -11,7 +11,8 @@ import {
   Truck, FileText, Building2, Layers, Zap, Wrench, Lock, LayoutGrid,
   SlidersHorizontal, BarChart3, Sliders, ArrowUpDown, ClipboardCheck,
   BookOpen, Shirt, PenTool, FlaskConical, Laptop, Armchair, Trophy,
-  FileSpreadsheet, Eye, Minus, Globe, Coins, GraduationCap, AlertTriangle, Info
+  FileSpreadsheet, Eye, Minus, Globe, Coins, GraduationCap, AlertTriangle, Info, AlertOctagon,
+  ArrowUpRight, ArrowDownLeft, TrendingDown
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
@@ -150,6 +151,41 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [editingPriceItem, setEditingPriceItem] = useState<{ id: string; label: string; current_price: number; new_price: string } | null>(null);
   const [updateCatalogPriceInPurchase, setUpdateCatalogPriceInPurchase] = useState<boolean>(false);
   const [newSellingPriceInPurchase, setNewSellingPriceInPurchase] = useState<string>('');
+  const [updateThresholdInPurchase, setUpdateThresholdInPurchase] = useState<boolean>(false);
+  const [newThresholdInPurchase, setNewThresholdInPurchase] = useState<string>('');
+  const [selectedItemAuditLogs, setSelectedItemAuditLogs] = useState<any[]>([]);
+  const [loadingItemLogs, setLoadingItemLogs] = useState<boolean>(false);
+
+  // Charger les logs d'audit pour l'article sélectionné dans le formulaire de réapprovisionnement
+  useEffect(() => {
+    if (!showPurchaseModal || !purchaseFormData.item_id) {
+      setSelectedItemAuditLogs([]);
+      return;
+    }
+
+    let isMounted = true;
+    const fetchItemAuditLogs = async () => {
+      setLoadingItemLogs(true);
+      try {
+        const { data, error } = await supabase
+          .from('audit_logs')
+          .select('*')
+          .eq('entity_id', purchaseFormData.item_id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        if (!error && data && isMounted) {
+          setSelectedItemAuditLogs(data);
+        }
+      } catch (err) {
+        console.warn('Erreur chargement audit_logs pour article:', err);
+      } finally {
+        if (isMounted) setLoadingItemLogs(false);
+      }
+    };
+
+    fetchItemAuditLogs();
+    return () => { isMounted = false; };
+  }, [showPurchaseModal, purchaseFormData.item_id]);
 
   const canEditPrices = useMemo(() => {
     const role = (user.role || '').toUpperCase();
@@ -296,7 +332,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       
       const { data: expensesData } = await expensesQuery
-        .ilike('label', '%ACHAT STOCK%')
+        .or('label.ilike.%ACHAT STOCK%,label.ilike.%AJUSTEMENT STOCK%')
         .order('expense_date', { ascending: false });
       setPurchaseHistory(expensesData || []);
 
@@ -496,6 +532,8 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }));
     setNewSellingPriceInPurchase(item?.unit_price ? item.unit_price.toString() : '');
     setUpdateCatalogPriceInPurchase(false);
+    setNewThresholdInPurchase(item?.low_stock_threshold !== undefined ? item.low_stock_threshold.toString() : '5');
+    setUpdateThresholdInPurchase(false);
   };
 
   const handleQuickRestock = (item: CatalogItem) => {
@@ -510,6 +548,8 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     });
     setNewSellingPriceInPurchase(item.unit_price ? item.unit_price.toString() : '');
     setUpdateCatalogPriceInPurchase(false);
+    setNewThresholdInPurchase(item.low_stock_threshold !== undefined ? item.low_stock_threshold.toString() : '5');
+    setUpdateThresholdInPurchase(false);
     setShowPurchaseModal(true);
   };
 
@@ -586,9 +626,24 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       toast.error("Veuillez indiquer ou sélectionner un fournisseur.");
       return;
     }
-    const validRows = batchItems.filter(r => r.item_id && parseInt(r.quantity) > 0);
+
+    // Validation stricte des quantités négatives
+    const hasNegativeQty = batchItems.some(r => r.item_id && parseFloat(r.quantity) < 0);
+    if (hasNegativeQty) {
+      toast.error("Validation bloquée : Aucune quantité ne peut être négative dans le bon de commande.");
+      return;
+    }
+
+    // Validation stricte des coûts négatifs
+    const hasNegativeCost = batchItems.some(r => r.item_id && parseFloat(r.unit_cost) < 0);
+    if (hasNegativeCost) {
+      toast.error("Validation bloquée : Le coût unitaire d'achat ne peut pas être négatif.");
+      return;
+    }
+
+    const validRows = batchItems.filter(r => r.item_id && parseFloat(r.quantity) > 0);
     if (validRows.length === 0) {
-      toast.error("Veuillez renseigner au moins un article avec une quantité supérieure à 0.");
+      toast.error("Veuillez renseigner au moins un article avec une quantité strictement supérieure à 0.");
       return;
     }
 
@@ -599,7 +654,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const item = catalog.find(i => i.id === row.item_id);
         if (!item) continue;
 
-        const qty = parseInt(row.quantity);
+        const qty = parseFloat(row.quantity);
         const cost = parseFloat(row.unit_cost) || 0;
         const total = qty * cost;
 
@@ -653,13 +708,34 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       toast.error("Veuillez indiquer ou sélectionner le partenaire fournisseur.");
       return;
     }
+
+    const rawQty = parseFloat(purchaseFormData.quantity);
+    if (isNaN(rawQty) || rawQty <= 0) {
+      toast.error("Validation bloquée : La quantité réceptionnée doit être un nombre strictement supérieur à 0.");
+      return;
+    }
+
+    const rawCost = parseFloat(purchaseFormData.unit_cost);
+    if (isNaN(rawCost) || rawCost < 0) {
+      toast.error("Validation bloquée : Le coût unitaire d'achat ne peut pas être négatif.");
+      return;
+    }
+
+    if (updateThresholdInPurchase) {
+      const thresh = parseFloat(newThresholdInPurchase);
+      if (isNaN(thresh) || thresh < 0) {
+        toast.error("Validation bloquée : Le seuil de stock critique ne peut pas être négatif.");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const item = catalog.find(i => i.id === purchaseFormData.item_id);
       if (!item) throw new Error("Article non trouvé");
 
-      const qty = parseInt(purchaseFormData.quantity);
-      const cost = parseFloat(purchaseFormData.unit_cost);
+      const qty = rawQty;
+      const cost = rawCost;
       const total = qty * cost;
 
       // 1. Create Expense
@@ -676,7 +752,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       if (expError) throw expError;
 
-      // 2. Update Stock & Optionally Selling Price
+      // 2. Update Stock & Optionally Selling Price & Critical Threshold
       const newStock = (item.stock_quantity || 0) + qty;
       const updatePayload: any = { stock_quantity: newStock };
       
@@ -684,7 +760,13 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (canEditPrices && updateCatalogPriceInPurchase && parseFloat(newSellingPriceInPurchase) > 0) {
         const newSelling = parseFloat(newSellingPriceInPurchase);
         updatePayload.unit_price = newSelling;
-        priceMsg = ` | Prix de vente mis à jour : ${newSelling.toLocaleString()} HTG`;
+        priceMsg += ` | Prix cession : ${newSelling.toLocaleString()} HTG`;
+      }
+
+      if (updateThresholdInPurchase && parseFloat(newThresholdInPurchase) >= 0) {
+        const newThresh = parseFloat(newThresholdInPurchase);
+        updatePayload.low_stock_threshold = newThresh;
+        priceMsg += ` | Seuil critique : ${newThresh}`;
       }
 
       const { error: stockError } = await supabase
@@ -702,7 +784,14 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         action: 'UPDATE',
         entity_type: 'settings',
         entity_id: item.id,
-        details: { type: 'stock_replenishment', qty, previous: item.stock_quantity, new: newStock, updatedSellingPrice: updatePayload.unit_price || item.unit_price }
+        details: { 
+          type: 'stock_replenishment', 
+          qty, 
+          previous: item.stock_quantity, 
+          new: newStock, 
+          updatedSellingPrice: updatePayload.unit_price || item.unit_price,
+          updatedLowStockThreshold: updatePayload.low_stock_threshold || item.low_stock_threshold
+        }
       });
 
       toast.success("Stock réapprovisionné et dépense enregistrée" + priceMsg);
@@ -731,6 +820,165 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     });
     return Array.from(unitsMap.entries()).filter(([_, count]) => count > 0);
   }, [catalog]);
+
+  // Article sélectionné pour le réapprovisionnement unitaire
+  const selectedRestockItemGlobal = useMemo(() => {
+    return catalog.find(i => i.id === purchaseFormData.item_id) || null;
+  }, [catalog, purchaseFormData.item_id]);
+
+  // Récapitulatif chronologique des 5 derniers mouvements de stock pour l'article sélectionné
+  const recentStockMovements = useMemo(() => {
+    if (!selectedRestockItemGlobal) return [];
+
+    const itemUnit = getItemUnitMeasure(selectedRestockItemGlobal);
+    const cleanItemLabel = (selectedRestockItemGlobal.label || '').trim().toLowerCase();
+    const movements: Array<{
+      id: string;
+      rawDate: string;
+      dateFormatted: string;
+      timeFormatted?: string;
+      type: 'IN' | 'OUT' | 'ADJUSTMENT';
+      typeLabel: string;
+      subType: string;
+      quantity: number;
+      formattedQuantity: string;
+      partnerOrBeneficiary: string;
+      subDetail?: string;
+      amountFormatted?: string;
+    }> = [];
+
+    // 1. Entrées de stock (Achats / Réceptions fournisseurs et ajustements positifs par dépenses)
+    purchaseHistory.forEach((p: any) => {
+      const pLabel = (p.label || '').toLowerCase();
+      if (!pLabel.includes(cleanItemLabel)) return;
+
+      const isAchat = pLabel.includes('achat stock');
+      const isAjustement = pLabel.includes('ajustement stock');
+
+      if (isAchat) {
+        let qty = 0;
+        const qMatch = p.label.match(/\((\d+(?:\.\d+)?)\s*unités?\)/i);
+        if (qMatch && qMatch[1]) {
+          qty = parseFloat(qMatch[1]);
+        } else {
+          const costMatch = p.description?.match(/Coût unitaire:\s*([\d.]+)/i);
+          if (costMatch && parseFloat(costMatch[1]) > 0 && p.amount) {
+            qty = Math.round(p.amount / parseFloat(costMatch[1]));
+          } else {
+            qty = 1;
+          }
+        }
+
+        let supplier = 'Fournisseur partenaire';
+        if (p.description) {
+          const suppMatch = p.description.match(/Fournisseur:\s*([^.]+)/i);
+          if (suppMatch && suppMatch[1]) supplier = suppMatch[1].trim();
+        }
+
+        const rawDate = p.expense_date || p.created_at || '';
+        const d = rawDate ? new Date(rawDate) : new Date();
+
+        movements.push({
+          id: `in-${p.id}`,
+          rawDate,
+          dateFormatted: d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }),
+          timeFormatted: rawDate.includes('T') ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : undefined,
+          type: 'IN',
+          typeLabel: 'Entrée Stock',
+          subType: 'Achat Fournisseur',
+          quantity: qty,
+          formattedQuantity: `+${formatQuantityWithUnit(qty, itemUnit)}`,
+          partnerOrBeneficiary: supplier,
+          subDetail: "Bon d'entrée magasin",
+          amountFormatted: p.amount ? `${Number(p.amount).toLocaleString()} HTG` : undefined
+        });
+      } else if (isAjustement) {
+        const diffMatch = p.label.match(/\(([+-]?\d+(?:\.\d+)?)\)/);
+        const diff = diffMatch ? parseFloat(diffMatch[1]) : 0;
+        const rawDate = p.expense_date || p.created_at || '';
+        const d = rawDate ? new Date(rawDate) : new Date();
+
+        movements.push({
+          id: `adj-exp-${p.id}`,
+          rawDate,
+          dateFormatted: d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }),
+          timeFormatted: rawDate.includes('T') ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : undefined,
+          type: 'ADJUSTMENT',
+          typeLabel: 'Régularisation',
+          subType: 'Inventaire physique',
+          quantity: diff,
+          formattedQuantity: `${diff >= 0 ? '+' : ''}${formatQuantityWithUnit(diff, itemUnit)}`,
+          partnerOrBeneficiary: p.description || 'Régularisation inventaire',
+          subDetail: 'Ajustement comptabilisé',
+          amountFormatted: p.amount ? `${Number(p.amount).toLocaleString()} HTG` : undefined
+        });
+      }
+    });
+
+    // 2. Sorties de stock (Ventes directes & Distributions élèves)
+    records.forEach((r: SupplyRecord) => {
+      const matchesId = r.catalog_item_id && r.catalog_item_id === selectedRestockItemGlobal.id;
+      const matchesLabel = r.description && r.description.trim().toLowerCase() === cleanItemLabel;
+      if (!matchesId && !matchesLabel) return;
+
+      const qty = r.quantity ? Math.abs(r.quantity) : 1;
+      const studentFullName = r.student ? `${r.student.first_name || ''} ${r.student.last_name || ''}`.trim() : '';
+      const studentClass = r.student?.class?.name ? `(${r.student.class.name})` : '';
+      const beneficiary = studentFullName ? `${studentFullName} ${studentClass}`.trim() : 'Élève / Cession comptoir';
+
+      const rawDate = r.created_at || '';
+      const d = rawDate ? new Date(rawDate) : new Date();
+
+      movements.push({
+        id: `out-${r.id}`,
+        rawDate,
+        dateFormatted: d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }),
+        timeFormatted: rawDate.includes('T') ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : undefined,
+        type: 'OUT',
+        typeLabel: 'Sortie Vente',
+        subType: 'Distribution Élève',
+        quantity: -qty,
+        formattedQuantity: `-${formatQuantityWithUnit(qty, itemUnit)}`,
+        partnerOrBeneficiary: beneficiary,
+        subDetail: r.transaction_id ? `Reçu #${r.transaction_id.slice(0, 8)}` : 'Distribution matérielle',
+        amountFormatted: r.total_amount ? `${Number(r.total_amount).toLocaleString()} HTG` : undefined
+      });
+    });
+
+    // 3. Ajustements d'inventaire manuels depuis audit_logs
+    selectedItemAuditLogs.forEach((log: any) => {
+      if (log.details?.type === 'inventory_manual_adjustment') {
+        const diff = typeof log.details.difference === 'number' ? log.details.difference : 0;
+        const rawDate = log.created_at || '';
+        const d = rawDate ? new Date(rawDate) : new Date();
+        const reason = log.details.reason || 'Comptage physique';
+
+        // Éviter les doublons avec les écritures de régularisation déjà enregistrées dans les dépenses
+        const isDuplicate = movements.some(m => m.type === 'ADJUSTMENT' && m.rawDate && rawDate && Math.abs(new Date(m.rawDate).getTime() - new Date(rawDate).getTime()) < 60000);
+        if (!isDuplicate) {
+          movements.push({
+            id: `adj-log-${log.id}`,
+            rawDate,
+            dateFormatted: d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' }),
+            timeFormatted: rawDate.includes('T') ? d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : undefined,
+            type: 'ADJUSTMENT',
+            typeLabel: 'Régularisation',
+            subType: 'Inventaire physique',
+            quantity: diff,
+            formattedQuantity: `${diff >= 0 ? '+' : ''}${formatQuantityWithUnit(diff, itemUnit)}`,
+            partnerOrBeneficiary: `Inventaire (${reason})`,
+            subDetail: `Stock : ${log.details.previousStock ?? '?'} ➔ ${log.details.newStock ?? '?'}`,
+            amountFormatted: undefined
+          });
+        }
+      }
+    });
+
+    // Trier chronologiquement par date décroissante et conserver uniquement les 5 derniers
+    return movements
+      .sort((a, b) => new Date(b.rawDate || 0).getTime() - new Date(a.rawDate || 0).getTime())
+      .slice(0, 5);
+  }, [selectedRestockItemGlobal, purchaseHistory, records, selectedItemAuditLogs]);
 
   const handleQuickSaveUnit = async (item: CatalogItem, newUnit: string) => {
     try {
@@ -832,6 +1080,16 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleSaveCatalog = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (parseFloat(catalogFormData.stock_quantity) < 0) {
+      toast.error("Validation bloquée : La quantité en stock ne peut pas être négative.");
+      return;
+    }
+    if (parseFloat(catalogFormData.low_stock_threshold) < 0) {
+      toast.error("Validation bloquée : Le seuil de réapprovisionnement ne peut pas être négatif.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const selectedUnit = catalogFormData.unit_measure || 'Pièce';
@@ -3649,92 +3907,137 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                        {/* Quantité en Stock Initial / Actuel */}
-                       <div className="space-y-1">
-                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-                           <span className="flex items-center gap-1">
-                             <span>Quantité en Stock</span>
-                             <span className="text-rose-500 font-black">*</span>
-                           </span>
-                           <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
-                             {catalogFormData.unit_measure || 'Pièce'}
-                           </span>
-                         </label>
-                         <div className="relative flex items-center">
-                           <input 
-                             required 
-                             type="number" 
-                             step="any" 
-                             placeholder="0"
-                             className="w-full pl-3 pr-20 py-1.5 bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
-                             value={catalogFormData.stock_quantity} 
-                             onChange={e => setCatalogFormData({...catalogFormData, stock_quantity: e.target.value})} 
-                           />
-                           <span className="absolute right-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 truncate max-w-[75px] pointer-events-none">
-                             {catalogFormData.unit_measure || 'Pièce'}
-                           </span>
-                         </div>
-                         <p className="text-[10px] text-slate-400">Unités physiquement disponibles à l'économat</p>
-                       </div>
+                       {(() => {
+                         const parsedStock = parseFloat(catalogFormData.stock_quantity);
+                         const isStockNegative = !isNaN(parsedStock) && parsedStock < 0;
+                         return (
+                           <div className="space-y-1">
+                             <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                               <span className="flex items-center gap-1">
+                                 <span>Quantité en Stock</span>
+                                 <span className="text-rose-500 font-black">*</span>
+                               </span>
+                               <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                                 {catalogFormData.unit_measure || 'Pièce'}
+                               </span>
+                             </label>
+                             <div className="relative flex items-center">
+                               <input 
+                                 required 
+                                 type="number" 
+                                 step="any" 
+                                 placeholder="0"
+                                 className={`w-full pl-3 pr-20 py-1.5 bg-white ${isStockNegative ? "text-rose-900 border-rose-500 ring-2 ring-rose-500/20" : "text-slate-900 border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"} rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs`} 
+                                 value={catalogFormData.stock_quantity} 
+                                 onChange={e => setCatalogFormData({...catalogFormData, stock_quantity: e.target.value})} 
+                               />
+                               <span className="absolute right-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 truncate max-w-[75px] pointer-events-none">
+                                 {catalogFormData.unit_measure || 'Pièce'}
+                               </span>
+                             </div>
+                             {isStockNegative ? (
+                               <p className="text-[10px] text-rose-600 font-bold flex items-center gap-1 animate-in fade-in">
+                                 <AlertOctagon size={11} className="shrink-0" />
+                                 Le stock ne peut pas être négatif ({catalogFormData.stock_quantity})
+                               </p>
+                             ) : (
+                               <p className="text-[10px] text-slate-400">Unités physiquement disponibles à l'économat</p>
+                             )}
+                           </div>
+                         );
+                       })()}
 
                        {/* Seuil Alerte (Stock Bas) */}
-                       <div className="space-y-1">
-                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-700 flex items-center justify-between">
-                           <span className="flex items-center gap-1">
-                             <AlertTriangle size={11} className="text-rose-500" />
-                             <span>Seuil de Réapprovisionnement</span>
-                             <span className="text-rose-500 font-black">*</span>
-                           </span>
-                           <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md">
-                             {catalogFormData.unit_measure || 'Pièce'}
-                           </span>
-                         </label>
-                         <div className="relative flex items-center">
-                           <input 
-                             required 
-                             type="number" 
-                             step="any" 
-                             placeholder="5"
-                             className="w-full pl-3 pr-20 py-1.5 bg-white text-rose-900 border border-rose-200 hover:border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
-                             value={catalogFormData.low_stock_threshold} 
-                             onChange={e => setCatalogFormData({...catalogFormData, low_stock_threshold: e.target.value})} 
-                           />
-                           <span className="absolute right-2 px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-lg text-[10px] font-bold text-rose-600 truncate max-w-[75px] pointer-events-none">
-                             {catalogFormData.unit_measure || 'Pièce'}
-                           </span>
-                         </div>
-                         <p className="text-[10px] text-rose-500/80">Déclenche un signal visuel dès que le stock atteint ce niveau</p>
-                       </div>
+                       {(() => {
+                         const parsedThresh = parseFloat(catalogFormData.low_stock_threshold);
+                         const isThreshNegative = !isNaN(parsedThresh) && parsedThresh < 0;
+                         return (
+                           <div className="space-y-1">
+                             <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-700 flex items-center justify-between">
+                               <span className="flex items-center gap-1">
+                                 <AlertTriangle size={11} className="text-rose-500" />
+                                 <span>Seuil de Réapprovisionnement</span>
+                                 <span className="text-rose-500 font-black">*</span>
+                               </span>
+                               <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md">
+                                 {catalogFormData.unit_measure || 'Pièce'}
+                               </span>
+                             </label>
+                             <div className="relative flex items-center">
+                               <input 
+                                 required 
+                                 type="number" 
+                                 step="any" 
+                                 placeholder="5"
+                                 className={`w-full pl-3 pr-20 py-1.5 bg-white ${isThreshNegative ? "text-rose-900 border-rose-500 ring-2 ring-rose-500/20" : "text-rose-900 border-rose-200 hover:border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20"} rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs`} 
+                                 value={catalogFormData.low_stock_threshold} 
+                                 onChange={e => setCatalogFormData({...catalogFormData, low_stock_threshold: e.target.value})} 
+                               />
+                               <span className="absolute right-2 px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-lg text-[10px] font-bold text-rose-600 truncate max-w-[75px] pointer-events-none">
+                                 {catalogFormData.unit_measure || 'Pièce'}
+                               </span>
+                             </div>
+                             {isThreshNegative ? (
+                               <p className="text-[10px] text-rose-600 font-bold flex items-center gap-1 animate-in fade-in">
+                                 <AlertOctagon size={11} className="shrink-0" />
+                                 Le seuil critique ne peut pas être négatif ({catalogFormData.low_stock_threshold})
+                               </p>
+                             ) : (
+                               <p className="text-[10px] text-rose-500/80">Déclenche un signal visuel dès que le stock atteint ce niveau</p>
+                             )}
+                           </div>
+                         );
+                       })()}
                      </div>
                    </div>
 
                  </div>
 
-                 {/* PIED DE FORMULAIRE HARMONISÉ & COMPACT */}
-                 <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
-                   <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
-                     <ShieldCheck size={13} className="text-emerald-600" />
-                     <span>Enregistrement certifié dans le référentiel de l'établissement</span>
-                   </div>
+                 {/* PIED DE FORMULAIRE HARMONISÉ & COMPACT AVEC VALIDATION */}
+                 {(() => {
+                   const parsedStock = parseFloat(catalogFormData.stock_quantity);
+                   const isStockNegative = !isNaN(parsedStock) && parsedStock < 0;
+                   const parsedThresh = parseFloat(catalogFormData.low_stock_threshold);
+                   const isThreshNegative = !isNaN(parsedThresh) && parsedThresh < 0;
+                   const isBlocked = isSubmitting || isStockNegative || isThreshNegative;
 
-                   <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                     <button 
-                       type="button"
-                       onClick={() => setShowCatalogModal(false)} 
-                       className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
-                     >
-                       Annuler
-                     </button>
-                     
-                     <button 
-                       disabled={isSubmitting} 
-                       type="submit" 
-                       className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                     >
-                       {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                       <span>{catalogFormData.id ? 'Mettre à Jour la Fiche' : 'Enregistrer au Référentiel'}</span>
-                     </button>
-                   </div>
-                 </div>
+                   return (
+                     <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+                       <div className="flex items-center gap-2 flex-wrap">
+                         <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                           <ShieldCheck size={13} className="text-emerald-600" />
+                           <span>Enregistrement certifié dans le référentiel de l'établissement</span>
+                         </div>
+
+                         {(isStockNegative || isThreshNegative) && (
+                           <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center gap-1 animate-in fade-in">
+                             <AlertOctagon size={12} className="shrink-0 text-rose-600" />
+                             <span>Valeur négative interdite ({isStockNegative ? 'Stock' : ''}{isStockNegative && isThreshNegative ? ' & ' : ''}{isThreshNegative ? 'Seuil' : ''})</span>
+                           </span>
+                         )}
+                       </div>
+
+                       <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                         <button 
+                           type="button"
+                           onClick={() => setShowCatalogModal(false)} 
+                           className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
+                         >
+                           Annuler
+                         </button>
+                         
+                         <button 
+                           disabled={isBlocked} 
+                           type="submit" 
+                           className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-indigo-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                         >
+                           {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                           <span>{catalogFormData.id ? 'Mettre à Jour la Fiche' : 'Enregistrer au Référentiel'}</span>
+                         </button>
+                       </div>
+                     </div>
+                   );
+                 })()}
               </form>
            </div>
         </div>
@@ -3831,7 +4134,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       {/* MODALE DE RÉAPPROVISIONNEMENT & COMMANDES FOURNISSEURS (HARMONISÉ ÉCOLE CONNECTÉE) */}
       {showPurchaseModal && (
         <div className="fixed inset-0 z-[1000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-200">
-          <div className={`bg-white w-full ${purchaseMode === 'batch' ? 'max-w-4xl lg:max-w-5xl' : 'max-w-2xl lg:max-w-3xl'} rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200 transition-all`}>
+          <div className={`bg-white w-full ${purchaseMode === 'batch' ? 'max-w-4xl lg:max-w-5xl' : 'max-w-2xl sm:max-w-3xl lg:max-w-4xl'} rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200 transition-all`}>
             
             {/* EN-TÊTE DENSE & HARMONISÉ (STYLE FEUILLE DE PRÉSENCE / POS) */}
             <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-900 text-white flex items-center justify-between border-b border-slate-800 shrink-0 gap-2">
@@ -3980,169 +4283,326 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   {/* GROUPE 3 : TARIFICATION, QUANTITÉS & MARGE */}
-                  <div className="bg-slate-50/70 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 space-y-2.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
-                        <DollarSign size={13} className="text-emerald-600" />
-                        <span>Tarification d'Acquisition & Contrôle de Marge</span>
-                      </div>
-                      <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider">
-                        Devise : HTG (Gourdes)
-                      </span>
-                    </div>
+                  {(() => {
+                    const selectedRestockItem = catalog.find(i => i.id === purchaseFormData.item_id);
+                    const selectedRestockUnit = selectedRestockItem ? getItemUnitMeasure(selectedRestockItem) : 'Unités';
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      {/* Coût Unitaire d'Achat */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            <span>Coût Unitaire d'Achat</span>
-                            <span className="text-rose-500 font-black">*</span>
-                          </span>
-                          {purchaseFormData.item_id && (() => {
-                            const sel = catalog.find(i => i.id === purchaseFormData.item_id);
-                            const unit = sel ? getItemUnitMeasure(sel) : '';
-                            return unit ? (
-                              <span className="text-[9px] font-bold text-slate-500">
-                                / {unit}
-                              </span>
-                            ) : null;
-                          })()}
-                        </label>
-                        <div className="relative flex items-center">
-                          <input 
-                            required
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            className="w-full pl-3 pr-12 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
-                            value={purchaseFormData.unit_cost}
-                            onChange={(e) => setPurchaseFormData({ ...purchaseFormData, unit_cost: e.target.value })}
-                          />
-                          <span className="absolute right-2.5 text-[10px] font-black text-slate-500 font-mono pointer-events-none">HTG</span>
-                        </div>
-                      </div>
+                    // Validation en temps réel
+                    const parsedQty = parseFloat(purchaseFormData.quantity);
+                    const isQtyNegative = !isNaN(parsedQty) && parsedQty < 0;
+                    const isQtyZero = !isNaN(parsedQty) && parsedQty === 0;
+                    const isQtyInvalid = isNaN(parsedQty) || parsedQty <= 0;
 
-                      {/* Quantité Réapprovisionnée */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-                          <span className="flex items-center gap-1">
-                            <span>Quantité Réceptionnée</span>
-                            <span className="text-rose-500 font-black">*</span>
-                          </span>
-                          {purchaseFormData.item_id && (() => {
-                            const sel = catalog.find(i => i.id === purchaseFormData.item_id);
-                            const unit = sel ? getItemUnitMeasure(sel) : '';
-                            return unit ? (
-                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
-                                <span className="text-slate-400 font-normal">Unité :</span>
-                                <strong>{unit}</strong>
-                              </span>
-                            ) : null;
-                          })()}
-                        </label>
-                        <div className="relative flex items-center">
-                          <input 
-                            required
-                            type="number"
-                            min="0.01"
-                            step="any"
-                            placeholder="10"
-                            className="w-full pl-3 pr-24 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
-                            value={purchaseFormData.quantity}
-                            onChange={(e) => setPurchaseFormData({ ...purchaseFormData, quantity: e.target.value })}
-                          />
-                          <div className="absolute right-2 px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] font-black text-indigo-700 pointer-events-none flex items-center gap-1 max-w-[85px] truncate shadow-2xs">
-                            <Package size={10} className="text-indigo-500 shrink-0" />
-                            <span className="truncate">
-                              {(() => {
-                                const sel = catalog.find(i => i.id === purchaseFormData.item_id);
-                                return sel ? getItemUnitMeasure(sel) : 'Unités';
-                              })()}
-                            </span>
+                    const parsedCost = parseFloat(purchaseFormData.unit_cost);
+                    const isCostNegative = !isNaN(parsedCost) && parsedCost < 0;
+
+                    const currentStock = selectedRestockItem?.stock_quantity ?? 0;
+                    const defaultThreshold = selectedRestockItem?.low_stock_threshold ?? 5;
+                    const parsedNewThreshold = parseFloat(newThresholdInPurchase);
+                    const effectiveThreshold = updateThresholdInPurchase ? parsedNewThreshold : defaultThreshold;
+
+                    const isThresholdNegative = updateThresholdInPurchase && !isNaN(parsedNewThreshold) && parsedNewThreshold < 0;
+                    const isThresholdEmpty = updateThresholdInPurchase && newThresholdInPurchase.trim() === '';
+                    const isThresholdStrictlyIncoherent = isThresholdNegative || (updateThresholdInPurchase && (isThresholdEmpty || isNaN(parsedNewThreshold)));
+
+                    const projectedStock = isQtyInvalid ? currentStock : currentStock + parsedQty;
+                    const isThresholdExceedingProjected = !isQtyInvalid && !isNaN(effectiveThreshold) && effectiveThreshold >= projectedStock;
+                    const isProjectedStockBelowThreshold = !isQtyInvalid && !isNaN(effectiveThreshold) && projectedStock <= effectiveThreshold;
+
+                    return (
+                      <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/90 space-y-2.5 shadow-2xs">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
+                            <DollarSign size={13} className="text-emerald-600 shrink-0" />
+                            <span>Tarification d'Acquisition & Contrôle de Marge</span>
                           </div>
+                          <span className="text-[9px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 shadow-2xs">
+                            Devise : HTG (Gourdes)
+                          </span>
                         </div>
-                      </div>
 
-                      {/* Prix de Vente Élèves (Actuel au Catalogue) */}
-                      <div className="space-y-1">
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
-                          <span>Prix de Cession Élève</span>
-                          <span className="text-[10px] text-slate-400 font-normal">Référentiel</span>
-                        </label>
-                        <div className="relative flex items-center">
-                          <input 
-                            disabled
-                            type="text"
-                            className="w-full pl-3 pr-10 py-1.5 bg-slate-100/90 border border-slate-200 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-700 cursor-not-allowed shadow-2xs"
-                            value={(catalog.find(i => i.id === purchaseFormData.item_id)?.unit_price || 0).toLocaleString()}
-                          />
-                          <span className="absolute right-2.5 text-[10px] font-bold text-slate-400 font-mono">HTG</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Analyse de Marge en Temps Réel */}
-                    {purchaseFormData.item_id && (() => {
-                      const selItem = catalog.find(i => i.id === purchaseFormData.item_id);
-                      if (!selItem) return null;
-                      const sell = selItem.unit_price || 0;
-                      const buy = parseFloat(purchaseFormData.unit_cost) || 0;
-                      const qty = parseInt(purchaseFormData.quantity) || 0;
-                      const unitMargin = sell - buy;
-                      const totalMargin = unitMargin * qty;
-                      const pct = buy > 0 ? ((unitMargin / buy) * 100).toFixed(1) : '0';
-                      const isProfitable = unitMargin >= 0;
-                      const unitStr = getItemUnitMeasure(selItem);
-                      return (
-                        <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
-                          <span className="text-[11px] text-slate-600 font-bold">Marge brute d'exploitation :</span>
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-mono font-black ${isProfitable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
-                              {isProfitable ? '+' : ''}{unitMargin.toLocaleString()} HTG / {unitStr} ({pct}%)
-                            </span>
-                            {qty > 1 && (
-                              <span className="text-[10px] text-slate-500 font-medium">
-                                Total : <strong className={`font-mono ${isProfitable ? 'text-emerald-700' : 'text-rose-700'}`}>{isProfitable ? '+' : ''}{totalMargin.toLocaleString()} HTG</strong>
+                        {/* Grille responsive et parfaitement alignée des 3 textboxes */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 items-end">
+                          {/* Coût Unitaire d'Achat */}
+                          <div className="flex flex-col space-y-1">
+                            <div className="h-6 flex items-center justify-between gap-1">
+                              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 truncate" title="Coût Unitaire d'Achat">
+                                Coût Achat Unit. <span className="text-rose-500 font-black">*</span>
+                              </span>
+                              {selectedRestockItem && (
+                                <span className="text-[9px] font-bold text-slate-500 bg-slate-100/90 border border-slate-200/80 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap" title={`Unité : ${selectedRestockUnit}`}>
+                                  / {selectedRestockUnit}
+                                </span>
+                              )}
+                            </div>
+                            <div className="relative flex items-center w-full">
+                              <input 
+                                required
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                placeholder="0.00"
+                                className={`w-full h-10 pl-3 pr-14 bg-white border ${isCostNegative ? 'border-rose-500 ring-2 ring-rose-500/20 text-rose-900' : 'border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-slate-900'} rounded-xl text-xs sm:text-sm font-black font-mono outline-none transition-all shadow-2xs`}
+                                value={purchaseFormData.unit_cost}
+                                onChange={(e) => setPurchaseFormData({ ...purchaseFormData, unit_cost: e.target.value })}
+                              />
+                              <span className="absolute right-2 px-2 py-1 bg-slate-100/90 border border-slate-200 rounded-lg text-[10px] font-black text-slate-600 font-mono pointer-events-none shadow-2xs">
+                                HTG
+                              </span>
+                            </div>
+                            {isCostNegative && (
+                              <span className="text-[10px] font-bold text-rose-600 flex items-center gap-1 mt-0.5 animate-in fade-in">
+                                <AlertCircle size={11} className="shrink-0" />
+                                Coût négatif interdit
                               </span>
                             )}
                           </div>
-                        </div>
-                      );
-                    })()}
 
-                    {/* Ajustement Optionnel du Prix de Vente Élèves si habilité */}
-                    {canEditPrices && purchaseFormData.item_id && (
-                      <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input 
-                            type="checkbox" 
-                            checked={updateCatalogPriceInPurchase} 
-                            onChange={e => setUpdateCatalogPriceInPurchase(e.target.checked)}
-                            className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
-                          />
-                          <span className="text-[11px] font-bold text-slate-700">
-                            Ajuster simultanément le prix de cession au référentiel
-                          </span>
-                        </label>
-                        {updateCatalogPriceInPurchase && (
-                          <div className="relative w-full sm:w-44 flex items-center animate-in fade-in duration-200">
-                            <input 
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              placeholder="Nouveau prix..."
-                              className="w-full pl-3 pr-10 py-1 bg-white border border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs font-bold font-mono text-slate-900 outline-none shadow-2xs"
-                              value={newSellingPriceInPurchase}
-                              onChange={e => setNewSellingPriceInPurchase(e.target.value)}
-                            />
-                            <span className="absolute right-2.5 text-[10px] font-bold text-slate-500 font-mono">HTG</span>
+                          {/* Quantité Réceptionnée */}
+                          <div className="flex flex-col space-y-1">
+                            <div className="h-6 flex items-center justify-between gap-1">
+                              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 truncate" title="Quantité Réceptionnée">
+                                Qté Réceptionnée <span className="text-rose-500 font-black">*</span>
+                              </span>
+                              {selectedRestockItem && (
+                                <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap shadow-2xs" title={`Unité de mesure : ${selectedRestockUnit}`}>
+                                  {selectedRestockUnit}
+                                </span>
+                              )}
+                            </div>
+                            <div className="relative flex items-center w-full">
+                              <input 
+                                required
+                                type="number"
+                                min="0.01"
+                                step="any"
+                                placeholder="10"
+                                className={`w-full h-10 pl-3 pr-24 bg-white border ${isQtyNegative ? 'border-rose-500 ring-2 ring-rose-500/20 text-rose-900' : isQtyZero ? 'border-amber-400 ring-2 ring-amber-400/20 text-amber-900' : 'border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-slate-900'} rounded-xl text-xs sm:text-sm font-black font-mono outline-none transition-all shadow-2xs`}
+                                value={purchaseFormData.quantity}
+                                onChange={(e) => setPurchaseFormData({ ...purchaseFormData, quantity: e.target.value })}
+                              />
+                              <div className="absolute right-2 px-2 py-1 bg-indigo-50 border border-indigo-200/80 rounded-lg text-[10px] font-black text-indigo-700 pointer-events-none flex items-center gap-1 max-w-[95px] shadow-2xs">
+                                <Package size={11} className="text-indigo-600 shrink-0" />
+                                <span className="truncate" title={selectedRestockUnit}>
+                                  {selectedRestockUnit}
+                                </span>
+                              </div>
+                            </div>
+                            {isQtyNegative && (
+                              <span className="text-[10px] font-bold text-rose-600 flex items-center gap-1 mt-0.5 animate-in fade-in">
+                                <AlertCircle size={11} className="shrink-0" />
+                                Quantité négative interdite ({purchaseFormData.quantity})
+                              </span>
+                            )}
+                            {isQtyZero && (
+                              <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1 mt-0.5 animate-in fade-in">
+                                <AlertTriangle size={11} className="shrink-0" />
+                                Quantité &gt; 0 obligatoire
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Prix de Vente Élèves (Actuel au Catalogue) */}
+                          <div className="flex flex-col space-y-1">
+                            <div className="h-6 flex items-center justify-between gap-1">
+                              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 truncate" title="Prix de Cession Élève">
+                                Prix Cession Élève
+                              </span>
+                              <span className="text-[9px] font-semibold text-slate-400 bg-slate-100/80 border border-slate-200/60 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                                Référentiel
+                              </span>
+                            </div>
+                            <div className="relative flex items-center w-full">
+                              <input 
+                                disabled
+                                type="text"
+                                className="w-full h-10 pl-3 pr-14 bg-slate-100/80 border border-slate-200 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-600 cursor-not-allowed shadow-2xs select-none"
+                                value={(selectedRestockItem?.unit_price || 0).toLocaleString()}
+                              />
+                              <span className="absolute right-2 px-2 py-1 bg-slate-200/80 border border-slate-300/80 rounded-lg text-[10px] font-black text-slate-500 font-mono pointer-events-none shadow-2xs">
+                                HTG
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Analyse de Marge en Temps Réel */}
+                        {selectedRestockItem && (() => {
+                          const sell = selectedRestockItem.unit_price || 0;
+                          const buy = parseFloat(purchaseFormData.unit_cost) || 0;
+                          const qty = parseFloat(purchaseFormData.quantity) || 0;
+                          const unitMargin = sell - buy;
+                          const totalMargin = unitMargin * qty;
+                          const pct = buy > 0 ? ((unitMargin / buy) * 100).toFixed(1) : '0';
+                          const isProfitable = unitMargin >= 0;
+                          return (
+                            <div className="pt-2 border-t border-slate-200/70 flex flex-wrap items-center justify-between gap-2 text-xs">
+                              <span className="text-[11px] text-slate-600 font-bold">Marge brute d'exploitation :</span>
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-mono font-black shadow-2xs ${isProfitable ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                                  {isProfitable ? '+' : ''}{unitMargin.toLocaleString()} HTG / {selectedRestockUnit} ({pct}%)
+                                </span>
+                                {qty > 1 && (
+                                  <span className="text-[10px] text-slate-500 font-medium">
+                                    Total : <strong className={`font-mono ${isProfitable ? 'text-emerald-700' : 'text-rose-700'}`}>{isProfitable ? '+' : ''}{totalMargin.toLocaleString()} HTG</strong>
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
+                        {/* CONTRÔLE DE COHÉRENCE DU SEUIL DE STOCK CRITIQUE */}
+                        {selectedRestockItem && (
+                          <div className="pt-2.5 border-t border-slate-200/80 space-y-2">
+                            <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-600">
+                              <span className="flex items-center gap-1">
+                                <Package size={12} className="text-indigo-600" />
+                                <span>Contrôle de Cohérence Stock & Seuil d'Alerte</span>
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-slate-500">
+                                Seuil d'alerte : {effectiveThreshold} {selectedRestockUnit}
+                              </span>
+                            </div>
+
+                            {/* Baromètre de Projection du Stock */}
+                            <div className="grid grid-cols-3 gap-2 p-2 bg-white/90 border border-slate-200/90 rounded-xl text-center shadow-2xs">
+                              <div className="flex flex-col items-center">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">Stock Actuel</span>
+                                <span className="text-xs sm:text-sm font-mono font-black text-slate-700">
+                                  {currentStock} <span className="text-[10px] font-sans font-medium text-slate-500">{selectedRestockUnit}</span>
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-center border-x border-slate-100">
+                                <span className="text-[9px] font-bold text-indigo-500 uppercase">Entrée Prévue</span>
+                                <span className={`text-xs sm:text-sm font-mono font-black ${isQtyNegative ? 'text-rose-600' : 'text-indigo-600'}`}>
+                                  {isQtyNegative ? parsedQty : `+${isQtyInvalid ? 0 : parsedQty}`} <span className="text-[10px] font-sans font-medium text-indigo-400">{selectedRestockUnit}</span>
+                                </span>
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="text-[9px] font-bold text-slate-400 uppercase">Stock Projeté</span>
+                                <span className={`text-xs sm:text-sm font-mono font-black ${isProjectedStockBelowThreshold ? 'text-amber-600' : 'text-emerald-600'}`}>
+                                  {projectedStock} <span className="text-[10px] font-sans font-medium text-slate-500">{selectedRestockUnit}</span>
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Alertes de cohérence en temps réel */}
+                            {isQtyNegative && (
+                              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-xs text-rose-900 animate-in fade-in">
+                                <AlertOctagon size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="font-bold">Validation bloquée : </strong>
+                                  La quantité entrée est négative ({purchaseFormData.quantity}). Un réapprovisionnement ne peut être qu'un apport positif de stock.
+                                </div>
+                              </div>
+                            )}
+
+                            {isThresholdStrictlyIncoherent && (
+                              <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl flex items-start gap-2 text-xs text-rose-900 animate-in fade-in">
+                                <AlertOctagon size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="font-bold">Incohérence critique bloquante : </strong>
+                                  Le seuil de réapprovisionnement ne peut pas être négatif ({newThresholdInPurchase}). Veuillez saisir une valeur &ge; 0 pour débloquer la validation.
+                                </div>
+                              </div>
+                            )}
+
+                            {!isQtyInvalid && !isThresholdStrictlyIncoherent && isThresholdExceedingProjected && (
+                              <div className="p-2.5 bg-amber-50 border border-amber-200/90 rounded-xl flex items-start gap-2 text-xs text-amber-900 animate-in fade-in">
+                                <AlertTriangle size={15} className="text-amber-600 shrink-0 mt-0.5" />
+                                <div>
+                                  <strong className="font-bold">Avertissement de cohérence : </strong>
+                                  Le stock après entrée ({projectedStock} {selectedRestockUnit}) restera inférieur ou égal au seuil critique d'alerte ({effectiveThreshold} {selectedRestockUnit}). L'article demeurera en alerte de réapprovisionnement.
+                                </div>
+                              </div>
+                            )}
+
+                            {!isQtyInvalid && !isThresholdStrictlyIncoherent && !isThresholdExceedingProjected && (
+                              <div className="p-2 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center gap-2 text-xs text-emerald-900 animate-in fade-in">
+                                <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                                <div>
+                                  <span className="font-bold">Niveau de stock sécurisé : </span> Le stock projeté ({projectedStock} {selectedRestockUnit}) dépasse le seuil critique ({effectiveThreshold} {selectedRestockUnit}).
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Ajustement du seuil de stock critique directement depuis le réapprovisionnement */}
+                            <div className="pt-1.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                              <label className="flex items-center gap-2 cursor-pointer select-none">
+                                <input 
+                                  type="checkbox" 
+                                  checked={updateThresholdInPurchase} 
+                                  onChange={e => {
+                                    setUpdateThresholdInPurchase(e.target.checked);
+                                    if (e.target.checked && (!newThresholdInPurchase || newThresholdInPurchase === '0')) {
+                                      setNewThresholdInPurchase(selectedRestockItem?.low_stock_threshold !== undefined ? selectedRestockItem.low_stock_threshold.toString() : '5');
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                                />
+                                <span className="text-[11px] font-bold text-slate-700">
+                                  Ajuster le seuil de stock critique pour cet article
+                                </span>
+                              </label>
+                              {updateThresholdInPurchase && (
+                                <div className="relative w-full sm:w-44 flex items-center animate-in fade-in duration-200">
+                                  <input 
+                                    type="number" 
+                                    step="any" 
+                                    min="0" 
+                                    placeholder="Seuil..."
+                                    className={`w-full pl-3 pr-16 py-1 bg-white border ${isThresholdNegative ? 'border-rose-500 ring-2 ring-rose-500/20 text-rose-900' : 'border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 text-slate-900'} rounded-xl text-xs font-bold font-mono outline-none shadow-2xs`}
+                                    value={newThresholdInPurchase}
+                                    onChange={e => setNewThresholdInPurchase(e.target.value)}
+                                  />
+                                  <span className="absolute right-2 px-1.5 py-0.5 bg-slate-100 border border-slate-200 rounded text-[9px] font-bold text-slate-600 truncate max-w-[55px] pointer-events-none">
+                                    {selectedRestockUnit}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Ajustement Optionnel du Prix de Vente Élèves si habilité */}
+                        {canEditPrices && purchaseFormData.item_id && (
+                          <div className="pt-2 border-t border-slate-200/70 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                            <label className="flex items-center gap-2 cursor-pointer select-none">
+                              <input 
+                                type="checkbox" 
+                                checked={updateCatalogPriceInPurchase} 
+                                onChange={e => {
+                                  if (e.target.checked && selectedRestockItem?.unit_price) {
+                                    setNewSellingPriceInPurchase(selectedRestockItem.unit_price.toString());
+                                  }
+                                  setUpdateCatalogPriceInPurchase(e.target.checked);
+                                }}
+                                className="w-4 h-4 text-indigo-600 rounded-md border-slate-300 focus:ring-indigo-500 cursor-pointer"
+                              />
+                              <span className="text-[11px] font-bold text-slate-700">
+                                Ajuster simultanément le prix de cession au référentiel
+                              </span>
+                            </label>
+                            {updateCatalogPriceInPurchase && (
+                              <div className="relative w-full sm:w-44 flex items-center animate-in fade-in duration-200">
+                                <input 
+                                  type="number" 
+                                  step="0.01" 
+                                  min="0" 
+                                  placeholder="Nouveau prix..."
+                                  className="w-full pl-3 pr-10 py-1 bg-white border border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs font-bold font-mono text-slate-900 outline-none shadow-2xs"
+                                  value={newSellingPriceInPurchase}
+                                  onChange={e => setNewSellingPriceInPurchase(e.target.value)}
+                                />
+                                <span className="absolute right-2.5 text-[10px] font-bold text-slate-500 font-mono">HTG</span>
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
-                  </div>
+                    );
+                  })()}
 
                   {/* GROUPE 4 : BANDEAU SORTIE DE CAISSE */}
                   <div className="bg-gradient-to-br from-rose-50/90 via-slate-50 to-amber-50/40 p-3 sm:p-3.5 rounded-2xl border border-rose-200/80 shadow-2xs flex items-center justify-between gap-3">
@@ -4166,34 +4626,219 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
 
-                </div>
+                  {/* GROUPE 5 : TABLEAU RÉCAPITULATIF DES 5 DERNIERS MOUVEMENTS DE STOCK POUR L'ARTICLE SÉLECTIONNÉ */}
+                  <div className="bg-slate-50/75 border border-slate-200/90 rounded-2xl p-3 sm:p-3.5 space-y-2.5 shadow-2xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/70 pb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-6 h-6 rounded-lg bg-indigo-500/10 text-indigo-600 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                          <History size={13} className="text-indigo-600" />
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-800">
+                            Historique des 5 Derniers Mouvements
+                          </h4>
+                          {selectedRestockItemGlobal && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-indigo-100/90 text-indigo-800 border border-indigo-200/70 text-[9px] font-extrabold font-mono">
+                              {recentStockMovements.length} / 5 enregistrés
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                {/* PIED DU FORMULAIRE UNITAIRE */}
-                <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
-                  <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
-                    <ShieldCheck size={13} className="text-emerald-600" />
-                    <span>Mise à jour immédiate du stock et inscription au journal des dépenses</span>
+                      {selectedRestockItemGlobal && (
+                        <div className="text-[10px] sm:text-[11px] font-medium text-slate-500 flex items-center gap-1.5 self-start sm:self-auto flex-wrap">
+                          <span>Article :</span>
+                          <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
+                            {selectedRestockItemGlobal.label}
+                          </span>
+                          <span className="text-slate-400">•</span>
+                          <span>Stock actuel :</span>
+                          <span className="font-mono font-bold text-slate-900 bg-white px-1.5 py-0.5 rounded-lg border border-slate-200">
+                            {selectedRestockItemGlobal.stock_quantity ?? 0} {getItemUnitMeasure(selectedRestockItemGlobal)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+
+                    {!selectedRestockItemGlobal ? (
+                      <div className="py-4 px-3 text-center bg-white/80 rounded-xl border border-dashed border-slate-200 text-slate-400 text-xs flex flex-col items-center justify-center gap-1">
+                        <Package size={20} className="text-slate-300" />
+                        <p className="font-semibold text-slate-600 text-[11px]">Aucun article sélectionné</p>
+                        <p className="text-[10px] text-slate-400">Sélectionnez un article dans la liste déroulante ci-dessus pour consulter l'historique de ses mouvements.</p>
+                      </div>
+                    ) : recentStockMovements.length === 0 ? (
+                      <div className="py-4 px-3 text-center bg-white/90 rounded-xl border border-slate-200/80 text-slate-500 text-xs space-y-1">
+                        <History size={20} className="mx-auto text-slate-300" />
+                        <p className="font-bold text-slate-700 text-[11px]">Aucun mouvement de stock antérieur pour « {selectedRestockItemGlobal.label} »</p>
+                        <p className="text-[10px] text-slate-400 max-w-md mx-auto">
+                          Cet article n'a encore fait l'objet d'aucune réception, vente aux élèves ou régularisation inventaire. La validation de ce bon d'entrée constituera son premier mouvement.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto rounded-xl border border-slate-200/80 bg-white shadow-2xs">
+                        <table className="w-full text-left border-collapse">
+                          <thead>
+                            <tr className="bg-slate-100/90 text-[10px] font-black text-slate-600 uppercase tracking-wider border-b border-slate-200/80">
+                              <th className="px-3 py-2">Date & Heure</th>
+                              <th className="px-3 py-2">Type de Flux</th>
+                              <th className="px-3 py-2 text-right">Quantité</th>
+                              <th className="px-3 py-2">Tiers / Bénéficiaire / Motif</th>
+                              <th className="px-3 py-2 text-right">Impact Financier</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 text-xs">
+                            {recentStockMovements.map((mov) => {
+                              const isEntry = mov.type === 'IN';
+                              const isExit = mov.type === 'OUT';
+                              const isAdj = mov.type === 'ADJUSTMENT';
+
+                              return (
+                                <tr key={mov.id} className="hover:bg-slate-50/70 transition-colors">
+                                  {/* Date & Heure */}
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    <div className="flex items-center gap-1.5">
+                                      <Calendar size={12} className="text-slate-400 shrink-0" />
+                                      <span className="font-bold text-slate-800 text-[11px]">{mov.dateFormatted}</span>
+                                      {mov.timeFormatted && (
+                                        <span className="text-[10px] text-slate-400 font-mono">({mov.timeFormatted})</span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Type de flux */}
+                                  <td className="px-3 py-2 whitespace-nowrap">
+                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-extrabold border ${
+                                      isEntry
+                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                        : isExit
+                                        ? 'bg-rose-50 text-rose-800 border-rose-200'
+                                        : 'bg-amber-50 text-amber-800 border-amber-200'
+                                    }`}>
+                                      {isEntry && <ArrowDownLeft size={10} className="text-emerald-600 shrink-0" />}
+                                      {isExit && <ArrowUpRight size={10} className="text-rose-600 shrink-0" />}
+                                      {isAdj && <SlidersHorizontal size={10} className="text-amber-600 shrink-0" />}
+                                      <span>{mov.typeLabel}</span>
+                                    </span>
+                                  </td>
+
+                                  {/* Quantité & unité */}
+                                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                                    <span className={`font-mono font-black text-xs ${
+                                      isEntry
+                                        ? 'text-emerald-700'
+                                        : isExit
+                                        ? 'text-rose-700'
+                                        : mov.quantity >= 0
+                                        ? 'text-emerald-700'
+                                        : 'text-rose-700'
+                                    }`}>
+                                      {mov.formattedQuantity}
+                                    </span>
+                                  </td>
+
+                                  {/* Tiers / Bénéficiaire / Motif */}
+                                  <td className="px-3 py-2">
+                                    <div className="flex flex-col min-w-0 max-w-[190px] sm:max-w-[240px]">
+                                      <span className="font-bold text-slate-800 text-[11px] truncate" title={mov.partnerOrBeneficiary}>
+                                        {mov.partnerOrBeneficiary}
+                                      </span>
+                                      {mov.subDetail && (
+                                        <span className="text-[9px] text-slate-400 truncate font-medium" title={mov.subDetail}>
+                                          {mov.subDetail}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </td>
+
+                                  {/* Impact financier */}
+                                  <td className="px-3 py-2 text-right whitespace-nowrap">
+                                    {mov.amountFormatted ? (
+                                      <div className="flex flex-col items-end">
+                                        <span className={`font-mono font-black text-[11px] ${isEntry ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                          {isEntry ? `-${mov.amountFormatted}` : `+${mov.amountFormatted}`}
+                                        </span>
+                                        <span className="text-[9px] text-slate-400 font-medium">
+                                          {isEntry ? 'Décaissement' : 'Vente / Encaissement'}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <span className="text-[10px] text-slate-400 font-mono">—</span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
                   </div>
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <button 
-                      type="button"
-                      onClick={() => setShowPurchaseModal(false)} 
-                      className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
-                    >
-                      Annuler
-                    </button>
-                    
-                    <button 
-                      disabled={isSubmitting || !purchaseFormData.item_id || !purchaseFormData.supplier.trim() || (parseInt(purchaseFormData.quantity) || 0) <= 0} 
-                      type="submit" 
-                      className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-slate-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      <span>Valider le Bon d'Entrée</span>
-                    </button>
-                  </div>
                 </div>
+
+                {/* PIED DU FORMULAIRE UNITAIRE AVEC VALIDATION EN TEMPS RÉEL */}
+                {(() => {
+                  const parsedPurchaseQty = parseFloat(purchaseFormData.quantity);
+                  const isPurchaseQtyNegative = !isNaN(parsedPurchaseQty) && parsedPurchaseQty < 0;
+                  const isPurchaseQtyInvalid = isNaN(parsedPurchaseQty) || parsedPurchaseQty <= 0;
+                  const isPurchaseCostNegative = parseFloat(purchaseFormData.unit_cost) < 0;
+
+                  const parsedThreshVal = parseFloat(newThresholdInPurchase);
+                  const isPurchaseThresholdNegative = updateThresholdInPurchase && !isNaN(parsedThreshVal) && parsedThreshVal < 0;
+                  const isPurchaseThresholdInvalid = updateThresholdInPurchase && (isNaN(parsedThreshVal) || newThresholdInPurchase.trim() === '' || parsedThreshVal < 0);
+
+                  const isSingleRestockBlocked = isSubmitting || !purchaseFormData.item_id || !purchaseFormData.supplier.trim() || isPurchaseQtyInvalid || isPurchaseCostNegative || isPurchaseThresholdInvalid;
+
+                  return (
+                    <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                          <ShieldCheck size={13} className="text-emerald-600" />
+                          <span>Mise à jour immédiate du stock et inscription au journal des dépenses</span>
+                        </div>
+
+                        {/* Badges d'invalidation en temps réel */}
+                        {isPurchaseQtyNegative && (
+                          <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center gap-1 animate-in fade-in">
+                            <AlertOctagon size={12} className="shrink-0 text-rose-600" />
+                            <span>Quantité négative interdite</span>
+                          </span>
+                        )}
+                        {isPurchaseThresholdNegative && (
+                          <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center gap-1 animate-in fade-in">
+                            <AlertOctagon size={12} className="shrink-0 text-rose-600" />
+                            <span>Seuil critique négatif interdit</span>
+                          </span>
+                        )}
+                        {isPurchaseCostNegative && (
+                          <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center gap-1 animate-in fade-in">
+                            <AlertOctagon size={12} className="shrink-0 text-rose-600" />
+                            <span>Coût d'achat négatif</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button 
+                          type="button"
+                          onClick={() => setShowPurchaseModal(false)} 
+                          className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
+                        >
+                          Annuler
+                        </button>
+                        
+                        <button 
+                          disabled={isSingleRestockBlocked} 
+                          type="submit" 
+                          className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-slate-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                          <span>Valider le Bon d'Entrée</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </form>
             ) : (
               /* FORMULAIRE GROUPÉ / BON DE COMMANDE FOURNISSEUR HARMONISÉ */
@@ -4468,7 +5113,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   min="0.01"
                                   step="any"
                                   placeholder="Qté"
-                                  className="w-full pl-2 pr-12 py-1 bg-white border border-indigo-200 focus:border-indigo-500 rounded-md text-xs font-mono font-bold text-center text-slate-900 outline-none"
+                                  className={`w-full pl-2 pr-12 py-1 bg-white border ${parseFloat(row.quantity) < 0 ? 'border-rose-500 ring-2 ring-rose-500/20 text-rose-900' : 'border-indigo-200 focus:border-indigo-500 text-slate-900'} rounded-md text-xs font-mono font-bold text-center outline-none`}
                                   value={row.quantity}
                                   onChange={(e) => {
                                     const newRows = [...batchItems];
@@ -4480,6 +5125,9 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   {unitAbbr}
                                 </span>
                               </div>
+                              {parseFloat(row.quantity) < 0 && (
+                                <span className="text-[8px] font-bold text-rose-600 mt-0.5">Qté &lt; 0 interdite</span>
+                              )}
                             </div>
                           </div>
 
@@ -4523,7 +5171,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 min="0.01"
                                 step="any"
                                 placeholder="Qté"
-                                className="w-full pl-2 pr-14 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs text-center hover:border-indigo-300 transition-colors"
+                                className={`w-full pl-2 pr-14 py-1.5 bg-white border ${parseFloat(row.quantity) < 0 ? 'border-rose-500 ring-2 ring-rose-500/20 text-rose-900' : 'border-slate-200 focus:border-indigo-500 hover:border-indigo-300 text-slate-900'} rounded-xl text-xs font-mono font-bold outline-none shadow-2xs text-center transition-colors`}
                                 value={row.quantity}
                                 title={`Volume en ${unitMeasure} à commander auprès du fournisseur`}
                                 onChange={(e) => {
@@ -4544,6 +5192,9 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
                               </div>
                             </div>
+                            {parseFloat(row.quantity) < 0 && (
+                              <span className="text-[8px] font-bold text-rose-600 mt-0.5">Négatif interdit</span>
+                            )}
                           </div>
 
                           {/* Colonne 4 (Desktop) : Coût unitaire achat HTG */}
@@ -4558,7 +5209,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 type="number"
                                 step="0.01"
                                 placeholder="0.00"
-                                className="w-full pl-2.5 pr-7 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs text-right hover:border-indigo-300 transition-colors"
+                                className={`w-full pl-2.5 pr-7 py-1.5 bg-white border ${parseFloat(row.unit_cost) < 0 ? 'border-rose-500 ring-2 ring-rose-500/20 text-rose-900' : 'border-slate-200 focus:border-indigo-500 hover:border-indigo-300 text-slate-900'} rounded-xl text-xs font-mono font-bold outline-none shadow-2xs text-right transition-colors`}
                                 value={row.unit_cost}
                                 title="Prix d'achat unitaire négocié en HTG"
                                 onChange={(e) => {
@@ -4579,6 +5230,9 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 <div className="w-1.5 h-1.5 bg-slate-900 rotate-45 -mt-0.5" />
                               </div>
                             </div>
+                            {parseFloat(row.unit_cost) < 0 && (
+                              <span className="text-[8px] font-bold text-rose-600 mt-0.5 text-right block">Négatif interdit</span>
+                            )}
                           </div>
 
                           {/* Colonne 5 (Desktop) : Sous-total ligne HTG avec affichage spacieux */}
@@ -4760,32 +5414,56 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 </div>
 
-                {/* PIED DU FORMULAIRE EN LOT */}
-                <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
-                  <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
-                    <ShieldCheck size={13} className="text-emerald-600" />
-                    <span>Réapprovisionnement multi-lignes certifié dans le registre scolaire</span>
-                  </div>
+                {/* PIED DU FORMULAIRE EN LOT AVEC VALIDATION EN TEMPS RÉEL */}
+                {(() => {
+                  const hasNegativeQty = batchItems.some(r => r.item_id && parseFloat(r.quantity) < 0);
+                  const hasNegativeCost = batchItems.some(r => r.item_id && parseFloat(r.unit_cost) < 0);
+                  const hasValidRows = batchItems.some(r => r.item_id && parseFloat(r.quantity) > 0);
+                  const isBatchBlocked = isSubmitting || !batchSupplier.trim() || !hasValidRows || hasNegativeQty || hasNegativeCost;
 
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-                    <button 
-                      type="button"
-                      onClick={() => setShowPurchaseModal(false)} 
-                      className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
-                    >
-                      Annuler
-                    </button>
-                    
-                    <button 
-                      disabled={isSubmitting || !batchSupplier.trim() || batchItems.every(r => !r.item_id)} 
-                      type="submit" 
-                      className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-slate-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-                    >
-                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                      <span>Valider la Commande Groupée</span>
-                    </button>
-                  </div>
-                </div>
+                  return (
+                    <div className="pt-3 border-t border-slate-100 flex flex-col-reverse sm:flex-row items-center justify-between gap-2.5">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <div className="text-[10px] text-slate-400 hidden sm:flex items-center gap-1">
+                          <ShieldCheck size={13} className="text-emerald-600" />
+                          <span>Réapprovisionnement multi-lignes certifié dans le registre scolaire</span>
+                        </div>
+
+                        {hasNegativeQty && (
+                          <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center gap-1 animate-in fade-in">
+                            <AlertOctagon size={12} className="shrink-0 text-rose-600" />
+                            <span>Quantité négative détectée dans le lot</span>
+                          </span>
+                        )}
+                        {hasNegativeCost && (
+                          <span className="text-[11px] font-bold text-rose-700 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-lg flex items-center gap-1 animate-in fade-in">
+                            <AlertOctagon size={12} className="shrink-0 text-rose-600" />
+                            <span>Prix unitaire négatif dans le lot</span>
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                        <button 
+                          type="button"
+                          onClick={() => setShowPurchaseModal(false)} 
+                          className="w-full sm:w-auto px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer text-center"
+                        >
+                          Annuler
+                        </button>
+                        
+                        <button 
+                          disabled={isBatchBlocked} 
+                          type="submit" 
+                          className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-xl text-xs sm:text-sm font-extrabold shadow-sm shadow-slate-900/20 transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                          <span>Valider la Commande Groupée</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
               </form>
             )}
           </div>
