@@ -7,24 +7,27 @@ export interface SupplyUnitOption {
 }
 
 export const STANDARD_SUPPLY_UNITS: SupplyUnitOption[] = [
-  { value: 'Aune', label: 'Aune (Tissu, Kaki, Uniforme)', categoryHint: 'Uniforme', allowFractions: true },
-  { value: 'Exemplaire', label: 'Exemplaire (Manuels, Livres, Recueils)', categoryHint: 'Manuel' },
-  { value: 'Rame', label: 'Rame (Papier 8.5x11, Papier ministre)', categoryHint: 'Fourniture' },
+  { value: 'Pièce', label: 'Pièce (Article individuel, accessoire)', categoryHint: 'Fourniture' },
+  { value: 'Kilogramme', label: 'Kilogramme / kg (Riz, sucre, farine, vrac, cantine)', categoryHint: 'Cantine', allowFractions: true },
+  { value: 'Litre', label: 'Litre / L (Huile, liquide, boissons, désinfectant)', categoryHint: 'Cantine', allowFractions: true },
+  { value: 'Pack', label: 'Pack / Lot (Pack d\'eau, packs groupés, lots scellés)', categoryHint: 'Fourniture' },
+  { value: 'Boîte', label: 'Boîte (Craies, stylos, marqueurs, compas)', categoryHint: 'Fourniture' },
+  { value: 'Carton', label: 'Carton (Conditionnement de gros, réapprovisionnement)', categoryHint: 'Fourniture' },
+  { value: 'Paquet', label: 'Paquet / Lot (Copies d\'examen, enveloppes)', categoryHint: 'Fourniture' },
+  { value: 'Rame', label: 'Rame (Papier 8.5x11, papier ministre)', categoryHint: 'Fourniture' },
+  { value: 'Aune', label: 'Aune (Tissu, kaki, uniforme scolaire)', categoryHint: 'Uniforme', allowFractions: true },
+  { value: 'Mètre', label: 'Mètre (Ruban, élastique, galon, tissu)', categoryHint: 'Uniforme', allowFractions: true },
+  { value: 'Paire', label: 'Paire (Chaussettes, chaussures, baskets)', categoryHint: 'Uniforme' },
+  { value: 'Douzaine', label: 'Douzaine (Crayons, bics, cahiers)', categoryHint: 'Fourniture' },
+  { value: 'Bouteille', label: 'Bouteille (Désinfectant, alcool 70°, eau)', categoryHint: 'Entretien' },
+  { value: 'Gallon', label: 'Gallon / Bidon (Savon liquide, eau de Javel)', categoryHint: 'Entretien', allowFractions: true },
+  { value: 'Flacon', label: 'Flacon / Tube (Colle liquide, encre, gouache)', categoryHint: 'Fourniture' },
+  { value: 'Exemplaire', label: 'Exemplaire (Manuels, livres, recueils)', categoryHint: 'Manuel' },
   { value: 'Cahier', label: 'Cahier (Cahier devoirs, travaux pratiques)', categoryHint: 'Fourniture' },
-  { value: 'Boîte', label: 'Boîte (Craies, Stylos, Marqueurs, Compas)', categoryHint: 'Fourniture' },
-  { value: 'Paquet', label: 'Paquet / Lot (Copies d\'examen, Enveloppes)', categoryHint: 'Fourniture' },
-  { value: 'Douzaine', label: 'Douzaine (Crayons, Bics, Cahiers)', categoryHint: 'Fourniture' },
-  { value: 'Ensemble', label: 'Ensemble / Tenue (Uniforme complet, EPS)', categoryHint: 'Uniforme' },
-  { value: 'Paire', label: 'Paire (Chaussettes, Chaussures, Baskets)', categoryHint: 'Uniforme' },
-  { value: 'Mètre', label: 'Mètre (Ruban, Élastique, Galon)', categoryHint: 'Uniforme', allowFractions: true },
-  { value: 'Rouleau', label: 'Rouleau (Scotch, Papier craft, Adhésif)', categoryHint: 'Fourniture' },
-  { value: 'Flacon', label: 'Flacon / Tube (Colle liquide, Encre, Gouache)', categoryHint: 'Fourniture' },
-  { value: 'Bouteille', label: 'Bouteille (Désinfectant, Alcool 70°)', categoryHint: 'Entretien' },
-  { value: 'Gallon', label: 'Gallon / Bidon (Savon liquide, Eau de Javel)', categoryHint: 'Entretien', allowFractions: true },
-  { value: 'Carton', label: 'Carton (Conditionnement de gros)', categoryHint: 'Fourniture' },
-  { value: 'Kit', label: 'Kit (Trousse garnie, Set géométrie)', categoryHint: 'Fourniture' },
-  { value: 'Pièce', label: 'Pièce (Article individuel général)', categoryHint: 'Fourniture' },
-  { value: 'Forfait', label: 'Forfait (Services, Droits, Cantine, Transport)', categoryHint: 'Service' }
+  { value: 'Kit', label: 'Kit (Trousse garnie, set géométrie)', categoryHint: 'Fourniture' },
+  { value: 'Ensemble', label: 'Ensemble / Tenue (Uniforme complet, tenue EPS)', categoryHint: 'Uniforme' },
+  { value: 'Rouleau', label: 'Rouleau (Scotch, papier craft, adhésif)', categoryHint: 'Fourniture' },
+  { value: 'Forfait', label: 'Forfait (Services, droits, cantine, transport)', categoryHint: 'Service' }
 ];
 
 /**
@@ -34,6 +37,41 @@ export const STANDARD_SUPPLY_UNITS: SupplyUnitOption[] = [
 export const detectItemUnit = (label: string = '', category: string = ''): string => {
   const l = label.toLowerCase();
   const c = category.toLowerCase();
+
+  // 0. Alimentation, vrac & cantine (kg, litre, pack)
+  if (
+    l.includes('kg') || 
+    l.includes('kilo') || 
+    l.includes('riz') || 
+    l.includes('farine') || 
+    l.includes('sucre') || 
+    l.includes('haricot') || 
+    l.includes('pois') || 
+    l.includes('viande') || 
+    l.includes('poulet') || 
+    l.includes('blé') || 
+    l.includes('ble') || 
+    l.includes('céréale') || 
+    l.includes('cereale')
+  ) {
+    return 'Kilogramme';
+  }
+
+  if (
+    l.includes('litre') || 
+    l.includes('huile') || 
+    l.includes('sirop') || 
+    l.includes('jus de') || 
+    l.includes('boisson')
+  ) {
+    if (l.includes('gallon') || l.includes('bidon')) return 'Gallon';
+    if (l.includes('pack')) return 'Pack';
+    return 'Litre';
+  }
+
+  if (l.includes('pack')) {
+    return 'Pack';
+  }
 
   // 1. Tissus scolaires et articles d'uniforme
   if (
@@ -213,6 +251,15 @@ export const formatQuantityWithUnit = (quantity: number = 0, unit?: string): str
   const isPlural = Math.abs(quantity) > 1;
 
   switch (safeUnit) {
+    case 'Kilogramme':
+    case 'kg':
+    case 'Kg':
+      return `${quantity.toLocaleString()} kg`;
+    case 'Litre':
+    case 'L':
+      return `${quantity.toLocaleString()} ${isPlural ? 'Litres' : 'Litre'}`;
+    case 'Pack':
+      return `${quantity.toLocaleString()} ${isPlural ? 'Packs' : 'Pack'}`;
     case 'Aune':
       return `${quantity.toLocaleString()} ${isPlural ? 'Aunes' : 'Aune'}`;
     case 'Exemplaire':

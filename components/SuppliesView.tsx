@@ -26,6 +26,7 @@ import { PrintableInventoryModal } from './PrintableInventoryModal';
 import { UnitHarmonizationModal } from './UnitHarmonizationModal';
 import { 
   resolveItemUnit, 
+  detectItemUnit,
   formatQuantityWithUnit, 
   extractCleanDiscipline, 
   encodeDisciplineWithUnit, 
@@ -3566,27 +3567,25 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                          />
                        </div>
 
-                       {/* Unité de Vente (Style Pilule) */}
+                       {/* Champ Unité de mesure (ex: pièces, kg, litres, packs...) */}
                        <div className="sm:col-span-2 lg:col-span-5 space-y-1 min-w-0">
-                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                           Unité de Conditionnement
+                         <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                           <span className="flex items-center gap-1">
+                             <span>Unité de mesure</span>
+                             <span className="text-rose-500 font-black">*</span>
+                           </span>
+                           <span className="text-[10px] text-slate-400 font-normal">ex: pièces, kg, litres, packs...</span>
                          </label>
                          <SelectPill
                            options={[
-                             { value: 'Pièce', label: 'Pièce / Article individuel' },
-                             { value: 'Aune', label: 'Aune (Tissu / Uniforme)' },
-                             { value: 'Paquet', label: 'Paquet / Ramette' },
-                             { value: 'Mètre', label: 'Mètre (Ruban, Tissu)' },
-                             { value: 'Paire', label: 'Paire (Chaussettes, Chaussures)' },
-                             { value: 'Ensemble', label: 'Ensemble complet' },
-                             { value: 'Unité', label: 'Unité générale' },
-                             { value: 'Carton', label: 'Carton' },
-                             { value: 'Boîte', label: 'Boîte' },
-                             { value: 'Rouleau', label: 'Rouleau' },
-                             { value: 'Dozaine', label: 'Dozaine' },
-                             { value: 'Autre', label: 'Autre (Saisie personnalisée...)' }
+                             ...STANDARD_SUPPLY_UNITS.map(u => ({
+                               value: u.value,
+                               label: u.label,
+                               badge: u.categoryHint
+                             })),
+                             { value: 'Autre', label: 'Autre (Saisie personnalisée...)', badge: 'Personnalisé' }
                            ]}
-                           value={['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure) ? catalogFormData.unit_measure : 'Autre'}
+                           value={STANDARD_SUPPLY_UNITS.some(u => u.value === catalogFormData.unit_measure) ? catalogFormData.unit_measure : 'Autre'}
                            onChange={(val) => {
                              if (val !== 'Autre') {
                                setCatalogFormData({ ...catalogFormData, unit_measure: val });
@@ -3597,16 +3596,16 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                            variant="field"
                            size="sm"
                            colorScheme="indigo"
-                           searchable={false}
-                           placeholder="Sélectionner l'unité..."
+                           searchable={true}
+                           placeholder="Sélectionner l'unité (pièces, kg, litres, packs...)"
                            className="w-full"
                          />
 
-                         {(!['Aune', 'Pièce', 'Mètre', 'Paquet', 'Paire', 'Ensemble', 'Unité', 'Carton', 'Boîte', 'Rouleau', 'Dozaine'].includes(catalogFormData.unit_measure)) && (
+                         {(!STANDARD_SUPPLY_UNITS.some(u => u.value === catalogFormData.unit_measure)) && (
                            <input
                              autoFocus
                              type="text"
-                             placeholder="Préciser l'unité (ex: Sac, Livre, Bidon...)"
+                             placeholder="Préciser l'unité exacte (ex: Sac, Livre, Bidon, Rouleau...)"
                              className="mt-1.5 w-full px-3 py-1.5 bg-white text-slate-900 border border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs font-bold outline-none transition-all shadow-2xs"
                              value={catalogFormData.unit_measure}
                              onChange={e => setCatalogFormData({...catalogFormData, unit_measure: e.target.value})}
@@ -3656,21 +3655,24 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                              <span>Quantité en Stock</span>
                              <span className="text-rose-500 font-black">*</span>
                            </span>
-                           {Number(catalogFormData.stock_quantity || 0) <= Number(catalogFormData.low_stock_threshold || 5) && (
-                             <span className="text-[9px] font-extrabold text-amber-700 bg-amber-100/80 px-1.5 py-0.5 rounded-md">
-                               Alerte active
-                             </span>
-                           )}
+                           <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                             {catalogFormData.unit_measure || 'Pièce'}
+                           </span>
                          </label>
-                         <input 
-                           required 
-                           type="number" 
-                           step="any" 
-                           placeholder="0"
-                           className="w-full px-3 py-1.5 bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
-                           value={catalogFormData.stock_quantity} 
-                           onChange={e => setCatalogFormData({...catalogFormData, stock_quantity: e.target.value})} 
-                         />
+                         <div className="relative flex items-center">
+                           <input 
+                             required 
+                             type="number" 
+                             step="any" 
+                             placeholder="0"
+                             className="w-full pl-3 pr-20 py-1.5 bg-white text-slate-900 border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
+                             value={catalogFormData.stock_quantity} 
+                             onChange={e => setCatalogFormData({...catalogFormData, stock_quantity: e.target.value})} 
+                           />
+                           <span className="absolute right-2 px-2 py-0.5 bg-slate-100 border border-slate-200 rounded-lg text-[10px] font-bold text-slate-600 truncate max-w-[75px] pointer-events-none">
+                             {catalogFormData.unit_measure || 'Pièce'}
+                           </span>
+                         </div>
                          <p className="text-[10px] text-slate-400">Unités physiquement disponibles à l'économat</p>
                        </div>
 
@@ -3682,17 +3684,24 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                              <span>Seuil de Réapprovisionnement</span>
                              <span className="text-rose-500 font-black">*</span>
                            </span>
-                           <span className="text-[10px] text-slate-400 font-normal">Alerte stock</span>
+                           <span className="text-[10px] font-bold text-rose-700 bg-rose-50 border border-rose-100 px-2 py-0.5 rounded-md">
+                             {catalogFormData.unit_measure || 'Pièce'}
+                           </span>
                          </label>
-                         <input 
-                           required 
-                           type="number" 
-                           step="any" 
-                           placeholder="5"
-                           className="w-full px-3 py-1.5 bg-white text-rose-900 border border-rose-200 hover:border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
-                           value={catalogFormData.low_stock_threshold} 
-                           onChange={e => setCatalogFormData({...catalogFormData, low_stock_threshold: e.target.value})} 
-                         />
+                         <div className="relative flex items-center">
+                           <input 
+                             required 
+                             type="number" 
+                             step="any" 
+                             placeholder="5"
+                             className="w-full pl-3 pr-20 py-1.5 bg-white text-rose-900 border border-rose-200 hover:border-rose-300 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 rounded-xl text-xs sm:text-sm font-bold font-mono outline-none transition-all shadow-2xs" 
+                             value={catalogFormData.low_stock_threshold} 
+                             onChange={e => setCatalogFormData({...catalogFormData, low_stock_threshold: e.target.value})} 
+                           />
+                           <span className="absolute right-2 px-2 py-0.5 bg-rose-50 border border-rose-200 rounded-lg text-[10px] font-bold text-rose-600 truncate max-w-[75px] pointer-events-none">
+                             {catalogFormData.unit_measure || 'Pièce'}
+                           </span>
+                         </div>
                          <p className="text-[10px] text-rose-500/80">Déclenche un signal visuel dès que le stock atteint ce niveau</p>
                        </div>
                      </div>
@@ -3985,9 +3994,20 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                       {/* Coût Unitaire d'Achat */}
                       <div className="space-y-1">
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                          <span>Coût Unitaire d'Achat</span>
-                          <span className="text-rose-500 font-black">*</span>
+                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <span>Coût Unitaire d'Achat</span>
+                            <span className="text-rose-500 font-black">*</span>
+                          </span>
+                          {purchaseFormData.item_id && (() => {
+                            const sel = catalog.find(i => i.id === purchaseFormData.item_id);
+                            const unit = sel ? getItemUnitMeasure(sel) : '';
+                            return unit ? (
+                              <span className="text-[9px] font-bold text-slate-500">
+                                / {unit}
+                              </span>
+                            ) : null;
+                          })()}
                         </label>
                         <div className="relative flex items-center">
                           <input 
@@ -3996,7 +4016,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             step="0.01"
                             min="0"
                             placeholder="0.00"
-                            className="w-full pl-3 pr-10 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
+                            className="w-full pl-3 pr-12 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
                             value={purchaseFormData.unit_cost}
                             onChange={(e) => setPurchaseFormData({ ...purchaseFormData, unit_cost: e.target.value })}
                           />
@@ -4006,26 +4026,42 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       {/* Quantité Réapprovisionnée */}
                       <div className="space-y-1">
-                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                          <span>Quantité Réceptionnée</span>
-                          <span className="text-rose-500 font-black">*</span>
+                        <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                          <span className="flex items-center gap-1">
+                            <span>Quantité Réceptionnée</span>
+                            <span className="text-rose-500 font-black">*</span>
+                          </span>
+                          {purchaseFormData.item_id && (() => {
+                            const sel = catalog.find(i => i.id === purchaseFormData.item_id);
+                            const unit = sel ? getItemUnitMeasure(sel) : '';
+                            return unit ? (
+                              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                                <span className="text-slate-400 font-normal">Unité :</span>
+                                <strong>{unit}</strong>
+                              </span>
+                            ) : null;
+                          })()}
                         </label>
                         <div className="relative flex items-center">
                           <input 
                             required
                             type="number"
-                            min="1"
+                            min="0.01"
+                            step="any"
                             placeholder="10"
-                            className="w-full pl-3 pr-14 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
+                            className="w-full pl-3 pr-24 py-1.5 bg-white border border-slate-200 hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs sm:text-sm font-black font-mono text-slate-900 outline-none transition-all shadow-2xs"
                             value={purchaseFormData.quantity}
                             onChange={(e) => setPurchaseFormData({ ...purchaseFormData, quantity: e.target.value })}
                           />
-                          <span className="absolute right-2 text-[10px] font-bold text-slate-500 truncate max-w-[50px] pointer-events-none">
-                            {(() => {
-                              const sel = catalog.find(i => i.id === purchaseFormData.item_id);
-                              return sel ? getItemUnitMeasure(sel) : 'Unités';
-                            })()}
-                          </span>
+                          <div className="absolute right-2 px-2 py-0.5 bg-indigo-50 border border-indigo-200 rounded-lg text-[10px] font-black text-indigo-700 pointer-events-none flex items-center gap-1 max-w-[85px] truncate shadow-2xs">
+                            <Package size={10} className="text-indigo-500 shrink-0" />
+                            <span className="truncate">
+                              {(() => {
+                                const sel = catalog.find(i => i.id === purchaseFormData.item_id);
+                                return sel ? getItemUnitMeasure(sel) : 'Unités';
+                              })()}
+                            </span>
+                          </div>
                         </div>
                       </div>
 
@@ -4323,9 +4359,10 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     {batchItems.map((row, idx) => {
                       const selItem = catalog.find(i => i.id === row.item_id);
                       const cost = parseFloat(row.unit_cost) || 0;
-                      const qty = parseInt(row.quantity) || 0;
+                      const qty = parseFloat(row.quantity) || 0;
                       const lineTotal = cost * qty;
                       const unitMeasure = selItem ? getItemUnitMeasure(selItem) : 'Unités';
+                      const unitAbbr = unitMeasure === 'Kilogramme' ? 'kg' : unitMeasure === 'Mètre' ? 'm' : unitMeasure === 'Litre' ? 'L' : unitMeasure;
                       const isLowStock = selItem && (selItem.stock_quantity || 0) <= (selItem.low_stock_threshold || 5);
 
                       return (
@@ -4404,7 +4441,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                     ? 'bg-rose-100 text-rose-800' 
                                     : 'bg-emerald-100 text-emerald-800'
                               }`}>
-                                {selItem ? `${selItem.stock_quantity ?? 0} ${unitMeasure.slice(0, 3)}` : '—'}
+                                {selItem ? `${selItem.stock_quantity ?? 0} ${unitAbbr}` : '—'}
                               </span>
                               {selItem && (
                                 <span className={`text-[9px] mt-0.5 font-medium ${isLowStock ? 'text-amber-700 font-bold' : 'text-slate-400'}`}>
@@ -4415,30 +4452,41 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                             {/* Mobile 2: Qté à Commander */}
                             <div className="flex flex-col items-center justify-center">
-                              <span className="text-[9px] font-black uppercase text-indigo-700 flex items-center gap-0.5 mb-1" title="Quantité à commander au fournisseur">
-                                À Commander
+                              <span className="text-[9px] font-black uppercase text-indigo-700 flex items-center gap-1 mb-1" title="Quantité à commander au fournisseur">
+                                <span>À Commander</span>
+                                {selItem && (
+                                  <span className="px-1 py-0.2 bg-indigo-100 text-indigo-800 rounded font-bold text-[8px]">
+                                    {unitAbbr}
+                                  </span>
+                                )}
                                 <Info size={9} className="text-indigo-500" />
                               </span>
-                              <input
-                                required
-                                type="number"
-                                min="1"
-                                placeholder="Qté"
-                                className="w-full px-2 py-0.5 bg-white border border-indigo-200 focus:border-indigo-500 rounded-md text-xs font-mono font-bold text-center text-slate-900 outline-none"
-                                value={row.quantity}
-                                onChange={(e) => {
-                                  const newRows = [...batchItems];
-                                  newRows[idx].quantity = e.target.value;
-                                  setBatchItems(newRows);
-                                }}
-                              />
+                              <div className="relative w-full flex items-center">
+                                <input
+                                  required
+                                  type="number"
+                                  min="0.01"
+                                  step="any"
+                                  placeholder="Qté"
+                                  className="w-full pl-2 pr-12 py-1 bg-white border border-indigo-200 focus:border-indigo-500 rounded-md text-xs font-mono font-bold text-center text-slate-900 outline-none"
+                                  value={row.quantity}
+                                  onChange={(e) => {
+                                    const newRows = [...batchItems];
+                                    newRows[idx].quantity = e.target.value;
+                                    setBatchItems(newRows);
+                                  }}
+                                />
+                                <span className="absolute right-1 text-[9px] font-bold text-indigo-700 bg-indigo-50 px-1 py-0.5 rounded border border-indigo-100 pointer-events-none max-w-[45px] truncate">
+                                  {unitAbbr}
+                                </span>
+                              </div>
                             </div>
                           </div>
 
                           {/* Colonne 2 (Desktop) : Qté en Stock avec largeur confortable */}
                           <div className="hidden md:flex flex-col items-center justify-center">
                             <div 
-                              className={`px-2.5 py-1.5 rounded-xl text-xs font-mono font-black text-center shadow-2xs border transition-all cursor-help group/stock relative w-full ${
+                              className={`px-2 py-1.5 rounded-xl text-xs font-mono font-black text-center shadow-2xs border transition-all cursor-help group/stock relative w-full flex items-center justify-center gap-1 ${
                                 !selItem 
                                   ? 'bg-slate-100 text-slate-400 border-slate-200' 
                                   : isLowStock 
@@ -4448,7 +4496,11 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               title={selItem ? `Stock actuel en magasin : ${selItem.stock_quantity ?? 0} ${unitMeasure} (Seuil d'alerte: ≤ ${selItem.low_stock_threshold || 5})` : "Sélectionnez un article"}
                             >
                               <span>{selItem ? (selItem.stock_quantity ?? 0) : '—'}</span>
-                              {selItem && <span className="text-[9px] font-sans font-semibold ml-0.5 opacity-75">{unitMeasure.slice(0, 3)}</span>}
+                              {selItem && (
+                                <span className="text-[9px] font-sans font-bold px-1 py-0.2 bg-white/90 border border-slate-200/80 rounded text-slate-700 max-w-[45px] truncate inline-block align-middle" title={unitMeasure}>
+                                  {unitAbbr}
+                                </span>
+                              )}
 
                               {/* Tooltip au survol */}
                               {selItem && (
@@ -4468,19 +4520,20 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <input
                                 required
                                 type="number"
-                                min="1"
+                                min="0.01"
+                                step="any"
                                 placeholder="Qté"
-                                className="w-full pl-2.5 pr-7 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs text-center hover:border-indigo-300 transition-colors"
+                                className="w-full pl-2 pr-14 py-1.5 bg-white border border-slate-200 focus:border-indigo-500 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none shadow-2xs text-center hover:border-indigo-300 transition-colors"
                                 value={row.quantity}
-                                title="Volume d'unités à commander auprès du fournisseur"
+                                title={`Volume en ${unitMeasure} à commander auprès du fournisseur`}
                                 onChange={(e) => {
                                   const newRows = [...batchItems];
                                   newRows[idx].quantity = e.target.value;
                                   setBatchItems(newRows);
                                 }}
                               />
-                              <span className="absolute right-2 text-[9px] font-bold text-slate-400 font-sans pointer-events-none uppercase">
-                                {unitMeasure.slice(0, 3)}
+                              <span className="absolute right-1.5 px-1.5 py-0.5 bg-indigo-50 border border-indigo-100 rounded text-[9px] font-black text-indigo-700 font-sans pointer-events-none max-w-[50px] truncate" title={unitMeasure}>
+                                {unitAbbr}
                               </span>
 
                               {/* Tooltip au survol */}
@@ -4757,6 +4810,125 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         academicYearLabel={academicYears.find(y => y.id === selectedYearId)?.label || 'Année Académique'}
         selectedCategory={inventoryCategoryFilter}
       />
+
+      {/* MODAL MODIFICATION / VÉRIFICATION RAPIDE DE L'UNITÉ DE MESURE */}
+      {quickUnitItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="p-4 bg-gradient-to-r from-indigo-900 to-slate-900 text-white flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-indigo-500/20 rounded-xl border border-indigo-400/30">
+                  <Package size={18} className="text-indigo-200" />
+                </div>
+                <div>
+                  <h4 className="font-extrabold text-sm text-white">Unité de Mesure de l'Article</h4>
+                  <p className="text-[11px] text-indigo-200 truncate max-w-[260px]">{quickUnitItem.label}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickUnitItem(null)}
+                className="p-1.5 text-slate-300 hover:text-white hover:bg-white/10 rounded-xl transition-colors cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-5 space-y-4">
+              <div className="p-3 bg-indigo-50/70 border border-indigo-100 rounded-xl text-xs text-indigo-900 leading-relaxed">
+                <p className="font-medium">
+                  Tous les articles ne sont pas conditionnés à la pièce. Définissez l'unité contextuelle adéquate afin d'assurer une gestion et des bons de commande fidèles à la réalité.
+                </p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center justify-between">
+                  <span>Sélectionner l'Unité de Mesure</span>
+                  <span className="text-[10px] text-indigo-600 font-bold">Actuel : {getItemUnitMeasure(quickUnitItem)}</span>
+                </label>
+                <SelectPill
+                  options={[
+                    ...STANDARD_SUPPLY_UNITS.map(u => ({
+                      value: u.value,
+                      label: u.label,
+                      badge: u.categoryHint
+                    })),
+                    { value: 'Autre', label: 'Autre (Saisie personnalisée...)', badge: 'Personnalisé' }
+                  ]}
+                  value={STANDARD_SUPPLY_UNITS.some(u => u.value === quickUnitValue) ? quickUnitValue : 'Autre'}
+                  onChange={(val) => {
+                    if (val !== 'Autre') {
+                      setQuickUnitValue(val);
+                    } else {
+                      setQuickUnitValue('');
+                    }
+                  }}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  searchable={true}
+                  placeholder="Sélectionner l'unité..."
+                  className="w-full"
+                />
+
+                {(!STANDARD_SUPPLY_UNITS.some(u => u.value === quickUnitValue)) && (
+                  <input
+                    autoFocus
+                    type="text"
+                    placeholder="Préciser l'unité exacte (ex: Sac, Livre, Bidon, Rouleau...)"
+                    className="mt-2 w-full px-3.5 py-2 bg-white text-slate-900 border border-indigo-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 rounded-xl text-xs font-bold outline-none transition-all shadow-2xs"
+                    value={quickUnitValue}
+                    onChange={e => setQuickUnitValue(e.target.value)}
+                  />
+                )}
+              </div>
+
+              {/* Raccourcis fréquents */}
+              <div className="space-y-1.5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Suggestions rapides :</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {['Pièce', 'Kilogramme', 'Litre', 'Pack', 'Boîte', 'Paire', 'Carton', 'Aune'].map((unit) => (
+                    <button
+                      key={unit}
+                      type="button"
+                      onClick={() => setQuickUnitValue(unit)}
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
+                        quickUnitValue === unit
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                      }`}
+                    >
+                      {unit}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setQuickUnitItem(null)}
+                className="px-4 py-2 text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-xl text-xs font-bold transition-all border border-slate-200 cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="button"
+                disabled={!quickUnitValue.trim()}
+                onClick={() => handleQuickSaveUnit(quickUnitItem, quickUnitValue)}
+                className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-sm shadow-indigo-600/20 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                <Save size={14} />
+                <span>Mettre à jour l'unité</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

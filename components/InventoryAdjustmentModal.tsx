@@ -15,6 +15,7 @@ import {
   DollarSign
 } from 'lucide-react';
 import { CatalogItem } from '../types';
+import { resolveItemUnit } from '../utils/supplyUnits';
 
 interface InventoryAdjustmentModalProps {
   isOpen: boolean;
@@ -41,6 +42,7 @@ export const InventoryAdjustmentModal: React.FC<InventoryAdjustmentModalProps> =
 }) => {
   if (!isOpen || !item) return null;
 
+  const itemUnit = resolveItemUnit(item);
   const currentStock = item.stock_quantity ?? 0;
   const [adjustmentMode, setAdjustmentMode] = useState<'set' | 'add' | 'subtract'>('set');
   const [inputValue, setInputValue] = useState<string>(currentStock.toString());
@@ -144,7 +146,7 @@ export const InventoryAdjustmentModal: React.FC<InventoryAdjustmentModalProps> =
                 Stock Actuel
               </span>
               <div className="text-lg font-black font-mono text-slate-900">
-                {currentStock} {item.unit_measure ? `/${item.unit_measure}` : 'unités'}
+                {currentStock} <span className="text-xs font-bold text-slate-600 font-sans">{itemUnit}</span>
               </div>
             </div>
           </div>
@@ -198,22 +200,27 @@ export const InventoryAdjustmentModal: React.FC<InventoryAdjustmentModalProps> =
 
           {/* QUANTITY INPUT */}
           <div className="space-y-1.5">
-            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
-              {adjustmentMode === 'set' ? 'Nouveau Stock Total Réel' : adjustmentMode === 'add' ? 'Quantité à ajouter' : 'Quantité à déduire'}
-            </label>
-            <div className="relative">
+            <div className="flex items-center justify-between">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">
+                {adjustmentMode === 'set' ? 'Nouveau Stock Total Réel' : adjustmentMode === 'add' ? 'Quantité à ajouter' : 'Quantité à déduire'}
+              </label>
+              <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                Unité : <strong>{itemUnit}</strong>
+              </span>
+            </div>
+            <div className="relative flex items-center">
               <input
                 type="number"
                 min="0"
-                step="1"
+                step="any"
                 required
                 value={inputValue}
                 onChange={(e) => setInputValue(e.target.value)}
-                className="w-full px-4 py-3 bg-white border-2 border-slate-200 rounded-xl text-lg font-black font-mono text-slate-900 outline-none focus:border-indigo-600 transition-all"
+                className="w-full pl-4 pr-24 py-3 bg-white border-2 border-slate-200 rounded-xl text-lg font-black font-mono text-slate-900 outline-none focus:border-indigo-600 transition-all"
                 placeholder="0"
               />
-              <span className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-bold text-slate-400">
-                {item.unit_measure || 'Unités'}
+              <span className="absolute right-3 px-2 py-1 bg-slate-100 border border-slate-200 rounded-lg text-xs font-bold text-slate-700 pointer-events-none max-w-[80px] truncate">
+                {itemUnit}
               </span>
             </div>
           </div>
@@ -225,10 +232,9 @@ export const InventoryAdjustmentModal: React.FC<InventoryAdjustmentModalProps> =
                 Résultat Prévisionnel
               </span>
               <div className="text-sm font-bold text-slate-200 flex items-center gap-2">
-                <span>{currentStock}</span>
+                <span>{currentStock} {itemUnit}</span>
                 <span>➔</span>
-                <span className="font-black text-emerald-400 font-mono text-base">{calculatedNewStock}</span>
-                <span>{item.unit_measure || 'unités'}</span>
+                <span className="font-black text-emerald-400 font-mono text-base">{calculatedNewStock} {itemUnit}</span>
               </div>
             </div>
 
