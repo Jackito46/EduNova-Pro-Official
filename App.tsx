@@ -750,6 +750,24 @@ const App: React.FC = () => {
     };
     window.addEventListener('edunova_auth_error', handleCustomAuthError);
 
+    // Listen for outgoing API security violations intercepted by outgoingSecurityMiddleware
+    const handleSecurityAlert = (e: any) => {
+      const detail = e?.detail;
+      const message = detail?.message || "Requête sortante anormale ou suspecte interceptée par le bouclier de sécurité.";
+      console.warn("App.tsx: Outgoing API security alert triggered:", detail);
+      setApiError(message);
+      toast.error("Alerte de Sécurité Système", {
+        description: message,
+        duration: 8000,
+      });
+
+      // Auto-clear banner after 10 seconds
+      setTimeout(() => {
+        if (mounted) setApiError(null);
+      }, 10000);
+    };
+    window.addEventListener('edunova_security_alert', handleSecurityAlert);
+
     // Fetch maintenance mode
     const fetchGlobalSettings = async () => {
       try {
@@ -861,6 +879,7 @@ const App: React.FC = () => {
       subscription.unsubscribe();
       supabase.removeChannel(channel);
       window.removeEventListener('edunova_auth_error', handleCustomAuthError);
+      window.removeEventListener('edunova_security_alert', handleSecurityAlert);
     };
   }, [syncProfile]);
 

@@ -54,6 +54,92 @@ async function startServer() {
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // =========================================================================
+  // MIDDLEWARE DE SÉCURITÉ : DÉTECTION DES INJECTIONS SQL & REQUÊTES MALFORMÉES
+  // =========================================================================
+  const SQL_INJECTION_SERVER_RULES = [
+    /(?:'|"|`|\b)(?:or|and)\s+(?:'[^']+'|[0-9]+)\s*=\s*(?:'[^']+'|[0-9]+)/i,
+    /\b(union\s+(?:all\s+)?select|insert\s+into|delete\s+from|drop\s+(?:table|database|function|view)|alter\s+table|truncate\s+table)\b/i,
+    /(?:--\s|\/\*.*?\*\/|;\s*(?:select|insert|update|delete|drop|alter|exec|declare)\b)/i,
+    /\b(?:pg_sleep|waitfor\s+delay|benchmark)\s*\(/i,
+    /\b(?:exec|execute)\s+(?:sp_|xp_|immediate)\b/i
+  ];
+
+  const CONTROL_CHAR_SERVER_REGEX = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/;
+
+  function hasSqlInjectionViolation(val: any, depth = 0): { detected: boolean; reason?: string } {
+    if (depth > 6 || val === null || val === undefined) return { detected: false };
+    if (typeof val === 'string') {
+      if (val.startsWith('eyJ') || val.length > 8000) return { detected: false };
+      if (CONTROL_CHAR_SERVER_REGEX.test(val)) {
+        return { detected: true, reason: 'Caractères de contrôle non imprimables / Null byte' };
+      }
+      for (const rule of SQL_INJECTION_SERVER_RULES) {
+        if (rule.test(val)) {
+          return { detected: true, reason: 'Motif SQL malveillant détecté' };
+        }
+      }
+      return { detected: false };
+    }
+    if (Array.isArray(val)) {
+      for (const item of val) {
+        const check = hasSqlInjectionViolation(item, depth + 1);
+        if (check.detected) return check;
+      }
+      return { detected: false };
+    }
+    if (typeof val === 'object') {
+      for (const [k, v] of Object.entries(val)) {
+        const keyCheck = hasSqlInjectionViolation(k, depth + 1);
+        if (keyCheck.detected) return keyCheck;
+        const valCheck = hasSqlInjectionViolation(v, depth + 1);
+        if (valCheck.detected) return valCheck;
+      }
+    }
+    return { detected: false };
+  }
+
+  app.use('/api', (req, res, next) => {
+    // Whitelist des routes d'export ou endpoints techniques nécessitant des formats spécifiques
+    if (req.path === '/export-github' || req.path.startsWith('/backups')) {
+      return next();
+    }
+
+    // 1. Vérification de l'URL et query string
+    try {
+      const decodedOriginalUrl = decodeURIComponent(req.originalUrl);
+      const urlViolation = hasSqlInjectionViolation(decodedOriginalUrl);
+      if (urlViolation.detected) {
+        console.warn(`[API Security Guard] ⚠️ Tentative d'injection bloquée dans l'URL: ${req.originalUrl} (${urlViolation.reason})`);
+        return res.status(400).json({
+          error: "Requête bloquée par le middleware de sécurité.",
+          reason: urlViolation.reason,
+          code: "SECURITY_VIOLATION_URL"
+        });
+      }
+    } catch (e) {
+      return res.status(400).json({
+        error: "Requête malformée (échec de décodage de l'URL).",
+        code: "MALFORMED_URL"
+      });
+    }
+
+    // 2. Vérification du corps de la requête
+    if (req.body && typeof req.body === 'object') {
+      const bodyViolation = hasSqlInjectionViolation(req.body);
+      if (bodyViolation.detected) {
+        console.warn(`[API Security Guard] ⚠️ Tentative d'injection bloquée dans le Body: ${req.path} (${bodyViolation.reason})`);
+        return res.status(400).json({
+          error: "Requête bloquée par le middleware de sécurité.",
+          reason: bodyViolation.reason,
+          code: "SECURITY_VIOLATION_BODY"
+        });
+      }
+    }
+
+    next();
+  });
+
+  // =========================================================================
   // RENDER & CLOUD KEEP-ALIVE DAEMON (Anti-Cold-Start / Veille Automatique)
   // =========================================================================
   let appExternalUrl = (process.env.RENDER_EXTERNAL_URL || process.env.APP_URL || process.env.KEEP_ALIVE_URL || '').trim();
@@ -2625,8 +2711,13 @@ async function startServer() {
   app.post('/api/verify-admin-password', async (req, res) => {
     const { email, password, school_id } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ success: false, error: 'Email et mot de passe requis' });
+    if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
+      return res.status(400).json({ success: false, error: 'Email et mot de passe requis sous forme de chaînes de caractères valides.' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (cleanEmail.length > 254 || password.length > 256) {
+      return res.status(400).json({ success: false, error: 'Taille d\'identifiants invalide.' });
     }
 
     try {
@@ -2637,7 +2728,7 @@ async function startServer() {
 
       // Try signing in
       const { data: authData, error: authError } = await authClient.auth.signInWithPassword({
-        email: email,
+        email: cleanEmail,
         password: password
       });
 
@@ -2651,22 +2742,16 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Format ID utilisateur non valide.' });
       }
 
-      // Find user profile using exec_sql RPC which runs as SECURITY DEFINER
-      const { data: dbResult, error: profileErr } = await supabase.rpc('exec_sql', {
-        sql_query: `SELECT * FROM public.profiles WHERE id = '${authData.user.id}'`
-      });
+      // Find user profile using parameterized Supabase query builder (100% immune to SQL injection)
+      const { data: profile, error: profileErr } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authData.user.id)
+        .maybeSingle();
 
       if (profileErr) {
         console.error('Database query error in verify-admin-password:', profileErr);
         return res.status(500).json({ success: false, error: 'Erreur d\'accès au profil utilisateur.' });
-      }
-
-      let profile: any = null;
-      if (Array.isArray(dbResult) && dbResult.length > 0) {
-        profile = dbResult[0];
-      } else if (dbResult && typeof dbResult === 'object' && dbResult.status === 'error') {
-        console.error('SQL error in verify-admin-password:', dbResult);
-        return res.status(500).json({ success: false, error: dbResult.message || 'Erreur lors de la récupération du profil.' });
       }
 
       if (!profile) {
@@ -2695,20 +2780,19 @@ async function startServer() {
           });
         }
 
-        // Check if school is active
+        // Check if school is active using parameterized Supabase query builder
         if (profile.school_id) {
-          const { data: schoolResult, error: schoolErr } = await supabase.rpc('exec_sql', {
-            sql_query: `SELECT status FROM public.schools WHERE id = '${profile.school_id}'`
-          });
+          const { data: school, error: schoolErr } = await supabase
+            .from('schools')
+            .select('status')
+            .eq('id', profile.school_id)
+            .maybeSingle();
 
-          if (!schoolErr && Array.isArray(schoolResult) && schoolResult.length > 0) {
-            const school = schoolResult[0];
-            if (school.status !== 'ACTIVE') {
-              return res.status(403).json({
-                success: false,
-                error: "Autorisation refusée. Cet établissement est suspendu ou désactivé."
-              });
-            }
+          if (!schoolErr && school && school.status !== 'ACTIVE') {
+            return res.status(403).json({
+              success: false,
+              error: "Autorisation refusée. Cet établissement est suspendu ou désactivé."
+            });
           }
         }
       }

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { UserRole, UserProfile } from '../types';
 import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorage } from '../supabase';
 import { AuditLogger } from '../utils/auditLogger';
-import { normalizeIdentifier } from '../utils/authHelpers';
+import { normalizeIdentifier, containsSuspiciousPattern, validateCredentialsSanity } from '../utils/authHelpers';
 import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
@@ -148,6 +148,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
       setError("Veuillez saisir votre adresse email ou identifiant.");
       return;
     }
+
+    const sanityCheck = validateCredentialsSanity(rawEmail);
+    if (!sanityCheck.valid) {
+      setError(sanityCheck.error || "Identifiant invalide.");
+      return;
+    }
+
+    if (containsSuspiciousPattern(rawEmail)) {
+      setError("Format d'identifiant invalide ou caractères non autorisés.");
+      return;
+    }
+
     const targetEmail = normalizeIdentifier(rawEmail);
     setIsSubmitting(true);
     setError(null);
@@ -184,8 +196,21 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
     setError(null);
+
+    // Strict input sanity & Anti-SQL-Injection check
+    const sanityCheck = validateCredentialsSanity(email, password);
+    if (!sanityCheck.valid) {
+      setError(sanityCheck.error || "Identifiants invalides.");
+      return;
+    }
+
+    if (containsSuspiciousPattern(email)) {
+      setError("Format d'identifiant invalide ou caractères non autorisés.");
+      return;
+    }
+
+    setIsSubmitting(true);
 
     const targetEmail = normalizeIdentifier(email);
     const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
