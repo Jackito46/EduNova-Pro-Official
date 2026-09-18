@@ -208,6 +208,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   const [githubToken, setGithubToken] = useState(() => {
     return localStorage.getItem('edunova_github_pat') || '';
   });
+  const [showGithubToken, setShowGithubToken] = useState(false);
   const [githubOwner, setGithubOwner] = useState('Jackito46');
   const [githubRepo, setGithubRepo] = useState('EduNova-Pro-Official');
   const [githubBranch, setGithubBranch] = useState('main');
@@ -1785,16 +1786,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        <p className="text-slate-700 mt-2 font-medium text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
       </div>
       <div className="flex items-center gap-3">
-       {isSuperAdmin && isDevWorkstation && (
-        <button
-         onClick={() => setIsGitHubModalOpen(true)}
-         className="flex items-center gap-2 px-4 py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-sm transition-all active:scale-95 cursor-pointer"
-         title="Exporter l'ensemble du projet vers votre dépôt GitHub (Super Admin sur poste de développement uniquement)"
-        >
-         <GitBranch size={15} className="text-emerald-400" />
-         <span>Exporter vers GitHub</span>
-        </button>
-       )}
        <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
         <span>Synchro Cloud Automatique</span>
@@ -1868,12 +1859,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
              {isExportingGitHub ? (
                <>
                  <Loader2 size={14} className="animate-spin text-indigo-600 shrink-0" />
-                 <span>Envoi GitHub ({githubExportProgress?.percent || 0}%)...</span>
+                 <span>Synchronisation GitHub ({githubExportProgress?.percent || 0}%)...</span>
                </>
              ) : (
                <>
                  <GitPullRequest size={14} />
-                 <span>Exporter vers GitHub</span>
+                 <span>Exporter et Synchroniser vers GitHub</span>
                </>
              )}
            </button>
@@ -4186,60 +4177,102 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         </>
       )}
 
-      {/* Modal - Exportation du Projet vers GitHub */}
+      {/* Modal - Exportation et Synchronisation vers GitHub (École connectée) */}
       <Modal
         isOpen={isGitHubModalOpen}
         onClose={() => !isExportingGitHub && setIsGitHubModalOpen(false)}
-        title="Exporter et Synchroniser vers GitHub"
-        hideDefaultActions={true}
-        containerClassName="max-w-lg sm:max-w-xl"
-      >
-        <div className="space-y-4">
-          <div className="bg-slate-900 text-white p-4 rounded-2xl flex items-start gap-3 shadow-md">
-            <div className="p-2.5 bg-white/10 text-white rounded-xl shrink-0 mt-0.5 border border-white/10">
-              <GitBranch size={20} />
+        title={
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-slate-900 text-emerald-400 flex items-center justify-center shrink-0">
+              <GitBranch size={15} />
             </div>
-            <div className="space-y-1">
-              <h4 className="text-sm font-bold text-white tracking-tight flex items-center gap-2">
-                <span>Exportation Directe via API GitHub</span>
-                <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[10px] font-bold">
-                  Super Admin / Dev
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-bold text-slate-900 truncate">Exporter et Synchroniser vers GitHub</span>
+                <span className="hidden sm:inline-flex px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded text-[9px] font-black uppercase tracking-wider">
+                  École connectée
                 </span>
-                <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-bold">
-                  Synchro Rapide (Delta)
+              </div>
+            </div>
+          </div>
+        }
+        hideDefaultActions={true}
+        containerClassName="max-w-md sm:max-w-lg lg:max-w-xl"
+      >
+        <div className="space-y-3">
+          {/* Header Banner - Compact & Modern */}
+          <div className="bg-slate-900 text-white p-3 sm:p-3.5 rounded-xl flex items-start gap-3 shadow-xs border border-slate-800">
+            <div className="w-8 h-8 rounded-lg bg-white/10 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5 border border-white/10">
+              <GitBranch size={16} />
+            </div>
+            <div className="space-y-0.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="text-xs font-bold text-white tracking-tight">Synchronisation des sources du SI Scolaire</h4>
+                <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[9px] font-bold">
+                  Delta Express
                 </span>
-              </h4>
-              <p className="text-xs text-slate-300 leading-relaxed font-normal">
-                Analyse les sources du projet, calcule instantanément les différences et synchronise votre dépôt officiel en quelques secondes.
+                <span className="px-1.5 py-0.2 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[9px] font-bold">
+                  Dev Workstation
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                Différentiel automatique et commit instantané sur votre dépôt institutionnel sécurisé.
               </p>
             </div>
           </div>
 
-          <div className="space-y-3.5">
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block flex items-center justify-between">
-                <span>Token d'accès personnel GitHub (PAT)</span>
-                <span className="text-[10px] font-mono text-emerald-700 font-bold bg-emerald-50 px-2 py-0.5 rounded">Configuré</span>
-              </label>
+          {/* Form Fields - Compact, 2-column on tablet/desktop */}
+          <div className="space-y-2.5">
+            {/* PAT Token Field with Toggle */}
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider flex items-center gap-1">
+                  <Key size={11} className="text-slate-500" />
+                  <span>Token d'accès personnel GitHub (PAT)</span>
+                  <span className="text-rose-500">*</span>
+                </label>
+                <span className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded border ${
+                  githubToken.trim() 
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}>
+                  {githubToken.trim() ? 'Prêt' : 'Requis'}
+                </span>
+              </div>
               <div className="relative">
                 <input
-                  type="password"
+                  type={showGithubToken ? "text" : "password"}
                   value={githubToken}
                   onChange={e => setGithubToken(e.target.value)}
-                  placeholder="ghp_..."
+                  placeholder="ghp_TOKEN_PROTECTED"
                   disabled={isExportingGitHub}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                  className="w-full pl-3 pr-9 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600 focus:bg-white focus:ring-1 focus:ring-indigo-600 transition-all disabled:opacity-60"
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowGithubToken(!showGithubToken)}
+                  disabled={isExportingGitHub}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer p-0.5"
+                  title={showGithubToken ? "Masquer le jeton" : "Afficher le jeton"}
+                >
+                  {showGithubToken ? <EyeOff size={13} /> : <Eye size={13} />}
+                </button>
               </div>
-              <p className="text-[10px] text-slate-600">
-                Token GitHub Classic avec autorisations <strong>repo</strong> (lecture/écriture).
-              </p>
+              <div className="flex items-center justify-between text-[10px] text-slate-500">
+                <span>Classic PAT avec portée <strong className="font-semibold text-slate-700">repo</strong> (lecture / écriture).</span>
+                {githubToken && (
+                  <span className="text-slate-400 font-mono text-[9px]">
+                    ••••{githubToken.slice(-4)}
+                  </span>
+                )}
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
-                  Propriétaire / Utilisateur
+            {/* Owner & Repo in Responsive 2-Col Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                  Propriétaire / Organisation <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -4247,13 +4280,13 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   onChange={e => setGithubOwner(e.target.value)}
                   placeholder="Ex: Jackito46"
                   disabled={isExportingGitHub}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:bg-white focus:ring-1 focus:ring-indigo-600 transition-all disabled:opacity-60"
                 />
               </div>
 
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
-                  Nom du Dépôt
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
+                  Nom du Dépôt <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -4261,14 +4294,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   onChange={e => setGithubRepo(e.target.value)}
                   placeholder="Ex: EduNova-Pro-Official"
                   disabled={isExportingGitHub}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:bg-white focus:ring-1 focus:ring-indigo-600 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-1.5 sm:col-span-1">
-                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
+            {/* Branch & Commit Message in Responsive Compact Layout */}
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+              <div className="sm:col-span-4 space-y-1">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
                   Branche Cible
                 </label>
                 <input
@@ -4277,12 +4311,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   onChange={e => setGithubBranch(e.target.value)}
                   placeholder="main"
                   disabled={isExportingGitHub}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600 focus:bg-white focus:ring-1 focus:ring-indigo-600 transition-all disabled:opacity-60"
                 />
               </div>
 
-              <div className="space-y-1.5 sm:col-span-2">
-                <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest block">
+              <div className="sm:col-span-8 space-y-1">
+                <label className="text-[10px] font-black text-slate-700 uppercase tracking-wider block">
                   Message du Commit (Optionnel)
                 </label>
                 <input
@@ -4291,34 +4325,34 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   onChange={e => setGithubCommitMsg(e.target.value)}
                   placeholder="Mise à jour synchronisée depuis EduNova..."
                   disabled={isExportingGitHub}
-                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all disabled:opacity-60"
+                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:bg-white focus:ring-1 focus:ring-indigo-600 transition-all disabled:opacity-60"
                 />
               </div>
             </div>
 
-            {/* Progress Status Card with Step Tracker */}
+            {/* Progress Card with Step Checkpoints */}
             {isExportingGitHub && githubExportProgress && (
-              <div className="bg-slate-900 border border-indigo-900/50 text-white p-4 rounded-xl space-y-3 animate-fadeIn shadow-lg shadow-indigo-950/20">
+              <div className="bg-slate-900 border border-indigo-900/50 text-white p-3 rounded-xl space-y-2 animate-in fade-in duration-200 shadow-sm">
                 <div className="flex items-center justify-between text-xs font-bold text-slate-200">
-                  <span className="flex items-center gap-2.5">
-                    <Loader2 size={15} className="animate-spin text-indigo-400 shrink-0" />
-                    <span className="truncate max-w-[280px] sm:max-w-xs">{githubExportProgress.step}</span>
+                  <span className="flex items-center gap-2 truncate">
+                    <Loader2 size={13} className="animate-spin text-indigo-400 shrink-0" />
+                    <span className="truncate text-[11px]">{githubExportProgress.step}</span>
                   </span>
-                  <span className="font-mono text-xs bg-indigo-500/20 border border-indigo-500/30 px-2 py-0.5 rounded text-indigo-300 font-bold shrink-0">
+                  <span className="font-mono text-[10px] bg-indigo-500/20 border border-indigo-500/30 px-1.5 py-0.2 rounded text-indigo-300 font-bold shrink-0">
                     {githubExportProgress.percent}%
                   </span>
                 </div>
 
-                {/* Animated Progress Bar */}
-                <div className="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden p-0.5 border border-slate-700/50">
+                {/* Compact Progress Bar */}
+                <div className="w-full h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div 
                     className="h-full bg-gradient-to-r from-indigo-500 via-indigo-400 to-emerald-400 rounded-full transition-all duration-300 ease-out"
                     style={{ width: `${Math.max(5, githubExportProgress.percent)}%` }}
                   />
                 </div>
 
-                {/* Step checkpoints */}
-                <div className="grid grid-cols-4 gap-1 text-[10px] text-slate-400 pt-0.5 border-t border-slate-800/80">
+                {/* Step checkpoints - High Density */}
+                <div className="grid grid-cols-4 gap-1 text-[9px] text-slate-400 pt-0.5 border-t border-slate-800/80">
                   <div className={`flex items-center gap-1 ${githubExportProgress.percent >= 10 ? 'text-indigo-300 font-bold' : ''}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${githubExportProgress.percent >= 10 ? 'bg-indigo-400' : 'bg-slate-700'}`} />
                     <span>Analyse</span>
@@ -4339,47 +4373,46 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
             )}
 
-            {/* Success Card */}
+            {/* Success Card - Compact & Clean */}
             {githubExportResult?.success && (
-              <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl space-y-3 animate-fadeIn">
-                <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs">
-                  <CheckCircle2 size={16} className="text-emerald-600" />
-                  <span>Dépôt GitHub mis à jour avec succès !</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-700">
-                  <div className="bg-white p-2.5 rounded-lg border border-emerald-100">
-                    <span className="text-slate-600 block text-[10px] uppercase font-bold">Fichiers synchronisés</span>
-                    <strong className="text-xs text-slate-900">
-                      {githubExportResult.modifiedFilesCount !== undefined ? `${githubExportResult.modifiedFilesCount} modifié(s) / ` : ''}{githubExportResult.filesCount} total
-                    </strong>
+              <div className="bg-emerald-50 border border-emerald-200 p-2.5 sm:p-3 rounded-xl space-y-2 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="flex items-center gap-1.5 text-emerald-800 font-bold text-xs">
+                    <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                    <span>Synchronisation GitHub validée !</span>
                   </div>
-                  <div className="bg-white p-2.5 rounded-lg border border-emerald-100">
-                    <span className="text-slate-600 block text-[10px] uppercase font-bold">Commit SHA</span>
-                    <strong className="text-xs font-mono text-slate-900">{githubExportResult.commitSha?.slice(0, 8)}...</strong>
-                  </div>
+                  {githubExportResult.commitSha && (
+                    <span className="font-mono text-[10px] text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200">
+                      SHA: {githubExportResult.commitSha.slice(0, 7)}
+                    </span>
+                  )}
                 </div>
-                <div className="flex items-center gap-2 pt-1">
+                <div className="flex items-center justify-between gap-2 text-[10px] text-slate-700 bg-white p-2 rounded-lg border border-emerald-100">
+                  <span>
+                    Fichiers synchronisés : <strong className="text-slate-900">{githubExportResult.modifiedFilesCount !== undefined ? `${githubExportResult.modifiedFilesCount} modif. / ` : ''}{githubExportResult.filesCount} total</strong>
+                  </span>
                   <a
                     href={githubExportResult.commitUrl || githubExportResult.repoUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-xs"
+                    className="inline-flex items-center gap-1 text-emerald-700 hover:text-emerald-900 font-bold hover:underline"
                   >
-                    <span>Voir le commit sur GitHub</span>
-                    <ExternalLink size={12} />
+                    <span>Consulter sur GitHub</span>
+                    <ExternalLink size={10} />
                   </a>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+          {/* Action Buttons - Compact */}
+          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
             <button
               type="button"
               id="btn-github-modal-close"
               onClick={() => setIsGitHubModalOpen(false)}
               disabled={isExportingGitHub}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all disabled:opacity-50 cursor-pointer"
+              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all disabled:opacity-50 cursor-pointer"
             >
               Fermer
             </button>
@@ -4388,7 +4421,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               id="btn-github-export-modal"
               onClick={handleExportToGitHub}
               disabled={isExportingGitHub || !githubToken.trim() || !githubOwner.trim() || !githubRepo.trim()}
-              className="relative overflow-hidden px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 group min-w-[200px]"
+              className="relative overflow-hidden px-4 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 shadow-xs disabled:opacity-60 disabled:cursor-not-allowed active:scale-95 group min-w-[180px] cursor-pointer"
             >
               {isExportingGitHub && (
                 <div 
@@ -4396,20 +4429,20 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   style={{ width: `${Math.max(5, githubExportProgress?.percent || 0)}%` }}
                 />
               )}
-              <span className="relative z-10 flex items-center gap-2">
+              <span className="relative z-10 flex items-center gap-1.5">
                 {isExportingGitHub ? (
                   <>
-                    <Loader2 size={15} className="animate-spin text-indigo-300 shrink-0" />
+                    <Loader2 size={13} className="animate-spin text-indigo-300 shrink-0" />
                     <span>
                       {githubExportProgress?.percent !== undefined
-                        ? `Envoi des sources (${githubExportProgress.percent}%)...`
-                        : "Envoi des sources en cours..."}
+                        ? `Envoi (${githubExportProgress.percent}%)...`
+                        : "Envoi en cours..."}
                     </span>
                   </>
                 ) : (
                   <>
-                    <GitPullRequest size={15} className="text-white group-hover:scale-110 transition-transform" />
-                    <span>Lancer l'exportation GitHub</span>
+                    <GitPullRequest size={13} className="text-white group-hover:scale-110 transition-transform" />
+                    <span>Lancer la Synchronisation</span>
                   </>
                 )}
               </span>
