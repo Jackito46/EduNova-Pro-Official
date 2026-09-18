@@ -157,8 +157,147 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
   }
 };
 
+/**
+ * Détermine si une clé de stockage correspond à une préférence d'interface utilisateur (UI)
+ * ou à un message système non sensible devant être conservé lors de la déconnexion.
+ */
+export const isUiPreferenceStorageKey = (key: string): boolean => {
+  if (!key) return false;
+
+  // Clés critiques absolues de préférences UI devant être conservées
+  const preservedExactKeys = [
+    'edunova_login_error',               // Notification/erreur de session affichée sur l'écran de login
+    'edunova_pwa_banner_dismissed',       // Acquittement de la bannière PWA
+    'edunova_pwa_installed',              // Statut d'installation PWA
+    'edunova_address_bar_hint_dismissed', // Acquittement du hint de barre d'adresse
+    'edunova_hide_security_banner',       // Acquittement de la bannière de sécurité
+    'push_banner_dismissed',              // Acquittement du bandeau de notifications push
+    'push_denied_dismissed',              // Acquittement du refus de notification push
+    'theme',                              // Thème visuel global (dark/light)
+    'edunova_theme',                      // Thème spécifique EduNova
+    'theme_mode',                         // Mode d'affichage visuel
+    'color-scheme',                       // Schéma de couleur
+    'sidebar_collapsed',                  // Repli de la barre latérale
+    'edunova_sidebar_collapsed',          // Préférence sidebar EduNova
+    'edunova_current_campus_id',          // Annexe sélectionnée par défaut
+    'locale',                             // Langue / Internationalisation
+    'language',
+    'edunova_language',
+    'fontSize',                           // Taille de police / Accessibilité
+    'edunova_font_size'
+  ];
+
+  if (preservedExactKeys.includes(key)) {
+    return true;
+  }
+
+  // Clés préfixées spécifiques pour l'interface (ex: bannières d'abonnement acquittées par école)
+  if (key.startsWith('dismiss_sub_banner_')) {
+    return true;
+  }
+
+  // Règle de sécurité absolue : Ne JAMAIS conserver une clé qui contient un identifiant sensible
+  const sensitiveTokens = [
+    'token',
+    'session_id',
+    'session_active',
+    'session_synced',
+    'user_profile',
+    'auth',
+    'password',
+    'secret',
+    'jwt',
+    'credential',
+    'stats',
+    'cache',
+    'draft',
+    'subscription'
+  ];
+
+  const lowerKey = key.toLowerCase();
+  for (const token of sensitiveTokens) {
+    if (lowerKey.includes(token)) {
+      return false;
+    }
+  }
+
+  // Motifs de préférences d'affichage UI courantes
+  const uiSuffixes = [
+    '_dismissed',
+    '_hint',
+    '_banner',
+    '_collapsed',
+    '_expanded',
+    '_theme',
+    '_mode',
+    '_view_mode',
+    '_display_mode',
+    '_preference',
+    '_pref',
+    '_prefs'
+  ];
+
+  return uiSuffixes.some(suffix => lowerKey.endsWith(suffix));
+};
+
+/**
+ * Nettoie sélectivement le sessionStorage :
+ * - Supprime tous les jetons d'accès, jetons de rafraîchissement Supabase (sb-*),
+ *   identifiants de session utilisateur, profils locaux, et caches de données sensibles.
+ * - Préserve intactes toutes les préférences UI de l'utilisateur (thème, bannières rejetées,
+ *   état de la barre latérale, et message de redirection d'erreur de connexion).
+ */
+export const purgeSelectiveSessionStorage = (preserveLoginError: boolean = true) => {
+  if (typeof window === 'undefined' || !window.sessionStorage) return;
+
+  try {
+    const savedPreferences: Record<string, string> = {};
+    const keysToRemove: string[] = [];
+
+    // 1. Sauvegarde préventive des préférences UI
+    for (let i = 0; i < window.sessionStorage.length; i++) {
+      const key = window.sessionStorage.key(i);
+      if (!key) continue;
+
+      if (isUiPreferenceStorageKey(key)) {
+        if (key === 'edunova_login_error' && !preserveLoginError) {
+          keysToRemove.push(key);
+        } else {
+          const val = window.sessionStorage.getItem(key);
+          if (val !== null) {
+            savedPreferences[key] = val;
+          }
+        }
+      } else {
+        // Toute clé non identifiée comme préférence UI est candidate à la suppression
+        keysToRemove.push(key);
+      }
+    }
+
+    // 2. Suppression systématique des clés sensibles ou non-UI
+    keysToRemove.forEach(key => {
+      try {
+        window.sessionStorage.removeItem(key);
+      } catch (e) {}
+    });
+
+    // 3. Réapplication garantie des préférences UI sauvegardées
+    Object.entries(savedPreferences).forEach(([key, value]) => {
+      try {
+        window.sessionStorage.setItem(key, value);
+      } catch (e) {}
+    });
+  } catch (err) {
+    console.error("Erreur lors de la purge sélective du sessionStorage :", err);
+  }
+};
+
+export interface ClearAuthStorageOptions {
+  preserveUiPreferences?: boolean;
+}
+
 // Helper to clear all auth-related storage
-export const clearAuthStorage = () => {
+export const clearAuthStorage = (options: ClearAuthStorageOptions = { preserveUiPreferences: true }) => {
   console.warn("Clearing all auth-related storage and purging caches...");
   if (typeof window === 'undefined') return;
 
@@ -176,27 +315,33 @@ export const clearAuthStorage = () => {
     // Clear specific keys
     storageKeys.forEach(key => {
       try { window.localStorage.removeItem(key); } catch (e) {}
-      try { window.sessionStorage.removeItem(key); } catch (e) {}
     });
     
-    // Clear all keys starting with 'sb-' or 'edunova' from both storages
-    const clearByPrefix = (storage: Storage) => {
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < storage.length; i++) {
-          const key = storage.key(i);
-          if (key && (key.startsWith('sb-') || key.startsWith('edunova'))) {
-            keysToRemove.push(key);
+    // Clear all keys starting with 'sb-' or 'edunova' from localStorage (sauf préférences préservées)
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < window.localStorage.length; i++) {
+        const key = window.localStorage.key(i);
+        if (key && (key.startsWith('sb-') || key.startsWith('edunova'))) {
+          if (options.preserveUiPreferences && isUiPreferenceStorageKey(key)) {
+            continue;
           }
+          keysToRemove.push(key);
         }
-        keysToRemove.forEach(key => storage.removeItem(key));
-      } catch (e) {
-        console.error("Error clearing storage by prefix:", e);
       }
-    };
+      keysToRemove.forEach(key => window.localStorage.removeItem(key));
+    } catch (e) {
+      console.error("Error clearing localStorage by prefix:", e);
+    }
 
-    clearByPrefix(window.localStorage);
-    clearByPrefix(window.sessionStorage);
+    // Nettoyage sélectif du sessionStorage
+    if (options.preserveUiPreferences !== false) {
+      purgeSelectiveSessionStorage(true);
+    } else {
+      try {
+        window.sessionStorage.clear();
+      } catch (e) {}
+    }
 
     // Set explicit flag indicating user logged out
     try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}

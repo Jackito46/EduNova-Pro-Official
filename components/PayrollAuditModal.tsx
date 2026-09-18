@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { supabase } from '../supabase';
-import { UserProfile, PayrollSlip, StaffMember, PayrollPeriod } from '../types';
+import { UserProfile, PayrollSlip, StaffMember, PayrollPeriod, UserRole } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { SelectPill, SelectOption } from './SelectPill';
 import { 
@@ -103,6 +103,14 @@ export const PayrollAuditModal: React.FC<PayrollAuditModalProps> = ({
   const [viewScope, setViewScope] = useState<'SLIP' | 'GLOBAL'>(slip ? 'SLIP' : 'GLOBAL');
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
+  // RBAC : Identification des privilèges
+  const isSuperUser = Boolean(
+    currentUser?.is_super_admin || 
+    currentUser?.role === UserRole.SUPER_ADMIN || 
+    (currentUser?.role as any) === 'SUPER_ADMIN'
+  );
+  const isAnnexeAdmin = Boolean(currentUser?.campus_id && !isSuperUser);
+
   // Sync initial scope if slip is provided
   useEffect(() => {
     if (slip) {
@@ -143,6 +151,14 @@ export const PayrollAuditModal: React.FC<PayrollAuditModalProps> = ({
             (newRecord.action && newRecord.action.includes('PAYROLL'));
           if (!isPayrollType) return;
 
+          // RBAC : Pour un administrateur d'annexe, filtrer les logs appartenant à d'autres annexes
+          if (isAnnexeAdmin && currentUser?.campus_id) {
+            const recordCampusId = d.campus_id || newRecord.campus_id;
+            if (recordCampusId && recordCampusId !== currentUser.campus_id) {
+              return;
+            }
+          }
+
           setLogs(prev => {
             if (prev.some(l => l.id === newRecord.id)) return prev;
             return [newRecord, ...prev];
@@ -154,7 +170,7 @@ export const PayrollAuditModal: React.FC<PayrollAuditModalProps> = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isOpen, schoolId]);
+  }, [isOpen, schoolId, isAnnexeAdmin, currentUser?.campus_id]);
 
   const fetchAuditLogs = async () => {
     if (!schoolId) return;
@@ -194,7 +210,18 @@ export const PayrollAuditModal: React.FC<PayrollAuditModalProps> = ({
             (log.action === 'CREATE' && d.type === 'payroll_slip') ||
             (log.action === 'DELETE' && d.type?.includes('payroll')) ||
             log.action?.includes('PAYROLL');
-          return isPayrollType;
+          
+          if (!isPayrollType) return false;
+
+          // RBAC : Pour un administrateur d'annexe, filtrer les logs appartenant à d'autres annexes
+          if (isAnnexeAdmin && currentUser?.campus_id) {
+            const logCampusId = d.campus_id || log.campus_id;
+            if (logCampusId && logCampusId !== currentUser.campus_id) {
+              return false;
+            }
+          }
+
+          return true;
         });
 
       setLogs(payrollLogs);
@@ -499,6 +526,12 @@ export const PayrollAuditModal: React.FC<PayrollAuditModalProps> = ({
               {viewScope === 'SLIP' && targetStaffId && (
                 <span className="px-2 py-0.5 bg-indigo-100/80 text-indigo-800 text-[10px] sm:text-xs font-black rounded-full border border-indigo-200/60 shrink-0">
                   Fiche ciblée
+                </span>
+              )}
+              {isAnnexeAdmin && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-indigo-100 text-indigo-900 text-[10px] sm:text-xs font-bold rounded-full border border-indigo-200 shrink-0">
+                  <Building2 className="w-3 h-3 text-indigo-600" />
+                  Accès Dédié Annexe
                 </span>
               )}
             </div>

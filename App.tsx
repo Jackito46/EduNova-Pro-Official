@@ -65,7 +65,7 @@ import { SuperAdminRoute } from './components/SuperAdminRoute';
 import { SystemHealthView } from './components/SystemHealthView';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { UserProfile, UserRole } from './types';
-import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken } from './supabase';
+import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import EmailModule from './components/EmailModule';
@@ -141,7 +141,7 @@ declare global {
 
 
 
-const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void, maintenanceMode: boolean }> = ({ user, purgeSystemState, maintenanceMode }) => {
+const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?: any) => void, maintenanceMode: boolean }> = ({ user, purgeSystemState, maintenanceMode }) => {
   const location = useLocation();
 
   // Détection du mode PWA / Autonome pour masquer les éléments superflus
@@ -186,7 +186,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: () => void
               <RefreshCw size={18} /> Vérifier la disponibilité
             </button>
             <button 
-              onClick={purgeSystemState}
+              onClick={() => purgeSystemState()}
               className="w-full py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all active:scale-95"
             >
               Se déconnecter
@@ -532,15 +532,56 @@ const App: React.FC = () => {
     }
   }, []);
 
-  const purgeSystemState = useCallback(async () => {
-    // 1. Déconnexion locale instantanée et réinitialisation de l'état (0ms de latence pour l'utilisateur)
-    clearAuthStorage();
+  const purgeSystemState = useCallback(async (options?: { reason?: string; preserveUiPreferences?: boolean } | unknown) => {
+    // Si options est un MouseEvent ou événement DOM, l'ignorer proprement
+    const isDomEvent = options && typeof options === 'object' && ('nativeEvent' in options || 'target' in options);
+    const opts = isDomEvent ? undefined : (options as { reason?: string; preserveUiPreferences?: boolean } | undefined);
+    const preservePreferences = opts?.preserveUiPreferences !== false;
+
+    // 0. Si un message de raison est spécifié, l'enregistrer dans sessionStorage pour affichage sur l'écran de login
+    if (opts?.reason && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        window.sessionStorage.setItem('edunova_login_error', opts.reason);
+      } catch (e) {}
+    }
+
+    // 1. Sauvegarde préventive des préférences UI existantes dans sessionStorage
+    const savedUiPreferences: Record<string, string> = {};
+    if (preservePreferences && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        for (let i = 0; i < window.sessionStorage.length; i++) {
+          const key = window.sessionStorage.key(i);
+          if (key && isUiPreferenceStorageKey(key)) {
+            const val = window.sessionStorage.getItem(key);
+            if (val !== null) {
+              savedUiPreferences[key] = val;
+            }
+          }
+        }
+      } catch (e) {}
+    }
+
+    // 2. Nettoyage sélectif du sessionStorage : suppression immédiate des tokens Supabase,
+    // identifiants de session, profils locaux, et caches de données sensibles
+    clearAuthStorage({ preserveUiPreferences: preservePreferences });
+    purgeSelectiveSessionStorage(true);
+
+    // 3. Réapplication garantie des préférences UI préservées (thème, bannières rejetées, sidebar, etc.)
+    if (preservePreferences && typeof window !== 'undefined' && window.sessionStorage) {
+      try {
+        Object.entries(savedUiPreferences).forEach(([key, val]) => {
+          window.sessionStorage.setItem(key, val);
+        });
+      } catch (e) {}
+    }
+
+    // 4. Déconnexion locale instantanée et réinitialisation de l'état (0ms de latence pour l'utilisateur)
     try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}
     setUser(null);
     setLoading(false);
     setIsExiting(false);
 
-    // 2. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
+    // 5. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
     (async () => {
       try {
         const getUserPromise = supabase.auth.getUser();
@@ -1244,7 +1285,7 @@ const App: React.FC = () => {
             Pour des raisons de sécurité, l'accès au système n'est autorisé que depuis le territoire national et pendant les heures régulières de bureau (06h00 - 19h00).
           </p>
           <button 
-            onClick={purgeSystemState}
+            onClick={() => purgeSystemState()}
             className="w-full bg-slate-900 hover:bg-slate-800 text-white font-medium py-3 px-4 rounded-xl transition-colors"
           >
             Se déconnecter

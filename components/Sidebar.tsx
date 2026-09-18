@@ -320,7 +320,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         </div>
 
         {/* CAMPUS SELECTOR AREA */}
-        {school?.has_multi_campus && hasAccess([UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR]) && !user.campus_id && campuses && campuses.length > 1 && (
+        {school?.has_multi_campus && hasAccess([UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR]) && (!user.campus_id || user.is_super_admin || user.role === UserRole.SUPER_ADMIN) && campuses && campuses.length > 1 && (
           <div className={`px-4 py-3 border-b border-slate-200 bg-slate-50/50 ${isNarrow ? 'flex justify-center' : ''}`}>
             {isNarrow ? (
               <div 

@@ -105,6 +105,15 @@ export const PayrollSensitiveNotificationListener: React.FC<PayrollSensitiveNoti
 
           if (!isPayrollType) return;
 
+          // RBAC : Pour un administrateur d'annexe (sans droits super-admin), ignorer les alertes d'autres annexes
+          const isSuperUser = Boolean(user.is_super_admin || (user.role as any) === 'SUPER_ADMIN');
+          if (user.campus_id && !isSuperUser) {
+            const eventCampusId = details.campus_id || newRecord.campus_id;
+            if (eventCampusId && eventCampusId !== user.campus_id) {
+              return;
+            }
+          }
+
           // Déterminer la sensibilité
           const isSensitive = details.is_sensitive === true || newRecord.action === 'PAYROLL_SENSITIVE_UPDATE';
           if (!isSensitive) return;

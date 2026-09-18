@@ -21,6 +21,8 @@ interface PayrollIntegrityAuditProps {
   onPurgeDuplicate: (slip: PayrollSlip, staffName: string) => Promise<void>;
   onFilterMissingStaff?: () => void;
   onFilterDuplicates?: () => void;
+  restrictedCampusId?: string | null;
+  isSuperUser?: boolean;
 }
 
 export interface CampusAuditRow {
@@ -56,11 +58,22 @@ export const PayrollIntegrityAudit: React.FC<PayrollIntegrityAuditProps> = ({
   onPrepareCampus,
   onPurgeDuplicate,
   onFilterMissingStaff,
-  onFilterDuplicates
+  onFilterDuplicates,
+  restrictedCampusId,
+  isSuperUser
 }) => {
   const [isExpanded, setIsExpanded] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<'matrix' | 'duplicates' | 'unassigned'>('matrix');
   const [processingAction, setProcessingAction] = useState<string | null>(null);
+
+  // Campuses audités : si restreint par RBAC pour un administrateur d'annexe, limiter strictement à son annexe
+  const auditedCampuses = useMemo(() => {
+    if (!campuses || campuses.length === 0) return [];
+    if (restrictedCampusId && !isSuperUser) {
+      return campuses.filter(c => c.id === restrictedCampusId);
+    }
+    return campuses;
+  }, [campuses, restrictedCampusId, isSuperUser]);
 
   const getCampusName = (campusId?: string | null, staffMember?: StaffMember | null) => {
     const cId = campusId || staffMember?.campus_id;
@@ -107,9 +120,9 @@ export const PayrollIntegrityAudit: React.FC<PayrollIntegrityAuditProps> = ({
 
   // 2. Analyse croisée par annexe / campus
   const campusMatrix: CampusAuditRow[] = useMemo(() => {
-    if (!campuses || campuses.length === 0) return [];
+    if (!auditedCampuses || auditedCampuses.length === 0) return [];
 
-    return campuses.map(campus => {
+    return auditedCampuses.map(campus => {
       const activeCampusStaff = allSchoolStaff.filter(m => m.campus_id === campus.id);
       const campusSlips = periodSlips.filter(s => isSlipInCampus(s, campus.id));
       const preparedStaffIds = new Set(campusSlips.map(s => s.staff_id));
@@ -170,6 +183,9 @@ export const PayrollIntegrityAudit: React.FC<PayrollIntegrityAuditProps> = ({
   const is100PercentComplete = !hasCriticalAnomalies && totalMissingStaffCount === 0 && totalActiveStaff > 0;
 
   const handlePrepareCampusClick = async (campusId: string | null, campusName: string) => {
+    if (restrictedCampusId && !isSuperUser && campusId !== restrictedCampusId) {
+      return;
+    }
     setProcessingAction(`prepare-${campusId}`);
     try {
       await onPrepareCampus(campusId, campusName);
@@ -216,8 +232,16 @@ export const PayrollIntegrityAudit: React.FC<PayrollIntegrityAuditProps> = ({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">
-                Contrôle d'Intégrité des Effectifs & Annexes
+                {restrictedCampusId && !isSuperUser 
+                  ? `Contrôle d'Intégrité — Annexe ${getCampusName(restrictedCampusId)}`
+                  : "Contrôle d'Intégrité des Effectifs & Annexes"}
               </h3>
+              {restrictedCampusId && !isSuperUser && (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200">
+                  <Building2 className="w-3 h-3 text-indigo-600" />
+                  Accès Dédié Annexe
+                </span>
+              )}
               {is100PercentComplete ? (
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold bg-emerald-100 text-emerald-800 border border-emerald-200">
                   <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -336,7 +360,7 @@ export const PayrollIntegrityAudit: React.FC<PayrollIntegrityAuditProps> = ({
                 }`}>
                   {totalOmittedCampuses}
                 </span>
-                <span className="text-xs font-bold text-slate-600">/ {campuses.length}</span>
+                <span className="text-xs font-bold text-slate-600">/ {auditedCampuses.length}</span>
               </div>
               <span className={`text-[10px] font-semibold block mt-0.5 ${
                 totalOmittedCampuses > 0 ? 'text-rose-600 font-bold' : 'text-emerald-600'

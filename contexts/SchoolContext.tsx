@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { School, SchoolType, SchoolCampus, UserProfile, AcademicYear } from '../types';
+import { School, SchoolType, SchoolCampus, UserProfile, AcademicYear, UserRole } from '../types';
 import { supabase } from '../supabase';
 import { getTerminology, Terminology } from '../lib/terminology';
 
@@ -19,29 +19,35 @@ interface SchoolContextType {
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
 
 export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: string | null, children: React.ReactNode }> = ({ user, schoolId, children }) => {
+  const isSuperUser = Boolean(
+    user?.is_super_admin || 
+    user?.role === UserRole.SUPER_ADMIN || 
+    (user?.role as any) === 'SUPER_ADMIN'
+  );
+
   const [school, setSchool] = useState<School | null>(null);
   const [campuses, setCampuses] = useState<SchoolCampus[]>([]);
   const [activeAcademicYear, setActiveAcademicYear] = useState<AcademicYear | null>(null);
   const [currentCampusId, setCurrentCampusIdState] = useState<string | null>(() => {
     try {
-      if (user && user.campus_id) {
+      if (user && user.campus_id && !isSuperUser) {
          return user.campus_id; 
       }
       const saved = localStorage.getItem('edunova_current_campus_id');
       if (saved === 'GLOBAL') return null;
-      return saved || null;
+      return saved || (user?.campus_id || null);
     } catch (e) {
       return null;
     }
   });
   const [loading, setLoading] = useState(true);
 
-  // Strictly enforce user's campus when user changes
+  // Strictly enforce user's campus for non-super-user annexe admins
   useEffect(() => {
-    if (user && user.campus_id) {
+    if (user && user.campus_id && !isSuperUser) {
       setCurrentCampusIdState(user.campus_id);
     }
-  }, [user?.campus_id]);
+  }, [user?.campus_id, isSuperUser]);
 
   const isValidUuid = (id: any): boolean => {
     if (typeof id !== 'string') return false;
@@ -213,7 +219,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
   };
 
   const handleSetCampusId = (id: string | null) => {
-    if (user?.campus_id) {
+    if (user?.campus_id && !isSuperUser) {
       setCurrentCampusIdState(user.campus_id);
       return;
     }

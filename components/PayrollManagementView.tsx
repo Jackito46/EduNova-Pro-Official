@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
-import { UserProfile, StaffMember, PayrollPeriod, PayrollSlip, SalaryAdvance } from '../types';
+import { UserProfile, StaffMember, PayrollPeriod, PayrollSlip, SalaryAdvance, UserRole } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -393,17 +393,30 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const { school, currentCampusId, setCurrentCampusId, campuses, terminology } = useSchool();
   const hasMultipleCampuses = Boolean((school?.has_multi_campus || (campuses && campuses.length > 1)) && campuses && campuses.length > 0);
 
+  // RBAC : Identification des privilèges
+  const isSuperUser = Boolean(
+    user.is_super_admin || 
+    user.role === UserRole.SUPER_ADMIN || 
+    (user.role as any) === 'SUPER_ADMIN'
+  );
+
+  // Un administrateur d'annexe est rattaché à une annexe spécifique ET n'a pas les droits super-utilisateur
+  const isAnnexeAdmin = Boolean(user.campus_id && !isSuperUser);
+
   const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>(() => {
-    if (user.campus_id) return user.campus_id;
+    if (isAnnexeAdmin && user.campus_id) return user.campus_id;
     if (currentCampusId && currentCampusId !== 'GLOBAL') return currentCampusId;
-    return 'ALL';
+    return user.campus_id || 'ALL';
   });
 
-  const effectiveCampusId = user.campus_id 
+  const effectiveCampusId = isAnnexeAdmin && user.campus_id 
     ? user.campus_id 
     : (!selectedCampusFilter || selectedCampusFilter === 'ALL' || selectedCampusFilter === 'all' || selectedCampusFilter === 'GLOBAL' ? null : selectedCampusFilter);
 
-  const [newPeriodCampusId, setNewPeriodCampusId] = useState<string>('ALL');
+  const [newPeriodCampusId, setNewPeriodCampusId] = useState<string>(() => {
+    if (isAnnexeAdmin && user.campus_id) return user.campus_id;
+    return 'ALL';
+  });
 
   const getCampusName = (campusId?: string | null, staffMember?: StaffMember | null) => {
     const cId = campusId || staffMember?.campus_id;
@@ -474,7 +487,17 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       const sensitiveLogs = (data || []).filter((log: any) => {
         const d = log.details || {};
         const isPayroll = d.type?.includes('payroll') || log.entity_type === 'payroll_slip' || log.action?.includes('PAYROLL');
-        return isPayroll && (d.is_sensitive === true || log.action === 'PAYROLL_SENSITIVE_UPDATE' || (log.action === 'PAYROLL_DELETE' && d.is_sensitive));
+        if (!isPayroll) return false;
+
+        // RBAC : Pour un administrateur d'annexe, filtrer les alertes d'autres annexes
+        if (isAnnexeAdmin && user.campus_id) {
+          const logCampusId = d.campus_id || log.campus_id;
+          if (logCampusId && logCampusId !== user.campus_id) {
+            return false;
+          }
+        }
+
+        return d.is_sensitive === true || log.action === 'PAYROLL_SENSITIVE_UPDATE' || (log.action === 'PAYROLL_DELETE' && d.is_sensitive);
       });
       setRecentSensitiveAlerts(sensitiveLogs);
     } catch (e) {
@@ -491,6 +514,10 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
     const handleOpenTargetAudit = (e: any) => {
       const detail = e.detail || {};
+      // RBAC : Si l'alerte cible une autre annexe et l'utilisateur est admin d'annexe, ignorer l'ouverture
+      if (isAnnexeAdmin && user.campus_id && detail.campusId && detail.campusId !== user.campus_id) {
+        return;
+      }
       const targetSlip = slips.find(s => s.id === detail.slipId) || null;
       const targetMember = staff.find(s => s.id === detail.staffId) || targetSlip?.staff || null;
       if (targetSlip) {
@@ -664,12 +691,12 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
 
   useEffect(() => {
-    if (user.campus_id) {
+    if (isAnnexeAdmin && user.campus_id) {
       setSelectedCampusFilter(user.campus_id);
-    } else if (currentCampusId && currentCampusId !== 'GLOBAL' && selectedCampusFilter === 'ALL') {
+    } else if (!isAnnexeAdmin && currentCampusId && currentCampusId !== 'GLOBAL' && selectedCampusFilter === 'ALL') {
       setSelectedCampusFilter(currentCampusId);
     }
-  }, [user.campus_id, currentCampusId]);
+  }, [user.campus_id, isAnnexeAdmin, currentCampusId]);
 
   useEffect(() => {
     // Clear the selected period when switching campuses to avoid displaying a period from another campus
@@ -693,13 +720,19 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       const { data: schoolData } = await supabase.from('schools').select('global_settings').eq('id', user.school_id).single();
       if (schoolData) setGlobalSettings(schoolData.global_settings);
 
-      // 1. Fetch Staff (All active staff for whole school to enable cross-annexe integrity audit)
-      const { data: allStaffData, error: staffError } = await supabase
+      // 1. Fetch Staff (All active staff for whole school or restricted to annexe if annexe admin)
+      let staffQuery = supabase
         .from('staff')
         .select('*')
         .eq('school_id', user.school_id)
         .eq('status', 'Actif')
         .order('last_name');
+
+      if (isAnnexeAdmin && user.campus_id) {
+        staffQuery = staffQuery.eq('campus_id', user.campus_id);
+      }
+
+      const { data: allStaffData, error: staffError } = await staffQuery;
       if (staffError) throw staffError;
 
       // Fetch active academic year
@@ -737,7 +770,10 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           return { ...member, calculated_base_salary };
         });
 
-      setAllSchoolStaff(allStaffWithCalculatedSalary);
+      setAllSchoolStaff(isAnnexeAdmin && user.campus_id
+        ? allStaffWithCalculatedSalary.filter(s => s.campus_id === user.campus_id)
+        : allStaffWithCalculatedSalary
+      );
 
       const activeCampusId = effectiveCampusId;
       const staffForCurrentView = activeCampusId 
@@ -752,7 +788,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         .select('*')
         .eq('school_id', user.school_id);
       
-      if (activeCampusId) {
+      if (isAnnexeAdmin && user.campus_id) {
+        periodsQuery = periodsQuery.or(`campus_id.eq.${user.campus_id},campus_id.is.null`);
+      } else if (activeCampusId) {
         periodsQuery = periodsQuery.or(`campus_id.is.null,campus_id.eq.${activeCampusId}`);
       }
       
@@ -793,7 +831,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         `)
         .in('period_id', (periodsData || []).map(p => p.id));
       
-      if (activeCampusId) {
+      if (isAnnexeAdmin && user.campus_id) {
+        slipsQuery = slipsQuery.or(`campus_id.eq.${user.campus_id},campus_id.is.null`);
+      } else if (activeCampusId) {
         slipsQuery = slipsQuery.or(`campus_id.is.null,campus_id.eq.${activeCampusId}`);
       }
 
@@ -801,13 +841,15 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       if (slipsError) throw slipsError;
       
       let slipsResult = slipsData || [];
-      if (activeCampusId) {
+      if (isAnnexeAdmin && user.campus_id) {
+        slipsResult = slipsResult.filter(s => s.campus_id === user.campus_id || (!s.campus_id && (!s.staff || s.staff.campus_id === user.campus_id)));
+      } else if (activeCampusId) {
         slipsResult = slipsResult.filter(s => s.campus_id === activeCampusId || (!s.campus_id && (!s.staff || s.staff.campus_id === activeCampusId)));
       }
       setSlips(slipsResult);
 
       // 4. Fetch Advances
-      const { data: advancesData, error: advancesError } = await supabase
+      let advancesQuery = supabase
         .from('salary_advances')
         .select(`
           *,
@@ -818,11 +860,18 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         .eq('school_id', user.school_id)
         .order('created_at', { ascending: false });
       
+      if (isAnnexeAdmin && user.campus_id) {
+        advancesQuery = advancesQuery.or(`campus_id.eq.${user.campus_id},campus_id.is.null`);
+      }
+
+      const { data: advancesData, error: advancesError } = await advancesQuery;
       if (advancesError && advancesError.code !== '42P01') throw advancesError;
       
       let advancesFiltered = advancesData || [];
-      if (activeCampusId) {
-        advancesFiltered = advancesFiltered.filter(adv => !adv.staff || adv.staff.campus_id === activeCampusId);
+      if (isAnnexeAdmin && user.campus_id) {
+        advancesFiltered = advancesFiltered.filter(adv => adv.campus_id === user.campus_id || (!adv.campus_id && (!adv.staff || adv.staff.campus_id === user.campus_id)));
+      } else if (activeCampusId) {
+        advancesFiltered = advancesFiltered.filter(adv => !adv.staff || adv.staff.campus_id === activeCampusId || adv.campus_id === activeCampusId);
       }
       setAdvances(advancesFiltered);
 
@@ -840,7 +889,9 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     setModalLoading(true);
     setModalError(null);
     try {
-      const targetCampus = user.campus_id || (newPeriodCampusId !== 'ALL' ? newPeriodCampusId : null);
+      const targetCampus = isAnnexeAdmin && user.campus_id 
+        ? user.campus_id 
+        : (newPeriodCampusId !== 'ALL' ? newPeriodCampusId : (user.campus_id || null));
 
       const { data, error } = await supabase
         .from('payroll_periods')
@@ -897,6 +948,13 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handleUpdatePeriodStatus = async (periodId: string, status: 'DRAFT' | 'VALIDATED' | 'CLOSED') => {
     try {
       const targetPeriod = periods.find(p => p.id === periodId);
+
+      // RBAC : Vérifier si l'admin d'annexe a le droit d'altérer cette période
+      if (isAnnexeAdmin && user.campus_id && targetPeriod?.campus_id && targetPeriod.campus_id !== user.campus_id) {
+        showToast("Accès refusé : Cette période appartient à une autre annexe.", 'error');
+        return;
+      }
+
       const { error } = await supabase
         .from('payroll_periods')
         .update({ status })
@@ -961,7 +1019,7 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         .delete()
         .eq('period_id', periodId);
       
-      const targetCampusIdForDelete = effectiveCampusId;
+      const targetCampusIdForDelete = isAnnexeAdmin ? user.campus_id : effectiveCampusId;
       if (targetCampusIdForDelete) {
         slipsDeleteQuery = slipsDeleteQuery.eq('campus_id', targetCampusIdForDelete);
       }
@@ -970,9 +1028,14 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
       // 3. Delete period record itself if not shared, or if no campus selected
       let shouldDeletePeriodRecord = true;
-      const activeCampusIdForDelete = effectiveCampusId;
+      const activeCampusIdForDelete = isAnnexeAdmin ? user.campus_id : effectiveCampusId;
       if (activeCampusIdForDelete && !periodToDelete.campus_id) {
         // If a campus is selected but the period is centralized (has no campus_id), do not delete the period itself
+        shouldDeletePeriodRecord = false;
+      }
+
+      // RBAC check: an annexe admin cannot delete a period belonging to another annexe
+      if (isAnnexeAdmin && user.campus_id && periodToDelete.campus_id && periodToDelete.campus_id !== user.campus_id) {
         shouldDeletePeriodRecord = false;
       }
 
@@ -1027,6 +1090,15 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handleDeleteSlip = async () => {
     if (!slipToDelete) return;
+
+    // RBAC : Vérifier si l'administrateur d'annexe a les droits sur cette fiche
+    if (isAnnexeAdmin && user.campus_id) {
+      const slipCampus = slipToDelete.campus_id || slipToDelete.staff?.campus_id;
+      if (slipCampus && slipCampus !== user.campus_id) {
+        showToast("Accès refusé : Vous ne pouvez pas supprimer une fiche d'une autre annexe.", 'error');
+        return;
+      }
+    }
 
     setLoading(true);
     try {
@@ -1100,7 +1172,16 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     const net = base + bonus - deduction;
     const existingSlip = slips.find(s => s.period_id === selectedPeriodId && s.staff_id === staffId);
     const staffMember = staff.find(s => s.id === staffId);
-    const targetCampusId = staffMember?.campus_id || user.campus_id || effectiveCampusId || null;
+    const targetCampusId = isAnnexeAdmin ? user.campus_id : (staffMember?.campus_id || user.campus_id || effectiveCampusId || null);
+
+    // RBAC : Contrôle d'accès sur l'annexe
+    if (isAnnexeAdmin && user.campus_id) {
+      const slipCampus = existingSlip?.campus_id || staffMember?.campus_id;
+      if (slipCampus && slipCampus !== user.campus_id) {
+        showToast("Accès refusé : Cette fiche de paie appartient à une autre annexe.", 'error');
+        return;
+      }
+    }
 
     // Évaluation en amont de la sensibilité de la modification
     const sensitivity = evaluatePayrollSensitivity({
@@ -1321,6 +1402,12 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handlePrepareCampus = async (targetCampusId: string | null, targetCampusName: string) => {
     if (!selectedPeriodId) return;
 
+    // RBAC : Un administrateur d'annexe ne peut pas préparer la paie d'une autre annexe
+    if (isAnnexeAdmin && user.campus_id && targetCampusId && targetCampusId !== user.campus_id) {
+      showToast("Accès restreint : Vous n'avez pas les droits pour préparer la paie d'une autre annexe.", 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const targetStaff = (allSchoolStaff.length > 0 ? allSchoolStaff : staff).filter(member => {
@@ -1523,8 +1610,13 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handlePayAllSlips = async (periodId: string) => {
     try {
       setLoading(true);
-      const periodSlips = slips.filter(s => s.period_id === periodId && s.status === 'UNPAID');
+      let periodSlips = slips.filter(s => s.period_id === periodId && s.status === 'UNPAID');
       
+      // RBAC : Filtrer par annexe pour les administrateurs d'annexe
+      if (isAnnexeAdmin && user.campus_id) {
+        periodSlips = periodSlips.filter(s => isSlipInCampus(s, user.campus_id));
+      }
+
       if (periodSlips.length === 0) {
         showToast("Aucune fiche de paie en attente pour cette période.");
         return;
@@ -1553,6 +1645,16 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handleProcessPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSlip) return;
+
+    // RBAC : Contrôle d'accès sur l'annexe
+    if (isAnnexeAdmin && user.campus_id) {
+      const slipCampus = selectedSlip.campus_id || selectedSlip.staff?.campus_id;
+      if (slipCampus && slipCampus !== user.campus_id) {
+        showToast("Accès refusé : Cette fiche appartient à une autre annexe.", 'error');
+        return;
+      }
+    }
+
     if (paymentMethod === 'Chèque' && paymentRefError) {
       showToast(paymentRefError, 'error');
       return;
@@ -1596,10 +1698,14 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     if (!advanceStaffId || advanceAmount <= 0) return;
 
     try {
+      const targetStaffMember = staff.find(s => s.id === advanceStaffId);
+      const advanceCampusId = isAnnexeAdmin ? user.campus_id : (targetStaffMember?.campus_id || null);
+
       const { data, error } = await supabase
         .from('salary_advances')
         .insert([{
           school_id: user.school_id,
+          campus_id: advanceCampusId,
           staff_id: advanceStaffId,
           amount: advanceAmount,
           reason: advanceReason,
@@ -1625,6 +1731,15 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handleApproveAdvance = async (advanceId: string) => {
     try {
+      const targetAdvance = advances.find(a => a.id === advanceId);
+      if (isAnnexeAdmin && user.campus_id) {
+        const advCampus = targetAdvance?.campus_id || targetAdvance?.staff?.campus_id;
+        if (advCampus && advCampus !== user.campus_id) {
+          showToast("Accès refusé : Cette avance appartient à une autre annexe.", 'error');
+          return;
+        }
+      }
+
       const { data, error } = await supabase
         .from('salary_advances')
         .update({
@@ -1648,6 +1763,15 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handleRejectAdvance = async (advanceId: string) => {
     try {
+      const targetAdvance = advances.find(a => a.id === advanceId);
+      if (isAnnexeAdmin && user.campus_id) {
+        const advCampus = targetAdvance?.campus_id || targetAdvance?.staff?.campus_id;
+        if (advCampus && advCampus !== user.campus_id) {
+          showToast("Accès refusé : Cette avance appartient à une autre annexe.", 'error');
+          return;
+        }
+      }
+
       const { error } = await supabase
         .from('salary_advances')
         .update({
@@ -1668,6 +1792,15 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handleProcessAdvancePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAdvance) return;
+
+    if (isAnnexeAdmin && user.campus_id) {
+      const advCampus = selectedAdvance.campus_id || selectedAdvance.staff?.campus_id;
+      if (advCampus && advCampus !== user.campus_id) {
+        showToast("Accès refusé : Cette avance appartient à une autre annexe.", 'error');
+        return;
+      }
+    }
+
     if (advancePaymentMethod === 'Chèque' && advancePaymentRefError) {
       showToast(advancePaymentRefError, 'error');
       return;
@@ -1951,6 +2084,8 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
             advances={advances}
             terminology={terminology}
             loading={loading}
+            restrictedCampusId={isAnnexeAdmin ? user.campus_id : null}
+            isSuperUser={isSuperUser}
             onPrepareCampus={handlePrepareCampus}
             onPurgeDuplicate={handlePurgeDuplicate}
             onFilterMissingStaff={() => setPreparationStatusFilter('MISSING')}
@@ -4197,26 +4332,38 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           <p className="text-xs sm:text-sm text-slate-500 font-medium mt-0.5">Préparez les salaires, gérez les arriérés et suivez les paiements.</p>
         </div>
 
-        {/* Multi-Tenant / Campus Selector Header */}
+        {/* Multi-Tenant / Campus Selector Header avec RBAC */}
         {hasMultipleCampuses && (
           <div className="flex items-center gap-2 w-full sm:w-auto self-stretch sm:self-auto justify-between sm:justify-end">
-            {user.campus_id ? (
-              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 text-slate-700 rounded-xl text-xs font-bold">
-                <Building2 className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                <span>Annexe assignée :</span>
-                <strong className="text-slate-900">{getCampusName(user.campus_id)}</strong>
+            {isAnnexeAdmin ? (
+              <div className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-950 rounded-xl text-xs font-bold shadow-2xs">
+                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <Building2 className="w-3.5 h-3.5 text-indigo-700 shrink-0" />
+                <span>Accès restreint à l'annexe :</span>
+                <span className="px-2 py-0.5 rounded-md bg-white border border-indigo-200 text-indigo-900 font-extrabold">
+                  {getCampusName(user.campus_id)}
+                </span>
+                <span className="text-[10px] text-indigo-700/80 font-normal hidden lg:inline">
+                  (Contrôle RBAC Annexe)
+                </span>
               </div>
             ) : (
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap sm:flex-nowrap">
+                {isSuperUser && (
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-black bg-purple-50 text-purple-700 border border-purple-200 shadow-2xs shrink-0">
+                    <ShieldCheck className="w-3.5 h-3.5 text-purple-600" />
+                    <span>Super-Utilisateur</span>
+                  </span>
+                )}
                 <span className="text-xs font-bold text-slate-600 whitespace-nowrap flex items-center gap-1.5">
                   <Building2 className="w-3.5 h-3.5 text-indigo-600" />
                   <span className="hidden md:inline">Filtrer par</span> Annexe :
                 </span>
-                <div className="min-w-[170px] sm:min-w-[200px]">
+                <div className="min-w-[170px] sm:min-w-[210px]">
                   <SelectPill
                     options={[
-                      { value: 'ALL', label: 'Toutes les Annexes (Réseau)' },
-                      ...(campuses || []).map(c => ({ value: c.id, label: c.name }))
+                      { value: 'ALL', label: '🌍 Toutes les Annexes (Réseau)' },
+                      ...(campuses || []).map(c => ({ value: c.id, label: `📍 ${c.name}` }))
                     ]}
                     value={selectedCampusFilter}
                     onChange={(val) => {
@@ -4466,24 +4613,32 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
                   </div>
                 </div>
 
-                {hasMultipleCampuses && !user.campus_id && (
+                {hasMultipleCampuses && (
                   <div className="space-y-1 sm:space-y-1.5 min-w-0 pt-1">
                     <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block truncate">
                       Annexe / Campus concerné
                     </label>
-                    <SelectPill
-                      options={[
-                        { value: 'ALL', label: 'Toutes les Annexes (Réseau complet)' },
-                        ...(campuses || []).map(c => ({ value: c.id, label: c.name }))
-                      ]}
-                      value={newPeriodCampusId}
-                      onChange={(val) => setNewPeriodCampusId(val)}
-                      icon={Building2}
-                      variant="field"
-                      size="sm"
-                      colorScheme="indigo"
-                      className="w-full"
-                    />
+                    {isAnnexeAdmin ? (
+                      <div className="flex items-center gap-2 p-2.5 bg-indigo-50/80 border border-indigo-200/80 rounded-xl text-xs text-indigo-950 font-bold">
+                        <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                        <span>{getCampusName(user.campus_id)}</span>
+                        <span className="text-[10px] text-indigo-700 ml-auto font-medium">Verrouillé à votre annexe (RBAC)</span>
+                      </div>
+                    ) : (
+                      <SelectPill
+                        options={[
+                          { value: 'ALL', label: '🌍 Toutes les Annexes (Réseau complet)' },
+                          ...(campuses || []).map(c => ({ value: c.id, label: `📍 ${c.name}` }))
+                        ]}
+                        value={newPeriodCampusId}
+                        onChange={(val) => setNewPeriodCampusId(val)}
+                        icon={Building2}
+                        variant="field"
+                        size="sm"
+                        colorScheme="indigo"
+                        className="w-full"
+                      />
+                    )}
                   </div>
                 )}
                 <div className="pt-2.5 sm:pt-3 border-t border-slate-100 flex items-center justify-end gap-2 sm:gap-2.5">
