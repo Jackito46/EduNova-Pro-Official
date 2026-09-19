@@ -2225,147 +2225,165 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           </div>
 
-          {/* Director/Admin Specific Section */}
+          {/* Director/Admin Specific Section - Moderne, Fluide, Compact & Responsive */}
           {(user.role === UserRole.DIRECTOR || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.SUPER_ADMIN || user.is_super_admin) && (
-            <div className="sm:col-span-2 xl:col-span-4 grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+            <div className="sm:col-span-2 xl:col-span-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mt-1">
               {/* Daily Staff Attendance */}
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-sm hover:border-indigo-100 transition-all duration-200">
                 <div>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-indigo-50 text-indigo-600 rounded-xl">
-                        <ClipboardCheck size={18} />
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center border border-indigo-100/70 shadow-2xs shrink-0">
+                        <ClipboardCheck size={17} />
                       </div>
-                      <div>
-                        <h3 className="text-base font-black text-slate-900 tracking-tight">Présence Personnel</h3>
-                        <p className="text-[11px] font-medium text-slate-400">Pointage des enseignants & employés</p>
+                      <div className="min-w-0">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-tight truncate">Présence Personnel</h3>
+                        <p className="text-[10px] sm:text-[10.5px] font-medium text-slate-400 truncate">Pointage enseignants & employés</p>
                       </div>
                     </div>
-                    <span className="text-[10px] font-black uppercase text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">Aujourd'hui</span>
+                    <span className="text-[9px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full shrink-0">
+                      Aujourd'hui
+                    </span>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="text-center p-3.5 bg-emerald-50/80 border border-emerald-100/60 rounded-2xl">
-                      <p className="text-2xl font-black text-emerald-600">{directorStats.presentStaff}</p>
-                      <p className="text-[10px] text-emerald-700 font-black uppercase tracking-wider mt-0.5">Présents</p>
+                  <div className="grid grid-cols-3 gap-2 my-2.5">
+                    <div className="text-center p-2 sm:p-2.5 bg-emerald-50/70 border border-emerald-100 rounded-xl group hover:bg-emerald-50 transition-colors">
+                      <p className="text-lg sm:text-xl font-black text-emerald-600 font-mono tracking-tight leading-none">{directorStats.presentStaff}</p>
+                      <p className="text-[9px] text-emerald-700 font-bold uppercase tracking-wider mt-1">Présents</p>
                     </div>
-                    <div className="text-center p-3.5 bg-rose-50/80 border border-rose-100/60 rounded-2xl">
-                      <p className="text-2xl font-black text-rose-600">{directorStats.absentStaff}</p>
-                      <p className="text-[10px] text-rose-700 font-black uppercase tracking-wider mt-0.5">Absents</p>
+                    <div className="text-center p-2 sm:p-2.5 bg-rose-50/70 border border-rose-100 rounded-xl group hover:bg-rose-50 transition-colors">
+                      <p className="text-lg sm:text-xl font-black text-rose-600 font-mono tracking-tight leading-none">{directorStats.absentStaff}</p>
+                      <p className="text-[9px] text-rose-700 font-bold uppercase tracking-wider mt-1">Absents</p>
                     </div>
-                    <div className="text-center p-3.5 bg-amber-50/80 border border-amber-100/60 rounded-2xl">
-                      <p className="text-2xl font-black text-amber-600">{directorStats.lateStaff}</p>
-                      <p className="text-[10px] text-amber-700 font-black uppercase tracking-wider mt-0.5">Retards</p>
+                    <div className="text-center p-2 sm:p-2.5 bg-amber-50/70 border border-amber-100 rounded-xl group hover:bg-amber-50 transition-colors">
+                      <p className="text-lg sm:text-xl font-black text-amber-600 font-mono tracking-tight leading-none">{directorStats.lateStaff}</p>
+                      <p className="text-[9px] text-amber-700 font-bold uppercase tracking-wider mt-1">Retards</p>
                     </div>
                   </div>
                 </div>
 
-                <Link to="/personnel/pointage" className="mt-5 flex items-center justify-center w-full py-2.5 text-xs font-black uppercase tracking-wider text-indigo-600 bg-indigo-50/60 hover:bg-indigo-100 rounded-xl transition-all border border-indigo-100">
-                  Détails du pointage
-                  <ChevronRight size={14} className="ml-1" />
+                <Link 
+                  to="/personnel/pointage" 
+                  className="mt-1 flex items-center justify-center w-full py-1.5 sm:py-2 text-[10.5px] font-black uppercase tracking-wider text-indigo-600 hover:text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100/80 rounded-xl transition-all border border-indigo-100/80 shadow-2xs hover:shadow-xs active:scale-98 gap-1"
+                >
+                  <span>Détails du pointage</span>
+                  <ChevronRight size={13} />
                 </Link>
               </div>
 
               {/* Recent Transactions */}
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-sm hover:border-emerald-100 transition-all duration-200">
                 <div>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl">
-                        <Coins size={18} />
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center border border-emerald-100/70 shadow-2xs shrink-0">
+                        <Coins size={17} />
                       </div>
-                      <div>
-                        <h3 className="text-base font-black text-slate-900 tracking-tight">Derniers Paiements</h3>
-                        <p className="text-[11px] font-medium text-slate-400">Flux d'encaissement en direct</p>
+                      <div className="min-w-0">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-tight truncate">Derniers Paiements</h3>
+                        <p className="text-[10px] sm:text-[10.5px] font-medium text-slate-400 truncate">Flux d'encaissement direct</p>
                       </div>
                     </div>
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60 shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                      Direct
+                    </span>
                   </div>
 
-                  <div className="space-y-2.5">
+                  <div className="space-y-1.5 my-2.5">
                     {directorStats.recentPayments.slice(0, 2).map((p, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50 border border-slate-100/80">
-                        <div className="flex items-center gap-2.5 min-w-0">
-                          <div className="w-8 h-8 rounded-xl bg-emerald-100/80 text-emerald-700 font-black text-xs flex items-center justify-center shrink-0">
+                      <div key={idx} className="flex items-center justify-between p-2 rounded-xl bg-slate-50/80 hover:bg-slate-50 border border-slate-100 transition-colors">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-800 font-black text-[11px] flex items-center justify-center shrink-0 shadow-2xs">
                             {p.students?.first_name?.[0] || 'E'}
                           </div>
                           <div className="flex flex-col min-w-0">
-                            <span className="font-bold text-xs text-slate-800 truncate">{formatStudentName(p.students?.last_name, p.students?.first_name).fullName}</span>
-                            <span className="text-[10px] text-slate-400">{new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
+                            <span className="font-bold text-xs text-slate-800 truncate leading-tight">
+                              {formatStudentName(p.students?.last_name, p.students?.first_name).fullName}
+                            </span>
+                            <span className="text-[9.5px] text-slate-400 font-mono">
+                              {new Date(p.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                            </span>
                           </div>
                         </div>
-                        <span className="font-black text-xs text-emerald-600 shrink-0 ml-2">+{Number(p.amount_to_display).toLocaleString()} G</span>
+                        <span className="font-black text-xs text-emerald-600 font-mono shrink-0 ml-2">
+                          +{Number(p.amount_to_display).toLocaleString()} <span className="text-[9px] font-normal text-slate-400">G</span>
+                        </span>
                       </div>
                     ))}
                     {directorStats.recentPayments.length === 0 && (
-                      <p className="text-center py-6 text-slate-400 text-xs italic">Aucun paiement récent enregistré</p>
+                      <p className="text-center py-4 text-slate-400 text-xs italic">Aucun paiement récent enregistré</p>
                     )}
                   </div>
                 </div>
 
-                <Link to="/economat/liste" className="mt-5 flex items-center justify-center w-full py-2.5 text-xs font-black uppercase tracking-wider text-emerald-700 bg-emerald-50/60 hover:bg-emerald-100 rounded-xl transition-all border border-emerald-100">
-                  Voir tout l'historique
-                  <ChevronRight size={14} className="ml-1" />
+                <Link 
+                  to="/economat/liste" 
+                  className="mt-1 flex items-center justify-center w-full py-1.5 sm:py-2 text-[10.5px] font-black uppercase tracking-wider text-emerald-700 hover:text-emerald-800 bg-emerald-50/60 hover:bg-emerald-100/80 rounded-xl transition-all border border-emerald-100/80 shadow-2xs hover:shadow-xs active:scale-98 gap-1"
+                >
+                  <span>Voir tout l'historique</span>
+                  <ChevronRight size={13} />
                 </Link>
               </div>
 
               {/* Management Shortcuts Bento */}
-              <div className="bg-white rounded-3xl shadow-sm border border-slate-100 p-6 flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-sm hover:border-blue-100 transition-all duration-200">
                 <div>
-                  <div className="flex items-center justify-between mb-5">
-                    <div className="flex items-center gap-2.5">
-                      <div className="p-2 bg-blue-50 text-blue-600 rounded-xl">
-                        <Zap size={18} />
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100/70 shadow-2xs shrink-0">
+                        <Zap size={17} />
                       </div>
-                      <div>
-                        <h3 className="text-base font-black text-slate-900 tracking-tight">Gestion Stratégique</h3>
-                        <p className="text-[11px] font-medium text-slate-400">Navigation rapide aux modules clés</p>
+                      <div className="min-w-0">
+                        <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight leading-tight truncate">Gestion Stratégique</h3>
+                        <p className="text-[10px] sm:text-[10.5px] font-medium text-slate-400 truncate">Navigation rapide aux modules clés</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <Link to="/economat" className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/40 transition-all group">
-                      <div className="p-2 bg-white rounded-xl shadow-xs text-blue-600 mb-1.5 group-hover:scale-110 transition-transform">
-                        <Coins size={16} />
+                  <div className="grid grid-cols-3 gap-1.5 my-2">
+                    <Link to="/economat" className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 transition-all duration-150 group shadow-2xs active:scale-95">
+                      <div className="p-1.5 bg-white rounded-lg shadow-2xs text-blue-600 mb-1 group-hover:scale-105 transition-transform border border-slate-100/60">
+                        <Coins size={14} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700">Économat</span>
+                      <span className="text-[10.5px] font-bold text-slate-700 truncate w-full text-center group-hover:text-blue-700">Économat</span>
                     </Link>
-                    <Link to="/eleves" className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all group">
-                      <div className="p-2 bg-white rounded-xl shadow-xs text-indigo-600 mb-1.5 group-hover:scale-110 transition-transform">
-                        <Users size={16} />
+                    <Link to="/eleves" className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50/70 hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-200 transition-all duration-150 group shadow-2xs active:scale-95">
+                      <div className="p-1.5 bg-white rounded-lg shadow-2xs text-indigo-600 mb-1 group-hover:scale-105 transition-transform border border-slate-100/60">
+                        <Users size={14} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700">{terminology.students}</span>
+                      <span className="text-[10.5px] font-bold text-slate-700 truncate w-full text-center group-hover:text-indigo-700">{terminology.students}</span>
                     </Link>
-                    <Link to="/communication/email" className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-blue-200 hover:bg-blue-50/40 transition-all group">
-                      <div className="p-2 bg-white rounded-xl shadow-xs text-blue-600 mb-1.5 group-hover:scale-110 transition-transform">
-                        <Mail size={16} />
+                    <Link to="/communication/email" className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50/70 hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 transition-all duration-150 group shadow-2xs active:scale-95">
+                      <div className="p-1.5 bg-white rounded-lg shadow-2xs text-blue-600 mb-1 group-hover:scale-105 transition-transform border border-slate-100/60">
+                        <Mail size={14} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700">Contact</span>
+                      <span className="text-[10.5px] font-bold text-slate-700 truncate w-full text-center group-hover:text-blue-700">Contact</span>
                     </Link>
-                    <Link to="/notes" className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-emerald-200 hover:bg-emerald-50/40 transition-all group">
-                      <div className="p-2 bg-white rounded-xl shadow-xs text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform">
-                        <FileSignature size={16} />
+                    <Link to="/notes" className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50/70 hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 transition-all duration-150 group shadow-2xs active:scale-95">
+                      <div className="p-1.5 bg-white rounded-lg shadow-2xs text-emerald-600 mb-1 group-hover:scale-105 transition-transform border border-slate-100/60">
+                        <FileSignature size={14} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700">Notes</span>
+                      <span className="text-[10.5px] font-bold text-slate-700 truncate w-full text-center group-hover:text-emerald-700">Notes</span>
                     </Link>
-                    <Link to="/bulletins" className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-amber-200 hover:bg-amber-50/40 transition-all group">
-                      <div className="p-2 bg-white rounded-xl shadow-xs text-amber-600 mb-1.5 group-hover:scale-110 transition-transform">
-                        <FileText size={16} />
+                    <Link to="/bulletins" className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50/70 hover:bg-amber-50/50 border border-slate-100 hover:border-amber-200 transition-all duration-150 group shadow-2xs active:scale-95">
+                      <div className="p-1.5 bg-white rounded-lg shadow-2xs text-amber-600 mb-1 group-hover:scale-105 transition-transform border border-slate-100/60">
+                        <FileText size={14} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700">Bulletins</span>
+                      <span className="text-[10.5px] font-bold text-slate-700 truncate w-full text-center group-hover:text-amber-700">Bulletins</span>
                     </Link>
-                    <Link to="/discipline" className="flex flex-col items-center justify-center p-3 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-rose-200 hover:bg-rose-50/40 transition-all group">
-                      <div className="p-2 bg-white rounded-xl shadow-xs text-rose-600 mb-1.5 group-hover:scale-110 transition-transform">
-                        <ShieldAlert size={16} />
+                    <Link to="/discipline" className="flex flex-col items-center justify-center p-2 rounded-xl bg-slate-50/70 hover:bg-rose-50/50 border border-slate-100 hover:border-rose-200 transition-all duration-150 group shadow-2xs active:scale-95">
+                      <div className="p-1.5 bg-white rounded-lg shadow-2xs text-rose-600 mb-1 group-hover:scale-105 transition-transform border border-slate-100/60">
+                        <ShieldAlert size={14} />
                       </div>
-                      <span className="text-[11px] font-bold text-slate-700">Discipline</span>
+                      <span className="text-[10.5px] font-bold text-slate-700 truncate w-full text-center group-hover:text-rose-700">Discipline</span>
                     </Link>
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-slate-400">
+                <div className="mt-1 pt-2 border-t border-slate-100 flex items-center justify-between text-[9.5px] font-semibold text-slate-400">
                   <span>Centre de commande</span>
-                  <span className="text-slate-600">EduNova OS</span>
+                  <span className="text-slate-600 font-bold">École Connectée</span>
                 </div>
               </div>
             </div>
@@ -2755,87 +2773,87 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             )}
           </div>
 
-          {/* Quick Actions & Shortcuts */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Quick Actions & Shortcuts - Compact, Fluide & Ergonomique */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
             {/* Quick Actions */}
-            <div className={`bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8 flex flex-col ${canAccessShortcuts ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
-              <h3 className="text-base font-black text-slate-900 mb-6">Actions Rapides</h3>
-              <div className={`space-y-3 ${!canAccessShortcuts ? 'sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:space-y-0 sm:gap-3' : ''}`}>
+            <div className={`bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-4 flex flex-col ${canAccessShortcuts ? 'lg:col-span-1' : 'lg:col-span-3'}`}>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight mb-2.5">Actions Rapides</h3>
+              <div className={`space-y-2 ${!canAccessShortcuts ? 'sm:grid sm:grid-cols-2 lg:grid-cols-3 sm:space-y-0 sm:gap-2' : ''}`}>
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY].includes(user.role) && (
-                <Link to="/eleves/ajouter" className="flex items-center p-3.5 rounded-2xl hover:bg-blue-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-blue-50 rounded-xl text-blue-600 group-hover:scale-105 transition-colors shrink-0">
-                    <UserPlus size={18} />
+                <Link to="/eleves/ajouter" className="flex items-center p-2.5 rounded-xl hover:bg-blue-50/50 border border-slate-100 hover:border-blue-200 transition-all group shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-blue-100/60">
+                    <UserPlus size={16} />
                   </div>
-                  <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-900 truncate">Créer dossier</p>
+                  <div className="ml-2.5 min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600">Créer dossier</p>
                     <p className="text-[10px] text-slate-400 truncate">Nouveau {terminology.student.toLowerCase()}</p>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-blue-500 shrink-0" />
+                  <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-blue-500 shrink-0" />
                 </Link>
                 )}
                 
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
-                <Link to="/economat/frais" className="flex items-center p-3.5 rounded-2xl hover:bg-emerald-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-emerald-50 rounded-xl text-emerald-600 group-hover:scale-105 transition-colors shrink-0">
-                    <Receipt size={18} />
+                <Link to="/economat/frais" className="flex items-center p-2.5 rounded-xl hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 transition-all group shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-emerald-100/60">
+                    <Receipt size={16} />
                   </div>
-                  <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-900 truncate">Nouveau Paiement</p>
+                  <div className="ml-2.5 min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-emerald-600">Nouveau Paiement</p>
                     <p className="text-[10px] text-slate-400 truncate">Encaisser des frais</p>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-emerald-500 shrink-0" />
+                  <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-emerald-500 shrink-0" />
                 </Link>
                 )}
 
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
-                <Link to="/economat/fournitures" className="flex items-center p-3.5 rounded-2xl hover:bg-purple-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-purple-50 rounded-xl text-purple-600 group-hover:scale-105 transition-colors shrink-0">
-                    <ShoppingCart size={18} />
+                <Link to="/economat/fournitures" className="flex items-center p-2.5 rounded-xl hover:bg-purple-50/50 border border-slate-100 hover:border-purple-200 transition-all group shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-purple-100/60">
+                    <ShoppingCart size={16} />
                   </div>
-                  <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-900 truncate">Vente Fournitures</p>
+                  <div className="ml-2.5 min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-purple-600">Vente Fournitures</p>
                     <p className="text-[10px] text-slate-400 truncate">Boutique & Articles</p>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-purple-500 shrink-0" />
+                  <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-purple-500 shrink-0" />
                 </Link>
                 )}
 
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR].includes(user.role) && isPresencesEnabled && (
-                  <Link to="/presences" className="flex items-center p-3.5 rounded-2xl hover:bg-amber-50/40 border border-slate-100 transition-all group shadow-xs">
-                    <div className="p-2.5 bg-amber-50 rounded-xl text-amber-600 group-hover:scale-105 transition-colors shrink-0">
-                      <ClipboardCheck size={18} />
+                  <Link to="/presences" className="flex items-center p-2.5 rounded-xl hover:bg-amber-50/50 border border-slate-100 hover:border-amber-200 transition-all group shadow-2xs">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-amber-100/60">
+                      <ClipboardCheck size={16} />
                     </div>
-                    <div className="ml-3 min-w-0 flex-1">
-                      <p className="text-xs font-bold text-slate-900 truncate">Présences Staff</p>
+                    <div className="ml-2.5 min-w-0 flex-1">
+                      <p className="text-xs font-bold text-slate-900 truncate group-hover:text-amber-600">Présences Staff</p>
                       <p className="text-[10px] text-slate-400 truncate">Pointer arrivées</p>
                     </div>
-                    <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-amber-500 shrink-0" />
+                    <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-amber-500 shrink-0" />
                   </Link>
                 )}
 
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR].includes(user.role) && (
-                <Link to="/communication/email" className="flex items-center p-3.5 rounded-2xl hover:bg-indigo-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-indigo-50 rounded-xl text-indigo-600 group-hover:scale-105 transition-colors shrink-0">
-                    <MessageSquare size={18} />
+                <Link to="/communication/email" className="flex items-center p-2.5 rounded-xl hover:bg-indigo-50/50 border border-slate-100 hover:border-indigo-200 transition-all group shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-indigo-100/60">
+                    <MessageSquare size={16} />
                   </div>
-                  <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-900 truncate">Communication</p>
+                  <div className="ml-2.5 min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-indigo-600">Communication</p>
                     <p className="text-[10px] text-slate-400 truncate">Envoyer message</p>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-indigo-500 shrink-0" />
+                  <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-indigo-500 shrink-0" />
                 </Link>
                 )}
 
                 {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT].includes(user.role) && (
-                <Link to="/economat/paie" className="flex items-center p-3.5 rounded-2xl hover:bg-rose-50/40 border border-slate-100 transition-all group shadow-xs">
-                  <div className="p-2.5 bg-rose-50 rounded-xl text-rose-600 group-hover:scale-105 transition-colors shrink-0">
-                    <HandCoins size={18} />
+                <Link to="/economat/paie" className="flex items-center p-2.5 rounded-xl hover:bg-rose-50/50 border border-slate-100 hover:border-rose-200 transition-all group shadow-2xs">
+                  <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-rose-100/60">
+                    <HandCoins size={16} />
                   </div>
-                  <div className="ml-3 min-w-0 flex-1">
-                    <p className="text-xs font-bold text-slate-900 truncate">Avances Payroll</p>
+                  <div className="ml-2.5 min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate group-hover:text-rose-600">Avances Payroll</p>
                     <p className="text-[10px] text-slate-400 truncate">Demandes d'avances</p>
                   </div>
-                  <ChevronRight size={16} className="ml-auto text-slate-300 group-hover:text-rose-500 shrink-0" />
+                  <ChevronRight size={14} className="ml-auto text-slate-300 group-hover:text-rose-500 shrink-0" />
                 </Link>
                 )}
               </div>
@@ -2843,50 +2861,50 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Shortcuts - Uniquement Super Admin, Directeurs et Admin Ecoles */}
             {canAccessShortcuts && (
-              <div className="lg:col-span-2 bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8 flex flex-col">
-                <h3 className="text-base font-black text-slate-900 mb-6">Raccourcis Utiles</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <div className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-4 flex flex-col">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight mb-2.5">Raccourcis Utiles</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
                   {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR].includes(user.role) && (
-                  <Link to="/eleves" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-blue-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                    <div className="p-3 bg-blue-50 rounded-2xl text-blue-600 group-hover:scale-110 transition-transform shadow-xs">
-                      <Users size={22} />
+                  <Link to="/eleves" className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-blue-200 hover:shadow-2xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group active:scale-98">
+                    <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs border border-blue-100/60">
+                      <Users size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">{terminology.students}</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Registre complet</p>
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{terminology.students}</p>
+                      <p className="text-[9.5px] text-slate-400 mt-0.5">Registre complet</p>
                     </div>
                   </Link>
                   )}
 
                   {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
-                  <Link to="/economat/suivi" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-indigo-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                    <div className="p-3 bg-indigo-50 rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs">
-                      <Activity size={22} />
+                  <Link to="/economat/suivi" className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-indigo-200 hover:shadow-2xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group active:scale-98">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs border border-indigo-100/60">
+                      <Activity size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">Suivi Paiements</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">État des comptes</p>
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-indigo-600 transition-colors">Suivi Paiements</p>
+                      <p className="text-[9.5px] text-slate-400 mt-0.5">État des comptes</p>
                     </div>
                   </Link>
                   )}
 
-                  <Link to="/horaire" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-amber-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                    <div className="p-3 bg-amber-50 rounded-2xl text-amber-600 group-hover:scale-110 transition-transform shadow-xs">
-                      <Calendar size={22} />
+                  <Link to="/horaire" className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-amber-200 hover:shadow-2xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group active:scale-98">
+                    <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs border border-amber-100/60">
+                      <Calendar size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">Horaire</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Emploi du temps</p>
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-amber-600 transition-colors">Horaire</p>
+                      <p className="text-[9.5px] text-slate-400 mt-0.5">Emploi du temps</p>
                     </div>
                   </Link>
 
-                  <Link to="/economat/factures" className="p-4 rounded-2xl border border-slate-100 bg-slate-50/40 hover:bg-white hover:border-rose-200 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-3 group">
-                    <div className="p-3 bg-rose-50 rounded-2xl text-rose-600 group-hover:scale-110 transition-transform shadow-xs">
-                      <Receipt size={22} />
+                  <Link to="/economat/factures" className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-rose-200 hover:shadow-2xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group active:scale-98">
+                    <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs border border-rose-100/60">
+                      <Receipt size={16} />
                     </div>
                     <div>
-                      <p className="text-xs font-bold text-slate-900">Factures</p>
-                      <p className="text-[10px] text-slate-400 mt-0.5">Reçus émis</p>
+                      <p className="text-xs font-bold text-slate-900 group-hover:text-rose-600 transition-colors">Factures</p>
+                      <p className="text-[9.5px] text-slate-400 mt-0.5">Reçus émis</p>
                     </div>
                   </Link>
                 </div>
@@ -2900,100 +2918,162 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       {canViewFinances && (
         <>
           {canAccessShortcuts ? (
-            /* Raccourcis d'Accès Rapide pour Admins & Directeurs */
-            <div className="bg-white rounded-3xl shadow-xs border border-slate-100/90 p-6 md:p-8">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+            /* Raccourcis d'Accès Rapide pour Admins & Directeurs - Compact, Fluide & Responsive */
+            <div className="bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-5 relative overflow-hidden transition-all duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-3 sm:mb-4">
                 <div>
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">Raccourcis d'Accès Rapide</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">Actions prioritaires pour la gestion de l'établissement</p>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                    Raccourcis d'Accès Rapide
+                  </h3>
+                  <p className="text-[10.5px] sm:text-xs text-slate-500 font-medium mt-0.5">
+                    Actions prioritaires pour la gestion de l'établissement
+                  </p>
                 </div>
-                <div className="bg-indigo-50/70 border border-indigo-100/80 rounded-2xl px-4 py-2 flex items-center gap-3 w-full sm:w-auto shadow-xs">
-                  <div className="p-1.5 bg-white rounded-xl shadow-xs shrink-0 text-indigo-600">
-                    <UserPlus size={16} />
+                <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl px-3 py-1.5 flex items-center gap-2.5 w-auto self-start sm:self-auto shadow-2xs">
+                  <div className="w-6 h-6 bg-white rounded-lg shadow-2xs shrink-0 text-indigo-600 flex items-center justify-center border border-indigo-100/60">
+                    <UserPlus size={13} />
                   </div>
                   <div>
-                    <p className="text-[9px] font-black uppercase tracking-wider text-indigo-500">Nouveaux dossiers</p>
-                    <p className="text-sm font-black text-indigo-950 leading-none">{stats.todayEnrollments} <span className="text-[10px] font-bold text-indigo-400 lowercase">aujourd'hui</span></p>
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-indigo-500 leading-tight">Nouveaux dossiers</p>
+                    <p className="text-xs sm:text-sm font-black text-indigo-950 font-mono leading-tight">
+                      {stats.todayEnrollments} <span className="text-[9.5px] font-semibold text-indigo-400 lowercase font-sans">aujourd'hui</span>
+                    </p>
                   </div>
                 </div>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3.5">
-                <Link to="/eleves/ajouter" className="p-4 rounded-2xl bg-indigo-50/50 border border-indigo-100/80 hover:bg-white hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs border border-indigo-50">
-                    <UserPlus size={22} />
+
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 sm:gap-2.5">
+                <Link 
+                  to="/eleves/ajouter" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-indigo-50/40 hover:bg-indigo-50/80 border border-indigo-100/80 hover:border-indigo-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-indigo-600 flex items-center justify-center shrink-0 shadow-2xs border border-indigo-100/60 group-hover:scale-105 transition-transform">
+                    <UserPlus size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">{terminology.enrollments}</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-indigo-600 transition-colors truncate">
+                    {terminology.enrollments}
+                  </span>
                 </Link>
                 
-                <Link to="/economat/frais" className="p-4 rounded-2xl bg-emerald-50/50 border border-emerald-100/80 hover:bg-white hover:border-emerald-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-emerald-600 group-hover:scale-110 transition-transform shadow-xs border border-emerald-50">
-                    <Wallet size={22} />
+                <Link 
+                  to="/economat/frais" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-100/80 hover:border-emerald-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-emerald-600 flex items-center justify-center shrink-0 shadow-2xs border border-emerald-100/60 group-hover:scale-105 transition-transform">
+                    <Wallet size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Paiements</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-emerald-600 transition-colors truncate">
+                    Paiements
+                  </span>
                 </Link>
 
-                <Link to="/settings/utilisateurs" className="p-4 rounded-2xl bg-cyan-50/50 border border-cyan-100/80 hover:bg-white hover:border-cyan-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-cyan-600 group-hover:scale-110 transition-transform shadow-xs border border-cyan-50">
-                    <UserCog size={22} />
+                <Link 
+                  to="/settings/utilisateurs" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-cyan-50/40 hover:bg-cyan-50/80 border border-cyan-100/80 hover:border-cyan-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-cyan-600 flex items-center justify-center shrink-0 shadow-2xs border border-cyan-100/60 group-hover:scale-105 transition-transform">
+                    <UserCog size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Utilisateurs</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-cyan-600 transition-colors truncate">
+                    Utilisateurs
+                  </span>
                 </Link>
 
-                <Link to="/classes" className="p-4 rounded-2xl bg-teal-50/50 border border-teal-100/80 hover:bg-white hover:border-teal-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-teal-600 group-hover:scale-110 transition-transform shadow-xs border border-teal-50">
-                    <Layers size={22} />
+                <Link 
+                  to="/classes" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-teal-50/40 hover:bg-teal-50/80 border border-teal-100/80 hover:border-teal-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-teal-600 flex items-center justify-center shrink-0 shadow-2xs border border-teal-100/60 group-hover:scale-105 transition-transform">
+                    <Layers size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">{terminology.options}</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-teal-600 transition-colors truncate">
+                    {terminology.options}
+                  </span>
                 </Link>
 
-                <Link to="/horaire" className="p-4 rounded-2xl bg-blue-50/50 border border-blue-100/80 hover:bg-white hover:border-blue-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-blue-600 group-hover:scale-110 transition-transform shadow-xs border border-blue-50">
-                    <Calendar size={22} />
+                <Link 
+                  to="/horaire" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-blue-50/40 hover:bg-blue-50/80 border border-blue-100/80 hover:border-blue-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-blue-600 flex items-center justify-center shrink-0 shadow-2xs border border-blue-100/60 group-hover:scale-105 transition-transform">
+                    <Calendar size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Horaires</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate">
+                    Horaires
+                  </span>
                 </Link>
 
-                <Link to="/economat/factures" className="p-4 rounded-2xl bg-purple-50/50 border border-purple-100/80 hover:bg-white hover:border-purple-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-purple-600 group-hover:scale-110 transition-transform shadow-xs border border-purple-50">
-                    <Receipt size={22} />
+                <Link 
+                  to="/economat/factures" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-purple-50/40 hover:bg-purple-50/80 border border-purple-100/80 hover:border-purple-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-purple-600 flex items-center justify-center shrink-0 shadow-2xs border border-purple-100/60 group-hover:scale-105 transition-transform">
+                    <Receipt size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Factures</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-purple-600 transition-colors truncate">
+                    Factures
+                  </span>
                 </Link>
 
-                <Link to="/rapports" className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100/80 hover:bg-white hover:border-amber-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-amber-600 group-hover:scale-110 transition-transform shadow-xs border border-amber-50">
-                    <BarChart3 size={22} />
+                <Link 
+                  to="/rapports" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-amber-50/40 hover:bg-amber-50/80 border border-amber-100/80 hover:border-amber-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-amber-600 flex items-center justify-center shrink-0 shadow-2xs border border-amber-100/60 group-hover:scale-105 transition-transform">
+                    <BarChart3 size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Rapports</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-amber-600 transition-colors truncate">
+                    Rapports
+                  </span>
                 </Link>
 
-                <Link to="/personnel" className="p-4 rounded-2xl bg-violet-50/50 border border-violet-100/80 hover:bg-white hover:border-violet-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-violet-600 group-hover:scale-110 transition-transform shadow-xs border border-violet-50">
-                    <Users size={22} />
+                <Link 
+                  to="/personnel" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-violet-50/40 hover:bg-violet-50/80 border border-violet-100/80 hover:border-violet-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-violet-600 flex items-center justify-center shrink-0 shadow-2xs border border-violet-100/60 group-hover:scale-105 transition-transform">
+                    <Users size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Personnel</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-violet-600 transition-colors truncate">
+                    Personnel
+                  </span>
                 </Link>
 
-                <Link to="/settings/audit" className="p-4 rounded-2xl bg-rose-50/50 border border-rose-100/80 hover:bg-white hover:border-rose-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                  <div className="p-3 bg-white rounded-2xl text-rose-600 group-hover:scale-110 transition-transform shadow-xs border border-rose-50">
-                    <ShieldCheck size={22} />
+                <Link 
+                  to="/settings/audit" 
+                  className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-rose-50/40 hover:bg-rose-50/80 border border-rose-100/80 hover:border-rose-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                >
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-rose-600 flex items-center justify-center shrink-0 shadow-2xs border border-rose-100/60 group-hover:scale-105 transition-transform">
+                    <ShieldCheck size={17} />
                   </div>
-                  <span className="text-xs font-bold text-slate-900">Journal Audit</span>
+                  <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-rose-600 transition-colors truncate">
+                    Journal Audit
+                  </span>
                 </Link>
 
                 {(user.role === UserRole.SUPER_ADMIN || user.is_super_admin) ? (
-                  <Link to="/super-admin" className="p-4 rounded-2xl bg-amber-50/50 border border-amber-100/80 hover:bg-white hover:border-amber-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-amber-600 group-hover:scale-110 transition-transform shadow-xs border border-amber-50">
-                      <School size={22} />
+                  <Link 
+                    to="/super-admin" 
+                    className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-amber-50/40 hover:bg-amber-50/80 border border-amber-100/80 hover:border-amber-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                  >
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-amber-600 flex items-center justify-center shrink-0 shadow-2xs border border-amber-100/60 group-hover:scale-105 transition-transform">
+                      <School size={17} />
                     </div>
-                    <span className="text-xs font-bold text-slate-900">Gestion Écoles</span>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-amber-600 transition-colors truncate">
+                      Gestion Écoles
+                    </span>
                   </Link>
                 ) : (
-                  <Link to="/settings/ecole" className="p-4 rounded-2xl bg-slate-50/50 border border-slate-200/70 hover:bg-white hover:border-slate-300 hover:shadow-xs transition-all flex flex-col items-center justify-center text-center gap-2.5 group">
-                    <div className="p-3 bg-white rounded-2xl text-slate-600 group-hover:scale-110 transition-transform shadow-xs border border-slate-100">
-                      <Settings size={22} />
+                  <Link 
+                    to="/settings/ecole" 
+                    className="p-2 sm:p-2.5 rounded-xl sm:rounded-2xl bg-slate-50/60 hover:bg-slate-100/80 border border-slate-200/70 hover:border-slate-300 hover:shadow-2xs transition-all duration-150 flex flex-row sm:flex-col items-center sm:justify-center text-left sm:text-center gap-2 sm:gap-1.5 group active:scale-98"
+                  >
+                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white rounded-xl text-slate-600 flex items-center justify-center shrink-0 shadow-2xs border border-slate-100 group-hover:scale-105 transition-transform">
+                      <Settings size={17} />
                     </div>
-                    <span className="text-xs font-bold text-slate-900">Paramètres</span>
+                    <span className="text-[11px] sm:text-xs font-bold text-slate-800 group-hover:text-slate-900 transition-colors truncate">
+                      Paramètres
+                    </span>
                   </Link>
                 )}
               </div>
