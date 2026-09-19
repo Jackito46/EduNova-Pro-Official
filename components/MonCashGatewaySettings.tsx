@@ -896,9 +896,9 @@ export const MonCashGatewaySettings: React.FC<MonCashGatewaySettingsProps> = ({
                     <p className="text-xs font-extrabold text-slate-900 truncate">
                       Activer MonCash sur le guichet de paiement
                     </p>
-                    <p className="text-[11px] text-slate-500 font-medium leading-tight truncate">
-                      Permet aux {terminology.students.toLowerCase()} de régler directement par portefeuille mobile.
-                    </p>
+                    <span className="text-[11px] text-slate-500 font-medium leading-tight truncate block">
+                      Règlement mobile pour les {terminology.students.toLowerCase()}.
+                    </span>
                   </div>
                 </div>
 

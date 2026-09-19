@@ -1831,40 +1831,37 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
        {/* GitHub Quick Access Card (Super Admin Exclusive on Dev Workstation) */}
        {isSuperAdmin && isDevWorkstation && (
-         <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 p-5 rounded-2xl text-white shadow-md border border-slate-800 space-y-3">
+         <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 p-3.5 rounded-xl text-white shadow-md border border-slate-800 space-y-2.5">
            <div className="flex items-center justify-between">
-             <div className="flex items-center gap-3">
-               <div className="w-9 h-9 bg-white/10 text-emerald-400 rounded-xl flex items-center justify-center shrink-0 border border-white/10">
-                 <GitBranch size={18} />
+             <div className="flex items-center gap-2.5">
+               <div className="w-8 h-8 bg-white/10 text-emerald-400 rounded-lg flex items-center justify-center shrink-0 border border-white/10">
+                 <GitBranch size={16} />
                </div>
-               <div>
+               <div className="min-w-0">
                  <h4 className="text-xs font-bold text-white tracking-tight">Dépôt GitHub</h4>
-                 <p className="text-[11px] text-slate-400 font-mono">Jackito46 / EduNova...</p>
+                 <p className="text-[10px] text-slate-400 font-mono truncate">Jackito46 / EduNova...</p>
                </div>
              </div>
-             <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[9px] font-black uppercase tracking-wider">
+             <span className="px-2 py-0.5 bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 rounded text-[9px] font-black uppercase tracking-wider shrink-0">
                Dev Only
              </span>
            </div>
-           <p className="text-[11px] text-slate-300 leading-relaxed">
-             Transférer et synchroniser les modifications du poste vers GitHub en 1 clic.
-           </p>
            <button
              type="button"
              id="btn-github-export-sidebar"
              onClick={() => setIsGitHubModalOpen(true)}
              disabled={isExportingGitHub}
-             className="w-full py-2.5 bg-white text-slate-900 hover:bg-slate-100 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 cursor-pointer disabled:opacity-85"
+             className="w-full py-2 bg-white text-slate-900 hover:bg-slate-100 rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 cursor-pointer disabled:opacity-85"
            >
              {isExportingGitHub ? (
                <>
-                 <Loader2 size={14} className="animate-spin text-indigo-600 shrink-0" />
-                 <span>Synchronisation GitHub ({githubExportProgress?.percent || 0}%)...</span>
+                 <Loader2 size={13} className="animate-spin text-indigo-600 shrink-0" />
+                 <span>Synchronisation ({githubExportProgress?.percent || 0}%)...</span>
                </>
              ) : (
                <>
-                 <GitPullRequest size={14} />
-                 <span>Exporter et Synchroniser vers GitHub</span>
+                 <GitPullRequest size={13} />
+                 <span>Exporter & Synchroniser</span>
                </>
              )}
            </button>
@@ -3474,15 +3471,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             )}
 
             {/* Sécurité du Compte (Accès & Authentification École Connectée) */}
-            <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-              <div className="p-3 sm:p-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+            <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+              <div className="p-2.5 sm:p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 bg-slate-50/70">
                 <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-slate-900 text-emerald-400 rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-slate-800">
-                    <Key size={16} />
+                  <div className="w-8 h-8 rounded-lg bg-slate-900 text-emerald-400 flex items-center justify-center shrink-0 border border-slate-800 shadow-2xs">
+                    <Key size={15} />
                   </div>
                   <div className="min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
+                      <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
                         Sécurité du Compte & Authentification
                       </h3>
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
@@ -3490,8 +3487,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                         École Connectée
                       </span>
                     </div>
-                    <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
-                      Compte connecté : <strong className="text-slate-700 font-semibold">{user.email}</strong> • Modification des identifiants d'accès
+                    <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                      Compte connecté : <strong className="text-slate-700 font-semibold font-mono">{user.email}</strong>
                     </p>
                   </div>
                 </div>
@@ -3500,7 +3497,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                   type="button"
                   onClick={handleUpdatePassword} 
                   disabled={saving || !securityData.newPassword || !securityData.confirmPassword} 
-                  className="px-3.5 py-1.5 sm:py-2 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end sm:self-center cursor-pointer"
+                  className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end sm:self-center cursor-pointer"
                   title="Valider la mise à jour du mot de passe"
                 >
                   {saving ? (
@@ -3518,12 +3515,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 </button>
               </div>
 
-              <div className="p-3.5 sm:p-4 space-y-3">
-                <div className="flex items-center gap-2 text-slate-600 bg-slate-50 border border-slate-200/80 px-3 py-1.5 rounded-xl text-[11px] sm:text-xs font-medium">
-                  <Shield size={14} className="shrink-0 text-indigo-600" />
-                  <span>La mise à jour de vos identifiants révoquera automatiquement les sessions ouvertes sur vos autres terminaux connectés.</span>
-                </div>
-
+              <div className="p-3 sm:p-3.5">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div className="space-y-1">
                     <div className="flex items-center justify-between text-[11px] font-bold text-slate-700 ml-0.5">
@@ -3535,7 +3527,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                     <div className="relative">
                       <input 
                         type={showPassword ? "text" : "password"}
-                        className="w-full pl-3 pr-9 py-2 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-xl text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-2xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
+                        className="w-full pl-3 pr-9 py-1.5 sm:py-2 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-2xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
                         placeholder="Au moins 6 caractères"
                         value={securityData.newPassword}
                         onChange={e => setSecurityData({...securityData, newPassword: e.target.value})}
@@ -3569,7 +3561,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                     <div className="relative">
                       <input 
                         type={showPassword ? "text" : "password"}
-                        className="w-full pl-3 pr-9 py-2 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-xl text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-2xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
+                        className="w-full pl-3 pr-9 py-1.5 sm:py-2 bg-slate-50/70 text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold tracking-wider outline-none focus:bg-white focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10 transition-all shadow-2xs placeholder:font-sans placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400"
                         placeholder="Répétez le mot de passe"
                         value={securityData.confirmPassword}
                         onChange={e => setSecurityData({...securityData, confirmPassword: e.target.value})}
@@ -3591,18 +3583,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             {/* Politique d'Inactivité & Maintenance de Session */}
             {(user.role === 'SUPER_ADMIN' || user.role === 'SCHOOL_ADMIN' || user.role === 'DIRECTOR' || user.is_super_admin) && (
               <>
-                <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                  <div className="p-3 sm:p-3.5 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+                <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+                  <div className="p-2.5 sm:p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 bg-slate-50/70">
                     <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50 text-indigo-600 rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-indigo-100">
-                        <Clock size={16} />
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100 shadow-2xs">
+                        <Clock size={15} />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
+                        <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
                           Politique d'Inactivité & Verrouillage
                         </h3>
-                        <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
-                          Déconnexion automatique de session en cas de poste non surveillé (Terminaux École Connectée)
+                        <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          Verrouillage automatique de session après inactivité
                         </p>
                       </div>
                     </div>
@@ -3611,26 +3603,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                       type="button"
                       onClick={handleSaveSecurityPolicy} 
                       disabled={saving || !canManageAllCampuses} 
-                      className="px-3.5 py-1.5 sm:py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end sm:self-center cursor-pointer"
+                      className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 self-end sm:self-center cursor-pointer"
                     >
                       {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
-                      <span className="hidden sm:inline">Enregistrer la Politique</span>
-                      <span className="sm:hidden">Enregistrer</span>
+                      <span>Enregistrer</span>
                     </button>
                   </div>
 
-                  <div className="p-3.5 sm:p-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 bg-slate-50/80 p-3 rounded-xl border border-slate-200/80">
-                      <div className="space-y-0.5">
-                        <label className="text-xs font-bold text-slate-800">Délai d'inactivité avant verrouillage</label>
-                        <p className="text-[11px] text-slate-500">
-                          Verrouille la session après une période sans activité. Recommandé : 5 à 15 minutes.
-                        </p>
-                      </div>
+                  <div className="p-3 sm:p-3.5">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 bg-slate-50/80 p-2.5 sm:p-3 rounded-lg border border-slate-200/80">
+                      <span className="text-xs font-bold text-slate-800">
+                        Délai d'inactivité avant verrouillage
+                      </span>
                       
                       <div className="flex items-center flex-wrap gap-2 shrink-0">
                         {canManageAllCampuses && (
-                          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200">
+                          <div className="flex items-center gap-1 bg-white p-0.5 rounded-lg border border-slate-200 shadow-2xs">
                             {[5, 10, 15, 30, 60].map((preset) => (
                               <button
                                 key={preset}
@@ -3652,7 +3640,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                             type="number" 
                             min={1} 
                             max={120}
-                            className="w-20 px-2.5 py-1 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold text-center outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 shadow-2xs"
+                            className="w-16 px-2.5 py-1 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-mono font-bold text-center outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10 disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500 shadow-2xs"
                             value={sessionTimeoutInput}
                             disabled={!canManageAllCampuses}
                             onChange={e => setSessionTimeoutInput(Math.max(1, parseInt(e.target.value) || 1))}
@@ -3665,18 +3653,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 </div>
 
                 {/* Maintenance & Synchronisation des Permissions */}
-                <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-                  <div className="p-3 sm:p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+                <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+                  <div className="p-2.5 sm:p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
                     <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
-                      <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-50 text-amber-600 rounded-xl shadow-xs flex items-center justify-center shrink-0 border border-amber-100">
-                        <RefreshCw size={16} />
+                      <div className="w-8 h-8 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0 border border-amber-100 shadow-2xs">
+                        <RefreshCw size={15} />
                       </div>
                       <div className="min-w-0">
-                        <h3 className="text-sm sm:text-base font-bold tracking-tight text-slate-900">
+                        <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
                           Maintenance & Droits d'Accès
                         </h3>
-                        <p className="text-[11px] sm:text-xs text-slate-500 font-medium truncate">
-                          Resynchronisation des permissions et des profils de l'établissement connecté
+                        <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                          Resynchronisation des permissions et des profils de l'établissement
                         </p>
                       </div>
                     </div>
@@ -3685,11 +3673,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                       type="button"
                       onClick={handleRepairPermissions} 
                       disabled={saving || !canManageAllCampuses}
-                      className="px-3.5 py-1.5 sm:py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap self-end sm:self-center cursor-pointer"
+                      className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed shrink-0 whitespace-nowrap self-end sm:self-center cursor-pointer"
                     >
                       {saving ? <Loader2 size={13} className="animate-spin" /> : <ShieldCheck size={13} />} 
-                      <span className="hidden sm:inline">Réparer Permissions</span>
-                      <span className="sm:hidden">Réparer</span>
+                      <span>Réparer Permissions</span>
                     </button>
                   </div>
                 </div>
