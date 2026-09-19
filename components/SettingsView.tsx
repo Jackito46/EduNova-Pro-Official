@@ -3159,278 +3159,278 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        )}
 
        {activeTab === 'finance' && (
-         <div className="space-y-6 animate-in slide-in-from-right duration-500">
+         <div className="space-y-3 sm:space-y-3.5 animate-in slide-in-from-right duration-500">
            {!canManageAllCampuses && (
-             <div className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 p-6 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
-               <div className="flex items-start gap-4">
-                 <span className="p-3 bg-amber-100 text-amber-800 rounded-xl leading-none shrink-0"><Lock size={20} /></span>
-                 <div>
-                   <h4 className="text-sm font-bold text-amber-900 font-sans tracking-tight">Gestion Monétaire verrouillée (Annexe)</h4>
-                   <p className="text-xs text-amber-700/90 font-medium mt-1 leading-relaxed">
-                     Votre compte est rattaché à l'annexe <strong className="font-bold">"{userCampus?.name || 'Inconnue'}"</strong>. Les configurations des devises de référence, taux d'échange et listes bancaires institutionnelles relèvent de la compétence exclusive de la Direction au <strong className="font-bold">Siège Social</strong>.
-                   </p>
-                 </div>
+             <div className="bg-amber-50/90 border border-amber-200/80 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-900 shadow-xs">
+               <div className="flex items-center gap-2 min-w-0">
+                 <Lock size={15} className="text-amber-700 shrink-0" />
+                 <p className="font-medium text-[11px] sm:text-xs leading-tight truncate sm:whitespace-normal">
+                   <strong className="font-bold">Droits limités (Annexe) :</strong> Les devises institutionnelles et le taux de change de référence sont administrés par le Siège.
+                 </p>
                </div>
-               <span className="px-3 py-1.5 bg-amber-100/50 text-amber-800 text-[10px] font-black rounded-lg uppercase tracking-widest block whitespace-nowrap">
-                 Lecture Seule
+               <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
+                 Annexe
                </span>
              </div>
            )}
 
-           <div className="bg-white rounded-2xl shadow-xs border border-slate-200 overflow-hidden">
-            <div className="p-3.5 sm:p-4 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-slate-50/50">
-             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-white border border-slate-200 text-emerald-600 rounded-xl shadow-xs flex items-center justify-center shrink-0">
-                <CircleDollarSign size={20} />
-              </div>
-              <div>
-               <h3 className="text-base sm:text-lg font-bold tracking-tight text-slate-900">Finance & Devises</h3>
-               <p className="text-xs text-slate-500 font-medium">Configuration des devises et taux de change</p>
-              </div>
-             </div>
-            </div>
+           <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+             <div className="p-2.5 sm:p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+               <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+                 <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100 shadow-2xs">
+                   <CircleDollarSign size={15} />
+                 </div>
+                 <div className="min-w-0">
+                   <div className="flex items-center gap-2 flex-wrap">
+                     <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
+                       Finance & Devises
+                     </h3>
+                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono">
+                       {schoolData.global_settings?.primary_currency || 'HTG'} ↔ {schoolData.global_settings?.secondary_currency || 'USD'}
+                     </span>
+                   </div>
+                   <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                     Configuration des devises d'affichage et du taux de change de référence
+                   </p>
+                 </div>
+               </div>
 
-            <div className="p-3.5 sm:p-5 space-y-3.5">
-              {/* Configuration des Devises */}
-              <div className="space-y-4">
-                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                   <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-700 shrink-0">
-                     <CircleDollarSign size={16} />
-                    </div>
-                    <div>
-                     <h4 className="text-sm font-bold text-slate-900 tracking-tight">Configuration des Devises</h4>
-                     <p className="text-[11px] text-slate-500 font-medium">Définissez vos devises principale et de référence</p>
-                    </div>
-                   </div>
-                   <div className="flex items-center gap-2">
-                     <button
-                       type="button"
-                       disabled={!canManageAllCampuses}
-                       onClick={() => {
-                         const p = schoolData.global_settings?.primary_currency || 'HTG';
-                         const s = schoolData.global_settings?.secondary_currency || 'USD';
-                         const updatedSettings = {
-                           ...(schoolData.global_settings || {}),
-                           primary_currency: s,
-                           secondary_currency: p
-                         };
-                         setSchoolData({...schoolData, global_settings: updatedSettings});
-                         toast.info(`Devises inversées : Principale (${s}) - Secondaire (${p})`);
-                       }}
-                       className="px-3 py-2 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 disabled:opacity-50 shadow-sm"
-                     >
-                       <RefreshCw size={13} className="text-emerald-600" />
-                       Inverser devises ({schoolData.global_settings?.primary_currency || 'HTG'} ↔ {schoolData.global_settings?.secondary_currency || 'USD'})
-                     </button>
-                     <button 
-                       onClick={handleUpdateSchool} 
-                       disabled={saving || !canManageAllCampuses} 
-                       className="px-4 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 hover:bg-black transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                       Enregistrer
-                     </button>
-                   </div>
+               <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                 <button
+                   type="button"
+                   disabled={!canManageAllCampuses}
+                   onClick={() => {
+                     const p = schoolData.global_settings?.primary_currency || 'HTG';
+                     const s = schoolData.global_settings?.secondary_currency || 'USD';
+                     const updatedSettings = {
+                       ...(schoolData.global_settings || {}),
+                       primary_currency: s,
+                       secondary_currency: p
+                     };
+                     setSchoolData({...schoolData, global_settings: updatedSettings});
+                     toast.info(`Devises inversées : ${s} ↔ ${p}`);
+                   }}
+                   className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
+                   title="Inverser les devises principale et secondaire"
+                 >
+                   <RefreshCw size={12} className="text-emerald-600" />
+                   <span className="hidden sm:inline">Inverser devises</span>
+                   <span className="sm:hidden">Inverser</span>
+                 </button>
+
+                 <button 
+                   type="button"
+                   onClick={handleUpdateSchool} 
+                   disabled={saving || !canManageAllCampuses} 
+                   className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                 >
+                   {saving ? <Loader2 size={13} className="animate-spin text-emerald-400" /> : <Save size={13} className="text-emerald-400" />}
+                   <span>Enregistrer</span>
+                 </button>
+               </div>
+             </div>
+
+             <div className="p-3 sm:p-3.5 space-y-3 sm:space-y-3.5">
+               {/* Sélecteurs des Devises */}
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50/80 p-2.5 sm:p-3 rounded-lg border border-slate-200/80">
+                 <div className="space-y-1">
+                   <label className="text-[11px] font-bold text-slate-700 tracking-tight ml-0.5">Devise Principale (Affichage)</label>
+                   <select 
+                     className="w-full px-2.5 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 shadow-2xs transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
+                     value={schoolData.global_settings?.primary_currency || 'HTG'}
+                     disabled={!canManageAllCampuses}
+                     onChange={e => {
+                       const selectedPrimary = e.target.value;
+                       const currentSecondary = schoolData.global_settings?.secondary_currency || (selectedPrimary === 'HTG' ? 'USD' : 'HTG');
+                       const newSecondary = selectedPrimary === currentSecondary ? (selectedPrimary === 'HTG' ? 'USD' : 'HTG') : currentSecondary;
+                       const updatedSettings = {
+                         ...(schoolData.global_settings || {}),
+                         primary_currency: selectedPrimary,
+                         secondary_currency: newSecondary
+                       };
+                       setSchoolData({...schoolData, global_settings: updatedSettings});
+                     }}
+                   >
+                     <option value="HTG">Gourde Haïtienne (HTG)</option>
+                     <option value="USD">Dollar Américain (USD)</option>
+                   </select>
+                 </div>
+
+                 <div className="space-y-1">
+                   <label className="text-[11px] font-bold text-slate-700 tracking-tight ml-0.5">Devise Secondaire (Référence)</label>
+                   <select 
+                     className="w-full px-2.5 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 shadow-2xs transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
+                     value={schoolData.global_settings?.secondary_currency || 'USD'}
+                     disabled={!canManageAllCampuses}
+                     onChange={e => {
+                       const selectedSecondary = e.target.value;
+                       const currentPrimary = schoolData.global_settings?.primary_currency || (selectedSecondary === 'USD' ? 'HTG' : 'USD');
+                       const newPrimary = selectedSecondary === currentPrimary ? (selectedSecondary === 'USD' ? 'HTG' : 'USD') : currentPrimary;
+                       const updatedSettings = {
+                         ...(schoolData.global_settings || {}),
+                         primary_currency: newPrimary,
+                         secondary_currency: selectedSecondary
+                       };
+                       setSchoolData({...schoolData, global_settings: updatedSettings});
+                     }}
+                   >
+                     <option value="USD">Dollar Américain (USD)</option>
+                     <option value="HTG">Gourde Haïtienne (HTG)</option>
+                   </select>
+                 </div>
+               </div>
+
+               {/* Bloc Taux de Référence Actuel & Mise à jour rapide (Unifié) */}
+               <div className="bg-slate-900 rounded-xl p-3 sm:p-3.5 text-white shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 relative overflow-hidden">
+                 <div className="absolute -right-4 -bottom-4 text-white/[0.04] pointer-events-none">
+                   <CircleDollarSign size={80} />
                  </div>
                  
-                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-50/80 p-4 rounded-xl border border-slate-200/70">
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Devise Principale (Affichage)</label>
-                    <select 
-                      className="w-full px-3 py-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 shadow-sm transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
-                      value={schoolData.global_settings?.primary_currency || 'HTG'}
-                      disabled={!canManageAllCampuses}
-                      onChange={e => {
-                        const selectedPrimary = e.target.value;
-                        const currentSecondary = schoolData.global_settings?.secondary_currency || (selectedPrimary === 'HTG' ? 'USD' : 'HTG');
-                        const newSecondary = selectedPrimary === currentSecondary ? (selectedPrimary === 'HTG' ? 'USD' : 'HTG') : currentSecondary;
-                        const updatedSettings = {
-                          ...(schoolData.global_settings || {}),
-                          primary_currency: selectedPrimary,
-                          secondary_currency: newSecondary
-                        };
-                        setSchoolData({...schoolData, global_settings: updatedSettings});
-                      }}
-                    >
-                      <option value="HTG">Gourde Haïtienne (HTG)</option>
-                      <option value="USD">Dollar Américain (USD)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5">Devise Secondaire (Référence)</label>
-                    <select 
-                      className="w-full px-3 py-2.5 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 shadow-sm transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
-                      value={schoolData.global_settings?.secondary_currency || 'USD'}
-                      disabled={!canManageAllCampuses}
-                      onChange={e => {
-                        const selectedSecondary = e.target.value;
-                        const currentPrimary = schoolData.global_settings?.primary_currency || (selectedSecondary === 'USD' ? 'HTG' : 'USD');
-                        const newPrimary = selectedSecondary === currentPrimary ? (selectedSecondary === 'USD' ? 'HTG' : 'USD') : currentPrimary;
-                        const updatedSettings = {
-                          ...(schoolData.global_settings || {}),
-                          primary_currency: newPrimary,
-                          secondary_currency: selectedSecondary
-                        };
-                        setSchoolData({...schoolData, global_settings: updatedSettings});
-                      }}
-                    >
-                      <option value="USD">Dollar Américain (USD)</option>
-                      <option value="HTG">Gourde Haïtienne (HTG)</option>
-                    </select>
-                  </div>
-                 </div>
-              </div>
-
-              {/* Taux de Référence Actuel */}
-              <div className="bg-slate-900 p-4 sm:p-5 rounded-2xl text-white flex items-center justify-between gap-4 shadow-md relative overflow-hidden">
-               <div className="absolute -right-6 -top-6 text-white/5 pointer-events-none">
-                 <CircleDollarSign size={140} />
-               </div>
-               <div className="space-y-1 relative z-10">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></div>
-                  <p className="text-emerald-400 text-[10px] font-bold tracking-wider uppercase">Taux de Référence Actuel</p>
-                </div>
-                <h4 className="text-2xl sm:text-3xl font-black font-mono tracking-tight text-white">1 USD = {exchangeRate?.rate_usd_to_htg || '---'} HTG</h4>
-               </div>
-               <div className="w-10 h-10 bg-white/10 backdrop-blur-md rounded-xl flex items-center justify-center border border-white/10 relative z-10 shrink-0">
-                <RefreshCw size={18} className="text-white" />
-               </div>
-              </div>
-
-              {/* Nouveau Taux & Historique */}
-              <div className="space-y-5">
-               <div className="flex flex-col sm:flex-row gap-3 items-end">
-                <div className="flex-1 w-full">
-                 <label className="text-xs font-bold text-slate-700 tracking-tight ml-0.5 mb-1.5 block">Nouveau Taux (USD vers HTG)</label>
-                 <div className="relative group">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-xs group-focus-within:text-emerald-600 transition-colors">HTG</span>
-                  <input 
-                   type="number" 
-                   step="0.01"
-                   min="0"
-                   placeholder="Ex: 134.50"
-                   className="w-full pl-12 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/10 transition-all shadow-sm disabled:opacity-75"
-                   value={newExchangeRate}
-                   disabled={!canManageAllCampuses}
-                   onChange={e => setNewExchangeRate(e.target.value)}
-                  />
-                 </div>
-                </div>
-                <button 
-                 onClick={handleUpdateExchangeRate} 
-                 disabled={saving || !newExchangeRate || !canManageAllCampuses} 
-                 className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 active:scale-95 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed transition-all h-[42px] shrink-0"
-                >
-                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />} 
-                 Appliquer le taux
-                </button>
-               </div>
-
-               {/* Historique avec pagination */}
-               <div className="space-y-3 pt-4 border-t border-slate-100">
-                <div className="flex items-center justify-between">
-                 <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
-                   <RefreshCw size={14} />
-                  </div>
-                  <h4 className="text-xs font-bold text-slate-900 tracking-tight">
-                   Historique des Taux <span className="text-slate-400 font-normal">({exchangeRates.length})</span>
-                  </h4>
-                 </div>
-                </div>
-
-                <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                 <div className="overflow-x-auto custom-scrollbar">
-                  <table className="w-full text-left border-collapse min-w-[450px]">
-                   <thead>
-                    <tr className="bg-slate-50 border-b border-slate-200">
-                     <th className="px-4 py-2.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Date</th>
-                     <th className="px-4 py-2.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Taux (USD/HTG)</th>
-                     <th className="px-4 py-2.5 text-[10px] font-bold text-slate-600 uppercase tracking-wider text-right">Statut</th>
-                    </tr>
-                   </thead>
-                   <tbody className="divide-y divide-slate-100">
-                    {(() => {
-                     const pageSize = 5;
-                     const totalPages = Math.ceil(exchangeRates.length / pageSize) || 1;
-                     const currentPage = Math.min(exchangeRatePage, totalPages);
-                     const paginatedRates = exchangeRates.slice((currentPage - 1) * pageSize, currentPage * pageSize);
-
-                     if (exchangeRates.length === 0) {
-                      return (
-                       <tr>
-                        <td colSpan={3} className="px-4 py-8 text-center">
-                         <div className="flex flex-col items-center justify-center text-slate-400 space-y-1">
-                          <CircleDollarSign size={24} className="opacity-30" />
-                          <p className="text-xs font-bold text-slate-600">Aucun historique de taux</p>
-                          <p className="text-[11px] font-medium text-slate-400">Les taux enregistrés apparaîtront ici.</p>
-                         </div>
-                        </td>
-                       </tr>
-                      );
-                     }
-
-                     return paginatedRates.map((rate, idx) => {
-                      const absoluteIndex = (currentPage - 1) * pageSize + idx;
-                      return (
-                       <tr key={rate.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-4 py-2.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-                         {new Date(rate.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                        </td>
-                        <td className="px-4 py-2.5 text-xs font-bold text-slate-900">
-                         1 USD = {rate.rate_usd_to_htg} HTG
-                        </td>
-                        <td className="px-4 py-2.5 text-right">
-                         {absoluteIndex === 0 ? (
-                          <span className="px-2.5 py-0.5 bg-emerald-100 text-emerald-700 rounded-md text-[10px] font-bold uppercase tracking-wider">Actuel</span>
-                         ) : (
-                          <span className="px-2.5 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">Ancien</span>
-                         )}
-                        </td>
-                       </tr>
-                      );
-                     });
-                    })()}
-                   </tbody>
-                  </table>
-                 </div>
-
-                 {/* Pagination Footer */}
-                 {exchangeRates.length > 5 && (
-                  <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 border-t border-slate-200 text-xs text-slate-600">
-                   <span className="font-medium text-slate-500 text-[11px]">
-                    Page <strong className="text-slate-800">{exchangeRatePage}</strong> sur <strong className="text-slate-800">{Math.ceil(exchangeRates.length / 5) || 1}</strong> ({exchangeRates.length} au total)
-                   </span>
+                 <div className="space-y-0.5 relative z-10 min-w-0">
                    <div className="flex items-center gap-1.5">
-                    <button
-                     type="button"
-                     disabled={exchangeRatePage <= 1}
-                     onClick={() => setExchangeRatePage(p => Math.max(1, p - 1))}
-                     className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold"
-                    >
-                     <ChevronLeft size={13} /> Précédent
-                    </button>
-                    <button
-                     type="button"
-                     disabled={exchangeRatePage >= Math.ceil(exchangeRates.length / 5)}
-                     onClick={() => setExchangeRatePage(p => Math.min(Math.ceil(exchangeRates.length / 5), p + 1))}
-                     className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 transition-all shadow-sm flex items-center gap-1 text-[11px] font-bold"
-                    >
-                     Suivant <ChevronRight size={13} />
-                    </button>
-                  </div>
+                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
+                     <span className="text-emerald-400 text-[10px] font-bold tracking-wider uppercase">Taux de Référence Actuel</span>
+                   </div>
+                   <div className="text-xl sm:text-2xl font-black font-mono tracking-tight text-white flex items-baseline gap-1.5">
+                     <span>1 USD =</span>
+                     <span className="text-emerald-400">{exchangeRate?.rate_usd_to_htg || '---'}</span>
+                     <span className="text-slate-300 text-sm font-bold">HTG</span>
+                   </div>
                  </div>
-                )}
+
+                 {/* Nouveau Taux Compact */}
+                 <div className="relative z-10 flex flex-col sm:flex-row sm:items-center gap-2 shrink-0">
+                   <div className="relative">
+                     <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 font-bold font-mono text-xs">HTG</span>
+                     <input 
+                       type="number" 
+                       step="0.01"
+                       min="0"
+                       placeholder="Nouveau taux (ex: 135)"
+                       className="w-full sm:w-44 pl-11 pr-2.5 py-1.5 bg-slate-800/90 text-white placeholder:text-slate-500 border border-slate-700 rounded-lg text-xs font-mono font-bold outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/20 transition-all disabled:opacity-60"
+                       value={newExchangeRate}
+                       disabled={!canManageAllCampuses}
+                       onChange={e => setNewExchangeRate(e.target.value)}
+                       onKeyDown={e => {
+                         if (e.key === 'Enter' && newExchangeRate && canManageAllCampuses && !saving) {
+                           handleUpdateExchangeRate();
+                         }
+                       }}
+                     />
+                   </div>
+                   <button 
+                     type="button"
+                     onClick={handleUpdateExchangeRate} 
+                     disabled={saving || !newExchangeRate || !canManageAllCampuses} 
+                     className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 active:scale-95 shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed transition-all shrink-0 cursor-pointer"
+                   >
+                     {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} 
+                     <span>Appliquer</span>
+                   </button>
+                 </div>
                </div>
-              </div>
+
+               {/* Historique des Taux */}
+               <div className="space-y-2 pt-1">
+                 <div className="flex items-center justify-between">
+                   <div className="flex items-center gap-2">
+                     <div className="w-6 h-6 rounded-md bg-slate-100 text-slate-600 flex items-center justify-center shrink-0">
+                       <RefreshCw size={12} />
+                     </div>
+                     <h4 className="text-xs font-bold text-slate-900 tracking-tight">
+                       Historique des Taux <span className="text-slate-400 font-normal">({exchangeRates.length})</span>
+                     </h4>
+                   </div>
+                 </div>
+
+                 <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
+                   <div className="overflow-x-auto custom-scrollbar">
+                     <table className="w-full text-left border-collapse min-w-[400px]">
+                       <thead>
+                         <tr className="bg-slate-50/80 border-b border-slate-200/80">
+                           <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Date</th>
+                           <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider">Taux (USD/HTG)</th>
+                           <th className="px-3 py-2 text-[10px] font-bold text-slate-600 uppercase tracking-wider text-right">Statut</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-slate-100">
+                         {(() => {
+                           const pageSize = 5;
+                           const totalPages = Math.ceil(exchangeRates.length / pageSize) || 1;
+                           const currentPage = Math.min(exchangeRatePage, totalPages);
+                           const paginatedRates = exchangeRates.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+
+                           if (exchangeRates.length === 0) {
+                             return (
+                               <tr>
+                                 <td colSpan={3} className="px-4 py-6 text-center">
+                                   <div className="flex flex-col items-center justify-center text-slate-400 space-y-1">
+                                     <CircleDollarSign size={20} className="opacity-30" />
+                                     <p className="text-xs font-bold text-slate-600">Aucun historique de taux</p>
+                                     <p className="text-[11px] font-medium text-slate-400">Les taux enregistrés apparaîtront ici.</p>
+                                   </div>
+                                 </td>
+                               </tr>
+                             );
+                           }
+
+                           return paginatedRates.map((rate, idx) => {
+                             const absoluteIndex = (currentPage - 1) * pageSize + idx;
+                             return (
+                               <tr key={rate.id} className="hover:bg-slate-50/60 transition-colors">
+                                 <td className="px-3 py-2 text-xs font-medium text-slate-600 whitespace-nowrap">
+                                   {new Date(rate.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                 </td>
+                                 <td className="px-3 py-2 text-xs font-bold font-mono text-slate-900">
+                                   1 USD = {rate.rate_usd_to_htg} HTG
+                                 </td>
+                                 <td className="px-3 py-2 text-right">
+                                   {absoluteIndex === 0 ? (
+                                     <span className="px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-md text-[10px] font-bold uppercase tracking-wider">Actuel</span>
+                                   ) : (
+                                     <span className="px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md text-[10px] font-bold uppercase tracking-wider">Ancien</span>
+                                   )}
+                                 </td>
+                               </tr>
+                             );
+                           });
+                         })()}
+                       </tbody>
+                     </table>
+                   </div>
+
+                   {/* Pagination Footer */}
+                   {exchangeRates.length > 5 && (
+                     <div className="flex items-center justify-between px-3 py-2 bg-slate-50/80 border-t border-slate-200/80 text-xs text-slate-600">
+                       <span className="font-medium text-slate-500 text-[11px]">
+                         Page <strong className="text-slate-800 font-mono">{exchangeRatePage}</strong> sur <strong className="text-slate-800 font-mono">{Math.ceil(exchangeRates.length / 5) || 1}</strong> ({exchangeRates.length} au total)
+                       </span>
+                       <div className="flex items-center gap-1.5">
+                         <button
+                           type="button"
+                           disabled={exchangeRatePage <= 1}
+                           onClick={() => setExchangeRatePage(p => Math.max(1, p - 1))}
+                           className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 transition-all shadow-2xs flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                         >
+                           <ChevronLeft size={13} /> Précédent
+                         </button>
+                         <button
+                           type="button"
+                           disabled={exchangeRatePage >= Math.ceil(exchangeRates.length / 5)}
+                           onClick={() => setExchangeRatePage(p => Math.min(Math.ceil(exchangeRates.length / 5), p + 1))}
+                           className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed text-slate-700 transition-all shadow-2xs flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                         >
+                           Suivant <ChevronRight size={13} />
+                         </button>
+                       </div>
+                     </div>
+                   )}
+                 </div>
+               </div>
              </div>
            </div>
-        </div>
-       </div>
-      )}
-
+         </div>
+       )}
         {activeTab === 'payment_methods' && (
           <PaymentMethodManager
             schoolData={schoolData}

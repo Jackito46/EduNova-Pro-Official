@@ -357,7 +357,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
   });
 
   const renderMethodIcon = (iconName: PaymentMethodConfig['icon_name'], enabled: boolean) => {
-    const props = { size: 18 };
+    const props = { size: 16 };
     let iconElement = <Banknote {...props} />;
     if (iconName === 'smartphone') iconElement = <Smartphone {...props} />;
     else if (iconName === 'landmark') iconElement = <Landmark {...props} />;
@@ -368,9 +368,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
 
     return (
       <div
-        className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center font-bold text-xs shrink-0 transition-all ${
+        className={`w-8 h-8 rounded-lg flex items-center justify-center font-bold text-xs shrink-0 transition-all ${
           enabled
-            ? 'bg-slate-900 text-emerald-400 shadow-xs'
+            ? 'bg-slate-900 text-emerald-400 shadow-2xs'
             : 'bg-slate-100 text-slate-400'
         }`}
       >
@@ -380,48 +380,46 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
   };
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-300">
+    <div className="space-y-3 sm:space-y-3.5 animate-in fade-in duration-300">
       {/* Sub-campus restricted notice */}
       {!canManageAllCampuses && (
-        <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-900">
-          <div className="flex items-center gap-2">
-            <Lock size={14} className="text-amber-700 shrink-0" />
-            <p className="font-medium">
-              <strong className="font-bold">Consultation :</strong> Seul le Siège Social configure les règlements et comptes bancaires.
+        <div className="bg-amber-50/90 border border-amber-200/80 p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-900 shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <Lock size={15} className="text-amber-700 shrink-0" />
+            <p className="font-medium text-[11px] sm:text-xs leading-tight truncate sm:whitespace-normal">
+              <strong className="font-bold">Droits limités (Annexe) :</strong> Les modes de règlement et comptes bancaires sont administrés par le Siège.
             </p>
           </div>
-          <span className="px-2 py-0.5 bg-amber-200/70 text-amber-900 font-mono text-[10px] font-bold rounded uppercase">
-            Lecture Seule
+          <span className="px-2 py-0.5 bg-amber-100 text-amber-900 font-mono text-[10px] font-bold rounded uppercase shrink-0">
+            Annexe
           </span>
         </div>
       )}
 
-      {/* MODERN STREAMLINED HEADER (Minimal text, ultra fluid & responsive) */}
-      <div className="bg-white rounded-2xl p-3.5 sm:p-4 md:p-5 shadow-xs border border-slate-200">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          {/* Title and compact subtitle */}
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center shadow-xs shrink-0">
-              <Wallet size={20} />
+      {/* COMPACT UNIFIED HEADER & TABS BAR */}
+      <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
+        {/* Top Header Row */}
+        <div className="p-2.5 sm:p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3 bg-slate-50/70">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 border border-emerald-100 shadow-2xs">
+              <Wallet size={15} />
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight truncate">
-                  <span className="hidden sm:inline">Modes de Règlement & Banques</span>
-                  <span className="sm:hidden">Modes de Règlement</span>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
+                  Modes de Règlement & Banques
                 </h3>
-                <span className="hidden xs:inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase font-mono bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  Trésorerie
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono">
+                  {activeMethodsCount} / {methods.length} Actifs
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                Canaux d'encaissement et comptes bancaires de l'établissement.
+              <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                Canaux d'encaissement au guichet et comptes bancaires institutionnels
               </p>
             </div>
           </div>
 
-          {/* Action buttons */}
-          <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
             {canManageAllCampuses && (
               <button
                 type="button"
@@ -435,9 +433,10 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                   setCustomMethodRequiresRef(true);
                   setCustomMethodRequiresBank(false);
                 }}
-                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-900 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 border border-slate-200/80"
+                className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 cursor-pointer"
+                title="Créer un mode de paiement personnalisé"
               >
-                <Plus size={14} className="text-slate-800" />
+                <Plus size={13} className="text-emerald-600" />
                 <span>Nouveau Mode</span>
               </button>
             )}
@@ -447,12 +446,12 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                 type="button"
                 onClick={handleUpdateSchool}
                 disabled={saving || !canManageAllCampuses}
-                className="px-4 py-2 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-xl transition-all shadow-xs flex items-center gap-1.5 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
               >
                 {saving ? (
-                  <Loader2 size={14} className="animate-spin text-emerald-400" />
+                  <Loader2 size={13} className="animate-spin text-emerald-400" />
                 ) : (
-                  <Save size={14} className="text-emerald-400" />
+                  <Save size={13} className="text-emerald-400" />
                 )}
                 <span>Enregistrer</span>
               </button>
@@ -460,123 +459,105 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
           </div>
         </div>
 
-        {/* METRICS ROW (Clean & Responsive on all displays) */}
-        <div className="mt-3.5 pt-3 border-t border-slate-100 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-          <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
-            <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block">Modes Actifs</span>
-            <span className="text-sm font-bold text-slate-900 font-mono">
-              <span className="text-emerald-600">{activeMethodsCount}</span> / {methods.length}
-            </span>
+        {/* Integrated Navigation Pills & Fast Metrics */}
+        <div className="px-2.5 sm:px-3 py-1.5 sm:py-2 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
+            <button
+              type="button"
+              onClick={() => setActiveTab('unified')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'unified'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <SlidersHorizontal size={12} />
+              <span>Vue Globale</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('methods')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'methods'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <Wallet size={12} />
+              <span>Modes de Règlement</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                activeTab === 'methods' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {activeMethodsCount}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('banks')}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
+                activeTab === 'banks'
+                  ? 'bg-slate-900 text-white shadow-2xs'
+                  : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+              }`}
+            >
+              <CreditCard size={12} />
+              <span>Comptes Bancaires</span>
+              <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                activeTab === 'banks' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {banks.length}
+              </span>
+            </button>
           </div>
 
-          <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
-            <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block">Comptes Bancaires</span>
-            <span className="text-sm font-bold text-slate-900 font-mono">
-              {banks.length} <span className="text-slate-400 text-xs font-normal">comptes</span>
+          <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0">
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200/70">
+              {banks.length} {banks.length > 1 ? 'banques' : 'banque'}
             </span>
+            <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-slate-100 text-slate-700 border border-slate-200/70">
+              HTG & USD
+            </span>
+            {customMethodsCount > 0 && (
+              <span className="px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70">
+                {customMethodsCount} sur-mesure
+              </span>
+            )}
           </div>
-
-          <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
-            <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block">Devises</span>
-            <span className="text-xs font-bold text-slate-800 font-mono inline-flex gap-1 mt-0.5">
-              <span className="px-1.5 py-0.2 bg-white rounded border border-slate-300 text-slate-900 font-bold">HTG</span>
-              <span className="px-1.5 py-0.2 bg-white rounded border border-slate-300 text-slate-900 font-bold">USD</span>
-            </span>
-          </div>
-
-          <div className="bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/70">
-            <span className="text-[10px] font-mono font-bold uppercase text-slate-500 block">Personnalisés</span>
-            <span className="text-sm font-bold text-indigo-600 font-mono">
-              {customMethodsCount} <span className="text-slate-400 text-xs font-normal">créés</span>
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* VIEW SELECTOR PILLS */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-1.5 rounded-2xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-1 overflow-x-auto custom-scrollbar">
-          <button
-            type="button"
-            onClick={() => setActiveTab('unified')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'unified'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <SlidersHorizontal size={13} />
-            <span>Vue Globale</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('methods')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'methods'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <Wallet size={13} />
-            <span>Modes de Règlement</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-              activeTab === 'methods' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
-            }`}>
-              {activeMethodsCount}
-            </span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => setActiveTab('banks')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer shrink-0 ${
-              activeTab === 'banks'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
-            }`}
-          >
-            <CreditCard size={13} />
-            <span>Comptes Bancaires</span>
-            <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-              activeTab === 'banks' ? 'bg-white/20 text-white' : 'bg-slate-200 text-slate-800'
-            }`}>
-              {banks.length}
-            </span>
-          </button>
         </div>
       </div>
 
       {/* SECTION 1: MODES DE RÈGLEMENT */}
       {(activeTab === 'unified' || activeTab === 'methods') && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="p-3.5 sm:p-4 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/40">
+        <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
+          <div className="p-2.5 sm:p-3 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200/60">
-                <Wallet size={16} />
+              <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200/60 shrink-0">
+                <Wallet size={14} />
               </div>
               <div>
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900">Modes d'Encaissement au Guichet</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">Modes d'Encaissement au Guichet</h4>
                 <p className="text-[11px] text-slate-500 font-medium">Activation et paramétrage des canaux de paiement</p>
               </div>
             </div>
 
-            <span className="text-xs font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+            <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 shrink-0">
               {activeMethodsCount} / {methods.length} Actifs
             </span>
           </div>
 
-          <div className="p-3.5 sm:p-4 md:p-5 space-y-4">
+          <div className="p-3 sm:p-3.5 space-y-3">
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="relative flex-1 max-w-sm">
-                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   type="text"
                   placeholder="Rechercher (MonCash, Espèces, Virement...)"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                  className="w-full pl-8 pr-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                 />
               </div>
 
@@ -586,9 +567,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     key={f}
                     type="button"
                     onClick={() => setMethodFilter(f)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                    className={`px-2 py-0.5 rounded-md text-[11px] font-bold transition-all whitespace-nowrap cursor-pointer ${
                       methodFilter === f
-                        ? 'bg-slate-900 text-white shadow-xs'
+                        ? 'bg-slate-900 text-white shadow-2xs'
                         : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
@@ -604,7 +585,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
             </div>
 
             {/* Grid of Methods */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
               {filteredMethods.map((method: PaymentMethodConfig) => {
                 const isMenuOpen = openMethodMenuId === method.id;
                 const isEditing = editingMethodId === method.id;
@@ -615,11 +596,11 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     key={method.id}
                     className={`bg-white rounded-xl border transition-all relative ${
                       method.enabled
-                        ? 'border-slate-200/90 shadow-xs hover:border-slate-300'
+                        ? 'border-slate-200/90 shadow-2xs hover:border-slate-300'
                         : 'border-slate-200 bg-slate-50/40 opacity-75'
                     }`}
                   >
-                    <div className="p-3.5 space-y-3">
+                    <div className="p-3 space-y-2.5">
                       {/* Top: Icon + Title + Dropdown Actions */}
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2.5 min-w-0">
@@ -646,14 +627,14 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                           <button
                             type="button"
                             onClick={() => setOpenMethodMenuId(isMenuOpen ? null : method.id)}
-                            className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                            className={`px-2 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
                               isMenuOpen
-                                ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                                ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                                 : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                             }`}
                           >
                             <span>Actions</span>
-                            <ChevronDown size={13} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={12} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
                           </button>
 
                           <AnimatePresence>
@@ -663,7 +644,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 4 }}
                                 transition={{ duration: 0.12 }}
-                                className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-40 text-xs font-medium space-y-0.5"
+                                className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-40 text-xs font-medium space-y-0.5"
                               >
                                 <div className="px-3 py-1 border-b border-slate-100 text-[10px] font-mono font-bold text-slate-400 uppercase truncate">
                                   {method.name}
@@ -754,9 +735,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                       </div>
 
                       {/* Status Badges */}
-                      <div className="flex flex-wrap items-center gap-1.5 pt-1.5 border-t border-slate-100">
+                      <div className="flex flex-wrap items-center gap-1.5 pt-1 border-t border-slate-100">
                         <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase font-mono flex items-center gap-1 ${
+                          className={`px-1.5 py-0.2 rounded text-[10px] font-bold uppercase font-mono flex items-center gap-1 ${
                             method.enabled
                               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               : 'bg-slate-100 text-slate-500 border border-slate-200'
@@ -786,9 +767,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                         )}
                       </div>
 
-                      {/* In-Card Config Form (High contrast dark text on white) */}
+                      {/* In-Card Config Form */}
                       {isEditing ? (
-                        <div className="space-y-2.5 p-3 bg-slate-50 rounded-xl border border-slate-200 animate-in fade-in">
+                        <div className="space-y-2 p-2.5 bg-slate-50/90 rounded-lg border border-slate-200 animate-in fade-in">
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold uppercase text-slate-700 font-mono">
                               Compte / ID Marchand
@@ -807,7 +788,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 });
                               }}
                               placeholder="Ex: +509 3844-0000 / Compte..."
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                             />
                           </div>
 
@@ -829,7 +810,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 });
                               }}
                               placeholder="Ex: Vérifier le SMS officiel Digicel..."
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 resize-none shadow-xs"
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 resize-none shadow-2xs"
                             />
                           </div>
 
@@ -837,7 +818,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                             <button
                               type="button"
                               onClick={() => setEditingMethodId(null)}
-                              className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors cursor-pointer"
+                              className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors cursor-pointer"
                             >
                               Terminer
                             </button>
@@ -847,7 +828,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                         (method.account_info || method.instructions) && (
                           <div className="space-y-1 text-xs pt-0.5">
                             {method.account_info && (
-                              <div className="flex items-center justify-between gap-1.5 bg-slate-50 px-2 py-1 rounded-lg border border-slate-200/70">
+                              <div className="flex items-center justify-between gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-200/70">
                                 <div className="min-w-0 truncate">
                                   <span className="text-[9px] uppercase font-bold text-slate-500 font-mono mr-1">ID:</span>
                                   <span className="font-mono font-bold text-slate-900 text-xs">{method.account_info}</span>
@@ -855,14 +836,14 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 <button
                                   type="button"
                                   onClick={() => copyToClipboard(method.account_info || '', 'ID Marchand')}
-                                  className="p-0.5 text-slate-400 hover:text-slate-800 transition-colors"
+                                  className="p-0.5 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
                                 >
                                   {copiedText === method.account_info ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
                                 </button>
                               </div>
                             )}
                             {method.instructions && (
-                              <p className="text-[11px] text-slate-600 italic bg-slate-50/60 p-1.5 rounded-lg border border-slate-100 line-clamp-2">
+                              <p className="text-[11px] text-slate-600 italic bg-slate-50/60 p-1.5 rounded-md border border-slate-100 line-clamp-2">
                                 "{method.instructions}"
                               </p>
                             )}
@@ -880,27 +861,27 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
 
       {/* SECTION 2: COMPTES BANCAIRES */}
       {(activeTab === 'unified' || activeTab === 'banks') && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-xs">
-          <div className="p-3.5 sm:p-4 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/40">
+        <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
+          <div className="p-2.5 sm:p-3 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200/60">
-                <CreditCard size={16} />
+              <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center border border-blue-200/60 shrink-0">
+                <CreditCard size={14} />
               </div>
               <div>
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900">Comptes Bancaires de l'Établissement</h4>
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">Comptes Bancaires de l'Établissement</h4>
                 <p className="text-[11px] text-slate-500 font-medium">Comptes institutionnels pour dépôts et virements</p>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-200">
+              <span className="text-[11px] font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200/80">
                 {banks.length} Comptes
               </span>
               {canManageAllCampuses && !showAddBank && (
                 <button
                   type="button"
                   onClick={() => setShowAddBank(true)}
-                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                  className="px-2.5 py-1 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-colors flex items-center gap-1 cursor-pointer shadow-2xs"
                 >
                   <Plus size={12} />
                   <span>Ajouter</span>
@@ -909,10 +890,10 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
             </div>
           </div>
 
-          <div className="p-3.5 sm:p-4 md:p-5 space-y-4">
+          <div className="p-3 sm:p-3.5 space-y-3">
             {/* INLINE BANK ADDITION FORM */}
             {canManageAllCampuses && showAddBank && (
-              <div className="bg-slate-50/90 p-3.5 sm:p-4 rounded-xl border border-slate-200 space-y-3 animate-in slide-in-from-top-2">
+              <div className="bg-slate-50/90 p-3 rounded-lg border border-slate-200/80 space-y-2.5 animate-in slide-in-from-top-2">
                 <div className="flex items-center justify-between">
                   <h5 className="text-xs font-bold text-slate-900 font-mono uppercase tracking-wider flex items-center gap-1.5">
                     <Plus size={13} className="text-emerald-600" /> Ajouter un Compte Bancaire
@@ -920,18 +901,18 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAddBank(false)}
-                    className="p-1 text-slate-400 hover:text-slate-700 rounded-lg"
+                    className="p-1 text-slate-400 hover:text-slate-700 rounded-lg cursor-pointer"
                   >
                     <X size={14} />
                   </button>
                 </div>
 
-                <form onSubmit={handleAddBank} className="space-y-3">
+                <form onSubmit={handleAddBank} className="space-y-2.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                     <div className="space-y-1">
                       <label className="text-[11px] font-bold text-slate-700">Institution Bancaire *</label>
                       <select
-                        className="w-full px-3 py-2 bg-white text-slate-900 font-semibold border border-slate-300 rounded-lg text-xs outline-none focus:border-slate-800 shadow-xs cursor-pointer"
+                        className="w-full px-2.5 py-1.5 bg-white text-slate-900 font-semibold border border-slate-200 rounded-lg text-xs outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
                         value={newBankName}
                         onChange={e => {
                           setNewBankName(e.target.value);
@@ -955,7 +936,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                         <label className="text-[11px] font-bold text-slate-700">Nom de la banque *</label>
                         <input
                           type="text"
-                          className="w-full px-3 py-2 bg-white text-slate-900 font-semibold border border-slate-300 rounded-lg text-xs placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                          className="w-full px-2.5 py-1.5 bg-white text-slate-900 font-semibold border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                           placeholder="Nom de la banque"
                           value={customBankName}
                           onChange={e => setCustomBankName(e.target.value)}
@@ -967,7 +948,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                       <label className="text-[11px] font-bold text-slate-700">Numéro de compte</label>
                       <input
                         type="text"
-                        className="w-full px-3 py-2 bg-white text-slate-900 font-mono font-bold border border-slate-300 rounded-lg text-xs placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                        className="w-full px-2.5 py-1.5 bg-white text-slate-900 font-mono font-bold border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                         placeholder="Ex: 102-394-1928"
                         value={newBankAccount}
                         onChange={e => setNewBankAccount(e.target.value)}
@@ -978,7 +959,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                       <label className="text-[11px] font-bold text-slate-700">Libellé / Devise</label>
                       <input
                         type="text"
-                        className="w-full px-3 py-2 bg-white text-slate-900 font-semibold border border-slate-300 rounded-lg text-xs placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                        className="w-full px-2.5 py-1.5 bg-white text-slate-900 font-semibold border border-slate-200 rounded-lg text-xs placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                         placeholder="Ex: Courant HTG, Épargne USD..."
                         value={newBankLabel}
                         onChange={e => setNewBankLabel(e.target.value)}
@@ -990,14 +971,14 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     <button
                       type="button"
                       onClick={() => setShowAddBank(false)}
-                      className="px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                      className="px-2.5 py-1 text-xs font-bold text-slate-600 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
                     >
                       Annuler
                     </button>
                     <button
                       type="submit"
                       disabled={!newBankName || (newBankName === 'AUTRE' && !customBankName.trim())}
-                      className="px-4 py-1.5 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-xs"
+                      className="px-3 py-1 bg-slate-900 hover:bg-black text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-2xs"
                     >
                       <Plus size={13} />
                       <span>Ajouter le compte</span>
@@ -1009,13 +990,13 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
 
             {/* LIST OF BANK ACCOUNTS */}
             {banks.length === 0 ? (
-              <div className="p-6 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200">
-                <Landmark size={24} className="mx-auto text-slate-400 mb-1.5" />
+              <div className="p-5 text-center bg-slate-50/80 rounded-xl border border-dashed border-slate-200">
+                <Landmark size={22} className="mx-auto text-slate-400 mb-1" />
                 <p className="text-xs font-bold text-slate-700">Aucun compte bancaire configuré</p>
                 <p className="text-[11px] text-slate-500 mt-0.5">Ajoutez les comptes bancaires autorisés pour les virements et dépôts directs.</p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {banks.map((bankStr, idx) => {
                   const { name, account, label } = parseBank(bankStr);
                   const isMenuOpen = openBankMenuIdx === idx;
@@ -1024,7 +1005,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                   return (
                     <div
                       key={idx}
-                      className="bg-white rounded-xl border border-slate-200/90 shadow-xs p-3.5 space-y-2.5 transition-all relative"
+                      className="bg-white rounded-xl border border-slate-200/90 shadow-2xs p-3 space-y-2 transition-all relative"
                     >
                       {isEditing ? (
                         <div className="space-y-2 animate-in fade-in">
@@ -1034,7 +1015,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                               type="text"
                               value={editBankName}
                               onChange={e => setEditBankName(e.target.value)}
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-slate-800"
+                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-slate-800"
                             />
                           </div>
                           <div className="grid grid-cols-2 gap-2">
@@ -1044,7 +1025,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 type="text"
                                 value={editBankAccount}
                                 onChange={e => setEditBankAccount(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-slate-800"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-slate-800"
                               />
                             </div>
                             <div className="space-y-1">
@@ -1053,7 +1034,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 type="text"
                                 value={editBankLabel}
                                 onChange={e => setEditBankLabel(e.target.value)}
-                                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-slate-800"
+                                className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-slate-800"
                               />
                             </div>
                           </div>
@@ -1068,7 +1049,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                             <button
                               type="button"
                               onClick={() => handleSaveEditBank(idx)}
-                              className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black cursor-pointer"
+                              className="px-3 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black cursor-pointer shadow-2xs"
                             >
                               Enregistrer
                             </button>
@@ -1078,8 +1059,8 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                         <>
                           <div className="flex items-start justify-between gap-2">
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100">
-                                <Landmark size={15} />
+                              <div className="w-7 h-7 rounded-md bg-blue-50 text-blue-700 flex items-center justify-center font-bold text-xs shrink-0 border border-blue-100">
+                                <Landmark size={14} />
                               </div>
                               <div className="min-w-0">
                                 <h6 className="text-xs sm:text-sm font-bold text-slate-900 truncate">{name}</h6>
@@ -1096,14 +1077,14 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                               <button
                                 type="button"
                                 onClick={() => setOpenBankMenuIdx(isMenuOpen ? null : idx)}
-                                className={`px-2.5 py-1.5 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                                className={`px-2 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
                                   isMenuOpen
-                                    ? 'bg-slate-900 text-white border-slate-900'
+                                    ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                                     : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                                 }`}
                               >
                                 <span>Actions</span>
-                                <ChevronDown size={13} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
+                                <ChevronDown size={12} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
                               </button>
 
                               <AnimatePresence>
@@ -1113,7 +1094,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                     animate={{ opacity: 1, scale: 1, y: 0 }}
                                     exit={{ opacity: 0, scale: 0.95, y: 4 }}
                                     transition={{ duration: 0.12 }}
-                                    className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-xl border border-slate-200 py-1 z-40 text-xs font-medium space-y-0.5"
+                                    className="absolute right-0 top-full mt-1 w-48 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-40 text-xs font-medium space-y-0.5"
                                   >
                                     {account && (
                                       <button
@@ -1165,14 +1146,14 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                           </div>
 
                           {account && (
-                            <div className="flex items-center justify-between bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/70 text-xs font-mono">
+                            <div className="flex items-center justify-between bg-slate-50 px-2 py-1 rounded-md border border-slate-200/70 text-xs font-mono">
                               <span className="font-bold text-slate-900">{account}</span>
                               <button
                                 type="button"
                                 onClick={() => copyToClipboard(account, 'Numéro de compte')}
                                 className="text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
                               >
-                                {copiedText === account ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                                {copiedText === account ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
                               </button>
                             </div>
                           )}
@@ -1187,39 +1168,39 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
         </div>
       )}
 
-      {/* MODAL: NOUVEAU MODE DE RÈGLEMENT (RESPONSIVE MOBILE / TABLETTE / LAPTOP 14" / DESKTOP) */}
+      {/* MODAL: NOUVEAU MODE DE RÈGLEMENT */}
       <AnimatePresence>
         {isAddingCustomMethod && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto">
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 12 }}
               transition={{ duration: 0.18 }}
-              className="bg-white rounded-2xl sm:rounded-3xl max-w-lg w-full p-4 sm:p-5 md:p-6 shadow-2xl border border-slate-200 relative my-auto max-h-[92vh] overflow-y-auto custom-scrollbar"
+              className="bg-white rounded-2xl max-w-md w-full p-4 sm:p-5 shadow-2xl border border-slate-200 relative my-auto max-h-[92vh] overflow-y-auto custom-scrollbar"
             >
               {/* Close button */}
               <button
                 type="button"
                 onClick={() => setIsAddingCustomMethod(false)}
-                className="absolute right-3.5 top-3.5 sm:right-4 sm:top-4 p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                className="absolute right-3 top-3 p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
               >
-                <X size={18} />
+                <X size={16} />
               </button>
 
               {/* Modal Header */}
-              <div className="flex items-center gap-3 mb-4 pr-6">
-                <div className="w-10 h-10 rounded-xl bg-slate-900 text-emerald-400 flex items-center justify-center shadow-xs shrink-0">
-                  <Wallet size={20} />
+              <div className="flex items-center gap-2.5 mb-3.5 pr-6">
+                <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 shadow-2xs shrink-0">
+                  <Wallet size={16} />
                 </div>
                 <div>
-                  <h4 className="text-base sm:text-lg font-bold text-slate-900">Nouveau Mode de Règlement</h4>
-                  <p className="text-xs text-slate-500 font-medium">Ajouter une méthode personnalisée d'encaissement</p>
+                  <h4 className="text-sm sm:text-base font-bold text-slate-900">Nouveau Mode de Règlement</h4>
+                  <p className="text-[11px] text-slate-500 font-medium">Ajouter une méthode personnalisée d'encaissement</p>
                 </div>
               </div>
 
-              {/* Modal Form (Clear high-contrast text inputs) */}
-              <form onSubmit={handleSaveCustomMethod} className="space-y-3.5 text-xs">
+              {/* Modal Form */}
+              <form onSubmit={handleSaveCustomMethod} className="space-y-3 text-xs">
                 {/* Method Name */}
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-slate-800">Nom de la méthode *</label>
@@ -1229,7 +1210,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     placeholder="Ex: Western Union, Zelle, Chèque Scolaire, Cam Transfert"
                     value={customMethodName}
                     onChange={e => setCustomMethodName(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                   />
                 </div>
 
@@ -1241,12 +1222,12 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     placeholder="Ex: Réception de transferts internationaux ou locaux"
                     value={customMethodDescription}
                     onChange={e => setCustomMethodDescription(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                   />
                 </div>
 
                 {/* Account ID & Icon type */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <div className="space-y-1">
                     <label className="text-[11px] font-bold text-slate-800">Numéro Marchand / ID Compte</label>
                     <input
@@ -1254,7 +1235,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                       placeholder="Ex: email@zelle.com ou +509..."
                       value={customMethodAccount}
                       onChange={e => setCustomMethodAccount(e.target.value)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-xs"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                     />
                   </div>
 
@@ -1263,7 +1244,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     <select
                       value={customMethodIcon}
                       onChange={e => setCustomMethodIcon(e.target.value as any)}
-                      className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 outline-none focus:border-slate-800 shadow-xs cursor-pointer"
+                      className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-slate-800 shadow-2xs cursor-pointer"
                     >
                       <option value="credit-card">Carte / Terminal (TPE)</option>
                       <option value="smartphone">Portefeuille Mobile (App/SMS)</option>
@@ -1296,9 +1277,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                               setCustomMethodCurrencies([...customMethodCurrencies, curr]);
                             }
                           }}
-                          className={`flex-1 py-2 rounded-xl text-xs font-mono font-bold border transition-all cursor-pointer ${
+                          className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-bold border transition-all cursor-pointer ${
                             isSelected
-                              ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                              ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                               : 'bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100'
                           }`}
                         >
@@ -1310,15 +1291,15 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                 </div>
 
                 {/* Rules Checkboxes */}
-                <div className="space-y-2 p-3 bg-slate-50 rounded-xl border border-slate-200">
+                <div className="space-y-1.5 p-2.5 bg-slate-50/80 rounded-lg border border-slate-200">
                   <label className="flex items-center gap-2 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={customMethodRequiresRef}
                       onChange={e => setCustomMethodRequiresRef(e.target.checked)}
-                      className="w-4 h-4 rounded text-slate-900 focus:ring-0"
+                      className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-0 cursor-pointer"
                     />
-                    <span className="text-xs font-semibold text-slate-800">Exiger un numéro de bordereau / transaction / référence</span>
+                    <span className="text-[11px] font-semibold text-slate-800">Exiger un numéro de bordereau / transaction / référence</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1326,9 +1307,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                       type="checkbox"
                       checked={customMethodRequiresBank}
                       onChange={e => setCustomMethodRequiresBank(e.target.checked)}
-                      className="w-4 h-4 rounded text-slate-900 focus:ring-0"
+                      className="w-3.5 h-3.5 rounded text-slate-900 focus:ring-0 cursor-pointer"
                     />
-                    <span className="text-xs font-semibold text-slate-800">Nécessite la sélection d'une banque affiliée</span>
+                    <span className="text-[11px] font-semibold text-slate-800">Nécessite la sélection d'une banque affiliée</span>
                   </label>
                 </div>
 
@@ -1340,7 +1321,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                     placeholder="Instructions affichées au caissier lors de la sélection..."
                     value={customMethodInstructions}
                     onChange={e => setCustomMethodInstructions(e.target.value)}
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-xl text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 resize-none shadow-xs"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 resize-none shadow-2xs"
                   />
                 </div>
 
@@ -1349,13 +1330,13 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                   <button
                     type="button"
                     onClick={() => setIsAddingCustomMethod(false)}
-                    className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                    className="px-3 py-1.5 text-slate-600 hover:bg-slate-100 rounded-lg text-xs font-bold transition-colors cursor-pointer"
                   >
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                    className="px-4 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer"
                   >
                     Enregistrer la Méthode
                   </button>
