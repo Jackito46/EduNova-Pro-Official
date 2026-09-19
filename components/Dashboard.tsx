@@ -70,6 +70,7 @@ import { ModernDashboardSkeleton } from './SkeletonLoader';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import Logo from './Logo';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
+import { ClassRevenueModal } from './ClassRevenueModal';
 
 const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
@@ -1706,78 +1707,16 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         </motion.div>
       )}
 
-      {/* Revenue Breakdown Modal */}
-      {showRevenueModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in zoom-in-95 duration-300">
-      <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-emerald-50/30">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-emerald-100 text-emerald-600 rounded-2xl">
-            <TrendingUp size={24} />
-          </div>
-          <div>
-            <h3 className="text-xl font-bold text-gray-900">Recettes par {terminology.option} (Global)</h3>
-            <p className="text-sm text-gray-500">Détail des encaissements effectifs globaux</p>
-          </div>
-        </div>
-        <button 
-          onClick={() => setShowRevenueModal(false)}
-          className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-400 hover:text-gray-600"
-        >
-          <X size={24} />
-        </button>
-      </div>
-      
-      <div className="p-8 max-h-[60vh] overflow-y-auto custom-scrollbar overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[500px]">
-          <thead>
-            <tr className="text-xs font-bold text-gray-400 uppercase tracking-wider border-b border-gray-100">
-              <th className="pb-4 px-2">{terminology.option}</th>
-              <th className="pb-4 px-2 text-right">Montant Collecté</th>
-              <th className="pb-4 px-2 text-right">% du Total</th>
-            </tr>
-          </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {fullClassRevenue.map((item, idx) => (
-                    <tr key={idx} className="group hover:bg-gray-50/50 transition-colors">
-                      <td className="py-4 px-2 font-medium text-gray-700">{item.name}</td>
-                      <td className="py-4 px-2 text-right font-bold text-gray-900 font-mono">
-                        {item.montant.toLocaleString()} <span className="text-[10px] text-gray-400 font-normal">HTG</span>
-                      </td>
-                      <td className="py-4 px-2 text-right">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-600">
-                          {stats.collected > 0 ? ((item.montant / stats.collected) * 100).toFixed(1) : 0}%
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
-                  {fullClassRevenue.length === 0 && (
-                    <tr>
-                      <td colSpan={3} className="py-12 text-center text-gray-400 italic">
-                        Aucune donnée disponible pour cette session.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="px-8 py-6 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
-              <span className="text-sm font-bold text-gray-900 uppercase tracking-widest">Total Général</span>
-              <div className="text-right">
-                <span className="text-xl font-black text-emerald-600 font-mono">
-                  {stats.collected.toLocaleString()} <span className="text-xs font-normal">HTG{(stats.collectedUSD > 0 || stats.expectedUSD > 0) ? " eq." : ""}</span>
-                </span>
-                {(stats.collectedUSD > 0 || stats.expectedUSD > 0) && (
-                  <p className="text-[10px] text-gray-400 font-bold mt-1 tracking-wider uppercase">
-                    Uniquement les versements de type effectif
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Revenue Breakdown Modal - Dense, Ergonomique et Responsive */}
+      <ClassRevenueModal
+        isOpen={showRevenueModal}
+        onClose={() => setShowRevenueModal(false)}
+        data={fullClassRevenue}
+        totalCollected={stats.collected}
+        hasUSD={stats.collectedUSD > 0 || stats.expectedUSD > 0}
+        schoolName={schoolInfo.name}
+        terminology={terminology}
+      />
 
       {/* Header Section */}
       <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
@@ -3160,277 +3099,327 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           )}
 
-        {/* Montant par Classe Chart */}
-        <div className="mt-6 bg-white rounded-3xl shadow-sm border border-gray-100 p-4 md:p-6 relative overflow-hidden group/chart">
-          {/* Decorative background element */}
-          <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-50/30 rounded-full -mr-48 -mt-48 blur-3xl pointer-events-none transition-transform duration-1000 group-hover/chart:scale-110"></div>
+        {/* Montant par Classe Chart - Moderne, Fluide, Compact & Responsive */}
+        <div className="mt-5 bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200/80 p-3.5 sm:p-5 relative overflow-hidden group/chart transition-all duration-300">
+          {/* Subtle background ambient blur */}
+          <div className="absolute top-0 right-0 w-80 h-80 bg-indigo-50/30 rounded-full -mr-40 -mt-40 blur-3xl pointer-events-none transition-transform duration-1000 group-hover/chart:scale-110"></div>
           
-          <div className="flex flex-col md:flex-row md:items-center justify-between mb-4 md:mb-5 gap-3 relative z-10">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-md shadow-indigo-100/40 border border-indigo-50">
-                <BarChart3 size={24} />
+          {/* Header Compact & Fluide */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2.5 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-11 sm:h-11 bg-indigo-50 text-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center shadow-xs border border-indigo-100/70 shrink-0">
+                <BarChart3 size={20} className="sm:w-5 sm:h-5" />
               </div>
-              <div>
-                <h3 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight leading-none">Répartition Financière</h3>
-                <p className="text-[11px] text-slate-400 mt-1.5 font-bold uppercase tracking-widest">Analyse des recettes par niveau d'enseignement</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg md:text-xl font-black text-slate-900 tracking-tight leading-tight">
+                    Répartition Financière
+                  </h3>
+                  <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    École Connectée
+                  </span>
+                </div>
+                <p className="text-[10.5px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
+                  Analyse des recettes consolidées par {terminology.option?.toLowerCase() || "niveau d'enseignement"}
+                </p>
               </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 z-10">
-               {/* Segmented Control for view mode */}
-               <div className="flex bg-slate-100 p-0.5 rounded-xl border border-slate-200/40 shadow-inner relative">
-                  <button
-                    onClick={() => setChartViewMode('donut')}
-                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 relative ${chartViewMode === 'donut' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-950'}`}
-                  >
-                    Vue Donut
-                  </button>
-                  <button
-                    onClick={() => setChartViewMode('bar')}
-                    className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 relative ${chartViewMode === 'bar' ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-950'}`}
-                  >
-                    Vue Barres
-                  </button>
-               </div>
-               
-               <div className="hidden sm:flex items-center gap-2 px-4 py-2 bg-emerald-50 rounded-xl border border-emerald-100/50 shadow-sm">
-                  <TrendingUp size={14} className="text-emerald-600" />
-                  <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest">Performance Optimale</span>
-               </div>
+
+            <div className="flex items-center gap-2 justify-between sm:justify-end z-10 shrink-0">
+              {/* Segmented Control mode de vue */}
+              <div className="flex bg-slate-100/90 p-0.5 rounded-xl border border-slate-200/50 shadow-inner text-xs">
+                <button
+                  onClick={() => setChartViewMode('donut')}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${
+                    chartViewMode === 'donut' 
+                      ? 'bg-white text-indigo-600 shadow-2xs' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Vue Donut
+                </button>
+                <button
+                  onClick={() => setChartViewMode('bar')}
+                  className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${
+                    chartViewMode === 'bar' 
+                      ? 'bg-white text-indigo-600 shadow-2xs' 
+                      : 'text-slate-500 hover:text-slate-800'
+                  }`}
+                >
+                  Vue Barres
+                </button>
+              </div>
+              
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50/80 rounded-xl border border-emerald-100 text-emerald-700">
+                <TrendingUp size={13} className="shrink-0 text-emerald-600" />
+                <span className="text-[9.5px] font-bold uppercase tracking-wider whitespace-nowrap">Temps Réel</span>
+              </div>
             </div>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative z-10">
-            {/* Left: Donut Chart / Bar Chart & Total Volume */}
-            <div className="lg:col-span-5 flex flex-col items-center justify-center relative min-h-[230px]">
-               {chartViewMode === 'donut' ? (
-                 <div className="h-[230px] w-full relative">
-                   <ResponsiveContainer width="100%" height="100%">
-                     <PieChart>
-                       <Pie
-                         data={processedChartData}
-                         cx="50%"
-                         cy="50%"
-                         innerRadius={80}
-                         outerRadius={110}
-                         paddingAngle={4}
-                         dataKey="montant"
-                         stroke="#fff"
-                         strokeWidth={2}
-                         cornerRadius={8}
-                         onMouseEnter={(_data, index) => setActivePieIndex(index)}
-                         onMouseLeave={() => setActivePieIndex(null)}
-                       >
-                         {processedChartData.map((_entry, index) => {
-                            const colors = ['#4f46e5', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#f43f5e'];
-                            const isHovered = activePieIndex === index;
-                            const hasActiveHover = activePieIndex !== null;
-                            const baseColor = colors[index % colors.length];
-                            
-                            return (
-                              <Cell 
-                                key={`cell-${index}`} 
-                                fill={baseColor} 
-                                opacity={hasActiveHover ? (isHovered ? 1 : 0.45) : 1}
-                                stroke={isHovered ? baseColor : '#fff'}
-                                strokeWidth={isHovered ? 4 : 2}
-                              />
-                            );
-                         })}
-                       </Pie>
-                       <Tooltip 
-                         contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', padding: '12px 18px', fontWeight: 'bold' }}
-                         itemStyle={{ color: '#1e293b', fontWeight: 900 }}
-                         formatter={(value: number) => [`${value.toLocaleString()} G`, 'Recettes']}
-                       />
-                     </PieChart>
-                   </ResponsiveContainer>
-                   
-                   {/* Center text of Donut */}
-                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-4 text-center">
-                     {activePieIndex !== null && processedChartData[activePieIndex] ? (
-                       <motion.div 
-                         initial={{ opacity: 0, scale: 0.9 }}
-                         animate={{ opacity: 1, scale: 1 }}
-                         transition={{ duration: 0.2 }}
-                         className="flex flex-col items-center justify-center"
-                       >
-                         <p className="text-[9px] font-black text-indigo-500 uppercase tracking-[0.15em] mb-0.5 truncate max-w-[150px]">
-                           {processedChartData[activePieIndex].name}
-                         </p>
-                         <p className="text-xl font-black text-slate-900 tracking-tighter">
-                           {processedChartData[activePieIndex].montant.toLocaleString()} G
-                         </p>
-                         <span className="text-[9px] font-black text-slate-500 bg-slate-100 border border-slate-200/60 px-2 py-0.5 rounded-full mt-1 shadow-sm">
-                           {stats.collected > 0 
-                             ? ((processedChartData[activePieIndex].montant / stats.collected) * 100).toFixed(1)
-                             : '0.0'}% du total
-                         </span>
-                       </motion.div>
-                     ) : (
-                       <div className="flex flex-col items-center justify-center">
-                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mb-0.5">Total Recettes</p>
-                         <p className="text-2xl font-black text-slate-900 tracking-tighter">
-                           {stats.collected.toLocaleString()}
-                         </p>
-                         <span className="text-xs font-black text-indigo-500 uppercase tracking-widest mt-0.5">HTG</span>
-                       </div>
-                     )}
-                   </div>
-                 </div>
-               ) : (
-                 <div className="h-[230px] w-full py-2 pr-2">
-                   <ResponsiveContainer width="100%" height="100%">
-                     <BarChart
-                       data={processedChartData}
-                       layout="vertical"
-                       margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-                     >
-                       <defs>
-                         <linearGradient id="revenueBarGradient" x1="0" y1="0" x2="1" y2="0">
-                           <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.85} />
-                           <stop offset="100%" stopColor="#a855f7" stopOpacity={1} />
-                         </linearGradient>
-                       </defs>
-                       <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                       <XAxis 
-                         type="number" 
-                         tickLine={false} 
-                         axisLine={false} 
-                         tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} 
-                         tickFormatter={(value) => `${(value / 1000).toFixed(0)}k G`}
-                       />
-                       <YAxis 
-                         dataKey="name" 
-                         type="category" 
-                         tickLine={false} 
-                         axisLine={false} 
-                         tick={{ fill: '#334155', fontSize: 10, fontWeight: 'bold' }} 
-                         width={80}
-                       />
-                       <Tooltip
-                         cursor={{ fill: '#f1f5f9', opacity: 0.5, radius: 8 }}
-                         contentStyle={{ borderRadius: '20px', border: 'none', boxShadow: '0 20px 40px -10px rgba(0,0,0,0.1)', padding: '12px 20px' }}
-                         itemStyle={{ color: '#1e293b', fontWeight: 900 }}
-                         formatter={(value: number) => [`${value.toLocaleString()} G`, 'Recettes']}
-                       />
-                       <Bar 
-                         dataKey="montant" 
-                         fill="url(#revenueBarGradient)" 
-                         radius={[0, 6, 6, 0]}
-                         barSize={12}
-                         onMouseEnter={(_data, index) => setActivePieIndex(index)}
-                         onMouseLeave={() => setActivePieIndex(null)}
-                       >
-                         {processedChartData.map((_entry, index) => {
-                           const isHovered = activePieIndex === index;
-                           return (
-                             <Cell 
-                               key={`bar-cell-${index}`}
-                               opacity={activePieIndex !== null ? (isHovered ? 1 : 0.45) : 1}
-                             />
-                           );
-                         })}
-                       </Bar>
-                     </BarChart>
-                   </ResponsiveContainer>
-                 </div>
-               )}
+          {/* Grille Principale Compacte & Aérée */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 lg:gap-5 items-center relative z-10">
+            {/* Colonne Gauche: Graphique Donut / Barres interactif */}
+            <div className="lg:col-span-5 flex flex-col items-center justify-center relative min-h-[200px] sm:min-h-[220px]">
+              {chartViewMode === 'donut' ? (
+                <div className="h-[200px] sm:h-[220px] w-full relative">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={processedChartData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={66}
+                        outerRadius={95}
+                        paddingAngle={3}
+                        dataKey="montant"
+                        stroke="#fff"
+                        strokeWidth={2}
+                        cornerRadius={6}
+                        onMouseEnter={(_data, index) => setActivePieIndex(index)}
+                        onMouseLeave={() => setActivePieIndex(null)}
+                      >
+                        {processedChartData.map((_entry, index) => {
+                          const colors = ['#4f46e5', '#6366f1', '#8b5cf6', '#a855f7', '#d946ef', '#f43f5e'];
+                          const isHovered = activePieIndex === index;
+                          const hasActiveHover = activePieIndex !== null;
+                          const baseColor = colors[index % colors.length];
+                          
+                          return (
+                            <Cell 
+                              key={`cell-${index}`} 
+                              fill={baseColor} 
+                              opacity={hasActiveHover ? (isHovered ? 1 : 0.45) : 1}
+                              stroke={isHovered ? baseColor : '#fff'}
+                              strokeWidth={isHovered ? 3 : 1.5}
+                            />
+                          );
+                        })}
+                      </Pie>
+                      <Tooltip 
+                        contentStyle={{ 
+                          borderRadius: '14px', 
+                          border: '1px solid #e2e8f0', 
+                          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.08)', 
+                          padding: '8px 12px', 
+                          fontWeight: 'bold',
+                          fontSize: '12px'
+                        }}
+                        itemStyle={{ color: '#1e293b', fontWeight: 900 }}
+                        formatter={(value: number) => [`${value.toLocaleString()} HTG`, 'Recettes']}
+                      />
+                    </PieChart>
+                  </ResponsiveContainer>
+                  
+                  {/* Centre du Donut */}
+                  <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none p-2 text-center">
+                    {activePieIndex !== null && processedChartData[activePieIndex] ? (
+                      <motion.div 
+                        initial={{ opacity: 0, scale: 0.92 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex flex-col items-center justify-center max-w-[130px]"
+                      >
+                        <p className="text-[9.5px] font-black text-indigo-600 uppercase tracking-wider truncate w-full">
+                          {processedChartData[activePieIndex].name}
+                        </p>
+                        <p className="text-base sm:text-lg font-black text-slate-900 tracking-tight font-mono leading-tight">
+                          {processedChartData[activePieIndex].montant.toLocaleString()}
+                        </p>
+                        <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.2 rounded-full mt-0.5">
+                          {stats.collected > 0 
+                            ? ((processedChartData[activePieIndex].montant / stats.collected) * 100).toFixed(1)
+                            : '0.0'}%
+                        </span>
+                      </motion.div>
+                    ) : (
+                      <div className="flex flex-col items-center justify-center">
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Total Recettes</p>
+                        <p className="text-lg sm:text-xl font-black text-slate-900 tracking-tight font-mono leading-none">
+                          {stats.collected.toLocaleString()}
+                        </p>
+                        <span className="text-[9.5px] font-bold text-indigo-600 uppercase tracking-wider mt-0.5">HTG eq.</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-[200px] sm:h-[220px] w-full py-1 pr-1">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart
+                      data={processedChartData}
+                      layout="vertical"
+                      margin={{ top: 2, right: 8, left: 0, bottom: 2 }}
+                    >
+                      <defs>
+                        <linearGradient id="revenueBarGradient" x1="0" y1="0" x2="1" y2="0">
+                          <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.9} />
+                          <stop offset="100%" stopColor="#8b5cf6" stopOpacity={1} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                      <XAxis 
+                        type="number" 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tick={{ fill: '#64748b', fontSize: 9, fontWeight: 'bold' }} 
+                        tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`}
+                      />
+                      <YAxis 
+                        dataKey="name" 
+                        type="category" 
+                        tickLine={false} 
+                        axisLine={false} 
+                        tick={{ fill: '#334155', fontSize: 10, fontWeight: 'bold' }} 
+                        width={70}
+                      />
+                      <Tooltip
+                        cursor={{ fill: '#f1f5f9', opacity: 0.6, radius: 6 }}
+                        contentStyle={{ 
+                          borderRadius: '14px', 
+                          border: '1px solid #e2e8f0', 
+                          boxShadow: '0 10px 25px -5px rgba(0,0,0,0.08)', 
+                          padding: '8px 12px', 
+                          fontWeight: 'bold',
+                          fontSize: '12px'
+                        }}
+                        itemStyle={{ color: '#1e293b', fontWeight: 900 }}
+                        formatter={(value: number) => [`${value.toLocaleString()} HTG`, 'Recettes']}
+                      />
+                      <Bar 
+                        dataKey="montant" 
+                        fill="url(#revenueBarGradient)" 
+                        radius={[0, 4, 4, 0]}
+                        barSize={10}
+                        onMouseEnter={(_data, index) => setActivePieIndex(index)}
+                        onMouseLeave={() => setActivePieIndex(null)}
+                      >
+                        {processedChartData.map((_entry, index) => {
+                          const isHovered = activePieIndex === index;
+                          return (
+                            <Cell 
+                              key={`bar-cell-${index}`}
+                              opacity={activePieIndex !== null ? (isHovered ? 1 : 0.45) : 1}
+                            />
+                          );
+                        })}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </div>
 
-            {/* Right: Detailed List */}
+            {/* Colonne Droite: Classement Dense, Ergonomique et Sans Cartes Imbriquées */}
             <div className="lg:col-span-7 flex flex-col justify-center">
-              <div className="bg-slate-50/70 p-3 md:p-4 rounded-2xl border border-slate-100/80 shadow-inner">
-                
-                {/* Search and Sort controls */}
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 mb-3 bg-white p-2.5 rounded-2xl border border-slate-100 shadow-sm">
-                  <div className="relative flex-1 w-full">
-                    <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-                      <Search size={14} />
-                    </span>
+              <div className="bg-slate-50/60 p-2.5 sm:p-3 rounded-2xl border border-slate-200/70">
+                {/* Barre de recherche et de tri compacte */}
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="relative flex-1">
+                    <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
                       type="text"
-                      placeholder={`Rechercher un niveau d'enseignement...`}
+                      placeholder={`Filtrer une ${terminology.option?.toLowerCase() || 'classe'}...`}
                       value={revenueSearch}
                       onChange={(e) => setRevenueSearch(e.target.value)}
-                      className="w-full pl-9 pr-4 py-2 text-xs font-medium text-slate-700 bg-slate-50/50 hover:bg-slate-50 focus:bg-white border border-slate-100 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
+                      className="w-full pl-8 pr-7 py-1 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all placeholder:text-slate-400"
                     />
                     {revenueSearch && (
                       <button
                         onClick={() => setRevenueSearch('')}
-                        className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
                       >
                         <X size={12} />
                       </button>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-end">
-                    <button
-                      onClick={() => setRevenueSortType(revenueSortType === 'amount' ? 'name' : 'amount')}
-                      className="px-3 py-2 text-xs font-black text-slate-600 bg-slate-50 hover:bg-slate-100 border border-slate-200/50 rounded-xl transition-all flex items-center gap-2 shadow-sm active:scale-95"
-                    >
-                      <span className="text-[9px] uppercase tracking-wider text-slate-400">Ordre:</span>
-                      <span className="text-indigo-600 uppercase tracking-wider">{revenueSortType === 'amount' ? 'Montant' : 'A-Z'}</span>
-                    </button>
-                  </div>
+
+                  <button
+                    onClick={() => setRevenueSortType(revenueSortType === 'amount' ? 'name' : 'amount')}
+                    className="px-2.5 py-1 text-[11px] font-bold text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all flex items-center gap-1.5 shadow-2xs shrink-0 active:scale-95"
+                    title="Basculer le tri"
+                  >
+                    <span className="text-[9.5px] uppercase tracking-wider text-slate-400">Tri:</span>
+                    <span className="text-indigo-600 font-black">{revenueSortType === 'amount' ? 'Montant ↓' : 'Nom (A-Z)'}</span>
+                  </button>
                 </div>
 
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.25em] mb-2 px-1">Classement des {terminology.options}</p>
-                <div className="space-y-2 min-h-[140px]">
-                   {processedChartData.slice(0, 6).map((item, idx) => {
-                      const colors = ['bg-[#4f46e5]', 'bg-[#6366f1]', 'bg-[#8b5cf6]', 'bg-[#a855f7]', 'bg-[#d946ef]', 'bg-[#f43f5e]'];
-                      const color = colors[idx % colors.length];
-                      const percentage = stats.collected > 0 ? ((item.montant / stats.collected) * 100).toFixed(1) : '0.0';
-                      const maxItem = classChartData[0]?.montant || 1;
-                      const barWidth = `${(item.montant / maxItem) * 100}%`;
-                      const isHovered = activePieIndex === idx;
-                      
-                      return (
-                        <motion.div 
-                          key={idx} 
-                          initial={{ opacity: 0, x: -20 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.05, duration: 0.4 }}
-                          onMouseEnter={() => setActivePieIndex(idx)}
-                          onMouseLeave={() => setActivePieIndex(null)}
-                          className={`flex flex-col gap-1 p-1.5 rounded-xl transition-all duration-300 border cursor-default ${isHovered ? 'bg-white border-indigo-100 shadow-md shadow-indigo-100/30 -translate-y-0.5' : 'border-transparent bg-transparent'}`}
-                        >
-                          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-0.5 px-1">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-3 h-3 rounded-full ${color} shadow-sm border-2 border-white shrink-0`} />
-                              <span className="text-xs font-black text-slate-700 truncate max-w-[200px]">{item.name}</span>
-                            </div>
-                            <div className="flex items-center gap-2 ml-5 sm:ml-0">
-                              <span className="text-xs font-black text-slate-900">{item.montant.toLocaleString()} G</span>
-                              <span className="text-[9px] font-black text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md min-w-[45px] text-center shadow-sm">
-                                {percentage}%
-                              </span>
-                            </div>
+                {/* Liste des classes avec jauge intégrée fluide (Compact & Ergonomique) */}
+                <div className="space-y-1">
+                  {processedChartData.slice(0, 6).map((item, idx) => {
+                    const colors = ['bg-indigo-600', 'bg-indigo-500', 'bg-purple-600', 'bg-purple-500', 'bg-fuchsia-600', 'bg-rose-500'];
+                    const color = colors[idx % colors.length];
+                    const percentage = stats.collected > 0 ? ((item.montant / stats.collected) * 100).toFixed(1) : '0.0';
+                    const maxItem = classChartData[0]?.montant || 1;
+                    const barWidth = `${Math.min(100, Math.max(3, (item.montant / maxItem) * 100))}%`;
+                    const isHovered = activePieIndex === idx;
+
+                    return (
+                      <div 
+                        key={idx} 
+                        onMouseEnter={() => setActivePieIndex(idx)}
+                        onMouseLeave={() => setActivePieIndex(null)}
+                        className={`relative rounded-xl px-2.5 py-1.5 transition-all duration-200 cursor-pointer overflow-hidden border ${
+                          isHovered 
+                            ? 'bg-white border-indigo-200 shadow-xs translate-x-0.5' 
+                            : 'bg-white/80 border-slate-100/90 hover:bg-white'
+                        }`}
+                      >
+                        {/* Jauge d'arrière-plan intégrée compacte et discrète */}
+                        <div 
+                          className="absolute inset-y-0 left-0 bg-indigo-50/50 rounded-xl transition-all duration-300 pointer-events-none"
+                          style={{ width: barWidth }}
+                        />
+
+                        {/* Contenu aligné dense */}
+                        <div className="relative z-10 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className={`w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center shrink-0 ${
+                              idx === 0 
+                                ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                                : idx === 1 
+                                ? 'bg-slate-200 text-slate-800 border border-slate-300' 
+                                : idx === 2 
+                                ? 'bg-orange-100 text-orange-800 border border-orange-200' 
+                                : 'bg-slate-100 text-slate-500'
+                            }`}>
+                              {idx + 1}
+                            </span>
+                            <div className={`w-2 h-2 rounded-full ${color} shrink-0`} />
+                            <span className="text-xs font-bold text-slate-800 truncate" title={item.name}>
+                              {item.name}
+                            </span>
                           </div>
-                          <div className="w-full h-1.5 bg-slate-200/60 rounded-full overflow-hidden ml-5" style={{ width: 'calc(100% - 20px)' }}>
-                            <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: barWidth }}
-                                transition={{ delay: 0.1 + (idx * 0.05), duration: 0.8, ease: "easeOut" }}
-                                className={`h-full rounded-full ${color} transition-colors`} 
-                            />
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className="text-xs font-black text-slate-900 font-mono">
+                              {item.montant.toLocaleString()} <span className="text-[9.5px] font-normal text-slate-400">HTG</span>
+                            </span>
+                            <span className="text-[10px] font-bold text-slate-600 bg-white/90 border border-slate-200/80 px-1.5 py-0.2 rounded-md min-w-[42px] text-center shadow-2xs font-mono">
+                              {percentage}%
+                            </span>
                           </div>
-                        </motion.div>
-                      )
-                   })}
-                   
-                   {processedChartData.length === 0 && (
-                     <div className="flex flex-col items-center justify-center py-8 text-center text-slate-400">
-                       <Info size={24} className="text-slate-300 mb-2" />
-                       <p className="text-[11px] font-bold italic">Aucun résultat pour cette recherche</p>
-                     </div>
-                   )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  
+                  {processedChartData.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-6 text-center text-slate-400">
+                      <Info size={20} className="text-slate-300 mb-1" />
+                      <p className="text-xs font-bold italic">Aucun résultat pour cette recherche</p>
+                    </div>
+                  )}
                 </div>
                 
+                {/* Bouton Voir Toutes les Classes */}
                 <button 
-                   onClick={() => setShowRevenueModal(true)}
-                   className="mt-4 w-full py-3 bg-white border border-slate-200 text-slate-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:border-indigo-300 hover:text-indigo-600 transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md active:scale-95"
+                  onClick={() => setShowRevenueModal(true)}
+                  className="mt-2 w-full py-2 bg-white hover:bg-indigo-50/60 text-slate-700 hover:text-indigo-600 rounded-xl text-[11px] font-black uppercase tracking-wider border border-slate-200/90 transition-all flex items-center justify-center gap-2 shadow-2xs hover:shadow-xs active:scale-98"
                 >
-                   <Layers size={14} /> Voir toutes les {terminology.options.toLowerCase()}
+                  <Layers size={13} className="text-indigo-500" />
+                  Voir toutes les {terminology.options?.toLowerCase() || 'classes'} ({fullClassRevenue.length || classChartData.length} au total)
                 </button>
               </div>
             </div>
