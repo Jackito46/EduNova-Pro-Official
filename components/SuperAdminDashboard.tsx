@@ -5,7 +5,7 @@ import {
   TrendingUp, ShieldCheck, Zap, ArrowUpRight, Clock, UserPlus, Server,
   LayoutDashboard, Settings, FileText, BarChart3, Mail, Palette, Sparkles, Sliders, DollarSign, Bus, BookOpen, Package,
   Globe, RefreshCw, Save, Shield, CreditCard, Terminal, Info, Trash2, Pause, Play, Edit2, HardDrive, Wrench, Key, Lock, Eraser, Activity, GraduationCap, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check, Unlock, UserX, KeyRound, ShieldOff, AlertTriangle, Archive, RotateCcw,
-  MoreVertical, MoreHorizontal, Filter, Layers, Grid, List, ExternalLink, Eye, Settings2, Phone, MapPin, School, SlidersHorizontal,
+  MoreVertical, MoreHorizontal, Filter, Layers, Grid, List, ExternalLink, Eye, EyeOff, Settings2, Phone, MapPin, School, SlidersHorizontal,
   ArrowUpDown, UserCheck
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -122,6 +122,8 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user }
     confirmPassword: '',
     injectDefaults: true
   });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Admin Management Modal State
   const [adminListModalOpen, setAdminListModalOpen] = useState(false);
