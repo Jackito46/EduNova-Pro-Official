@@ -959,52 +959,78 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         </div>
       </div>
 
-      {/* 4. Filter & View Mode Tabs */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 border-b border-slate-200 pb-2.5">
-        {/* View Mode Toggle */}
-        <div className="flex items-center bg-slate-100 p-0.5 sm:p-1 rounded-xl w-full sm:w-auto">
+      {/* 4. Filter & View Mode Tabs - Moderne, Fluide & Compact */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 border-b border-slate-200/80 pb-3">
+        {/* View Mode Toggle - Segmented Controller */}
+        <div className="inline-flex items-center bg-slate-100/90 p-1 rounded-xl border border-slate-200/70 shadow-2xs w-full sm:w-auto">
           <button 
             onClick={() => setViewMode('CURRENT')} 
-            className={`flex-1 sm:flex-none px-3.5 py-1.5 sm:py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${viewMode === 'CURRENT' ? 'bg-white text-indigo-700 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              viewMode === 'CURRENT' 
+                ? 'bg-white text-indigo-700 shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            <Calendar size={13} className={viewMode === 'CURRENT' ? 'text-indigo-600' : 'text-slate-500'} />
-            {isHigherEd ? 'Sessions Actives' : 'Années Scolaires Actives'} ({currentYears.length})
+            <Calendar size={13} className={viewMode === 'CURRENT' ? 'text-indigo-600' : 'text-slate-400'} />
+            <span>{isHigherEd ? 'Sessions Actives' : 'Années Scolaires Actives'}</span>
+            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-black ${
+              viewMode === 'CURRENT' ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {currentYears.length}
+            </span>
           </button>
           <button 
             onClick={() => setViewMode('ARCHIVED')} 
-            className={`flex-1 sm:flex-none px-3.5 py-1.5 sm:py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center justify-center gap-1.5 cursor-pointer ${viewMode === 'ARCHIVED' ? 'bg-white text-slate-900 shadow-2xs' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 sm:flex-none px-3.5 py-1.5 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              viewMode === 'ARCHIVED' 
+                ? 'bg-white text-slate-900 shadow-xs' 
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
           >
-            <Bookmark size={13} className={viewMode === 'ARCHIVED' ? 'text-slate-700' : 'text-slate-500'} />
-            Archives ({archivedYears.length})
+            <Bookmark size={13} className={viewMode === 'ARCHIVED' ? 'text-slate-700' : 'text-slate-400'} />
+            <span>Archives</span>
+            <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-mono font-black ${
+              viewMode === 'ARCHIVED' ? 'bg-slate-100 text-slate-800' : 'bg-slate-200/80 text-slate-600'
+            }`}>
+              {archivedYears.length}
+            </span>
           </button>
         </div>
 
         {/* Type Filter */}
         {isHigherEd && (
-          <div className="flex flex-wrap items-center gap-1.5 bg-slate-50 p-0.5 sm:p-1 rounded-xl border border-slate-100">
+          <div className="flex flex-wrap items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 shadow-2xs">
             <button 
               onClick={() => setActiveFilter('ALL')} 
-              className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer ${activeFilter === 'ALL' ? 'bg-white text-slate-950 shadow-2xs border border-slate-200/50' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-all cursor-pointer ${
+                activeFilter === 'ALL' ? 'bg-white text-slate-950 shadow-xs border border-slate-200/50' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               Tout
             </button>
             <button 
               onClick={() => setActiveFilter('REGULAR')} 
-              className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer ${activeFilter === 'REGULAR' ? 'bg-indigo-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                activeFilter === 'REGULAR' ? 'bg-indigo-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               <BookOpen size={11} />
               Normales
             </button>
             <button 
               onClick={() => setActiveFilter('INTENSIVE')} 
-              className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer ${activeFilter === 'INTENSIVE' ? 'bg-amber-500 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                activeFilter === 'INTENSIVE' ? 'bg-amber-500 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Zap size={11} />
               Intensives
             </button>
             <button 
               onClick={() => setActiveFilter('SPECIAL')} 
-              className={`px-2.5 py-1 text-[10px] sm:text-xs font-black uppercase tracking-wider rounded-lg transition-all flex items-center gap-1 cursor-pointer ${activeFilter === 'SPECIAL' ? 'bg-purple-600 text-white shadow-2xs' : 'text-slate-600 hover:bg-slate-200/50'}`}
+              className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                activeFilter === 'SPECIAL' ? 'bg-purple-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+              }`}
             >
               <Sparkles size={11} />
               Spéciales
@@ -1013,7 +1039,7 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
         )}
       </div>
 
-      {/* 5. Sessions Interactive Cards Grid */}
+      {/* 5. Sessions Interactive Cards Grid - Ergonomique & Équilibré */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
         <AnimatePresence mode="popLayout">
           {filteredYears.length === 0 ? (
@@ -1036,157 +1062,205 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             filteredYears.map(year => {
               const typeBadge = getSessionTypeBadge(year.session_type);
               const isActive = year.status === 'ACTIVE' || year.is_active;
+              const range = formatAcademicDateRange(year.start_date, year.end_date);
               
               return (
                 <motion.div 
                   layout
                   key={year.id} 
-                  initial={{ opacity: 0, y: 10 }}
+                  initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
-                  className={`flex flex-col p-3.5 sm:p-4 rounded-2xl border transition-all gap-3 ${isActive ? 'bg-slate-900/[0.02] border-indigo-500/80 shadow-md shadow-indigo-950/5 ring-1 ring-indigo-500/20' : year.status === 'FUTURE' ? 'bg-indigo-50/20 border-indigo-200/80' : 'bg-white border-slate-200/80 shadow-2xs hover:shadow-xs'}`}
+                  transition={{ duration: 0.18 }}
+                  className={`flex flex-col justify-between p-3.5 sm:p-4 rounded-2xl border transition-all relative overflow-hidden ${
+                    isActive 
+                      ? 'bg-white border-2 border-indigo-600/90 shadow-xs ring-4 ring-indigo-500/10' 
+                      : year.status === 'FUTURE' 
+                      ? 'bg-white border-indigo-200/90 shadow-2xs hover:shadow-xs hover:border-indigo-300' 
+                      : year.status === 'VIERGE'
+                      ? 'bg-white border-amber-200/90 shadow-2xs hover:shadow-xs hover:border-amber-300'
+                      : 'bg-slate-50/70 border-slate-200/80 shadow-2xs hover:shadow-xs opacity-90'
+                  }`}
                 >
-                  {/* Top Line: Badge, Libellé, Status */}
-                  <div className="flex items-start justify-between gap-2.5">
-                    <div className="space-y-1">
-                      {isHigherEd && (
-                        <div className="flex items-center gap-1.5">
-                          <span className={`px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider border flex items-center gap-1 ${typeBadge.classes}`}>
+                  {/* Decorative subtle accent bar for active */}
+                  {isActive && (
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-blue-500 to-indigo-600" />
+                  )}
+
+                  {/* Top: Header & Status */}
+                  <div>
+                    <div className="flex items-start justify-between gap-3 mb-2.5">
+                      <div className="min-w-0">
+                        {isHigherEd && (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9.5px] font-black uppercase tracking-wider border mb-1 ${typeBadge.classes}`}>
                             {typeBadge.icon}
                             {typeBadge.label}
                           </span>
-                        </div>
-                      )}
-                      
-                      <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug">
-                        {year.label}
-                      </h3>
-                      
-                      {/* DateTime Range Pill (Harmonisé Feuille de Présence) */}
-                      {(() => {
-                        const range = formatAcademicDateRange(year.start_date, year.end_date);
-                        return (
-                          <div className="inline-flex flex-wrap items-center gap-1.5 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-lg border border-slate-200/90 shadow-2xs transition-colors">
-                            <Calendar size={12} className="text-indigo-600 shrink-0 stroke-[2.2]" />
-                            <span className="font-extrabold text-[11px] text-slate-800">
-                              {range.startText}
-                            </span>
-                            <ArrowRight size={10} className="text-slate-400 shrink-0" />
-                            <span className="font-extrabold text-[11px] text-slate-800">
-                              {range.endText}
-                            </span>
-                            {range.duration && (
-                              <>
-                                <span className="text-slate-300 font-light">•</span>
-                                <span className="text-[10px] font-black uppercase px-1.5 py-0.5 bg-white text-indigo-700 rounded border border-indigo-100 shadow-2xs font-mono">
-                                  {range.duration}
-                                </span>
-                              </>
-                            )}
-                            {year.created_at && (
-                              <>
-                                <span className="text-slate-300 font-light">•</span>
-                                <Clock size={11} className="text-slate-400 shrink-0" />
-                                <span className="font-mono text-[10px] text-slate-500 font-semibold">
-                                  {new Date(year.created_at).toLocaleDateString('fr-FR', {
-                                    day: '2-digit',
-                                    month: 'short'
-                                  })}
-                                </span>
-                              </>
-                            )}
-                          </div>
-                        );
-                      })()}
+                        )}
+                        <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-snug font-mono">
+                          {year.label}
+                        </h3>
+                      </div>
+
+                      {/* Status Badges */}
+                      <div className="shrink-0">
+                        {isActive ? (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-900 text-white shadow-2xs border border-slate-800">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            Actif
+                          </span>
+                        ) : year.status === 'FUTURE' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-50 text-indigo-700 border border-indigo-200/80 shadow-2xs">
+                            En Préparation
+                          </span>
+                        ) : year.status === 'VIERGE' ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200/80 shadow-2xs">
+                            Nouvelle
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200 shadow-2xs">
+                            Archivée
+                          </span>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      {year.status === 'ACTIVE' && (
-                        <span className="px-2.5 py-0.5 bg-slate-900 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-2xs flex items-center gap-1.5">
-                          <span className="h-1.5 w-1.5 rounded-full bg-blue-400 animate-pulse"></span>
-                          Actif
-                        </span>
-                      )}
-                      {year.status === 'FUTURE' && (
-                        <span className="px-2 py-0.5 bg-indigo-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-2xs">
-                          En Préparation
-                        </span>
-                      )}
-                      {year.status === 'VIERGE' && (
-                        <span className="px-2 py-0.5 bg-amber-500 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-2xs">
-                          Nouvelle
-                        </span>
-                      )}
-                      {year.status === 'PAST' && (
-                        <span className="px-2 py-0.5 bg-slate-400 text-white rounded-lg text-[9px] font-black uppercase tracking-wider shadow-2xs">
-                          Archivée
-                        </span>
+                    {/* Date Period Container - Compact, Dense & Ergonomique */}
+                    <div className="mb-3">
+                      {range.hasDates ? (
+                        <div className="bg-slate-50/90 border border-slate-200/80 rounded-xl p-2.5 flex items-center justify-between gap-2 transition-colors hover:bg-slate-100/70">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-white border border-slate-200/80 text-indigo-600 flex items-center justify-center shrink-0 shadow-2xs">
+                              <Calendar size={13} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 text-xs font-black text-slate-800 tracking-tight">
+                                <span className="truncate">{range.startText}</span>
+                                <ArrowRight size={10} className="text-slate-400 shrink-0" />
+                                <span className="truncate">{range.endText}</span>
+                              </div>
+                              {year.created_at && (
+                                <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                  <Clock size={10} className="shrink-0" />
+                                  <span>Créée le {new Date(year.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          {range.duration && (
+                            <span className="px-2 py-0.5 rounded-md bg-white border border-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider font-mono shadow-2xs shrink-0">
+                              {range.duration}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <div className="bg-slate-50/80 border border-dashed border-slate-200 rounded-xl p-2.5 flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-white border border-slate-200 text-slate-400 flex items-center justify-center shrink-0">
+                              <Calendar size={13} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-bold text-slate-600">Période non configurée</p>
+                              {year.created_at && (
+                                <p className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                  <Clock size={10} className="shrink-0" />
+                                  <span>Ajoutée le {new Date(year.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-medium text-slate-400 italic shrink-0">Dates à définir</span>
+                        </div>
                       )}
                     </div>
                   </div>
 
-                  {/* Actions Bar */}
-                  <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
-                    {/* Launch button */}
-                    {year.status !== 'ACTIVE' && year.status !== 'PAST' && (
+                  {/* Actions Bar - Compacte & Alignée */}
+                  {isActive ? (
+                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
+                      <div className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700">
+                        <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                        <span className="truncate">Session active en production</span>
+                      </div>
+                      <button 
+                        onClick={() => setConfirmState({ year, status: 'PAST' })} 
+                        disabled={actionLoading?.startsWith('status_')} 
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shrink-0"
+                        title="Clôturer et archiver l'année"
+                      >
+                        {actionLoading === 'status_' + year.id ? <Loader2 size={11} className="animate-spin text-slate-700" /> : <Bookmark size={11} />}
+                        <span>{isHigherEd ? 'Archiver' : "Clôturer"}</span>
+                      </button>
+                    </div>
+                  ) : year.status === 'PAST' ? (
+                    <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-slate-100">
+                      <div className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                        <Bookmark size={13} className="text-slate-400 shrink-0" />
+                        <span>Session archivée</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => setConfirmState({ year, status: 'ACTIVE' })} 
+                          disabled={actionLoading?.startsWith('status_')} 
+                          className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                        >
+                          {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin" />}
+                          <span>Réactiver</span>
+                        </button>
+                        <button 
+                          onClick={() => setSessionToDelete(year)} 
+                          className="p-1.5 text-rose-600 bg-rose-50/60 hover:bg-rose-100 border border-rose-200/80 hover:border-rose-300 rounded-lg transition-all active:scale-90 flex items-center justify-center cursor-pointer shadow-2xs"
+                          title="Supprimer définitivement"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap items-center gap-2 pt-2.5 border-t border-slate-100">
+                      {/* Launch button */}
                       <button 
                         onClick={() => setConfirmState({ year, status: 'ACTIVE' })} 
                         disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-black transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                        className="px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
                       >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin" />}
-                        {isHigherEd ? 'Lancer la session' : "Lancer l'année scolaire"}
+                        {actionLoading === 'status_' + year.id ? <Loader2 size={11} className="animate-spin" /> : <Zap size={12} className="text-amber-300" />}
+                        <span>{isHigherEd ? 'Lancer la session' : "Lancer l'année scolaire"}</span>
                       </button>
-                    )}
 
-                    {/* Set to preparation button */}
-                    {year.status === 'VIERGE' && (
-                      <button 
-                        onClick={() => setConfirmState({ year, status: 'FUTURE' })} 
-                        disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3 py-1.5 bg-indigo-600 text-white rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-indigo-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                      >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin" />}
-                        Mettre en préparation
-                      </button>
-                    )}
+                      {/* Set to preparation button */}
+                      {year.status === 'VIERGE' && (
+                        <button 
+                          onClick={() => setConfirmState({ year, status: 'FUTURE' })} 
+                          disabled={actionLoading?.startsWith('status_')} 
+                          className="px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        >
+                          {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin" />}
+                          <span>En préparation</span>
+                        </button>
+                      )}
 
-                    {/* Archive button */}
-                    {year.status !== 'PAST' && year.status !== 'ACTIVE' && (
+                      {/* Archive button */}
                       <button 
                         onClick={() => setConfirmState({ year, status: 'PAST' })} 
                         disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
+                        className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/80 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
                       >
                         {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin text-slate-700" />}
-                        {isHigherEd ? 'Archiver la session' : "Archiver l'année"}
+                        <span>Archiver</span>
                       </button>
-                    )}
-                    
-                    {/* Archive active directly (expert mode for parallel sessions) */}
-                    {isActive && isHigherEd && (
-                      <button 
-                        onClick={() => setConfirmState({ year, status: 'PAST' })} 
-                        disabled={actionLoading?.startsWith('status_')} 
-                        className="px-3 py-1.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-[10px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-1.5 cursor-pointer"
-                      >
-                        {actionLoading === 'status_' + year.id && <Loader2 size={11} className="animate-spin text-slate-700" />}
-                        Terminer / Archiver
-                      </button>
-                    )}
 
-                    {/* Delete button */}
-                    {(year.status === 'VIERGE' || year.status === 'FUTURE' || year.status === 'PAST') && (
+                      {/* Delete button */}
                       <button 
                         onClick={() => setSessionToDelete(year)} 
-                        className="p-1.5 text-rose-600 bg-rose-50/50 hover:bg-rose-50 border border-rose-200 hover:border-rose-300 rounded-lg transition-all ml-auto active:scale-90 flex items-center justify-center cursor-pointer"
+                        className="p-1.5 text-rose-600 bg-rose-50/60 hover:bg-rose-100 border border-rose-200/80 hover:border-rose-300 rounded-lg transition-all ml-auto active:scale-90 flex items-center justify-center cursor-pointer shadow-2xs"
                         title="Supprimer définitivement"
                       >
                         <Trash2 size={13} />
                       </button>
-                    )}
-                  </div>
+                    </div>
+                  )}
                 </motion.div>
               );
             })

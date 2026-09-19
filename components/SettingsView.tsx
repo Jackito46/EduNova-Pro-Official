@@ -2342,375 +2342,381 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                  </div>
                </div>
 
-               {/* Pièces Justificatives Exigées à l'Inscription / Admission adaptées à l'École Connectée */}
-               <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
-                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-2">
-                   <div className="flex items-start sm:items-center gap-2">
-                     <div className="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg shrink-0 mt-0.5 sm:mt-0">
-                       <FileCheck size={14} />
-                     </div>
-                     <div>
-                       <div className="flex items-center gap-2 flex-wrap">
-                         <h4 className="text-[10px] sm:text-[11px] font-black text-slate-900 uppercase tracking-wider">
-                           Pièces Exigées à l'{activeTerminology.enrollment}
-                         </h4>
-                         <span className={`px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider flex items-center gap-1 border ${
-                            connectedSchoolType === 'UNIVERSITY'
-                              ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
-                              : connectedSchoolType === 'PROFESSIONAL'
-                              ? 'bg-amber-50 text-amber-800 border-amber-200'
-                              : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                          }`}>
-                           {connectedSchoolType === 'UNIVERSITY' ? (
-                             <><GraduationCap size={10} /> Enseignement Supérieur • {activeTerminology.students} ({activeTerminology.enrollments})</>
-                           ) : connectedSchoolType === 'PROFESSIONAL' ? (
-                             <><Wrench size={10} /> Formation Pro • {activeTerminology.students} ({activeTerminology.enrollments})</>
-                           ) : (
-                             <><BookOpen size={10} /> Scolaire K-12 • {activeTerminology.students} ({activeTerminology.enrollments})</>
-                           )}
-                         </span>
-                       </div>
-                       <p className="text-[11px] text-slate-600 font-medium mt-0.5">
-                         Personnalisez les pièces justificatives officielles requises pour la constitution du dossier d'{activeTerminology.enrollment.toLowerCase()} d'un {activeTerminology.student.toLowerCase()} dans votre établissement.
-                       </p>
-                     </div>
-                   </div>
+                {/* Pièces Justificatives Exigées à l'Inscription / Admission - Moderne, Fluide & Compact */}
+                <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-2.5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 shadow-2xs">
+                        <FileCheck size={16} />
+                      </div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight uppercase">
+                          Pièces Exigées à l'{activeTerminology.enrollment}
+                        </h4>
+                        <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider flex items-center gap-1 border ${
+                           connectedSchoolType === 'UNIVERSITY'
+                             ? 'bg-indigo-50 text-indigo-700 border-indigo-200'
+                             : connectedSchoolType === 'PROFESSIONAL'
+                             ? 'bg-amber-50 text-amber-800 border-amber-200'
+                             : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                         }`}>
+                          {connectedSchoolType === 'UNIVERSITY' ? (
+                            <><GraduationCap size={11} /> Enseignement Supérieur</>
+                          ) : connectedSchoolType === 'PROFESSIONAL' ? (
+                            <><Wrench size={11} /> Formation Pro</>
+                          ) : (
+                            <><BookOpen size={11} /> Scolaire K-12</>
+                          )}
+                        </span>
+                      </div>
+                    </div>
 
-                   {canManageAllCampuses && (
-                     <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0 relative">
-                       {/* Menu Standards Prédéfinis */}
-                       <div className="relative">
-                         <button
-                           type="button"
-                           onClick={() => setShowPresetsMenu(!showPresetsMenu)}
-                           disabled={isSavingDocs}
-                           className="px-2.5 py-1 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 hover:border-slate-300 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                           title="Choisir un standard officiel"
-                         >
-                           <Layers size={11} className="text-indigo-600" />
-                           <span>Standards Officiels</span>
+                    {canManageAllCampuses && (
+                      <div className="flex items-center gap-1.5 self-start sm:self-auto shrink-0 relative">
+                        {/* Menu Standards Prédéfinis */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowPresetsMenu(!showPresetsMenu)}
+                            disabled={isSavingDocs}
+                            className="px-2.5 py-1.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 hover:border-slate-300 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                            title="Choisir un standard officiel"
+                          >
+                            <Layers size={13} className="text-indigo-600" />
+                            <span>Standards Officiels</span>
                             <ChevronDown size={11} className={`transition-transform duration-200 ${showPresetsMenu ? "rotate-180" : ""}`} />
-                         </button>
+                          </button>
 
-                         {showPresetsMenu && (
-                           <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-30 space-y-1 animate-in fade-in zoom-in-95">
-                             <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                               Appliquer un standard complet
-                             </div>
-                             {DOCUMENT_PRESETS.map(preset => (
-                               <button
-                                 key={preset.id}
-                                 type="button"
-                                 onClick={() => handleApplyPreset(preset)}
-                                 className="w-full text-left p-2 rounded-lg hover:bg-slate-50 transition-all flex flex-col gap-0.5 cursor-pointer group"
-                               >
-                                 <div className="flex items-center justify-between">
-                                   <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
-                                     {preset.label}
-                                   </span>
-                                   <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
-                                     {preset.badge}
-                                   </span>
-                                 </div>
-                                 <span className="text-[10px] text-slate-500 leading-tight">
-                                   {preset.description}
-                                 </span>
-                               </button>
-                             ))}
-                           </div>
-                         )}
-                       </div>
+                          {showPresetsMenu && (
+                            <div className="absolute right-0 top-full mt-1.5 w-72 bg-white rounded-xl shadow-xl border border-slate-200 p-1.5 z-30 space-y-1 animate-in fade-in zoom-in-95">
+                              <div className="px-2 py-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                Appliquer un standard officiel
+                              </div>
+                              {DOCUMENT_PRESETS.map(preset => (
+                                <button
+                                  key={preset.id}
+                                  type="button"
+                                  onClick={() => handleApplyPreset(preset)}
+                                  className="w-full text-left p-2 rounded-lg hover:bg-slate-50 transition-all flex flex-col gap-0.5 cursor-pointer group"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold text-slate-900 group-hover:text-indigo-600">
+                                      {preset.label}
+                                    </span>
+                                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600">
+                                      {preset.badge}
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 leading-tight">
+                                    {preset.description}
+                                  </span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
 
-                       {/* Bouton Réinitialiser au type connecté */}
-                       <button
-                         type="button"
-                         onClick={handleResetDocsToDefault}
-                         disabled={isSavingDocs}
-                         className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 cursor-pointer"
-                         title="Restaurer la liste recommandée pour votre type d'établissement"
-                       >
-                         <RefreshCw size={11} className={isSavingDocs ? "animate-spin" : ""} />
-                         <span>Par défaut ({connectedSchoolType === 'UNIVERSITY' ? 'Université' : connectedSchoolType === 'PROFESSIONAL' ? 'Formation Pro' : 'École Fondamentale'})</span>
-                       </button>
-                     </div>
-                   )}
-                 </div>
+                        {/* Bouton Réinitialiser au type connecté */}
+                        <button
+                          type="button"
+                          onClick={handleResetDocsToDefault}
+                          disabled={isSavingDocs}
+                          className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer border border-slate-200/60 shadow-2xs"
+                          title="Restaurer la liste recommandée par défaut pour votre type d'établissement"
+                        >
+                          <RefreshCw size={12} className={isSavingDocs ? "animate-spin text-indigo-600" : "text-slate-500"} />
+                          <span>Par défaut</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
-                 {/* Form to add a new document requirement with contextual suggestions */}
-                 {canManageAllCampuses && (
-                   <div className="bg-slate-50/90 p-2.5 sm:p-3 rounded-xl border border-slate-200/90 mb-2 space-y-2">
-                     <div className="flex items-center justify-between gap-2">
-                       <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                         <Plus size={12} className="text-indigo-600" />
-                         <span>Ajouter une nouvelle pièce justificative exigée</span>
-                       </div>
-                       <span className="text-[10px] text-slate-500 font-medium">
-                         Constitution du dossier d'{activeTerminology.enrollment.toLowerCase()}
-                       </span>
-                     </div>
+                  {/* Form to add a new document requirement with clean layout */}
+                  {canManageAllCampuses && (
+                    <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 mb-3 space-y-2.5 shadow-2xs">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-slate-800 tracking-tight">
+                        <Plus size={13} className="text-indigo-600" />
+                        <span>Ajouter une pièce justificative</span>
+                      </div>
 
-                     {/* Suggestions contextuelles rapides en pills cliquables */}
-                     <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                       <span className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                         <Sparkles size={11} className="text-amber-500" />
-                         Suggestions rapides ({connectedSchoolType === 'UNIVERSITY' ? 'Universitaire' : connectedSchoolType === 'PROFESSIONAL' ? 'Technique' : 'Scolaire'}) :
-                       </span>
-                       {activeSchoolSuggestions.map((sug, i) => (
-                         <button
-                           key={i}
-                           type="button"
-                           onClick={() => handleApplySuggestion(sug)}
-                           className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-300 transition-all cursor-pointer shadow-2xs"
+                      {/* Suggestions contextuelles rapides en pills cliquables */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold text-slate-400 flex items-center gap-1 shrink-0">
+                          <Sparkles size={11} className="text-amber-500" />
+                          Suggestions :
+                        </span>
+                        {activeSchoolSuggestions.map((sug, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => handleApplySuggestion(sug)}
+                            className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white hover:bg-indigo-50 text-slate-700 hover:text-indigo-700 border border-slate-200 hover:border-indigo-200 transition-all cursor-pointer shadow-2xs"
                             title={`Cliquer pour pré-remplir: ${sug.description}`}
-                         >
-                           + {sug.name}
-                         </button>
-                       ))}
-                     </div>
+                          >
+                            + {sug.name}
+                          </button>
+                        ))}
+                      </div>
 
-                     <form onSubmit={handleAddCustomDocument} className="space-y-2 pt-1">
-                       <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                         <div className="sm:col-span-6 space-y-0.5">
-                           <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                             Intitulé officiel de la pièce *
-                           </label>
-                           <input
-                             type="text"
-                             placeholder={
-                               connectedSchoolType === 'UNIVERSITY'
-                                 ? "Ex: Relevé de Notes du Baccalauréat (S4 / Bac II), Pièce d'Identité..."
-                                 : connectedSchoolType === 'PROFESSIONAL'
-                                 ? "Ex: Pièce d'Identité (CIN/NIF), Dernier Diplôme Technique..."
-                                 : "Ex: Acte de Naissance / Extrait d'Archives, Bulletins Antérieurs..."
-                             }
-                             value={newDocName}
-                             onChange={e => setNewDocName(e.target.value)}
-                             className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
-                           />
-                         </div>
-                         <div className="sm:col-span-6 space-y-0.5">
-                           <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
-                             Description & Consignes officielles (optionnel)
-                           </label>
-                           <input
-                             type="text"
-                             placeholder={
-                               connectedSchoolType === 'UNIVERSITY'
-                                 ? "Ex: Diplôme original certifié par le MENFP, carnet d'admissibilité..."
-                                 : connectedSchoolType === 'PROFESSIONAL'
-                                 ? "Ex: Justificatif des prérequis techniques, convention d'apprentissage..."
-                                 : "Ex: Document officiel légalisé, carnet de vaccination pédiatrique à jour..."
-                             }
-                             value={newDocDescription}
-                             onChange={e => setNewDocDescription(e.target.value)}
-                             className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 transition-all"
-                           />
-                         </div>
-                       </div>
+                      <form onSubmit={handleAddCustomDocument} className="space-y-2.5 pt-0.5">
+                        <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+                          <div className="sm:col-span-6 space-y-1">
+                            <label className="text-[10.5px] font-bold text-slate-700 block">
+                              Intitulé de la pièce *
+                            </label>
+                            <input
+                              type="text"
+                              placeholder={
+                                connectedSchoolType === 'UNIVERSITY'
+                                  ? "Ex: Relevé de Notes du Baccalauréat (S4 / Bac II)..."
+                                  : connectedSchoolType === 'PROFESSIONAL'
+                                  ? "Ex: Pièce d'Identité (CIN/NIF), Diplôme Technique..."
+                                  : "Ex: Acte de Naissance / Extrait d'Archives, Bulletins..."
+                              }
+                              value={newDocName}
+                              onChange={e => setNewDocName(e.target.value)}
+                              className="w-full px-3 py-1.5 bg-white border border-slate-200/90 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 shadow-2xs transition-all"
+                            />
+                          </div>
+                          <div className="sm:col-span-6 space-y-1">
+                            <label className="text-[10.5px] font-bold text-slate-700 block">
+                              Consignes ou description (optionnel)
+                            </label>
+                            <input
+                              type="text"
+                              placeholder={
+                                connectedSchoolType === 'UNIVERSITY'
+                                  ? "Ex: Diplôme original légalisé par le MENFP..."
+                                  : connectedSchoolType === 'PROFESSIONAL'
+                                  ? "Ex: Justificatif des prérequis techniques..."
+                                  : "Ex: Document officiel légalisé, carnet pédiatrique..."
+                              }
+                              value={newDocDescription}
+                              onChange={e => setNewDocDescription(e.target.value)}
+                              className="w-full px-3 py-1.5 bg-white border border-slate-200/90 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-indigo-600 focus:ring-1 focus:ring-indigo-600 shadow-2xs transition-all"
+                            />
+                          </div>
+                        </div>
 
-                       <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
-                         <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-                           <input
-                             type="checkbox"
-                             checked={newDocRequired}
-                             onChange={e => setNewDocRequired(e.target.checked)}
-                             className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                           />
-                           <span>Pièce obligatoire lors de l'{activeTerminology.enrollment.toLowerCase()}</span>
-                         </label>
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                          <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                            <input
+                              type="checkbox"
+                              checked={newDocRequired}
+                              onChange={e => setNewDocRequired(e.target.checked)}
+                              className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                            />
+                            <span>Obligatoire à l'{activeTerminology.enrollment.toLowerCase()}</span>
+                          </label>
 
-                         <button
-                           type="submit"
-                           disabled={isSavingDocs || !newDocName.trim()}
-                           className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer"
-                         >
-                           <Plus size={12} />
-                           <span>Ajouter au dossier d'{activeTerminology.enrollment.toLowerCase()}</span>
-                         </button>
-                       </div>
-                     </form>
-                   </div>
-                 )}
+                          <button
+                            type="submit"
+                            disabled={isSavingDocs || !newDocName.trim()}
+                            className="px-3 py-1.5 bg-slate-900 hover:bg-black disabled:opacity-50 text-white text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer active:scale-95"
+                          >
+                            <Plus size={13} />
+                            <span>Ajouter la pièce</span>
+                          </button>
+                        </div>
+                      </form>
+                    </div>
+                  )}
 
-                 {/* List of configured documents with inline editing and ordering */}
-                 <div className="space-y-1.5">
-                   {currentConfiguredDocs.length === 0 ? (
-                     <div className="p-4 text-center bg-slate-50 rounded-xl border border-dashed border-slate-200 text-slate-500 text-xs font-medium">
-                       Aucune pièce justificative configurée pour les {activeTerminology.enrollments.toLowerCase()} de cet établissement.
-                     </div>
-                   ) : (
-                     currentConfiguredDocs.map((doc, idx) => (
-                       <div 
-                         key={doc.id || idx}
-                         className="bg-white p-2.5 rounded-xl border border-slate-200/90 flex flex-col gap-2 shadow-2xs hover:border-slate-300 transition-all"
-                       >
-                         {editingDocId === doc.id ? (
-                           /* Mode Édition en ligne */
-                           <div className="space-y-2 p-1">
-                             <div className="flex items-center justify-between">
-                               <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
-                                 <Edit2 size={12} /> Modifier la pièce #{idx + 1}
-                               </span>
-                               <div className="flex items-center gap-1.5">
-                                 <button
-                                   type="button"
-                                   onClick={handleSaveEditDoc}
-                                   disabled={isSavingDocs || !editDocName.trim()}
-                                   className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-                                 >
-                                   <Check size={12} /> Enregistrer
-                                 </button>
-                                 <button
-                                   type="button"
-                                   onClick={handleCancelEditDoc}
-                                   className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
-                                 >
-                                   <XCircle size={12} /> Annuler
-                                 </button>
-                               </div>
-                             </div>
+                  {/* List of configured documents with inline editing and ordering */}
+                  <div className="space-y-2">
+                    {currentConfiguredDocs.length === 0 ? (
+                      <div className="p-4 text-center bg-slate-50 rounded-2xl border border-dashed border-slate-200 text-slate-500 text-xs font-medium">
+                        Aucune pièce justificative configurée pour les {activeTerminology.enrollments.toLowerCase()} de cet établissement.
+                      </div>
+                    ) : (
+                      currentConfiguredDocs.map((doc, idx) => (
+                        <div 
+                          key={doc.id || idx}
+                          className="bg-white p-2.5 sm:p-3 rounded-2xl border border-slate-200/80 flex flex-col gap-2 shadow-2xs hover:shadow-xs hover:border-slate-300 transition-all"
+                        >
+                          {editingDocId === doc.id ? (
+                            /* Mode Édition en ligne */
+                            <div className="space-y-2.5 p-1">
+                              <div className="flex items-center justify-between">
+                                <span className="text-xs font-bold text-indigo-700 flex items-center gap-1">
+                                  <Edit2 size={12} /> Modifier la pièce #{idx + 1}
+                                </span>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={handleSaveEditDoc}
+                                    disabled={isSavingDocs || !editDocName.trim()}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-2xs"
+                                  >
+                                    <Check size={12} /> Enregistrer
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelEditDoc}
+                                    className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <XCircle size={12} /> Annuler
+                                  </button>
+                                </div>
+                              </div>
 
-                             <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
-                               <div className="sm:col-span-6 space-y-0.5">
-                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Intitulé *</label>
-                                 <input
-                                   type="text"
-                                   value={editDocName}
-                                   onChange={e => setEditDocName(e.target.value)}
-                                   className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:ring-1 focus:ring-indigo-600"
-                                 />
-                               </div>
-                               <div className="sm:col-span-6 space-y-0.5">
-                                 <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Description</label>
-                                 <input
-                                   type="text"
-                                   value={editDocDescription}
-                                   onChange={e => setEditDocDescription(e.target.value)}
-                                   className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-lg text-xs font-medium text-slate-900 outline-none focus:ring-1 focus:ring-indigo-600"
-                                 />
-                               </div>
-                             </div>
+                              <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                                <div className="sm:col-span-6 space-y-1">
+                                  <label className="text-[10.5px] font-bold text-slate-700 block">Intitulé *</label>
+                                  <input
+                                    type="text"
+                                    value={editDocName}
+                                    onChange={e => setEditDocName(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-1 focus:ring-indigo-600 shadow-2xs"
+                                  />
+                                </div>
+                                <div className="sm:col-span-6 space-y-1">
+                                  <label className="text-[10.5px] font-bold text-slate-700 block">Description / Consignes</label>
+                                  <input
+                                    type="text"
+                                    value={editDocDescription}
+                                    onChange={e => setEditDocDescription(e.target.value)}
+                                    className="w-full px-2.5 py-1.5 bg-white border border-indigo-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:ring-1 focus:ring-indigo-600 shadow-2xs"
+                                  />
+                                </div>
+                              </div>
 
-                             <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
-                               <input
-                                 type="checkbox"
-                                 checked={editDocRequired}
-                                 onChange={e => setEditDocRequired(e.target.checked)}
-                                 className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
-                               />
-                               <span>Pièce obligatoire lors de l'{activeTerminology.enrollment.toLowerCase()}</span>
-                             </label>
-                           </div>
-                         ) : (
-                           /* Mode Affichage standard */
-                           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                             <div className="flex items-start gap-2.5">
-                               <div className="w-5 h-5 rounded-md bg-indigo-50 text-indigo-700 font-bold text-xs flex items-center justify-center shrink-0 mt-0.5">
-                                 {idx + 1}
-                               </div>
-                               <div>
-                                 <div className="flex items-center gap-2 flex-wrap">
-                                   <h5 className="text-xs font-bold text-slate-900">{doc.name}</h5>
-                                   <button
-                                     type="button"
-                                     onClick={() => canManageAllCampuses && handleToggleDocRequired(doc.id, !!doc.required)}
-                                     disabled={!canManageAllCampuses || isSavingDocs}
-                                      className={`px-1.5 py-0.5 rounded text-[9px] font-bold transition-all ${
+                              <label className="inline-flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer select-none">
+                                <input
+                                  type="checkbox"
+                                  checked={editDocRequired}
+                                  onChange={e => setEditDocRequired(e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300"
+                                />
+                                <span>Obligatoire à l'{activeTerminology.enrollment.toLowerCase()}</span>
+                              </label>
+                            </div>
+                          ) : (
+                            /* Mode Affichage standard - Compact & Propre */
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                              <div className="flex items-start gap-2.5 min-w-0">
+                                <div className="w-6 h-6 rounded-lg bg-slate-100 border border-slate-200/70 text-slate-700 font-mono font-black text-xs flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                                  {idx + 1}
+                                </div>
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <h5 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
+                                      {doc.name}
+                                    </h5>
+                                    <button
+                                      type="button"
+                                      onClick={() => canManageAllCampuses && handleToggleDocRequired(doc.id, !!doc.required)}
+                                      disabled={!canManageAllCampuses || isSavingDocs}
+                                      className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider transition-all border ${
                                         doc.required 
-                                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200 hover:bg-indigo-100' 
-                                          : 'bg-slate-100 text-slate-600 border border-slate-200 hover:bg-slate-200'
-                                      } ${!canManageAllCampuses ? 'cursor-default' : 'cursor-pointer'}`}
-                                     title="Cliquer pour basculer entre obligatoire et facultatif"
-                                   >
-                                     {doc.required ? 'Obligatoire' : 'Facultatif'}
-                                   </button>
-                                 </div>
-                                 {doc.description && (
-                                   <p className="text-[10px] text-slate-500 font-medium mt-0.5 leading-relaxed">
-                                     {doc.description}
-                                   </p>
-                                 )}
-                               </div>
-                             </div>
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-emerald-100' 
+                                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200'
+                                      } ${!canManageAllCampuses ? 'cursor-default' : 'cursor-pointer shadow-2xs active:scale-95'}`}
+                                      title="Cliquer pour basculer entre obligatoire et facultatif"
+                                    >
+                                      {doc.required ? 'Obligatoire' : 'Facultatif'}
+                                    </button>
+                                  </div>
+                                  {doc.description && (
+                                    <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-snug">
+                                      {doc.description}
+                                    </p>
+                                  )}
+                                </div>
+                              </div>
 
-                             {canManageAllCampuses && (
-                               <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
-                                 {/* Réorganiser Ordre */}
-                                 <button
-                                   type="button"
-                                   onClick={() => handleMoveDoc(idx, 'up')}
-                                   disabled={idx === 0 || isSavingDocs}
-                                   className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent rounded-lg transition-all cursor-pointer"
-                                   title="Déplacer vers le haut"
-                                 >
-                                   <ArrowUp size={12} />
-                                 </button>
-                                 <button
-                                   type="button"
-                                   onClick={() => handleMoveDoc(idx, 'down')}
-                                   disabled={idx === currentConfiguredDocs.length - 1 || isSavingDocs}
-                                   className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent rounded-lg transition-all cursor-pointer"
-                                   title="Déplacer vers le bas"
-                                 >
-                                   <ArrowDown size={12} />
-                                 </button>
+                              {canManageAllCampuses && (
+                                <div className="flex items-center gap-1 self-end sm:self-center shrink-0 border-t sm:border-t-0 border-slate-100 pt-1.5 sm:pt-0">
+                                  {/* Réorganiser Ordre */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveDoc(idx, 'up')}
+                                    disabled={idx === 0 || isSavingDocs}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-20 disabled:hover:bg-transparent rounded-lg transition-all cursor-pointer"
+                                    title="Déplacer vers le haut"
+                                  >
+                                    <ArrowUp size={13} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveDoc(idx, 'down')}
+                                    disabled={idx === currentConfiguredDocs.length - 1 || isSavingDocs}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 disabled:opacity-20 disabled:hover:bg-transparent rounded-lg transition-all cursor-pointer"
+                                    title="Déplacer vers le bas"
+                                  >
+                                    <ArrowDown size={13} />
+                                  </button>
 
-                                 {/* Modifier */}
-                                 <button
-                                   type="button"
-                                   onClick={() => handleStartEditDoc(doc)}
-                                   disabled={isSavingDocs}
-                                   className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer"
-                                   title="Modifier cette pièce"
-                                 >
-                                   <Edit2 size={12} />
-                                 </button>
+                                  {/* Modifier */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleStartEditDoc(doc)}
+                                    disabled={isSavingDocs}
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all cursor-pointer ml-0.5"
+                                    title="Modifier cette pièce"
+                                  >
+                                    <Edit2 size={13} />
+                                  </button>
 
-                                 {/* Supprimer */}
-                                 <button
-                                   type="button"
-                                   onClick={() => handleRemoveCustomDocument(doc.id)}
-                                   disabled={isSavingDocs}
-                                   className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
-                                   title="Supprimer cette pièce"
-                                 >
-                                   <Trash2 size={12} />
-                                 </button>
-                               </div>
-                             )}
-                           </div>
-                         )}
-                       </div>
-                     ))
-                   )}
-                 </div>
-               </div>
+                                  {/* Supprimer */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveCustomDocument(doc.id)}
+                                    disabled={isSavingDocs}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all cursor-pointer"
+                                    title="Supprimer cette pièce"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
 
-               {/* Zone de Danger */}
+               {/* Zone de Danger - Moderne, Ergonomique & Compact */}
                {canManageAllCampuses && (
-                 <div className="pt-2 sm:pt-2.5 border-t border-rose-100">
-                   <div className="flex items-center gap-2 mb-2">
-                     <div className="p-1.5 bg-rose-50 text-rose-600 rounded-lg"><AlertTriangle size={13} /></div>
-                     <h4 className="text-[10px] sm:text-[11px] font-black text-rose-900 uppercase tracking-wider">Zone de Danger</h4>
+                 <div className="pt-2 sm:pt-2.5 border-t border-rose-100/90">
+                   <div className="flex items-center gap-2.5 mb-2.5">
+                     <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
+                       <AlertTriangle size={15} />
+                     </div>
+                     <div className="flex items-center gap-2 flex-wrap">
+                       <h4 className="text-xs sm:text-sm font-black text-rose-900 tracking-tight uppercase">
+                         Zone de Danger
+                       </h4>
+                       <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider flex items-center gap-1 border bg-rose-50 text-rose-700 border-rose-200/80 shadow-2xs">
+                         Action Irréversible
+                       </span>
+                     </div>
                    </div>
 
                    {isPrimaryAdmin ? (
-                     <div className="bg-rose-50/40 p-2.5 sm:p-3 rounded-xl border border-rose-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 shadow-2xs">
-                       <div className="space-y-0.5">
-                         <div className="flex items-center gap-2">
-                           <h5 className="text-xs sm:text-[13px] font-bold text-rose-950">Vider les informations de l'établissement</h5>
-                           <span className="px-1.5 py-0.5 bg-rose-100 text-rose-800 text-[9px] font-black rounded-md flex items-center gap-1 border border-rose-200">
-                             <Crown size={9} /> Droit Fondateur
+                     <div className="bg-rose-50/40 p-3 sm:p-3.5 rounded-2xl border border-rose-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-2xs hover:shadow-xs transition-all">
+                       <div className="space-y-1 min-w-0 max-w-2xl">
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <h5 className="text-xs sm:text-sm font-bold text-rose-950 tracking-tight">
+                             Vider les informations de l'établissement
+                           </h5>
+                           <span className="px-2 py-0.5 bg-rose-100/90 text-rose-800 text-[9.5px] font-black uppercase tracking-wider rounded-full flex items-center gap-1 border border-rose-200/80 shadow-2xs">
+                             <Crown size={10} className="text-amber-600" /> Droit Fondateur
                            </span>
                          </div>
-                         <p className="text-[11px] text-rose-700 font-medium leading-relaxed max-w-2xl">
+                         <p className="text-[11px] text-rose-800/80 font-medium leading-snug">
                            Cette action supprimera de manière définitive toutes les données opérationnelles associées à cet établissement tout en conservant la structure générale de votre école.
                          </p>
-                         <div className="flex items-center gap-1.5 text-[10px] font-bold text-rose-900 pt-0.5">
-                           <ShieldCheck size={12} className="text-rose-600" />
-                           <span>Privilège vérifié : <span className="underline">{user.email}</span> (1er Administrateur Système)</span>
+                         <div className="pt-0.5 flex items-center gap-1.5">
+                           <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg bg-white/95 border border-rose-200/80 text-[10.5px] font-bold text-rose-900 shadow-2xs">
+                             <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
+                             <span>Privilège vérifié : <span className="underline decoration-rose-300 font-semibold">{user.email}</span> (1er Administrateur Système)</span>
+                           </div>
                          </div>
                        </div>
+
                        <button
                          type="button"
                          onClick={() => {
@@ -2718,27 +2724,30 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                            setConfirmUserEmail('');
                            setIsCleanModalOpen(true);
                          }}
-                         className="w-full md:w-auto px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-1.5 shadow-xs shrink-0 active:scale-95 cursor-pointer"
+                         className="w-full md:w-auto px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-1.5 shadow-2xs shrink-0 active:scale-95 cursor-pointer"
                        >
                          <Trash2 size={13} />
-                         Vider les données
+                         <span>Vider les données</span>
                        </button>
                      </div>
                    ) : (
-                     <div className="bg-slate-50 p-2.5 sm:p-3 rounded-xl border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 opacity-85">
-                       <div className="space-y-0.5">
-                         <div className="flex items-center gap-2">
-                           <h5 className="text-xs sm:text-[13px] font-bold text-slate-900">Réinitialisation Verrouillée (Accès Sécurisé)</h5>
-                           <span className="px-1.5 py-0.5 bg-slate-200 text-slate-700 text-[9px] font-bold rounded-md flex items-center gap-1">
-                             <Lock size={9} /> Restreint
+                     <div className="bg-slate-50/80 p-3 sm:p-3.5 rounded-2xl border border-slate-200/80 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 shadow-2xs">
+                       <div className="space-y-1 min-w-0 max-w-2xl">
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <h5 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">
+                             Réinitialisation Verrouillée (Accès Sécurisé)
+                           </h5>
+                           <span className="px-2 py-0.5 bg-slate-200/80 text-slate-700 text-[9.5px] font-black uppercase tracking-wider rounded-full flex items-center gap-1 border border-slate-300/80">
+                             <Lock size={10} /> Restreint
                            </span>
                          </div>
-                         <p className="text-[11px] text-slate-600 font-medium leading-relaxed max-w-2xl">
-                           La réinitialisation globale des données est réservée au <strong>Premier Administrateur Système (Fondateur)</strong> {primaryAdmin?.full_name ? `(${primaryAdmin.full_name})` : ''} ou au Super-Admin EduNova.
+                         <p className="text-[11px] text-slate-500 font-medium leading-snug">
+                           La réinitialisation globale des données est réservée au <strong>Premier Administrateur Système (Fondateur)</strong> {primaryAdmin?.full_name ? ' (' + primaryAdmin.full_name + ')' : ''} ou au Super-Admin EduNova.
                          </p>
                        </div>
-                       <div className="px-2.5 py-1 bg-slate-200/80 text-slate-700 rounded-lg text-[11px] font-bold shrink-0 flex items-center gap-1.5">
-                         <ShieldAlert size={12} /> Accès non autorisé
+                       <div className="px-2.5 py-1 bg-slate-200/70 text-slate-700 rounded-xl text-xs font-bold shrink-0 flex items-center gap-1.5 border border-slate-300/60">
+                         <ShieldAlert size={13} className="text-slate-500" />
+                         <span>Accès non autorisé</span>
                        </div>
                      </div>
                    )}
@@ -2746,19 +2755,21 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                )}
 
                {/* Bottom Action Bar */}
-               <div className="pt-2 sm:pt-2.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-slate-100">
+               <div className="pt-2.5 sm:pt-3 flex flex-col sm:flex-row items-center justify-between gap-2.5 border-t border-slate-100">
                  <div className="flex items-center gap-2">
-                   <div className="p-1 bg-amber-50 text-amber-600 rounded-lg"><AlertCircle size={13} /></div>
-                   <p className="text-[10px] font-bold text-slate-700 uppercase tracking-tight">Vérifiez vos informations avant de confirmer.</p>
+                   <div className="w-6 h-6 rounded-lg bg-amber-50 border border-amber-200/70 text-amber-600 flex items-center justify-center shrink-0 shadow-2xs">
+                     <AlertCircle size={13} />
+                   </div>
+                   <p className="text-[10.5px] font-bold text-slate-600 uppercase tracking-tight">Vérifiez vos informations avant de confirmer.</p>
                  </div>
                  <button 
                    onClick={handleUpdateSchool} 
                    disabled={saving || !canManageAllCampuses} 
-                   className="w-full sm:w-auto px-5 py-2 bg-slate-900 text-white rounded-xl font-bold text-xs tracking-wide uppercase flex items-center justify-center gap-2 hover:bg-black transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                   className="w-full sm:w-auto px-5 py-2 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-wide uppercase flex items-center justify-center gap-2 transition-all shadow-xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
                    title={!canManageAllCampuses ? "Modification réservée au Siège Social" : "Enregistrer les modifications"}
                  >
                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                   Enregistrer les modifications
+                   <span>Enregistrer les modifications</span>
                  </button>
                </div>
 
@@ -3751,6 +3762,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         )}
       </AnimatePresence>
 
+      {/* Modal - Vider les données de l'école (Action Critique) - Moderne, Ergonomique & Compact */}
       <Modal
         isOpen={isCleanModalOpen}
         onClose={() => {
@@ -3763,170 +3775,207 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         title="Vider les données de l'école (Action Critique)"
         type="danger"
         hideDefaultActions={true}
+        containerClassName="max-w-lg"
+        contentClassName="p-3.5 sm:p-4 text-slate-800"
       >
-        <div className="space-y-6">
-          <div className="p-3.5 bg-rose-50 rounded-xl border border-rose-200/80 flex items-center gap-3 text-xs font-semibold text-rose-900">
-            <ShieldCheck size={20} className="text-rose-600 shrink-0" />
-            <div>
-              <p className="font-bold">Validation d'Identité Fondateur / Premier Admin</p>
-              <p className="text-[11px] text-rose-700 font-medium mt-0.5">
-                Vous êtes connecté en tant que <strong>{user.full_name || user.email}</strong>. Pour valider définitivement cet effacement, veuillez remplir le nom de l'école et votre adresse email.
-              </p>
-            </div>
-          </div>
+        {(() => {
+          const targetSchoolName = cleanScope === 'all' 
+            ? schoolData.name 
+            : (campuses.find(c => c.id === cleanScope)?.name || schoolData.name);
+          const isNameValid = confirmSchoolName.trim() === targetSchoolName.trim();
+          const isEmailValid = confirmUserEmail.trim().toLowerCase() === (user.email || '').trim().toLowerCase();
+          const canSubmit = !isCleaning && isNameValid && isEmailValid;
 
-          <p className="text-slate-700 font-medium tracking-tight text-xs text-center">
-            Attention : vous êtes sur le point de réinitialiser et vider toutes les données opérationnelles {cleanScope === 'all' ? (
-              <span>de l'établissement <span className="font-bold text-slate-900">"{schoolData.name}"</span> (Siège & Annexes)</span>
-            ) : (
-              <span>de l'annexe <span className="font-bold text-slate-900">"{campuses.find(c => c.id === cleanScope)?.name}"</span> de l'établissement <span className="font-bold text-slate-900">"{schoolData.name}"</span></span>
-            )}.
-          </p>
-
-          {campuses && campuses.length > 0 && (
-            <div className="space-y-3 bg-slate-50 p-4 border border-slate-100 rounded-2xl">
-              <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1 flex items-center gap-1.5">
-                Périmètre de nettoyage
-              </label>
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setCleanScope('all')}
-                  className={`flex items-center justify-between px-4 py-3.5 rounded-xl border text-xs font-bold transition-all ${
-                    cleanScope === 'all'
-                      ? 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm'
-                      : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
-                  }`}
-                >
-                  <span>Toute l'institution (Siège & toutes les annexes)</span>
-                  <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${cleanScope === 'all' ? 'border-rose-600' : 'border-slate-300'}`}>
-                    {cleanScope === 'all' && <div className="w-2 h-2 rounded-full bg-rose-600" />}
+          return (
+            <div className="space-y-2.5 sm:space-y-3">
+              {/* 1. Validation d'Identité Fondateur */}
+              <div className="p-2.5 sm:p-3 bg-rose-50/60 rounded-xl border border-rose-200/80 flex items-start gap-2.5 shadow-2xs">
+                <div className="w-7 h-7 rounded-lg bg-white border border-rose-200 text-rose-600 flex items-center justify-center shrink-0 mt-0.5 shadow-2xs">
+                  <ShieldCheck size={15} />
+                </div>
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-rose-950">Validation d'Identité Fondateur</span>
+                    <span className="px-1.5 py-0.2 bg-rose-100/90 text-rose-800 text-[9px] font-black rounded-md uppercase tracking-wider border border-rose-200/80 flex items-center gap-1">
+                      <Crown size={9} className="text-amber-600" /> Requis
+                    </span>
                   </div>
-                </button>
-                
-                <div className="relative">
-                  <select
-                    value={cleanScope === 'all' ? '' : cleanScope}
-                    onChange={(e) => {
-                      if (e.target.value === '') {
-                        setCleanScope('all');
-                      } else {
-                        setCleanScope(e.target.value);
-                      }
-                    }}
-                    className={`w-full px-4 py-3.5 rounded-xl border text-xs font-bold transition-all appearance-none outline-none ${
-                      cleanScope !== 'all'
-                        ? 'bg-rose-50 border-rose-200 text-rose-900 shadow-sm'
-                        : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
-                    }`}
-                  >
-                    <option value="">-- Choisir une annexe ou siège spécifique --</option>
-                    {campuses.map((campus) => (
-                      <option key={campus.id} value={campus.id}>
-                        Vider uniquement l'annexe : {campus.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-4 text-slate-500">
-                    <ChevronDown size={16} />
-                  </div>
+                  <p className="text-[11px] text-rose-800/90 font-medium leading-snug">
+                    Connecté : <strong className="text-rose-950 font-bold">{user.full_name || user.email}</strong>. Pour valider l'effacement, veuillez confirmer le nom et votre adresse email.
+                  </p>
                 </div>
               </div>
+
+              {/* 2. Notice d'impact & Action Irréversible */}
+              <div className="bg-slate-50/90 p-2.5 sm:p-3 rounded-xl border border-rose-200/70 space-y-1 shadow-2xs">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                    <span className="text-[10.5px] font-black text-rose-700 uppercase tracking-wider">
+                      Action Irréversible
+                    </span>
+                  </div>
+                  <span className="px-2 py-0.5 bg-white border border-slate-200 rounded-md text-[9.5px] font-bold text-slate-700 shadow-2xs truncate max-w-[210px]">
+                    {cleanScope === 'all' ? "Toute l'institution (Siège & Annexes)" : `Annexe : ${campuses.find(c => c.id === cleanScope)?.name || 'Spécifique'}`}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 font-medium leading-relaxed">
+                  {cleanScope === 'all' ? (
+                    <>
+                      Toutes les inscriptions, étudiants, professeurs, présences, notes et écritures comptables de <strong className="text-slate-900 font-bold">"{schoolData.name}"</strong> seront définitivement effacés. La configuration générale de l'école sera conservée.
+                    </>
+                  ) : (
+                    <>
+                      Toutes les données associées uniquement à l'annexe <strong className="text-slate-900 font-bold">"{campuses.find(c => c.id === cleanScope)?.name}"</strong> seront purgées. Les autres établissements restent intacts.
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* 3. Sélecteur de Périmètre (si plusieurs campus) */}
+              {campuses && campuses.length > 0 && (
+                <div className="bg-slate-50/80 p-2 sm:p-2.5 rounded-xl border border-slate-200/80 space-y-1.5 shadow-2xs">
+                  <label className="text-[9.5px] font-black text-slate-700 uppercase tracking-wider flex items-center justify-between px-0.5">
+                    <span>Périmètre ciblé</span>
+                    <span className="text-[9px] font-semibold text-slate-400 lowercase">siège ou annexe</span>
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCleanScope('all')}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg border text-[11px] font-bold transition-all ${
+                        cleanScope === 'all'
+                          ? 'bg-rose-50 border-rose-300 text-rose-900 shadow-2xs'
+                          : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-100'
+                      }`}
+                    >
+                      <span className="truncate">Toute l'institution</span>
+                      <div className={`w-3.5 h-3.5 rounded-full border-2 flex items-center justify-center shrink-0 ml-1.5 ${cleanScope === 'all' ? 'border-rose-600' : 'border-slate-300'}`}>
+                        {cleanScope === 'all' && <div className="w-1.5 h-1.5 rounded-full bg-rose-600" />}
+                      </div>
+                    </button>
+
+                    <div className="relative">
+                      <select
+                        value={cleanScope === 'all' ? '' : cleanScope}
+                        onChange={(e) => setCleanScope(e.target.value === '' ? 'all' : e.target.value)}
+                        className={`w-full px-2.5 py-1.5 pr-6 rounded-lg border text-[11px] font-bold transition-all appearance-none outline-none truncate ${
+                          cleanScope !== 'all'
+                            ? 'bg-rose-50 border-rose-300 text-rose-900 shadow-2xs'
+                            : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        <option value="">-- Annexe spécifique --</option>
+                        {campuses.map((campus) => (
+                          <option key={campus.id} value={campus.id}>
+                            Annexe : {campus.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-400">
+                        <ChevronDown size={13} />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* 4. Étape 1 : Confirmation du Nom de l'École */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-1 flex-wrap">
+                  <label className="text-[10.5px] font-bold text-slate-700">
+                    1. Saisir le nom exact :
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmSchoolName(targetSchoolName)}
+                    className="text-[10px] font-bold text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 border border-rose-200/80 px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95"
+                    title="Cliquez pour insérer automatiquement"
+                  >
+                    <span className="truncate max-w-[150px] sm:max-w-[220px]">{targetSchoolName}</span>
+                    <span className="text-[9px] text-rose-400 font-normal">Auto</span>
+                  </button>
+                </div>
+                <input
+                  type="text"
+                  placeholder={targetSchoolName}
+                  className={`w-full px-3 py-1.5 bg-slate-50 focus:bg-white text-slate-900 border rounded-xl text-xs font-semibold outline-none transition-all shadow-2xs placeholder:text-slate-400 ${
+                    confirmSchoolName && isNameValid
+                      ? 'border-emerald-400 ring-2 ring-emerald-50'
+                      : 'border-slate-200 focus:border-rose-500 focus:ring-2 focus:ring-rose-50'
+                  }`}
+                  value={confirmSchoolName}
+                  onChange={e => setConfirmSchoolName(e.target.value)}
+                  disabled={isCleaning}
+                />
+              </div>
+
+              {/* 5. Étape 2 : Confirmation de l'Email Administrateur */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between gap-1 flex-wrap">
+                  <label className="text-[10.5px] font-bold text-slate-700">
+                    2. Saisir votre email connecté :
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setConfirmUserEmail(user.email || '')}
+                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200/80 px-2 py-0.5 rounded-md transition-all cursor-pointer flex items-center gap-1 shadow-2xs active:scale-95"
+                    title="Cliquez pour insérer votre adresse email"
+                  >
+                    <span className="truncate max-w-[150px] sm:max-w-[220px]">{user.email}</span>
+                    <span className="text-[9px] text-indigo-400 font-normal">Auto</span>
+                  </button>
+                </div>
+                <input
+                  type="email"
+                  placeholder={user.email}
+                  className={`w-full px-3 py-1.5 bg-slate-50 focus:bg-white text-slate-900 border rounded-xl text-xs font-semibold outline-none transition-all shadow-2xs placeholder:text-slate-400 ${
+                    confirmUserEmail && isEmailValid
+                      ? 'border-emerald-400 ring-2 ring-emerald-50'
+                      : 'border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-50'
+                  }`}
+                  value={confirmUserEmail}
+                  onChange={e => setConfirmUserEmail(e.target.value)}
+                  disabled={isCleaning}
+                />
+              </div>
+
+              {/* 6. Actions Bottom Bar */}
+              <div className="pt-2 flex flex-col-reverse sm:flex-row items-center justify-end gap-2 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCleanModalOpen(false);
+                    setConfirmSchoolName('');
+                    setConfirmUserEmail('');
+                  }}
+                  disabled={isCleaning}
+                  className="w-full sm:w-auto px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCleanSchoolData}
+                  disabled={!canSubmit}
+                  className="w-full sm:w-auto px-4 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 disabled:opacity-45 disabled:cursor-not-allowed cursor-pointer"
+                >
+                  {isCleaning ? (
+                    <>
+                      <Loader2 className="animate-spin" size={13} />
+                      <span>Réinitialisation en cours...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} />
+                      <span>Confirmer la suppression</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
-          )}
-
-          <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl space-y-1.5">
-            <p className="text-[10px] font-black text-rose-700 uppercase tracking-widest flex items-center gap-2">
-              <AlertTriangle size={14} /> Action Irréversible
-            </p>
-            <p className="text-xs font-semibold text-rose-800 leading-relaxed">
-              {cleanScope === 'all' ? (
-                "Toutes les inscriptions, étudiants, professeurs, relevés de présence, dossiers de discipline, frais, paiements et écritures comptables seront définitivement effacés de l'ensemble des établissements. La configuration structurelle sera conservée."
-              ) : (
-                `Toutes les inscriptions, étudiants, relevés de présence, dossiers de discipline, frais de scolarité, et paiements associés uniquement à l'annexe "${campuses.find(c => c.id === cleanScope)?.name}" seront définitivement effacés. Les données des autres annexes ne seront pas touchées.`
-              )}
-            </p>
-          </div>
-
-          {/* Confirmation 1: School Name */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">
-              1. Saisir le nom{' '}
-              <span 
-                className="text-rose-600 cursor-pointer hover:underline border-b border-dashed border-rose-300 transition-all"
-                onClick={() => setConfirmSchoolName(cleanScope === 'all' ? schoolData.name : (campuses.find(c => c.id === cleanScope)?.name || ''))}
-                title="Cliquez pour insérer automatiquement"
-              >
-                {cleanScope === 'all' ? schoolData.name : (campuses.find(c => c.id === cleanScope)?.name || '')}
-              </span>
-            </label>
-            <input
-              type="text"
-              placeholder={cleanScope === 'all' ? schoolData.name : (campuses.find(c => c.id === cleanScope)?.name || '')}
-              className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-rose-600 focus:ring-4 focus:ring-rose-50 transition-all"
-              value={confirmSchoolName}
-              onChange={e => setConfirmSchoolName(e.target.value)}
-              disabled={isCleaning}
-            />
-          </div>
-
-          {/* Confirmation 2: User Email verification */}
-          <div className="space-y-2">
-            <label className="text-[10px] font-black text-slate-800 uppercase tracking-widest ml-1">
-              2. Saisir votre adresse email connectée{' '}
-              <span 
-                className="text-indigo-600 cursor-pointer hover:underline border-b border-dashed border-indigo-300 transition-all"
-                onClick={() => setConfirmUserEmail(user.email || '')}
-                title="Cliquez pour remplir votre email"
-              >
-                ({user.email})
-              </span>
-            </label>
-            <input
-              type="email"
-              placeholder={user.email}
-              className="w-full px-4 py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:border-indigo-600 focus:ring-4 focus:ring-indigo-50 transition-all"
-              value={confirmUserEmail}
-              onChange={e => setConfirmUserEmail(e.target.value)}
-              disabled={isCleaning}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2.5 pt-2">
-            <button
-              onClick={handleCleanSchoolData}
-              disabled={
-                isCleaning || 
-                confirmSchoolName !== (cleanScope === 'all' ? schoolData.name : (campuses.find(c => c.id === cleanScope)?.name || '')) ||
-                confirmUserEmail.trim().toLowerCase() !== (user.email || '').trim().toLowerCase()
-              }
-              className="w-full h-12 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-[11px] font-black uppercase tracking-widest shadow-lg shadow-rose-200 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isCleaning ? (
-                <>
-                  <Loader2 className="animate-spin" size={16} />
-                  Réinitialisation en cours...
-                </>
-              ) : (
-                <>
-                  <Trash2 size={16} />
-                  Confirmer la suppression
-                </>
-              )}
-            </button>
-            <button
-              onClick={() => {
-                setIsCleanModalOpen(false);
-                setConfirmSchoolName('');
-                setConfirmUserEmail('');
-              }}
-              disabled={isCleaning}
-              className="w-full h-12 bg-slate-100 text-slate-700 rounded-xl text-[11px] font-bold uppercase tracking-wider hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
-            >
-              Annuler
-            </button>
-          </div>
-        </div>
+          );
+        })()}
       </Modal>
 
       {/* Modals Sauvegardes Cloud (Réservées Super Admin pour préserver le stockage Supabase) */}
