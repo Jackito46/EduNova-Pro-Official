@@ -1186,6 +1186,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         useCORS: true, 
         logging: false,
         imageTimeout: 30000,
+        windowWidth: 1200,
         onclone: (clonedDoc) => {
           fixOklchForCanvas(clonedDoc);
         }

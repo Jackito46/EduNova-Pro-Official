@@ -44,6 +44,7 @@ import { ReportCardStudent, ReportCardOptions } from './report-cards/types';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { SelectPill } from './SelectPill';
+import { DesktopDeviceGuard } from './DesktopDeviceGuard';
 
 const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { ipAddress } = useSecurity();
@@ -629,6 +630,8 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
         } catch {}
         await wait(60);
 
+        const a4WidthPx = 794; // 210mm at 96 DPI (standard A4 width)
+
         const canvas = await html2canvas(card, {
           scale: 2,
           useCORS: true,
@@ -636,16 +639,39 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           backgroundColor: '#ffffff',
           allowTaint: false,
           imageTimeout: 20000,
+          windowWidth: 1280, // Clones iframe in wide desktop viewport to avoid mobile layout squishing
+          width: a4WidthPx,  // Enforces exact standard A4 width
           onclone: clonedDoc => {
             fixOklchForCanvas(clonedDoc);
+
+            // Force cloned document and body to desktop dimensions
+            clonedDoc.documentElement.style.width = '1280px';
+            clonedDoc.body.style.width = '1280px';
+            clonedDoc.body.style.minWidth = '1280px';
+
             const printableCards = clonedDoc.querySelectorAll<HTMLElement>('.report-card-printable, [data-report-card="true"]');
             printableCards.forEach(c => {
+              c.style.width = `${a4WidthPx}px`;
+              c.style.minWidth = `${a4WidthPx}px`;
+              c.style.maxWidth = `${a4WidthPx}px`;
+              c.style.boxSizing = 'border-box';
               c.style.boxShadow = 'none';
               c.style.borderRadius = '0';
-              c.style.margin = '0';
+              c.style.margin = '0 auto';
               c.style.border = 'none';
               c.style.transform = 'none';
             });
+
+            // Target the specific card being converted
+            if (card.id) {
+              const targetInClone = clonedDoc.getElementById(card.id);
+              if (targetInClone) {
+                targetInClone.style.width = `${a4WidthPx}px`;
+                targetInClone.style.minWidth = `${a4WidthPx}px`;
+                targetInClone.style.maxWidth = `${a4WidthPx}px`;
+                targetInClone.style.margin = '0 auto';
+              }
+            }
           }
         });
 
@@ -828,62 +854,73 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
 
     return (
-      <PrintPreviewModal
-        isOpen={showPreview}
-        onClose={() => setShowPreview(false)}
-        title="Aperçu & Certification des Bulletins"
-        subtitle={`${generationMode === 'student' ? `${terminology.student} Unique` : classes.find(c => c.id === selectedClassId)?.name} — ${term}${hasMultipleCampuses && activeCampusName ? ` (${activeCampusName})` : ''}`}
-        onPrint={handleDirectPrint}
-        onExportPDF={handleExportPDF}
-        isExporting={isExporting}
-        customControls={customControls}
+      <DesktopDeviceGuard
+        user={user}
+        moduleTitle="Certification & Export des Bulletins Scolaires"
+        description="Pour préserver la mise en page officielle A4, l'exactitude des calculs de moyennes et la conformité des scellements de bulletins, la certification et l'exportation des bulletins officiels nécessitent un poste de travail (PC ou ordinateur de bureau)."
       >
-        <div className="w-full" ref={printRef}>
-          <div className="w-full mx-auto flex flex-col items-center gap-10 print:gap-0 print:block">
-            {activeSubView === 'bulletins' ? (
-              generatedData.map((student, idx) => (
-                <div key={student.id} className="w-full flex flex-col items-center gap-3 print:gap-0 print:block group">
-                  <div className="bg-indigo-900 px-5 py-1.5 shadow-md text-[10px] font-black text-white rounded-full tracking-widest uppercase flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity print:hidden">
-                    <span>Bulletin {idx + 1} / {generatedData.length}</span>
-                    <span className="h-3 w-px bg-white/30"></span>
-                    <span>{student.name}</span>
-                    <span className="h-3 w-px bg-white/30"></span>
-                    <span className="text-indigo-200">{student.nisu}</span>
+        <PrintPreviewModal
+          isOpen={showPreview}
+          onClose={() => setShowPreview(false)}
+          title="Aperçu & Certification des Bulletins"
+          subtitle={`${generationMode === 'student' ? `${terminology.student} Unique` : classes.find(c => c.id === selectedClassId)?.name} — ${term}${hasMultipleCampuses && activeCampusName ? ` (${activeCampusName})` : ''}`}
+          onPrint={handleDirectPrint}
+          onExportPDF={handleExportPDF}
+          isExporting={isExporting}
+          customControls={customControls}
+        >
+          <div className="w-full" ref={printRef}>
+            <div className="w-full mx-auto flex flex-col items-center gap-10 print:gap-0 print:block">
+              {activeSubView === 'bulletins' ? (
+                generatedData.map((student, idx) => (
+                  <div key={student.id} className="w-full flex flex-col items-center gap-3 print:gap-0 print:block group">
+                    <div className="bg-indigo-900 px-5 py-1.5 shadow-md text-[10px] font-black text-white rounded-full tracking-widest uppercase flex items-center gap-3 opacity-60 group-hover:opacity-100 transition-opacity print:hidden">
+                      <span>Bulletin {idx + 1} / {generatedData.length}</span>
+                      <span className="h-3 w-px bg-white/30"></span>
+                      <span>{student.name}</span>
+                      <span className="h-3 w-px bg-white/30"></span>
+                      <span className="text-indigo-200">{student.nisu}</span>
+                    </div>
+                    <div className="w-full max-w-[21cm] shadow-2xl rounded-2xl overflow-hidden transition-all duration-300 print:shadow-none print:rounded-none print:max-w-none print:overflow-visible">
+                      <ReportCardItem
+                        student={student}
+                        term={term}
+                        year={selectedYearLabel}
+                        school={school}
+                        campusName={hasMultipleCampuses ? activeCampusName : undefined}
+                        isLast={idx === generatedData.length - 1}
+                        options={reportOptions}
+                        availableExams={availableExams}
+                      />
+                    </div>
                   </div>
-                  <div className="w-full max-w-[21cm] shadow-2xl rounded-2xl overflow-hidden transition-all duration-300 print:shadow-none print:rounded-none print:max-w-none print:overflow-visible">
-                    <ReportCardItem
-                      student={student}
-                      term={term}
-                      year={selectedYearLabel}
-                      school={school}
-                      campusName={hasMultipleCampuses ? activeCampusName : undefined}
-                      isLast={idx === generatedData.length - 1}
-                      options={reportOptions}
-                      availableExams={availableExams}
-                    />
-                  </div>
-                </div>
-              ))
-            ) : (
-              <PalmaresView
-                students={generatedData}
-                classNameTitle={classes.find(c => c.id === selectedClassId)?.name || ''}
-                term={term}
-                yearLabel={selectedYearLabel}
-                campusName={hasMultipleCampuses ? activeCampusName : undefined}
-                onExportPalmares={handleExportPalmaresPDF}
-                availableExams={availableExams}
-              />
-            )}
+                ))
+              ) : (
+                <PalmaresView
+                  students={generatedData}
+                  classNameTitle={classes.find(c => c.id === selectedClassId)?.name || ''}
+                  term={term}
+                  yearLabel={selectedYearLabel}
+                  campusName={hasMultipleCampuses ? activeCampusName : undefined}
+                  onExportPalmares={handleExportPalmaresPDF}
+                  availableExams={availableExams}
+                />
+              )}
+            </div>
           </div>
-        </div>
-      </PrintPreviewModal>
+        </PrintPreviewModal>
+      </DesktopDeviceGuard>
     );
   }
 
   // MAIN GENERATOR HUB VIEW
   return (
-    <div className="space-y-3.5 max-w-7xl mx-auto pb-16 px-2 sm:px-4 animate-in fade-in duration-300">
+    <DesktopDeviceGuard
+      user={user}
+      moduleTitle="Édition & Clôture des Bulletins Scolaires"
+      description="Pour préserver la mise en page officielle A4, l'exactitude des calculs de moyennes et la conformité des scellements de bulletins, l'édition et l'exportation des bulletins officiels nécessitent un poste de travail (PC ou ordinateur de bureau)."
+    >
+      <div className="space-y-3.5 max-w-7xl mx-auto pb-16 px-2 sm:px-4 animate-in fade-in duration-300">
       {/* En-tête Principal Harmonisé avec le Système */}
       <div className="bg-white p-3.5 sm:p-4 rounded-xl shadow-xs border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
         <div className="flex items-center gap-3">
@@ -1143,7 +1180,8 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       </div>
     </div>
-  );
+  </DesktopDeviceGuard>
+);
 };
 
 export default ReportCardsView;

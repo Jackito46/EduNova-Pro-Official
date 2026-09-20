@@ -75,6 +75,7 @@ import WhatsAppModule from './components/WhatsAppModule';
 
 import { SessionGuard } from './components/SessionGuard';
 import { RoleGuard } from './components/RoleGuard';
+import { DesktopDeviceGuard } from './components/DesktopDeviceGuard';
 import { useSecurity } from './components/SecurityGuard';
 import { SchoolProvider } from './contexts/SchoolContext';
 import Logo from './components/Logo';
@@ -294,7 +295,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/notes" element={<RoleGuard user={user} allowedRoles={academicRoles}><GradesView user={user} /></RoleGuard>} />
               <Route path="/enseignant/syllabus" element={<RoleGuard user={user} allowedRoles={academicRoles}><SyllabusHub user={user} /></RoleGuard>} />
               <Route path="/presences" element={<RoleGuard user={user} allowedRoles={academicRoles}><AttendanceView user={user} /></RoleGuard>} />
-              <Route path="/bulletins" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><ReportCardsView user={user} /></RoleGuard>} />
+              <Route path="/bulletins" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><DesktopDeviceGuard user={user} moduleTitle="Édition & Clôture des Bulletins Scolaires"><ReportCardsView user={user} /></DesktopDeviceGuard></RoleGuard>} />
               <Route path="/discipline" element={<RoleGuard user={user} allowedRoles={academicRoles}><DisciplinaryView user={user} /></RoleGuard>} />
               <Route path="/horaire" element={<RoleGuard user={user} allowedRoles={academicRoles}><ScheduleView user={user} /></RoleGuard>} />
               <Route path="/enseignant/pointage" element={<RoleGuard user={user} allowedRoles={[UserRole.TEACHER, ...adminRoles, UserRole.SECRETARY]}><CourseSignatureView user={user} /></RoleGuard>} />
@@ -330,13 +331,13 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/economat/derogations" element={<RoleGuard user={user} allowedRoles={adminRoles}><DiscountManagementView user={user} /></RoleGuard>} />
               <Route path="/economat/rapport-reductions" element={<RoleGuard user={user} allowedRoles={financeRoles}><ReductionReportView user={user} /></RoleGuard>} />
               <Route path="/economat/paie" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><PayrollManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/budget" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><BudgetPlanningView user={user} /></RoleGuard>} />
-              <Route path="/economat/audit" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FinancialAuditView user={user} /></RoleGuard>} />
+              <Route path="/economat/budget" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Planification Budgétaire & Arbitrages"><BudgetPlanningView user={user} /></DesktopDeviceGuard></RoleGuard>} />
+              <Route path="/economat/audit" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Audit Financier & Clôtures"><FinancialAuditView user={user} /></DesktopDeviceGuard></RoleGuard>} />
               
               {/* Reports Routes */}
               <Route path="/rapports" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY]}><ReportsView user={user} /></RoleGuard>} />
-              <Route path="/supervision-annexes" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.DIRECTOR]}><MultiCampusDashboardView user={user} /></RoleGuard>} />
-              <Route path="/direction/supervision-annexes" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.DIRECTOR]}><MultiCampusDashboardView user={user} /></RoleGuard>} />
+              <Route path="/supervision-annexes" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.DIRECTOR]}><DesktopDeviceGuard user={user} moduleTitle="Supervision Multi-Campus Institutionnelle"><MultiCampusDashboardView user={user} /></DesktopDeviceGuard></RoleGuard>} />
+              <Route path="/direction/supervision-annexes" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.DIRECTOR]}><DesktopDeviceGuard user={user} moduleTitle="Supervision Multi-Campus Institutionnelle"><MultiCampusDashboardView user={user} /></DesktopDeviceGuard></RoleGuard>} />
               
               {/* Guide Route */}
               {/* <Route path="/guide" element={<GuideView />} /> */}

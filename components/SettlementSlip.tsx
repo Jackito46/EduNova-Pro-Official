@@ -43,7 +43,7 @@ const SettlementSlip: React.FC<SettlementSlipProps> = ({ staff, schoolName, curr
         useCORS: true,
         logging: true,
         backgroundColor: '#ffffff',
-        windowWidth: element.scrollWidth,
+        windowWidth: Math.max(element.scrollWidth || 0, 1024),
         windowHeight: element.scrollHeight,
         imageTimeout: 30000,
         onclone: (clonedDoc) => {
