@@ -1704,6 +1704,10 @@ const handleDeleteSchool = async () => {
   };
 
   const handleExportData = (school: any) => {
+    if (!school || !school.id) {
+      toast.error("Données de l'établissement introuvables.");
+      return;
+    }
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(school, null, 2));
     const downloadAnchorNode = document.createElement('a');
     downloadAnchorNode.setAttribute("href", dataStr);
@@ -4236,6 +4240,10 @@ const handleDeleteSchool = async () => {
           };
 
           const handleExportLogsCSV = (logsToExport: any[]) => {
+            if (loadingLogs) {
+              toast.error("Veuillez patienter pendant le chargement des journaux...");
+              return;
+            }
             if (!logsToExport || logsToExport.length === 0) {
               toast.error("Aucun log à exporter.");
               return;
@@ -4307,7 +4315,8 @@ const handleDeleteSchool = async () => {
 
                     <button 
                       onClick={() => handleExportLogsCSV(systemLogs)}
-                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 font-bold text-xs shrink-0 cursor-pointer"
+                      disabled={loadingLogs || systemLogs.length === 0}
+                      className="px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 font-bold text-xs shrink-0 cursor-pointer disabled:opacity-50"
                       title="Exporter en CSV"
                     >
                       <Download size={13} />

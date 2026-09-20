@@ -1124,19 +1124,19 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   const exportBalancesToCSV = () => {
-    if (filteredBalances.length === 0) {
-      toast.error("Aucune donnée à exporter");
+    if (loading || filteredBalances.length === 0) {
+      toast.error("Aucune donnée disponible à exporter");
       return;
     }
     const headers = ['Matricule', 'Nom Complet', 'Classe / Option', 'Total Dû (HTG)', 'Total Payé (HTG)', 'Solde Dû (HTG)', 'Statut Compte'];
     const rows = filteredBalances.map(b => [
-      `"${b.id.substring(0, 8)}"`,
-      `"${b.fullName}"`,
-      `"${b.className}"`,
-      b.totalDue,
-      b.paid,
-      b.balance,
-      b.balance === 0 ? 'À JOUR (SOLDÉ)' : 'DÉBITEUR'
+      `"${(b.id || '').substring(0, 8)}"`,
+      `"${(b.fullName || '').replace(/"/g, '""')}"`,
+      `"${(b.className || '').replace(/"/g, '""')}"`,
+      b.totalDue ?? 0,
+      b.paid ?? 0,
+      b.balance ?? 0,
+      (b.balance ?? 0) === 0 ? 'À JOUR (SOLDÉ)' : 'DÉBITEUR'
     ]);
     const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + [headers.join(';'), ...rows.map(e => e.join(';'))].join('\n');
     const encodedUri = encodeURI(csvContent);
@@ -1150,16 +1150,40 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   };
 
   const exportToPDF = async () => {
-    if (!selectedGenStudent) return;
+    const targetStudent = selectedGenStudent || printPreview;
+    if (!targetStudent) {
+      toast.error("Veuillez sélectionner un élève avant d'exporter");
+      return;
+    }
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement complet du relevé...");
+      return;
+    }
     setIsExporting(true);
+    let openedTemporarily = false;
     try {
-      const element = document.getElementById('releve-compte-print');
-      if (!element) return;
-      await new Promise(resolve => setTimeout(resolve, 300));
+      let element = document.getElementById('releve-compte-print');
+      if (!element) {
+        setPrintPreview(targetStudent);
+        openedTemporarily = true;
+        await new Promise(resolve => setTimeout(resolve, 400));
+        element = document.getElementById('releve-compte-print');
+      }
+
+      if (!element) {
+        toast.error("Impossible de préparer le document pour l'export.");
+        return;
+      }
+
+      // Ensure fonts and assets are ready
+      if (document.fonts) {
+        await document.fonts.ready;
+      }
+      await new Promise(resolve => setTimeout(resolve, 200));
 
       const canvas = await html2canvas(element, { 
         scale: 2, 
-        useCORS: true,
+        useCORS: true, 
         logging: false,
         imageTimeout: 30000,
         onclone: (clonedDoc) => {
@@ -1170,14 +1194,32 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const pdf = new jsPDF('p', 'mm', 'a4');
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      let heightLeft = pdfHeight;
+      let position = 0;
+
+      pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+
+      while (heightLeft > 0) {
+        position -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+        heightLeft -= pageHeight;
+      }
+
       addSecurityWatermark(pdf, { user, ipAddress });
-      pdf.save(`Releve_${formatStudentName(selectedGenStudent.last_name, selectedGenStudent.first_name).fullName.replace(/\s+/g, '_')}.pdf`);
+      const studentNameClean = formatStudentName(targetStudent.last_name, targetStudent.first_name).fullName.replace(/\s+/g, '_') || 'Eleve';
+      pdf.save(`Releve_${studentNameClean}.pdf`);
       toast.success("PDF du Relevé de compte téléchargé avec succès");
     } catch (error) {
       console.error("Erreur export PDF:", error);
       toast.error("Erreur lors de l'export PDF");
     } finally {
+      if (openedTemporarily) {
+        setPrintPreview(null);
+      }
       setIsExporting(false);
     }
   };
@@ -2222,7 +2264,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </button>
                   <button 
                     onClick={exportToPDF}
-                    disabled={isExporting}
+                    disabled={isExporting || loading}
                     className="flex-1 md:flex-none px-5 py-3 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl font-bold text-xs tracking-tight transition-all shadow-md shadow-emerald-500/20 flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                   >
                     {isExporting ? <RefreshCcw size={16} className="animate-spin" /> : <FileDown size={16} />}
@@ -2715,6 +2757,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         title="Relevé de Compte Officiel"
         subtitle="Audit Certifié • EduNova Pro"
         onPrint={() => window.print()}
+        onExportPDF={exportToPDF}
+        isExporting={isExporting}
       >
         {printPreview && (
           <div id="releve-compte-print" className="max-w-3xl mx-auto shadow-2xl print:shadow-none print:m-0 print:w-full p-10 border-0 rounded-[2rem] bg-white relative overflow-hidden text-left">

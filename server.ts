@@ -50,6 +50,28 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // =========================================================================
+  // MIDDLEWARE CORS & PREFLIGHT OPTIONS POUR TOUS LES ENDPOINTS /api ET ASSETS
+  // =========================================================================
+  app.use((req, res, next) => {
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+    } else {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+    }
+    res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+
+    if (req.method === 'OPTIONS') {
+      return res.status(204).end();
+    }
+    next();
+  });
+
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
@@ -3671,8 +3693,28 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${PORT}`);
+  const isProduction = process.env.NODE_ENV === 'production';
+  // En développement, le port 3000 est strictement requis pour le proxy inverse du sandbox AI Studio.
+  // En production (Cloud Run, conteneur), écouter sur le port fourni par Cloud Run ($PORT, ex: 8080 ou 3000).
+  const primaryPort = isProduction && process.env.PORT ? parseInt(process.env.PORT, 10) : PORT;
+
+  app.listen(primaryPort, '0.0.0.0', () => {
+    console.log(`Server running on http://0.0.0.0:${primaryPort}`);
+
+    // Si déployé en production sur Cloud Run avec un PORT différent de 3000 (ex: 8080),
+    // ouvrir également un écouteur auxiliaire sur le port 3000 pour couvrir les proxies inverses internes.
+    if (isProduction && primaryPort !== 3000) {
+      try {
+        const auxServer = app.listen(3000, '0.0.0.0', () => {
+          console.log('Auxiliary reverse-proxy listener running on http://0.0.0.0:3000');
+        });
+        auxServer.on('error', (err: any) => {
+          console.log('Port 3000 auxiliary listener notice:', err.message);
+        });
+      } catch {
+        // Non-bloquant
+      }
+    }
 
     // Démarrage du daemon de maintien actif (Self-Ping toutes les 9 minutes)
     // Render met le service en veille après 15 minutes d'inactivité sur le plan gratuit.

@@ -55,6 +55,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useSecurity } from "./SecurityGuard";
 import { addSecurityWatermark } from "../utils/pdfWatermark";
+import { appendSecuritySheet } from "../utils/excelWatermark";
 import { formatStudentName } from "../utils/formatters";
 
 // Helper pour déterminer le niveau d'une classe et le programme de matières adapté
@@ -1122,7 +1123,14 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // EXPORT EXCEL (.XLSX)
   const exportJournalExcel = () => {
-    if (!selectedClassId || students.length === 0) return;
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement des notes...");
+      return;
+    }
+    if (!selectedClassId || students.length === 0 || filteredStudents.length === 0) {
+      toast.error("Aucune note ou élève à exporter pour cette sélection.");
+      return;
+    }
 
     const data: any[] = [];
     filteredStudents.forEach((student, index) => {
@@ -1168,6 +1176,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const worksheet = XLSX.utils.json_to_sheet(data);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Journal Évaluations");
+    appendSecuritySheet(workbook, { user, ipAddress });
     const fileName = `Journal_${selectedClassObj?.name || "Classe"}_${selectedTerm.replace(/\s+/g, "_")}.xlsx`;
     XLSX.writeFile(workbook, fileName);
     toast.success("Export Excel généré avec succès !");
@@ -1175,7 +1184,14 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // EXPORT PDF PAYSAGE ÉLÉGANT & OFFICIEL
   const exportJournalPDF = () => {
-    if (!selectedClassId || students.length === 0) return;
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement des notes...");
+      return;
+    }
+    if (!selectedClassId || students.length === 0 || filteredStudents.length === 0) {
+      toast.error("Aucune note ou élève à exporter pour cette sélection.");
+      return;
+    }
 
     const doc = new jsPDF("l", "mm", "a4");
     const currentYear = academicYears.find((y) => y.id === selectedYearId);
@@ -1405,7 +1421,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           <button
             onClick={exportJournalPDF}
-            disabled={!selectedClassId || students.length === 0}
+            disabled={!selectedClassId || students.length === 0 || loading || filteredStudents.length === 0}
             className="px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border border-blue-200/60 shadow-2xs cursor-pointer"
             title="Imprimer le journal au format PDF paysage"
           >
@@ -1415,7 +1431,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           <button
             onClick={exportJournalExcel}
-            disabled={!selectedClassId || students.length === 0}
+            disabled={!selectedClassId || students.length === 0 || loading || filteredStudents.length === 0}
             className="px-3 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl font-semibold text-xs transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 border border-emerald-200/60 shadow-2xs cursor-pointer"
             title="Exporter les notes vers Excel"
           >

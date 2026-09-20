@@ -43,6 +43,8 @@ import Modal from './Modal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
+import { useSecurity } from './SecurityGuard';
+import { appendSecuritySheet } from '../utils/excelWatermark';
 
 const discountSchema = z.object({
   category: z.string().min(1, "Veuillez sélectionner un motif de réévaluation"),
@@ -187,6 +189,7 @@ type ViewTab = 'form' | 'register' | 'report';
 
 const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { school, terminology, currentCampusId, campuses } = useSchool();
+  const { ipAddress } = useSecurity();
   const hasMultipleCampuses = Array.isArray(campuses) && campuses.length > 1;
 
   const [activeTab, setActiveTab] = useState<ViewTab>('form');
@@ -847,6 +850,10 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Exportation CSV du registre
   const handleExportRegisterCSV = () => {
+    if (registerLoading) {
+      toast.error("Veuillez patienter pendant le chargement du registre...");
+      return;
+    }
     if (filteredRegisterStudents.length === 0) {
       toast.error("Aucune donnée à exporter.");
       return;
@@ -858,8 +865,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     const rows = filteredRegisterStudents.map(st => {
       const row = [
-        st.last_name.replace(/;/g, ' '),
-        st.first_name.replace(/;/g, ' '),
+        (st.last_name || '').replace(/;/g, ' '),
+        (st.first_name || '').replace(/;/g, ' '),
         (st.class?.name || 'N/A').replace(/;/g, ' ')
       ];
       if (hasMultipleCampuses) {
@@ -867,7 +874,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       row.push(
         (st.discount_label || 'Ajustement').replace(/;/g, ' '),
-        st.discount_amount
+        st.discount_amount || 0
       );
       return row;
     });
@@ -878,7 +885,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Registre_Reevaluations_${school?.name || 'etablissement'}_${activeYear?.label || 'active'}.csv`);
+    link.setAttribute("download", `Registre_Reevaluations_${school?.name ? school.name.replace(/\s+/g, '_') : 'etablissement'}_${activeYear?.label || 'active'}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -887,6 +894,10 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Exportation Excel du registre
   const handleExportRegisterExcel = () => {
+    if (registerLoading) {
+      toast.error("Veuillez patienter pendant le chargement du registre...");
+      return;
+    }
     if (filteredRegisterStudents.length === 0) {
       toast.error("Aucune donnée à exporter.");
       return;
@@ -895,7 +906,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const data = filteredRegisterStudents.map((st, idx) => {
       const row: any = {
         'N°': idx + 1,
-        [terminology.student]: formatStudentName(st.last_name, st.first_name).fullName,
+        [terminology.student]: formatStudentName(st.last_name || '', st.first_name || '').fullName,
         'Matricule / ID': st.id?.substring(0, 8) || 'N/A',
         [terminology.class]: st.class?.name || 'N/A',
       };
@@ -912,7 +923,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const ws = XLSX.utils.json_to_sheet(data);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Audit Réévaluations');
-    XLSX.writeFile(wb, `Registre_Audit_Reevaluations_${school?.name || 'etablissement'}_${activeYear?.label || 'active'}.xlsx`);
+    appendSecuritySheet(wb, { user, ipAddress });
+    XLSX.writeFile(wb, `Registre_Audit_Reevaluations_${school?.name ? school.name.replace(/\s+/g, '_') : 'etablissement'}_${activeYear?.label || 'active'}.xlsx`);
     toast.success("Registre exporté en Excel avec succès.");
   };
 
@@ -1677,7 +1689,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               <button 
                 onClick={handleExportRegisterExcel}
-                className="px-3.5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                disabled={registerLoading || filteredRegisterStudents.length === 0}
+                className="px-3.5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                 title="Exporter le registre au format Excel (.xlsx)"
               >
                 <FileSpreadsheet size={15} /> Export Excel
@@ -1685,7 +1698,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               <button 
                 onClick={handleExportRegisterCSV}
-                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2"
+                disabled={registerLoading || filteredRegisterStudents.length === 0}
+                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-2 disabled:opacity-50 cursor-pointer"
                 title="Exporter au format CSV"
               >
                 <FileText size={15} /> Grand Livre CSV
@@ -1924,7 +1938,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               <button 
                 onClick={handleExportRegisterExcel}
-                className="px-3.5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                disabled={registerLoading || filteredRegisterStudents.length === 0}
+                className="px-3.5 py-2.5 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 title="Exporter au format Excel (.xlsx)"
               >
                 <FileSpreadsheet size={15} /> Export Excel
@@ -1932,7 +1947,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               <button 
                 onClick={handleExportRegisterCSV}
-                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5"
+                disabled={registerLoading || filteredRegisterStudents.length === 0}
+                className="px-3.5 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer"
                 title="Exporter au format Grand Livre CSV"
               >
                 <FileText size={15} /> Grand Livre CSV

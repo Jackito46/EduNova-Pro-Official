@@ -22,6 +22,9 @@ import * as XLSX from 'xlsx';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { SelectPill } from './SelectPill';
+import { useSecurity } from './SecurityGuard';
+import { addSecurityWatermark } from '../utils/pdfWatermark';
+import { appendSecuritySheet } from '../utils/excelWatermark';
 
 interface DisciplinaryRecord {
   id: string;
@@ -68,6 +71,7 @@ interface StudentOption {
 
 const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { school, terminology, campuses, currentCampusId, setCurrentCampusId, activeAcademicYear } = useSchool();
+  const { ipAddress } = useSecurity();
   
   const [loading, setLoading] = useState(true);
   const [records, setRecords] = useState<DisciplinaryRecord[]>([]);
@@ -630,6 +634,14 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Export PDF Report of Disciplinary Register
   const handleExportPDF = () => {
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement des dossiers...");
+      return;
+    }
+    if (filteredRecords.length === 0) {
+      toast.error("Aucun dossier disciplinaire à exporter.");
+      return;
+    }
     try {
       const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       const currentYearLabel = academicYears.find(y => y.id === selectedYearId)?.label || 'Session en cours';
@@ -726,6 +738,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       });
 
+      addSecurityWatermark(doc, { user, ipAddress });
       doc.save(`Registre_Disciplinaire_${school?.name ? school.name.replace(/\s+/g, '_') : 'EduNova'}_${format(new Date(), 'yyyy-MM-dd')}.pdf`);
       toast.success("Registre disciplinaire PDF exporté avec succès.");
     } catch (err: any) {
@@ -736,6 +749,14 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Export Excel Report
   const handleExportExcel = () => {
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement des dossiers...");
+      return;
+    }
+    if (filteredRecords.length === 0) {
+      toast.error("Aucun dossier disciplinaire à exporter.");
+      return;
+    }
     try {
       const dataToExport = filteredRecords.map((r, i) => {
         const student = formatStudentName(r.student?.last_name || '', r.student?.first_name || '').fullName;
@@ -758,6 +779,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const worksheet = XLSX.utils.json_to_sheet(dataToExport);
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, "Suivi Disciplinaire");
+      appendSecuritySheet(workbook, { user, ipAddress });
       XLSX.writeFile(workbook, `Suivi_Disciplinaire_${format(new Date(), 'yyyy-MM-dd')}.xlsx`);
       toast.success("Exportation Excel réalisée avec succès.");
     } catch (err: any) {
@@ -870,7 +892,8 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <button
               onClick={handleExportPDF}
-              className="p-2.5 sm:px-3.5 sm:py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-all shadow-xs flex items-center gap-1.5 text-xs font-bold"
+              disabled={loading || filteredRecords.length === 0}
+              className="p-2.5 sm:px-3.5 sm:py-2.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl transition-all shadow-xs flex items-center gap-1.5 text-xs font-bold disabled:opacity-40 cursor-pointer"
               title="Exporter le registre en PDF"
             >
               <Download size={15} />
@@ -1099,7 +1122,8 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             <button
               onClick={handleExportExcel}
-              className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-slate-700 transition-all"
+              disabled={loading || filteredRecords.length === 0}
+              className="p-3 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-2xl text-slate-700 transition-all disabled:opacity-40 cursor-pointer"
               title="Exporter vers Excel (.xlsx)"
             >
               <FileSpreadsheet size={16} />

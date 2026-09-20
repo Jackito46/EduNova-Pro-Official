@@ -1,5 +1,5 @@
 # Full-Stack Node Application for EduNova Pro
-FROM node:20-alpine
+FROM node:20-slim
 
 WORKDIR /app
 
@@ -7,7 +7,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci || npm install
 
 # Copy application source code
 COPY . .
@@ -17,9 +17,11 @@ RUN npm run build
 
 # Production Environment Settings
 ENV NODE_ENV=production
-ENV PORT=3000
+ENV PORT=8080
 
+EXPOSE 8080
 EXPOSE 3000
 
 # Start compiled server
 CMD ["node", "dist/server.cjs"]
+

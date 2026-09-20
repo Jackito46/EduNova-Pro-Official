@@ -569,26 +569,47 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleExportPDF = async () => {
     if (!printRef.current || generatedData.length === 0) return;
-    setIsExporting(true);
-    const toastId = toast.loading("Préparation de l'exportation PDF Haute Résolution...");
+
+    // Si l'utilisateur est sur la vue Palmarès, déléguer vers l'export palmarès dédié
+    if (activeSubView === 'palmares') {
+      handleExportPalmaresPDF();
+      return;
+    }
 
     const container = printRef.current;
-    const originalStyle = container.style.cssText;
+    // Cibler avec précision tous les bulletins imprimables
+    const cardElements = Array.from(
+      container.querySelectorAll<HTMLElement>('.report-card-printable, [data-report-card="true"]')
+    );
+
+    if (cardElements.length === 0) {
+      toast.error("Aucun bulletin trouvé pour l'exportation.");
+      return;
+    }
+
+    setIsExporting(true);
+    const toastId = toast.loading(`Préparation de l'exportation PDF (${cardElements.length} bulletin${cardElements.length > 1 ? 's' : ''})...`);
 
     try {
-      container.classList.remove('hidden');
-      container.style.display = 'block';
-      container.style.position = 'absolute';
-      container.style.left = '0';
-      container.style.top = '0';
-      container.style.width = '794px';
-      container.style.overflow = 'visible';
-      container.style.height = 'auto';
-      container.style.maxHeight = 'none';
-      container.style.backgroundColor = '#ffffff';
-      container.style.zIndex = '-9999';
-      container.style.opacity = '1';
-      container.style.pointerEvents = 'none';
+      // Ensure fonts and images are fully hydrated before rendering canvas
+      if (typeof document !== 'undefined' && 'fonts' in document) {
+        await document.fonts.ready;
+      }
+
+      const allImages = Array.from(container.querySelectorAll('img'));
+      await Promise.all(
+        allImages.map(img => {
+          if (img.complete && img.naturalWidth > 0) return Promise.resolve();
+          return new Promise(res => {
+            img.onload = () => res(null);
+            img.onerror = () => res(null);
+            setTimeout(() => res(null), 2000);
+          });
+        })
+      );
+
+      const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+      await wait(100);
 
       const pdf = new jsPDF({
         orientation: 'portrait',
@@ -597,71 +618,77 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
         compress: true
       });
 
-      const children = Array.from(container.children) as HTMLElement[];
-      const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
-
       let renderedCount = 0;
-      for (let i = 0; i < children.length; i++) {
-        const child = children[i];
-        if (!child.classList.contains('font-serif') && !child.classList.contains('font-sans') && !child.classList.contains('report-card-printable')) {
-          continue;
-        }
 
-        toast.loading(`Génération du bulletin ${renderedCount + 1} sur ${children.length}...`, { id: toastId });
+      for (let i = 0; i < cardElements.length; i++) {
+        const card = cardElements[i];
+        toast.loading(`Génération du bulletin ${i + 1} sur ${cardElements.length}...`, { id: toastId });
 
-        const originalChildStyle = child.style.cssText;
-        child.style.display = 'flex';
-        child.style.visibility = 'visible';
-        child.style.opacity = '1';
-        child.style.width = '794px';
-        child.style.minHeight = '1123px';
-        child.style.maxHeight = '1123px';
-        child.style.boxSizing = 'border-box';
-        child.style.margin = '0';
-        child.style.backgroundColor = '#ffffff';
-        child.style.position = 'relative';
+        try {
+          card.scrollIntoView({ block: 'nearest' });
+        } catch {}
+        await wait(60);
 
-        await wait(120);
-
-        const canvas = await html2canvas(child, {
+        const canvas = await html2canvas(card, {
           scale: 2,
           useCORS: true,
           logging: false,
           backgroundColor: '#ffffff',
-          width: 794,
-          height: 1123,
-          windowWidth: 794,
-          windowHeight: 1123,
-          allowTaint: true,
-          imageTimeout: 15000,
+          allowTaint: false,
+          imageTimeout: 20000,
           onclone: clonedDoc => {
             fixOklchForCanvas(clonedDoc);
+            const printableCards = clonedDoc.querySelectorAll<HTMLElement>('.report-card-printable, [data-report-card="true"]');
+            printableCards.forEach(c => {
+              c.style.boxShadow = 'none';
+              c.style.borderRadius = '0';
+              c.style.margin = '0';
+              c.style.border = 'none';
+              c.style.transform = 'none';
+            });
           }
         });
 
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
-        child.style.cssText = originalChildStyle;
-
-        if (renderedCount > 0) {
-          pdf.addPage();
+        if (canvas.width === 0 || canvas.height === 0) {
+          console.warn(`Card ${i + 1} generated empty canvas, skipping...`);
+          continue;
         }
 
-        pdf.addImage(dataUrl, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.95);
+        if (renderedCount > 0) {
+          pdf.addPage('a4', 'portrait');
+        }
+
+        const pdfPageWidth = 210;
+        const pdfPageHeight = 297;
+        const imgHeight = (canvas.height * pdfPageWidth) / canvas.width;
+
+        if (imgHeight <= pdfPageHeight) {
+          pdf.addImage(dataUrl, 'JPEG', 0, 0, pdfPageWidth, imgHeight, undefined, 'FAST');
+        } else {
+          const scale = pdfPageHeight / imgHeight;
+          const scaledWidth = pdfPageWidth * scale;
+          const xOffset = (pdfPageWidth - scaledWidth) / 2;
+          pdf.addImage(dataUrl, 'JPEG', xOffset, 0, scaledWidth, pdfPageHeight, undefined, 'FAST');
+        }
+
         renderedCount++;
         if (i % 2 === 0) await wait(30);
       }
 
-      const classNameClean = classes.find(c => c.id === selectedClassId)?.name || 'Classe';
-      const fileName = `Bulletins_${classNameClean.replace(/\s+/g, '_')}_${term.replace(/\s+/g, '_')}.pdf`;
-      addSecurityWatermark(pdf, { user, ipAddress });
-      pdf.save(fileName);
-      toast.success("Document PDF officiel téléchargé avec succès !", { id: toastId });
+      if (renderedCount > 0) {
+        const classNameClean = classes.find(c => c.id === selectedClassId)?.name || 'Classe';
+        const fileName = `Bulletins_${classNameClean.replace(/\s+/g, '_')}_${term.replace(/\s+/g, '_')}.pdf`;
+        addSecurityWatermark(pdf, { user, ipAddress });
+        pdf.save(fileName);
+        toast.success(`${renderedCount} bulletin(s) officiel(s) exporté(s) en PDF avec succès !`, { id: toastId });
+      } else {
+        toast.error("Aucun bulletin n'a pu être converti.", { id: toastId });
+      }
     } catch (error) {
       console.error("PDF export error:", error);
       toast.error("Une erreur est survenue lors de l'exportation.", { id: toastId });
     } finally {
-      container.style.cssText = originalStyle;
-      container.classList.add('hidden');
       setIsExporting(false);
     }
   };

@@ -63,6 +63,8 @@ export const MaternelleReportCardItem: React.FC<{
 
   return (
     <div
+      id={`report-card-maternelle-${student.id}`}
+      data-report-card="true"
       className={`bg-white p-[1cm] mb-12 border border-amber-200 print:border-none print:mb-0 w-full max-w-[21cm] mx-auto min-h-[29.7cm] flex flex-col ${
         isLast ? '' : 'page-break-after-always'
       } font-sans report-card-printable text-slate-900 rounded-3xl shadow-2xl relative`}

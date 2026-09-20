@@ -696,6 +696,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   // --- EXPORT FUNCTIONS ---
 
   const exportFinancePDF = () => {
+    if (loading) {
+      toast.error("Veuillez patienter pendant la synchronisation des données...");
+      return;
+    }
+    if (filteredPayments.length === 0) {
+      toast.error("Aucune transaction à exporter pour cette période.");
+      return;
+    }
     const doc = new jsPDF();
     
     // Header styling
@@ -707,10 +715,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     doc.setFontSize(10);
     doc.text(`Portée : ${getScopeLabel()}`, 14, 33);
     doc.text(`Période : Du ${new Date(startDate).toLocaleDateString('fr-FR')} au ${new Date(endDate).toLocaleDateString('fr-FR')}`, 14, 39);
-    doc.text(`Total Recettes HTG : ${financeStats.totalHTG.toLocaleString('fr-FR')} HTG | Total USD : ${financeStats.totalUSD.toLocaleString('fr-FR')} USD`, 14, 45);
+    doc.text(`Total Recettes HTG : ${(financeStats.totalHTG || 0).toLocaleString('fr-FR')} HTG | Total USD : ${(financeStats.totalUSD || 0).toLocaleString('fr-FR')} USD`, 14, 45);
 
     // Summary Table by Type
-    const summaryData = Object.entries(financeStats.byType).map(([type, amounts]) => [
+    const summaryData = Object.entries(financeStats.byType || {}).map(([type, amounts]) => [
       type,
       amounts.count,
       amounts.htg > 0 || amounts.usd === 0 ? `${amounts.htg.toLocaleString('fr-FR')} HTG` : '-',
@@ -745,15 +753,15 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
     // Details Table
     const detailsData = filteredPayments.map(p => [
-      new Date(p.created_at).toLocaleDateString('fr-FR'),
+      p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR') : '-',
       p.students ? formatStudentName(p.students.last_name, p.students.first_name).fullName : 'N/A',
       p.students?.className || 'Non assigné',
-      hasMultiCampus ? p.campus_name : '-',
+      hasMultiCampus ? (p.campus_name || '-') : '-',
       p.type || 'Autre',
       p.method || 'Cash',
       p.currency !== 'HTG' 
-        ? `${p.original_amount.toLocaleString('fr-FR')} ${p.currency} (${p.amount.toLocaleString('fr-FR')} HTG)`
-        : `${p.amount.toLocaleString('fr-FR')} HTG`
+        ? `${(p.original_amount || 0).toLocaleString('fr-FR')} ${p.currency || 'USD'} (${(p.amount || 0).toLocaleString('fr-FR')} HTG)`
+        : `${(p.amount || 0).toLocaleString('fr-FR')} HTG`
     ]);
 
     autoTable(doc, {
@@ -770,17 +778,25 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   };
 
   const exportFinanceExcel = () => {
+    if (loading) {
+      toast.error("Veuillez patienter pendant la synchronisation des données...");
+      return;
+    }
+    if (filteredPayments.length === 0) {
+      toast.error("Aucune transaction à exporter pour cette période.");
+      return;
+    }
     const wsData = filteredPayments.map(p => ({
-      'Date': new Date(p.created_at).toLocaleDateString('fr-FR'),
-      'Heure': new Date(p.created_at).toLocaleTimeString('fr-FR'),
+      'Date': p.created_at ? new Date(p.created_at).toLocaleDateString('fr-FR') : '-',
+      'Heure': p.created_at ? new Date(p.created_at).toLocaleTimeString('fr-FR') : '-',
       [terminology.student]: p.students ? formatStudentName(p.students.last_name, p.students.first_name).fullName : 'N/A',
       [terminology.option]: p.students?.className || 'Non assigné',
       'Annexe / Campus': p.campus_name || 'Siège',
       'Type de Frais': p.type || 'Autre',
       'Mode de Paiement': p.method || 'Cash',
-      'Montant Original': p.original_amount,
-      'Devise': p.currency,
-      'Montant Equiv. (HTG)': p.amount
+      'Montant Original': p.original_amount ?? p.amount ?? 0,
+      'Devise': p.currency || 'HTG',
+      'Montant Equiv. (HTG)': p.amount ?? 0
     }));
 
     const ws = XLSX.utils.json_to_sheet(wsData);
@@ -791,6 +807,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   };
 
   const exportStudentsPDF = () => {
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement des effectifs...");
+      return;
+    }
+    if (filteredStudents.length === 0) {
+      toast.error(`Aucun ${terminology.student.toLowerCase()} trouvé pour cette sélection.`);
+      return;
+    }
     const doc = new jsPDF();
     const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
     const className = isAllClasses ? 'Toutes les classes' : classes.find(c => c.id === selectedClassId)?.name || '';
@@ -808,8 +832,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
     const tableData = listToExport.map((s, index) => [
       index + 1,
-      s.last_name,
-      s.first_name,
+      s.last_name || '',
+      s.first_name || '',
       s.classes?.name || '-',
       hasMultiCampus ? (s.school_campuses?.name || 'Siège') : '-',
       s.gender?.charAt(0) || '-',
@@ -830,6 +854,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
   };
 
   const exportStudentsExcel = () => {
+    if (loading) {
+      toast.error("Veuillez patienter pendant le chargement des effectifs...");
+      return;
+    }
+    if (filteredStudents.length === 0) {
+      toast.error(`Aucun ${terminology.student.toLowerCase()} trouvé pour cette sélection.`);
+      return;
+    }
     const isAllClasses = !selectedClassId || selectedClassId.toLowerCase() === 'all';
     const className = isAllClasses ? 'Toutes_les_classes' : classes.find(c => c.id === selectedClassId)?.name || '';
     const listToExport = filteredStudents;
@@ -838,8 +870,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
       'N°': index + 1,
       [terminology.option]: s.classes?.name || '-',
       'Annexe / Campus': s.school_campuses?.name || 'Siège',
-      'Nom': s.last_name,
-      'Prénom': s.first_name,
+      'Nom': s.last_name || '',
+      'Prénom': s.first_name || '',
       'Sexe': s.gender || '-',
       'Date de Naissance': s.dob ? new Date(s.dob).toLocaleDateString('fr-FR') : '-',
       'Parent/Tuteur': s.parent_name || '-',
@@ -1425,7 +1457,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
                   <button 
                     onClick={exportFinancePDF}
-                    disabled={filteredPayments.length === 0}
+                    disabled={loading || filteredPayments.length === 0}
                     title="Exporter l'intégralité des transactions filtrées au format PDF"
                     className="px-3.5 sm:px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-rose-200/60"
                   >
@@ -1434,7 +1466,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
                   <button 
                     onClick={exportFinanceExcel}
-                    disabled={filteredPayments.length === 0}
+                    disabled={loading || filteredPayments.length === 0}
                     title="Exporter l'intégralité des transactions filtrées au format Excel"
                     className="px-3.5 sm:px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-emerald-200/60"
                   >
@@ -2178,14 +2210,14 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                 </button>
                 <button 
                   onClick={exportStudentsPDF}
-                  disabled={filteredStudents.length === 0}
+                  disabled={loading || filteredStudents.length === 0}
                   className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-rose-200/60"
                 >
                   <Download size={14} /> PDF
                 </button>
                 <button 
                   onClick={exportStudentsExcel}
-                  disabled={filteredStudents.length === 0}
+                  disabled={loading || filteredStudents.length === 0}
                   className="px-4 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 rounded-xl text-xs font-black tracking-wide transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-40 border border-emerald-200/60"
                 >
                   <FileSpreadsheet size={14} /> Excel

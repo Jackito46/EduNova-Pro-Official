@@ -75,6 +75,8 @@ export const ReportCardItem: React.FC<{
 
   return (
     <div
+      id={`report-card-${student.id}`}
+      data-report-card="true"
       className={`bg-white ${
         isSuperDense
           ? 'p-[0.5cm] sm:p-[0.65cm]'
