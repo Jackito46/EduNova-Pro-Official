@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { 
   Building2, ShieldAlert, Users, Database, 
@@ -193,22 +193,31 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
     school: any;
     anchorRect: { top: number; bottom: number; left: number; right: number; width: number; height: number };
   } | null>(null);
+  const actionMenuPortalRef = useRef<HTMLDivElement>(null);
   const openSchoolMenuId = activeSchoolMenu?.school.id || null;
   const setOpenSchoolMenuId = useCallback((id: string | null) => {
     if (!id) setActiveSchoolMenu(null);
   }, []);
 
-  // Auto-close floating action menu when scrolling or resizing to prevent alignment drift
+  // Auto-close floating action menu when scrolling or resizing the background page to prevent alignment drift
   useEffect(() => {
     if (!activeSchoolMenu) return;
-    const handleScrollOrResize = () => {
+    const handleScroll = (event: Event) => {
+      const target = event.target as Node | null;
+      // If the scroll event originated from inside the action menu popover itself (e.g. scrolling the action list or clicking its scrollbar), DO NOT close!
+      if (actionMenuPortalRef.current && target && (actionMenuPortalRef.current === target || actionMenuPortalRef.current.contains(target))) {
+        return;
+      }
       setActiveSchoolMenu(null);
     };
-    window.addEventListener('scroll', handleScrollOrResize, true);
-    window.addEventListener('resize', handleScrollOrResize);
+    const handleResize = () => {
+      setActiveSchoolMenu(null);
+    };
+    window.addEventListener('scroll', handleScroll, true);
+    window.addEventListener('resize', handleResize);
     return () => {
-      window.removeEventListener('scroll', handleScrollOrResize, true);
-      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScroll, true);
+      window.removeEventListener('resize', handleResize);
     };
   }, [activeSchoolMenu]);
 
@@ -223,12 +232,12 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
       return { isMobile: true, openUpward: false, style: {} };
     }
 
-    const popoverWidth = 250;
-    const estimatedHeight = 420;
+    const popoverWidth = 265;
+    const estimatedHeight = 500;
 
     const spaceBelow = viewportHeight - rect.bottom - 12;
     const spaceAbove = rect.top - 12;
-    const openUpward = spaceBelow < 320 && spaceAbove > spaceBelow;
+    const openUpward = spaceBelow < 340 && spaceAbove > spaceBelow;
 
     let right = viewportWidth - rect.right;
     if (right < 12) right = 12;
@@ -239,11 +248,11 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
     const topStyle: React.CSSProperties = openUpward
       ? {
           bottom: `${viewportHeight - rect.top + 6}px`,
-          maxHeight: `${Math.max(220, Math.min(estimatedHeight, spaceAbove - 12))}px`
+          maxHeight: `${Math.max(240, Math.min(estimatedHeight, spaceAbove - 12))}px`
         }
       : {
           top: `${rect.bottom + 6}px`,
-          maxHeight: `${Math.max(220, Math.min(estimatedHeight, spaceBelow - 12))}px`
+          maxHeight: `${Math.max(240, Math.min(estimatedHeight, spaceBelow - 12))}px`
         };
 
     return {
@@ -7280,52 +7289,55 @@ const handleDeleteSchool = async () => {
       {/* FLOATING ACTION MENU PORTAL (Rendered outside table & card containers)   */}
       {/* ========================================================================= */}
       {activeSchoolMenu && typeof document !== 'undefined' && createPortal(
-        (() => {
-          const school = activeSchoolMenu.school;
-          const { isMobile, openUpward, style } = getActionMenuPlacement(activeSchoolMenu.anchorRect);
+        <div ref={actionMenuPortalRef}>
+          {(() => {
+            const school = activeSchoolMenu.school;
+            const { isMobile, openUpward, style } = getActionMenuPlacement(activeSchoolMenu.anchorRect);
 
-          if (isMobile) {
-            return (
-              <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
-                <div 
-                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
-                  onClick={() => setActiveSchoolMenu(null)} 
-                />
-                <motion.div
-                  initial={{ opacity: 0, y: 30 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 30 }}
-                  className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[85vh]"
-                >
-                  {/* Mobile Header */}
-                  <div className="px-5 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0">
-                    <div className="min-w-0 flex-1 pr-3">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Opérations Avancées</span>
-                      <h4 className="text-sm font-black text-slate-900 truncate" title={school.name}>{school.name}</h4>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] font-mono text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
-                          ID: {school.id.split('-')[0]}
-                        </span>
-                        <span className="text-[10px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded uppercase border border-slate-200">
-                          {school.school_type || 'STANDARD'}
-                        </span>
-                        {school.is_protected && (
-                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
-                            <ShieldAlert size={10} /> Protégée
+            if (isMobile) {
+              return (
+                <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                  <div 
+                    className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+                    onClick={() => setActiveSchoolMenu(null)} 
+                  />
+                  <motion.div
+                    initial={{ opacity: 0, y: 30 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 30 }}
+                    onMouseDown={(e) => e.stopPropagation()}
+                    onClick={(e) => e.stopPropagation()}
+                    className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[85vh]"
+                  >
+                    {/* Mobile Header */}
+                    <div className="px-5 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0">
+                      <div className="min-w-0 flex-1 pr-3">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Opérations Avancées</span>
+                        <h4 className="text-sm font-black text-slate-900 truncate" title={school.name}>{school.name}</h4>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] font-mono text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                            ID: {school.id.split('-')[0]}
                           </span>
-                        )}
+                          <span className="text-[10px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded uppercase border border-slate-200">
+                            {school.school_type || 'STANDARD'}
+                          </span>
+                          {school.is_protected && (
+                            <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                              <ShieldAlert size={10} /> Protégée
+                            </span>
+                          )}
+                        </div>
                       </div>
+                      <button 
+                        onClick={() => setActiveSchoolMenu(null)}
+                        className="p-2 rounded-xl bg-slate-200/60 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                      >
+                        <X size={18} />
+                      </button>
                     </div>
-                    <button 
-                      onClick={() => setActiveSchoolMenu(null)}
-                      className="p-2 rounded-xl bg-slate-200/60 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
-                    >
-                      <X size={18} />
-                    </button>
-                  </div>
 
-                  {/* Mobile Actions List */}
-                  <div className="p-3 overflow-y-auto custom-scrollbar space-y-1 divide-y divide-slate-100 flex-1">
+                    {/* Mobile Actions List */}
+                    <div className="p-3 overflow-y-auto custom-scrollbar space-y-1 divide-y divide-slate-100 flex-1 overscroll-contain">
                     <div className="pb-1">
                       <button
                         onClick={() => {
@@ -7483,6 +7495,8 @@ const handleDeleteSchool = async () => {
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.96, y: openUpward ? 6 : -6 }}
                 transition={{ duration: 0.15 }}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
                 style={style}
                 className="pointer-events-auto bg-white rounded-2xl shadow-2xl border border-slate-200 divide-y divide-slate-100 text-left font-sans flex flex-col overflow-hidden"
               >
@@ -7502,7 +7516,7 @@ const handleDeleteSchool = async () => {
                 </div>
 
                 {/* Desktop Actions List */}
-                <div className="overflow-y-auto custom-scrollbar divide-y divide-slate-100 flex-1 py-1">
+                <div className="overflow-y-auto custom-scrollbar divide-y divide-slate-100 flex-1 py-1 overscroll-contain pr-0.5">
                   <div className="py-0.5">
                     <button
                       onClick={() => {
@@ -7645,7 +7659,8 @@ const handleDeleteSchool = async () => {
               </motion.div>
             </div>
           );
-        })(),
+        })()}
+        </div>,
         document.body
       )}
     </div>
