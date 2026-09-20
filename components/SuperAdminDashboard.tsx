@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   Building2, ShieldAlert, Users, Database, 
   Power, Download, Plus, Search, X, CheckCircle2, AlertCircle, CalendarPlus, CalendarCheck, Loader2,
@@ -188,7 +189,75 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
   const [filterExpired, setFilterExpired] = useState(false);
   const [schoolFilterTab, setSchoolFilterTab] = useState<'ALL' | 'ACTIVE' | 'EXPIRED' | 'MULTI_CAMPUS' | 'PROTECTED'>('ALL');
   const [schoolViewMode, setSchoolViewMode] = useState<'table' | 'grid'>('table');
-  const [openSchoolMenuId, setOpenSchoolMenuId] = useState<string | null>(null);
+  const [activeSchoolMenu, setActiveSchoolMenu] = useState<{
+    school: any;
+    anchorRect: { top: number; bottom: number; left: number; right: number; width: number; height: number };
+  } | null>(null);
+  const openSchoolMenuId = activeSchoolMenu?.school.id || null;
+  const setOpenSchoolMenuId = useCallback((id: string | null) => {
+    if (!id) setActiveSchoolMenu(null);
+  }, []);
+
+  // Auto-close floating action menu when scrolling or resizing to prevent alignment drift
+  useEffect(() => {
+    if (!activeSchoolMenu) return;
+    const handleScrollOrResize = () => {
+      setActiveSchoolMenu(null);
+    };
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [activeSchoolMenu]);
+
+  // Dynamic placement calculation for portal action popover (upward/downward and clamped)
+  const getActionMenuPlacement = useCallback((rect: { top: number; bottom: number; left: number; right: number; width: number; height: number }) => {
+    if (typeof window === 'undefined') return { isMobile: false, openUpward: false, style: {} };
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const isMobile = viewportWidth < 640;
+    
+    if (isMobile) {
+      return { isMobile: true, openUpward: false, style: {} };
+    }
+
+    const popoverWidth = 250;
+    const estimatedHeight = 420;
+
+    const spaceBelow = viewportHeight - rect.bottom - 12;
+    const spaceAbove = rect.top - 12;
+    const openUpward = spaceBelow < 320 && spaceAbove > spaceBelow;
+
+    let right = viewportWidth - rect.right;
+    if (right < 12) right = 12;
+    if (viewportWidth - right - popoverWidth < 12) {
+      right = Math.max(12, viewportWidth - popoverWidth - 12);
+    }
+
+    const topStyle: React.CSSProperties = openUpward
+      ? {
+          bottom: `${viewportHeight - rect.top + 6}px`,
+          maxHeight: `${Math.max(220, Math.min(estimatedHeight, spaceAbove - 12))}px`
+        }
+      : {
+          top: `${rect.bottom + 6}px`,
+          maxHeight: `${Math.max(220, Math.min(estimatedHeight, spaceBelow - 12))}px`
+        };
+
+    return {
+      isMobile: false,
+      openUpward,
+      style: {
+        position: 'fixed' as const,
+        right: `${right}px`,
+        width: `${popoverWidth}px`,
+        ...topStyle,
+        zIndex: 9999
+      }
+    };
+  }, []);
   const [configCategory, setConfigCategory] = useState<'ALL' | 'IDENTITY' | 'SECURITY' | 'SESSIONS' | 'MODULES' | 'SUBSCRIPTIONS' | 'MAINTENANCE'>('ALL');
 
   // Security & Active Sessions View State
@@ -1985,20 +2054,20 @@ const handleDeleteSchool = async () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-700 pb-20">
+    <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6 animate-in fade-in duration-700 pb-20 w-full min-w-0">
       {/* Header Super Admin Ergonomique & Centre de Contrôle */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         {/* Top Hero Banner */}
-        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-6 sm:p-8 rounded-[2rem] shadow-xl border border-slate-800 relative overflow-hidden">
+        <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 lg:p-7 rounded-2xl sm:rounded-[2rem] shadow-xl border border-slate-800 relative overflow-hidden">
           {/* Decorative glow overlays */}
           <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
           <div className="absolute right-1/3 -top-10 w-48 h-48 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
 
-          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+          <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5 sm:gap-6">
             {/* Title & Network Status Badges */}
-            <div className="space-y-3">
-              <div className="flex flex-wrap items-center gap-2.5">
-                <span className="px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[10px] font-black uppercase tracking-widest rounded-full backdrop-blur-md flex items-center gap-1.5">
+            <div className="space-y-2.5 sm:space-y-3 min-w-0">
+              <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+                <span className="px-2.5 sm:px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[10px] font-black uppercase tracking-widest rounded-full backdrop-blur-md flex items-center gap-1.5">
                   <ShieldCheck size={12} className="text-emerald-400" />
                   ADMINISTRATION DU SYSTÈME
                 </span>
@@ -2009,56 +2078,56 @@ const handleDeleteSchool = async () => {
               </div>
 
               <div>
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-white flex items-center gap-3">
-                  <ShieldAlert size={32} className="text-indigo-400 shrink-0" />
-                  Console Super Administrateur
+                <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5 sm:gap-3">
+                  <ShieldAlert size={28} className="text-indigo-400 shrink-0" />
+                  <span>Console Super Administrateur</span>
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1 max-w-2xl">
+                <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1 max-w-2xl leading-relaxed">
                   Supervision globale multi-établissement, gouvernance réseau, audit de sécurité et maintenance système.
                 </p>
               </div>
 
               {/* Live Metric Badges */}
-              <div className="pt-1 flex flex-wrap items-center gap-3 text-xs font-bold text-slate-300">
-                <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
-                  <Building2 size={15} className="text-indigo-400" />
+              <div className="pt-0.5 flex flex-wrap items-center gap-2 sm:gap-2.5 text-xs font-bold text-slate-300">
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/60 text-[11px] sm:text-xs">
+                  <Building2 size={14} className="text-indigo-400 shrink-0" />
                   <span><strong className="text-white font-black">{stats.totalSchools}</strong> Établissements</span>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
-                  <Users size={15} className="text-blue-400" />
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/60 text-[11px] sm:text-xs">
+                  <Users size={14} className="text-blue-400 shrink-0" />
                   <span><strong className="text-white font-black">{stats.totalUsers}</strong> Utilisateurs</span>
                 </div>
-                <div className="flex items-center gap-2 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700/60">
-                  <GraduationCap size={15} className="text-emerald-400" />
+                <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/60 text-[11px] sm:text-xs">
+                  <GraduationCap size={14} className="text-emerald-400 shrink-0" />
                   <span><strong className="text-white font-black">{stats.totalStudents}</strong> Élèves</span>
                 </div>
               </div>
             </div>
 
             {/* Main Action Buttons */}
-            <div className="flex flex-wrap lg:flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
+            <div className="flex flex-wrap lg:flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 shrink-0">
               {/* GROS BOUTON D'ADMINISTRATION / NOUVELLE ÉCOLE */}
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="px-6 py-4 bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800 text-white font-black text-sm rounded-2xl shadow-xl shadow-indigo-950/50 hover:shadow-indigo-600/30 transition-all flex items-center justify-center gap-3 border border-indigo-400/30 active:scale-95 group"
+                className="px-4 sm:px-5 py-3 sm:py-3.5 bg-gradient-to-r from-indigo-500 via-indigo-600 to-indigo-700 hover:from-indigo-600 hover:to-indigo-800 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-xl shadow-indigo-950/50 hover:shadow-indigo-600/30 transition-all flex items-center justify-center gap-2.5 sm:gap-3 border border-indigo-400/30 active:scale-95 group cursor-pointer"
               >
-                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <Plus size={22} className="text-white" strokeWidth={3} />
+                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                  <Plus size={20} className="text-white" strokeWidth={3} />
                 </div>
                 <div className="text-left">
-                  <div className="text-[10px] uppercase tracking-wider text-indigo-200 font-extrabold">Action Principale</div>
-                  <div className="text-sm font-black tracking-tight">Créer un Établissement</div>
+                  <div className="text-[9px] sm:text-[10px] uppercase tracking-wider text-indigo-200 font-extrabold">Action Principale</div>
+                  <div className="text-xs sm:text-sm font-black tracking-tight">Créer un Établissement</div>
                 </div>
               </button>
 
               {user.school_id && (
                 <button
                   onClick={() => setShowResetContextModal(true)}
-                  className="px-5 py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-black text-xs rounded-2xl transition-all flex items-center justify-center gap-2.5 backdrop-blur-md active:scale-95 shadow-lg shadow-amber-950/30 group"
+                  className="px-4 py-2.5 sm:py-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/40 font-black text-xs rounded-xl sm:rounded-2xl transition-all flex items-center justify-center gap-2 sm:gap-2.5 backdrop-blur-md active:scale-95 shadow-lg shadow-amber-950/30 group cursor-pointer"
                   title="Quitter le mode immersion et réinitialiser au périmètre Super Admin global"
                 >
                   <div className="w-6 h-6 rounded-lg bg-amber-400/20 flex items-center justify-center text-amber-300 group-hover:rotate-180 transition-transform duration-500 shrink-0">
-                    <RefreshCw size={14} />
+                    <RefreshCw size={13} />
                   </div>
                   <div className="text-left">
                     <div className="text-[9px] uppercase tracking-wider text-amber-300/80 font-black">Mode Immersion Actif</div>
@@ -2071,8 +2140,8 @@ const handleDeleteSchool = async () => {
         </div>
 
         {/* Ergonomic Navigation View Switcher (Tabs) */}
-        <div className="bg-white/90 backdrop-blur-md p-2 rounded-2xl border border-slate-200/90 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="bg-white/90 backdrop-blur-md p-1.5 sm:p-2 rounded-2xl border border-slate-200/90 shadow-xs overflow-x-auto custom-scrollbar">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-max lg:min-w-0 lg:flex-wrap">
             {[
               { id: 'schools', label: 'Établissements', icon: Building2, badge: stats.totalSchools },
               { id: 'health', label: 'Santé Système & Quotas', icon: Activity },
@@ -2093,28 +2162,28 @@ const handleDeleteSchool = async () => {
                     setActiveView(tab.id as any);
                     if (tab.actionExtra) tab.actionExtra();
                   }}
-                  className={`flex-1 sm:flex-initial px-4 py-3 rounded-xl font-extrabold text-xs tracking-tight transition-all flex items-center justify-center gap-2.5 whitespace-nowrap group relative ${
+                  className={`px-3 sm:px-3.5 py-2 sm:py-2.5 rounded-xl font-bold text-xs tracking-tight transition-all flex items-center justify-center gap-2 whitespace-nowrap group relative cursor-pointer ${
                     isActive
                       ? 'bg-slate-900 text-white shadow-md shadow-slate-900/15 border border-slate-800'
                       : 'bg-slate-50/80 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/60'
                   }`}
                 >
                   <Icon 
-                    size={16} 
+                    size={15} 
                     className={`shrink-0 transition-transform group-hover:scale-110 ${
                       isActive ? 'text-indigo-400' : 'text-slate-400 group-hover:text-slate-600'
                     }`} 
                   />
                   <span>{tab.label}</span>
                   {tab.badge !== undefined && (
-                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
+                    <span className={`px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] font-black shrink-0 ${
                       isActive ? 'bg-indigo-500/30 text-indigo-200 border border-indigo-400/30' : 'bg-slate-200/80 text-slate-700'
                     }`}>
                       {tab.badge}
                     </span>
                   )}
                   {isActive && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 bg-indigo-500 rounded-full shadow-sm" />
+                    <span className="absolute -bottom-0.5 left-1/2 -translate-x-1/2 w-6 h-0.5 bg-indigo-500 rounded-full shadow-sm" />
                   )}
                 </button>
               );
@@ -2461,47 +2530,47 @@ const handleDeleteSchool = async () => {
           return (
             <div className="space-y-6">
               {/* Header & Controls Bar */}
-              <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-xs flex flex-col gap-6">
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-5">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-indigo-50 border border-indigo-100/80 text-indigo-600 rounded-2xl shadow-xs flex items-center justify-center shrink-0">
-                      <Building2 size={24} />
+              <div className="bg-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 lg:p-6 border border-slate-200 shadow-xs flex flex-col gap-4 sm:gap-5">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3.5 sm:gap-4">
+                  <div className="flex items-center gap-3 sm:gap-3.5">
+                    <div className="w-10 h-10 sm:w-11 sm:h-11 bg-indigo-50 border border-indigo-100/80 text-indigo-600 rounded-xl sm:rounded-2xl shadow-xs flex items-center justify-center shrink-0">
+                      <Building2 size={22} />
                     </div>
                     <div>
-                      <div className="flex items-center gap-2.5 flex-wrap">
-                        <h2 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Établissements Scolaires</h2>
-                        <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 text-xs font-black rounded-full">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Établissements Scolaires</h2>
+                        <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[11px] font-black rounded-full">
                           {schools.length} {schools.length > 1 ? 'écoles' : 'école'}
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 font-medium mt-0.5">Instances, gouvernance, abonnements & multi-campus</p>
+                      <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-0.5">Instances, gouvernance, abonnements & multi-campus</p>
                     </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+                  <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
                     {/* View Switcher: Table vs Cards */}
-                    <div className="inline-flex bg-slate-100 p-1 rounded-2xl border border-slate-200/80 shrink-0">
+                    <div className="inline-flex bg-slate-100 p-1 rounded-xl sm:rounded-2xl border border-slate-200/80 shrink-0">
                       <button
                         type="button"
                         onClick={() => setSchoolViewMode('table')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           schoolViewMode === 'table' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                         title="Affichage Tableau Détaillé"
                       >
-                        <List size={15} />
-                        <span className="hidden sm:inline">Tableau</span>
+                        <List size={14} />
+                        <span>Tableau</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => setSchoolViewMode('grid')}
-                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer ${
                           schoolViewMode === 'grid' ? 'bg-white text-indigo-700 shadow-xs' : 'text-slate-600 hover:text-slate-900'
                         }`}
                         title="Affichage Grille Adaptative"
                       >
-                        <Grid size={15} />
-                        <span className="hidden sm:inline">Grille</span>
+                        <Grid size={14} />
+                        <span>Grille</span>
                       </button>
                     </div>
 
@@ -2509,27 +2578,27 @@ const handleDeleteSchool = async () => {
                     <button
                       onClick={fetchSchools}
                       disabled={loading}
-                      className="p-3 bg-slate-50 border border-slate-200 text-slate-700 rounded-2xl hover:bg-slate-100 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
+                      className="p-2 sm:p-2.5 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl sm:rounded-2xl hover:bg-slate-100 transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50"
                       title="Rafraîchir la liste"
                     >
-                      <RefreshCw size={17} className={loading ? 'animate-spin text-indigo-600' : ''} />
+                      <RefreshCw size={15} className={loading ? 'animate-spin text-indigo-600' : ''} />
                     </button>
 
                     {/* Create School Button */}
                     <button
                       onClick={() => setIsModalOpen(true)}
-                      className="flex-1 sm:flex-none px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white text-xs md:text-sm font-bold rounded-2xl transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-2 cursor-pointer"
+                      className="flex-1 sm:flex-none px-3.5 sm:px-4 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold rounded-xl sm:rounded-2xl transition-all shadow-md shadow-indigo-100 flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer"
                     >
-                      <Plus size={18} />
+                      <Plus size={16} />
                       <span>Ajouter une école</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Search & Filter Pills */}
-                <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 pt-4 border-t border-slate-100">
+                <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4 pt-3.5 border-t border-slate-100">
                   {/* Quick Filter Tabs */}
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 overflow-x-auto custom-scrollbar pb-1 xl:pb-0 flex-nowrap sm:flex-wrap">
                     {[
                       { id: 'ALL', label: 'Toutes', count: schools.length },
                       { id: 'ACTIVE', label: 'Actives', count: activeCount, color: 'text-emerald-700 bg-emerald-50 border-emerald-200' },
@@ -2546,14 +2615,14 @@ const handleDeleteSchool = async () => {
                             setSchoolFilterTab(tab.id as any);
                             if (tab.id !== 'EXPIRED' && filterExpired) setFilterExpired(false);
                           }}
-                          className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-2 border cursor-pointer ${
+                          className={`px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 border cursor-pointer whitespace-nowrap ${
                             isActive 
                               ? 'bg-slate-900 text-white border-slate-900 shadow-xs' 
                               : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
                           }`}
                         >
                           <span>{tab.label}</span>
-                          <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                          <span className={`px-1.5 py-0.5 rounded-md text-[10px] font-black leading-none ${
                             isActive ? 'bg-white/20 text-white' : tab.color || 'bg-slate-200 text-slate-700'
                           }`}>
                             {tab.count}
@@ -2564,21 +2633,21 @@ const handleDeleteSchool = async () => {
                   </div>
 
                   {/* Search Input */}
-                  <div className="relative w-full lg:w-80 group shrink-0">
-                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={16} />
+                  <div className="relative w-full xl:w-72 2xl:w-80 group shrink-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-indigo-600 transition-colors" size={15} />
                     <input 
                       type="text" 
                       placeholder="Rechercher par nom, ID, directeur..." 
-                      className="w-full pl-10 pr-9 py-2.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-400"
+                      className="w-full pl-9 pr-8 py-2 sm:py-2.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-600 outline-none transition-all placeholder:text-slate-400"
                       value={searchTerm || ''}
                       onChange={(e) => setSearchTerm(e.target.value)}
                     />
                     {searchTerm && (
                       <button 
                         onClick={() => setSearchTerm('')} 
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
                       >
-                        <X size={14} />
+                        <X size={13} />
                       </button>
                     )}
                   </div>
@@ -2620,16 +2689,16 @@ const handleDeleteSchool = async () => {
               ) : (
                 <>
                   {/* --- View 1: Modern Table View (Desktop & Tablet with Horizontal Smooth Scroll) --- */}
-                  <div className={`${schoolViewMode === 'grid' ? 'hidden' : 'block'} bg-white rounded-3xl shadow-xs border border-slate-200 overflow-hidden`}>
+                  <div className={`${schoolViewMode === 'grid' ? 'hidden' : 'block'} bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200 overflow-hidden`}>
                     <div className="overflow-x-auto custom-scrollbar">
-                      <table className="w-full text-left min-w-[750px]">
+                      <table className="w-full text-left min-w-full">
                         <thead>
-                          <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                            <th className="px-6 py-4.5">Établissement</th>
-                            <th className="px-6 py-4.5">Abonnement & Licence</th>
-                            <th className="px-6 py-4.5 text-center">Population</th>
-                            <th className="px-6 py-4.5 text-center">Statut</th>
-                            <th className="px-6 py-4.5 text-right">Actions</th>
+                          <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                            <th className="px-3 sm:px-4 py-3 sm:py-3.5">Établissement</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-3.5">Abonnement & Licence</th>
+                            <th className="px-2.5 sm:px-3 py-3 sm:py-3.5 text-center">Population</th>
+                            <th className="px-2.5 sm:px-3 py-3 sm:py-3.5 text-center">Statut</th>
+                            <th className="px-3 sm:px-4 py-3 sm:py-3.5 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -2650,40 +2719,40 @@ const handleDeleteSchool = async () => {
                                 className="hover:bg-slate-50/90 transition-all group"
                               >
                                 {/* Column 1: School Identity */}
-                                <td className="px-6 py-5">
-                                  <div className="flex items-center gap-3.5">
-                                    <div className="w-11 h-11 bg-indigo-50/80 text-indigo-600 rounded-2xl flex items-center justify-center relative border border-indigo-100 shrink-0 group-hover:scale-105 transition-transform">
-                                      <Building2 size={20} />
+                                <td className="px-3 sm:px-4 py-3 sm:py-3.5">
+                                  <div className="flex items-center gap-2.5 sm:gap-3">
+                                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-indigo-50/80 text-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center relative border border-indigo-100 shrink-0 group-hover:scale-105 transition-transform">
+                                      <Building2 size={18} />
                                       {school.is_protected && (
-                                        <div className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center shadow-xs" title="École Protégée Système">
-                                          <ShieldAlert size={9} className="text-white" />
+                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center shadow-xs" title="École Protégée Système">
+                                          <ShieldAlert size={8} className="text-white" />
                                         </div>
                                       )}
                                     </div>
                                     <div className="min-w-0">
-                                      <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="font-extrabold text-slate-900 text-sm tracking-tight leading-snug truncate whitespace-nowrap" title={school.name}>{school.name}</p>
+                                      <div className="flex items-center gap-1.5 flex-wrap">
+                                        <p className="font-extrabold text-slate-900 text-xs sm:text-sm tracking-tight leading-snug truncate max-w-[140px] sm:max-w-[180px] lg:max-w-[210px] xl:max-w-[260px]" title={school.name}>{school.name}</p>
                                         {isCurrentWorkingSchool && (
-                                          <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-full tracking-wider shrink-0">
+                                          <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-full tracking-wider shrink-0">
                                             Actuelle
                                           </span>
                                         )}
                                       </div>
-                                      <div className="flex items-center gap-2 mt-1 flex-wrap">
-                                        <span className="text-[10px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200/60">
+                                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                        <span className="text-[9px] font-mono text-slate-500 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/60">
                                           ID: {school.id.split('-')[0]}
                                         </span>
                                         {school.school_type && (
-                                          <span className="text-[10px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.5 rounded uppercase tracking-wider">
+                                          <span className="text-[9px] font-bold text-slate-600 bg-slate-100 px-1.5 py-0.2 rounded uppercase tracking-wider">
                                             {school.school_type}
                                           </span>
                                         )}
                                         {school.has_multi_campus ? (
-                                          <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded uppercase tracking-wider flex items-center gap-1">
-                                            <Layers size={10} /> Multi-Annexes ({school.annex_count || 1})
+                                          <span className="text-[9px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.2 rounded uppercase tracking-wider flex items-center gap-1">
+                                            <Layers size={9} /> Multi-Annexes ({school.annex_count || 1})
                                           </span>
                                         ) : (
-                                          <span className="text-[10px] text-slate-400 font-medium">
+                                          <span className="text-[9px] text-slate-400 font-medium">
                                             Site unique
                                           </span>
                                         )}
@@ -2693,9 +2762,9 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 2: Subscription & Expiration */}
-                                <td className="px-6 py-5">
-                                  <div className="flex flex-col gap-1.5 items-start">
-                                    <span className={`inline-flex items-center px-2.5 py-1 rounded-xl text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${
+                                <td className="px-3 sm:px-4 py-3 sm:py-3.5">
+                                  <div className="flex flex-col gap-1 items-start">
+                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${
                                       school.subscription_plan === 'unlimited' ? 'bg-amber-50 text-amber-800 border-amber-200/80 shadow-xs' :
                                       school.subscription_plan === 'yearly' ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80' :
                                       school.subscription_plan === 'monthly' ? 'bg-blue-50 text-blue-700 border-blue-200/80' :
@@ -2704,12 +2773,12 @@ const handleDeleteSchool = async () => {
                                       {planLabels[school.subscription_plan] || school.subscription_plan || 'Essai'}
                                     </span>
                                     {school.subscription_plan !== 'unlimited' && (
-                                      <div className="flex items-center gap-1.5 whitespace-nowrap">
-                                        <Clock size={12} className={isExpired ? 'text-rose-500 shrink-0' : 'text-slate-400 shrink-0'} />
-                                        <span className={`text-[11px] font-bold ${
+                                      <div className="flex items-center gap-1 whitespace-nowrap">
+                                        <Clock size={11} className={isExpired ? 'text-rose-500 shrink-0' : 'text-slate-400 shrink-0'} />
+                                        <span className={`text-[10px] sm:text-[11px] font-bold ${
                                           isExpired ? 'text-rose-600 font-black' : daysLeft && daysLeft <= 7 ? 'text-amber-600 font-bold' : 'text-slate-500'
                                         }`}>
-                                          {isExpired ? 'Licence expirée' : daysLeft ? `${daysLeft} jours restants` : 'Non configuré'}
+                                          {isExpired ? 'Licence expirée' : daysLeft ? `${daysLeft} j restants` : 'Non configuré'}
                                         </span>
                                       </div>
                                     )}
@@ -2717,22 +2786,22 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 3: Population Metrics */}
-                                <td className="px-6 py-5">
-                                  <div className="flex items-center justify-center gap-2">
-                                    <div className="flex flex-col items-center px-2.5 py-1 rounded-xl bg-blue-50/70 border border-blue-100 min-w-[64px]" title="Gestionnaires & Enseignants">
+                                <td className="px-2.5 sm:px-3 py-3 sm:py-3.5">
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <div className="flex flex-col items-center px-1.5 sm:px-2 py-0.5 rounded-lg bg-blue-50/70 border border-blue-100 min-w-[42px] sm:min-w-[48px]" title="Gestionnaires & Enseignants">
                                       <span className="text-blue-800 text-xs font-black leading-tight">{school.staff_count || 0}</span>
-                                      <span className="text-[8px] font-bold text-blue-600 uppercase tracking-widest">Staff</span>
+                                      <span className="text-[7.5px] sm:text-[8px] font-bold text-blue-600 uppercase tracking-widest">Staff</span>
                                     </div>
-                                    <div className="flex flex-col items-center px-2.5 py-1 rounded-xl bg-slate-50 border border-slate-200/70 min-w-[64px]" title="Élèves inscrits">
+                                    <div className="flex flex-col items-center px-1.5 sm:px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/70 min-w-[42px] sm:min-w-[48px]" title="Élèves inscrits">
                                       <span className="text-slate-800 text-xs font-black leading-tight">{school.student_count || 0}</span>
-                                      <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">Élèves</span>
+                                      <span className="text-[7.5px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest">Élèves</span>
                                     </div>
                                   </div>
                                 </td>
 
                                 {/* Column 4: Status */}
-                                <td className="px-6 py-5 text-center">
-                                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                <td className="px-2.5 sm:px-3 py-3 sm:py-3.5 text-center">
+                                  <span className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider border ${
                                     school.status === 'ACTIVE' 
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                       : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -2743,23 +2812,32 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 5: Smart Action Suite */}
-                                <td className="px-6 py-5 text-right">
-                                  <div className="flex items-center justify-end gap-1.5 relative">
+                                <td className="px-3 sm:px-4 py-3 sm:py-3.5 text-right">
+                                  <div className="flex items-center justify-end gap-1 sm:gap-1.5 relative">
                                     {/* Primary Work Button */}
                                     <button 
                                       onClick={() => setSwitchSchoolModal({ isOpen: true, school })}
                                       title={isCurrentWorkingSchool ? "Vous êtes dans cette école" : "Basculer et travailler dans cette école"}
-                                      className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                                         isCurrentWorkingSchool 
                                           ? 'bg-emerald-600 text-white shadow-xs' 
                                           : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-100'
                                       }`}
                                     >
-                                      <ArrowUpRight size={14} />
-                                      <span className="hidden xl:inline">{isCurrentWorkingSchool ? 'Actif' : 'Travailler'}</span>
+                                      <ArrowUpRight size={13} />
+                                      <span className="hidden sm:inline">{isCurrentWorkingSchool ? 'Actif' : 'Travailler'}</span>
                                     </button>
 
-                                    {/* Quick Edit */}
+                                    {/* Admins Button */}
+                                    <button 
+                                      onClick={() => openAdminList(school)}
+                                      title="Comptes Administrateurs & Accès"
+                                      className="p-1.5 sm:p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100 cursor-pointer"
+                                    >
+                                      <Users size={15} />
+                                    </button>
+
+                                    {/* Quick Edit (Large Screens) */}
                                     {!school.is_protected && (
                                       <button 
                                         onClick={() => setEditSchoolModal({ 
@@ -2773,151 +2851,54 @@ const handleDeleteSchool = async () => {
                                           has_multi_campus: !!school.has_multi_campus
                                         })}
                                         title="Modifier l'établissement"
-                                        className="p-2 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100 cursor-pointer"
+                                        className="hidden 2xl:inline-flex p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100 cursor-pointer"
                                       >
-                                        <Edit2 size={16} />
+                                        <Edit2 size={15} />
                                       </button>
                                     )}
 
-                                    {/* Admins Button */}
-                                    <button 
-                                      onClick={() => openAdminList(school)}
-                                      title="Comptes Administrateurs & Accès"
-                                      className="p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100 cursor-pointer"
-                                    >
-                                      <Users size={16} />
-                                    </button>
-
-                                    {/* Renew Button */}
+                                    {/* Renew Button (Large Screens) */}
                                     {!school.is_protected && (
                                       <button 
                                         onClick={() => openRenewModal(school)}
                                         title="Gérer l'abonnement"
-                                        className="p-2 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100 cursor-pointer"
+                                        className="hidden 2xl:inline-flex p-1.5 text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all border border-transparent hover:border-emerald-100 cursor-pointer"
                                       >
-                                        <CalendarPlus size={16} />
+                                        <CalendarPlus size={15} />
                                       </button>
                                     )}
 
-                                    {/* Dropdown Menu for Advanced Actions */}
-                                    <div className="relative">
-                                      <button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setOpenSchoolMenuId(isMenuOpen ? null : school.id);
-                                        }}
-                                        className={`p-2 rounded-xl transition-all cursor-pointer ${
-                                          isMenuOpen ? 'bg-slate-900 text-white' : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
-                                        }`}
-                                        title="Plus d'actions"
-                                      >
-                                        <MoreVertical size={16} />
-                                      </button>
-
-                                      {/* Dropdown Overlay Menu */}
-                                      <AnimatePresence>
-                                        {isMenuOpen && (
-                                          <>
-                                            <div 
-                                              className="fixed inset-0 z-20 cursor-default" 
-                                              onClick={() => setOpenSchoolMenuId(null)} 
-                                            />
-                                            <motion.div
-                                              initial={{ opacity: 0, scale: 0.95, y: 5 }}
-                                              animate={{ opacity: 1, scale: 1, y: 0 }}
-                                              exit={{ opacity: 0, scale: 0.95, y: 5 }}
-                                              className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-xl border border-slate-200 py-2 z-30 divide-y divide-slate-100 text-left font-sans"
-                                            >
-                                              <div className="px-3 py-1.5">
-                                                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Opérations Avancées</p>
-                                                <p className="text-xs font-bold text-slate-800 truncate">{school.name}</p>
-                                              </div>
-
-                                              <div className="py-1">
-                                                <button
-                                                  onClick={() => {
-                                                    setOpenSchoolMenuId(null);
-                                                    setModulesModal({ 
-                                                      isOpen: true, 
-                                                      schoolId: school.id, 
-                                                      schoolName: school.name,
-                                                      modules: {
-                                                        presences: school.global_settings?.modules?.presences ?? (school.school_type !== 'UNIVERSITY' && school.school_type !== 'PROFESSIONAL'),
-                                                        discipline: school.global_settings?.modules?.discipline ?? (school.school_type !== 'UNIVERSITY' && school.school_type !== 'PROFESSIONAL')
-                                                      }
-                                                    });
-                                                  }}
-                                                  className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                                >
-                                                  <Settings2 size={15} className="text-indigo-600" />
-                                                  <span>Modules & Options</span>
-                                                </button>
-
-                                                <button
-                                                  onClick={() => {
-                                                    setOpenSchoolMenuId(null);
-                                                    setSeedModal({ isOpen: true, schoolId: school.id, schoolName: school.name, schoolType: school.school_type });
-                                                  }}
-                                                  className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                                >
-                                                  <Database size={15} className="text-amber-600" />
-                                                  <span>Injecter données types</span>
-                                                </button>
-
-                                                <button
-                                                  onClick={() => {
-                                                    setOpenSchoolMenuId(null);
-                                                    handleExportData(school);
-                                                  }}
-                                                  className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                                >
-                                                  <Download size={15} className="text-blue-600" />
-                                                  <span>Exporter données JSON</span>
-                                                </button>
-                                              </div>
-
-                                              {!school.is_protected && (
-                                                <div className="py-1">
-                                                  <button
-                                                    onClick={() => {
-                                                      setOpenSchoolMenuId(null);
-                                                      setStatusModal({ isOpen: true, schoolId: school.id, schoolName: school.name, currentStatus: school.status });
-                                                    }}
-                                                    className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                                  >
-                                                    <Power size={15} className="text-amber-600" />
-                                                    <span>{school.status === 'ACTIVE' ? 'Suspendre l\'instance' : 'Réactiver l\'instance'}</span>
-                                                  </button>
-
-                                                  <button
-                                                    onClick={() => {
-                                                      setOpenSchoolMenuId(null);
-                                                      setCleanModal({ isOpen: true, schoolId: school.id, schoolName: school.name, confirmName: '' });
-                                                    }}
-                                                    className="w-full px-3.5 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                                  >
-                                                    <Eraser size={15} className="text-amber-600" />
-                                                    <span>Vider les données (Reset)</span>
-                                                  </button>
-
-                                                  <button
-                                                    onClick={() => {
-                                                      setOpenSchoolMenuId(null);
-                                                      setDeleteModal({ isOpen: true, schoolId: school.id, schoolName: school.name, confirmName: '' });
-                                                    }}
-                                                    className="w-full px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
-                                                  >
-                                                    <Trash2 size={15} className="text-rose-600" />
-                                                    <span>Supprimer l'école</span>
-                                                  </button>
-                                                </div>
-                                              )}
-                                            </motion.div>
-                                          </>
-                                        )}
-                                      </AnimatePresence>
-                                    </div>
+                                    {/* Advanced Actions Trigger (Portal anchored) */}
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (activeSchoolMenu?.school.id === school.id) {
+                                          setActiveSchoolMenu(null);
+                                        } else {
+                                          const rect = e.currentTarget.getBoundingClientRect();
+                                          setActiveSchoolMenu({
+                                            school,
+                                            anchorRect: {
+                                              top: rect.top,
+                                              bottom: rect.bottom,
+                                              left: rect.left,
+                                              right: rect.right,
+                                              width: rect.width,
+                                              height: rect.height,
+                                            }
+                                          });
+                                        }
+                                      }}
+                                      className={`p-1.5 sm:p-2 rounded-xl transition-all cursor-pointer ${
+                                        activeSchoolMenu?.school.id === school.id 
+                                          ? "bg-slate-900 text-white shadow-xs" 
+                                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-800"
+                                      }`}
+                                      title="Opérations avancées"
+                                    >
+                                      <MoreVertical size={15} />
+                                    </button>
                                   </div>
                                 </td>
                               </motion.tr>
@@ -2929,7 +2910,7 @@ const handleDeleteSchool = async () => {
                   </div>
 
                   {/* --- View 2: Responsive Modern Cards Grid (Desktop 3-columns, Tablet 2-columns, Mobile) --- */}
-                  <div className={`${schoolViewMode === 'table' ? 'hidden' : 'grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5'}`}>
+                  <div className={`${schoolViewMode === 'table' ? 'hidden' : 'grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-4 sm:gap-5'}`}>
                     {filteredSchoolList.map((school, idx) => {
                       const isExpired = school.subscription_plan !== 'unlimited' && school.subscription_end_date && new Date(school.subscription_end_date) < new Date();
                       const daysLeft = school.subscription_end_date 
@@ -3434,7 +3415,7 @@ const handleDeleteSchool = async () => {
                     {/* Search & Secondary Filter Dropdowns with Roomy Layout */}
                     <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
                       {/* Search Input */}
-                      <div className="flex-1 relative group min-w-[240px]">
+                      <div className="flex-1 relative group min-w-0">
                         <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={16} />
                         <input 
                           type="text" 
@@ -3460,16 +3441,16 @@ const handleDeleteSchool = async () => {
                       </div>
 
                       {/* Dropdown Filters Group */}
-                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
                         {/* School Filter */}
-                        <div className="w-full sm:w-auto min-w-[200px] flex-1 sm:flex-initial">
+                        <div className="w-full min-w-0">
                           <select
                             value={userSchoolFilter}
                             onChange={(e) => {
                               setUserSchoolFilter(e.target.value);
                               setUserPage(1);
                             }}
-                            className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none transition-all cursor-pointer focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600"
+                            className="w-full py-2 px-2.5 sm:py-2.5 sm:px-3 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none transition-all cursor-pointer focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600 truncate"
                           >
                             <option value="ALL">🏫 Tous les établissements</option>
                             <option value="NO_SCHOOL">🚫 Sans établissement assigné</option>
@@ -3482,14 +3463,14 @@ const handleDeleteSchool = async () => {
                         </div>
 
                         {/* Status Filter */}
-                        <div className="w-full sm:w-auto min-w-[150px] flex-1 sm:flex-initial">
+                        <div className="w-full min-w-0">
                           <select
                             value={userStatusFilter}
                             onChange={(e) => {
                               setUserStatusFilter(e.target.value as any);
                               setUserPage(1);
                             }}
-                            className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none transition-all cursor-pointer focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600"
+                            className="w-full py-2 px-2.5 sm:py-2.5 sm:px-3 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none transition-all cursor-pointer focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600"
                           >
                             <option value="ALL">⚡ Tous les statuts</option>
                             <option value="ONLINE">🟢 En ligne</option>
@@ -3499,11 +3480,11 @@ const handleDeleteSchool = async () => {
                         </div>
 
                         {/* Sort Selector */}
-                        <div className="w-full sm:w-auto min-w-[150px] flex-1 sm:flex-initial">
+                        <div className="w-full min-w-0">
                           <select
                             value={userSortBy}
                             onChange={(e) => setUserSortBy(e.target.value as any)}
-                            className="w-full py-2.5 px-3 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none transition-all cursor-pointer focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600"
+                            className="w-full py-2 px-2.5 sm:py-2.5 sm:px-3 bg-slate-50 hover:bg-slate-100 focus:bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 outline-none transition-all cursor-pointer focus:ring-4 focus:ring-blue-500/10 focus:border-blue-600"
                           >
                             <option value="created_desc">🕒 Plus récents</option>
                             <option value="created_asc">📅 Plus anciens</option>
@@ -3546,15 +3527,15 @@ const handleDeleteSchool = async () => {
                 ) : userViewMode === 'table' ? (
                   /* --- View 1: Modern Paginated Table --- */
                   <div className="overflow-x-auto custom-scrollbar">
-                    <table className="w-full text-left min-w-[800px]">
+                    <table className="w-full text-left min-w-full">
                       <thead>
-                        <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                          <th className="px-6 py-4">Utilisateur</th>
-                          <th className="px-6 py-4">Rôle & Permissions</th>
-                          <th className="px-6 py-4">Établissement</th>
-                          <th className="px-6 py-4">Statut & Session</th>
-                          <th className="px-6 py-4">Inscription</th>
-                          <th className="px-6 py-4 text-right">Actions</th>
+                        <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-wider">
+                          <th className="px-3 sm:px-4 py-3 sm:py-3.5">Utilisateur</th>
+                          <th className="px-2.5 sm:px-3 py-3 sm:py-3.5">Rôle & Permissions</th>
+                          <th className="px-2.5 sm:px-3 py-3 sm:py-3.5">Établissement</th>
+                          <th className="px-2.5 sm:px-3 py-3 sm:py-3.5">Statut & Session</th>
+                          <th className="px-2.5 sm:px-3 py-3 sm:py-3.5">Inscription</th>
+                          <th className="px-3 sm:px-4 py-3 sm:py-3.5 text-right">Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -4464,7 +4445,7 @@ const handleDeleteSchool = async () => {
 
                           {/* Desktop Bounded Table View with Intelligent Responsive Columns & Sticky Header */}
                           <div className="hidden md:block max-h-[580px] overflow-y-auto overflow-x-auto border-b border-slate-200/80 custom-scrollbar relative">
-                            <table className="w-full text-left min-w-[720px] border-collapse">
+                            <table className="w-full text-left min-w-full border-collapse">
                               <thead className="sticky top-0 z-20 bg-slate-100 shadow-2xs border-b border-slate-200">
                                 <tr>
                                   <th className="px-3 py-3.5 text-[10px] font-black uppercase tracking-wider text-slate-500 text-center w-10">
@@ -5035,7 +5016,7 @@ const handleDeleteSchool = async () => {
                 </div>
 
                 {/* Search Bar */}
-                <div className="relative min-w-[220px] md:w-72">
+                <div className="relative w-full md:w-72">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                   <input
                     type="text"
@@ -5055,8 +5036,8 @@ const handleDeleteSchool = async () => {
               {/* View Content Body */}
               {securityTabFilter === 'FAILED_LOGINS' ? (
                 /* Failed Login & Security Incident Logs Table */
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left min-w-[700px]">
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left min-w-full">
                     <thead className="bg-slate-100/80 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
                       <tr>
                         <th className="px-5 py-3.5">Horodatage</th>
@@ -5115,8 +5096,8 @@ const handleDeleteSchool = async () => {
                 </div>
               ) : (
                 /* User Accounts & Active Sessions Table - Online users sorted 1st */
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left min-w-[800px]">
+                <div className="overflow-x-auto custom-scrollbar">
+                  <table className="w-full text-left min-w-full">
                     <thead className="bg-slate-100/80 border-b border-slate-200 text-[10px] font-black uppercase tracking-wider text-slate-500">
                       <tr>
                         <th className="px-5 py-3.5">Utilisateur</th>
@@ -7294,6 +7275,379 @@ const handleDeleteSchool = async () => {
           </div>
         )}
       </AnimatePresence>
+
+      {/* ========================================================================= */}
+      {/* FLOATING ACTION MENU PORTAL (Rendered outside table & card containers)   */}
+      {/* ========================================================================= */}
+      {activeSchoolMenu && typeof document !== 'undefined' && createPortal(
+        (() => {
+          const school = activeSchoolMenu.school;
+          const { isMobile, openUpward, style } = getActionMenuPlacement(activeSchoolMenu.anchorRect);
+
+          if (isMobile) {
+            return (
+              <div className="fixed inset-0 z-[9999] flex items-end sm:items-center justify-center p-0 sm:p-4">
+                <div 
+                  className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity"
+                  onClick={() => setActiveSchoolMenu(null)} 
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 30 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 30 }}
+                  className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden z-10 flex flex-col max-h-[85vh]"
+                >
+                  {/* Mobile Header */}
+                  <div className="px-5 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0">
+                    <div className="min-w-0 flex-1 pr-3">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Opérations Avancées</span>
+                      <h4 className="text-sm font-black text-slate-900 truncate" title={school.name}>{school.name}</h4>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-mono text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                          ID: {school.id.split('-')[0]}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-600 bg-white px-1.5 py-0.5 rounded uppercase border border-slate-200">
+                          {school.school_type || 'STANDARD'}
+                        </span>
+                        {school.is_protected && (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 flex items-center gap-1">
+                            <ShieldAlert size={10} /> Protégée
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <button 
+                      onClick={() => setActiveSchoolMenu(null)}
+                      className="p-2 rounded-xl bg-slate-200/60 hover:bg-slate-200 text-slate-600 transition-colors cursor-pointer"
+                    >
+                      <X size={18} />
+                    </button>
+                  </div>
+
+                  {/* Mobile Actions List */}
+                  <div className="p-3 overflow-y-auto custom-scrollbar space-y-1 divide-y divide-slate-100 flex-1">
+                    <div className="pb-1">
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setSwitchSchoolModal({ isOpen: true, school });
+                        }}
+                        className="w-full px-4 py-2.5 text-xs font-bold text-indigo-700 hover:bg-indigo-50 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <ArrowUpRight size={16} className="text-indigo-600" />
+                        <span>Travailler dans cette école</span>
+                      </button>
+                    </div>
+
+                    <div className="py-1">
+                      {!school.is_protected && (
+                        <button
+                          onClick={() => {
+                            setActiveSchoolMenu(null);
+                            setEditSchoolModal({ 
+                              isOpen: true, 
+                              schoolId: school.id, 
+                              name: school.name, 
+                              email: school.email || '', 
+                              director_name: school.director_name || '', 
+                              phone: school.phone || '', 
+                              address: school.address || '',
+                              has_multi_campus: !!school.has_multi_campus
+                            });
+                          }}
+                          className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <Edit2 size={16} className="text-indigo-600" />
+                          <span>Modifier l'établissement</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          openAdminList(school);
+                        }}
+                        className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Users size={16} className="text-blue-600" />
+                        <span>Comptes Administrateurs</span>
+                      </button>
+
+                      {!school.is_protected && (
+                        <button
+                          onClick={() => {
+                            setActiveSchoolMenu(null);
+                            openRenewModal(school);
+                          }}
+                          className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <CalendarPlus size={16} className="text-emerald-600" />
+                          <span>Gérer l'abonnement</span>
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setModulesModal({ 
+                            isOpen: true, 
+                            schoolId: school.id, 
+                            schoolName: school.name,
+                            modules: {
+                              presences: school.global_settings?.modules?.presences ?? (school.school_type !== 'UNIVERSITY' && school.school_type !== 'PROFESSIONAL'),
+                              discipline: school.global_settings?.modules?.discipline ?? (school.school_type !== 'UNIVERSITY' && school.school_type !== 'PROFESSIONAL')
+                            }
+                          });
+                        }}
+                        className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Settings2 size={16} className="text-indigo-600" />
+                        <span>Modules & Options</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setSeedModal({ isOpen: true, schoolId: school.id, schoolName: school.name, schoolType: school.school_type });
+                        }}
+                        className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Database size={16} className="text-amber-600" />
+                        <span>Injecter données types</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          handleExportData(school);
+                        }}
+                        className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                      >
+                        <Download size={16} className="text-blue-600" />
+                        <span>Exporter données JSON</span>
+                      </button>
+                    </div>
+
+                    {!school.is_protected && (
+                      <div className="pt-1">
+                        <button
+                          onClick={() => {
+                            setActiveSchoolMenu(null);
+                            setStatusModal({ isOpen: true, schoolId: school.id, schoolName: school.name, currentStatus: school.status });
+                          }}
+                          className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <Power size={16} className="text-amber-600" />
+                          <span>{school.status === 'ACTIVE' ? "Suspendre l'instance" : "Réactiver l'instance"}</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveSchoolMenu(null);
+                            setCleanModal({ isOpen: true, schoolId: school.id, schoolName: school.name, confirmName: '' });
+                          }}
+                          className="w-full px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <Eraser size={16} className="text-amber-600" />
+                          <span>Vider les données (Reset)</span>
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            setActiveSchoolMenu(null);
+                            setDeleteModal({ isOpen: true, schoolId: school.id, schoolName: school.name, confirmName: '' });
+                          }}
+                          className="w-full px-4 py-2.5 text-xs font-bold text-rose-600 hover:bg-rose-50 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
+                        >
+                          <Trash2 size={16} className="text-rose-600" />
+                          <span>Supprimer l'école</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              </div>
+            );
+          }
+
+          // Desktop popover anchored dynamically to the button
+          return (
+            <div className="fixed inset-0 z-[9998] pointer-events-none">
+              <div 
+                className="fixed inset-0 pointer-events-auto bg-slate-900/10 backdrop-blur-[0.5px] cursor-default" 
+                onClick={() => setActiveSchoolMenu(null)} 
+              />
+              
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: openUpward ? 6 : -6 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: openUpward ? 6 : -6 }}
+                transition={{ duration: 0.15 }}
+                style={style}
+                className="pointer-events-auto bg-white rounded-2xl shadow-2xl border border-slate-200 divide-y divide-slate-100 text-left font-sans flex flex-col overflow-hidden"
+              >
+                {/* Desktop Header */}
+                <div className="px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
+                  <div className="min-w-0 flex-1 pr-2">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Opérations Avancées</p>
+                    <p className="text-xs font-bold text-slate-900 truncate" title={school.name}>{school.name}</p>
+                  </div>
+                  <button 
+                    onClick={() => setActiveSchoolMenu(null)}
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                    title="Fermer"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+
+                {/* Desktop Actions List */}
+                <div className="overflow-y-auto custom-scrollbar divide-y divide-slate-100 flex-1 py-1">
+                  <div className="py-0.5">
+                    <button
+                      onClick={() => {
+                        setActiveSchoolMenu(null);
+                        setSwitchSchoolModal({ isOpen: true, school });
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <ArrowUpRight size={14} className="text-indigo-600" />
+                      <span>Travailler dans cette école</span>
+                    </button>
+                  </div>
+
+                  <div className="py-0.5">
+                    {!school.is_protected && (
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setEditSchoolModal({ 
+                            isOpen: true, 
+                            schoolId: school.id, 
+                            name: school.name, 
+                            email: school.email || '', 
+                            director_name: school.director_name || '', 
+                            phone: school.phone || '', 
+                            address: school.address || '',
+                            has_multi_campus: !!school.has_multi_campus
+                          });
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      >
+                        <Edit2 size={14} className="text-indigo-600" />
+                        <span>Modifier l'établissement</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setActiveSchoolMenu(null);
+                        openAdminList(school);
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Users size={14} className="text-blue-600" />
+                      <span>Comptes Administrateurs</span>
+                    </button>
+
+                    {!school.is_protected && (
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          openRenewModal(school);
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-emerald-50 hover:text-emerald-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      >
+                        <CalendarPlus size={14} className="text-emerald-600" />
+                        <span>Gérer l'abonnement</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        setActiveSchoolMenu(null);
+                        setModulesModal({ 
+                          isOpen: true, 
+                          schoolId: school.id, 
+                          schoolName: school.name,
+                          modules: {
+                            presences: school.global_settings?.modules?.presences ?? (school.school_type !== 'UNIVERSITY' && school.school_type !== 'PROFESSIONAL'),
+                            discipline: school.global_settings?.modules?.discipline ?? (school.school_type !== 'UNIVERSITY' && school.school_type !== 'PROFESSIONAL')
+                          }
+                        });
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Settings2 size={14} className="text-indigo-600" />
+                      <span>Modules & Options</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveSchoolMenu(null);
+                        setSeedModal({ isOpen: true, schoolId: school.id, schoolName: school.name, schoolType: school.school_type });
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Database size={14} className="text-amber-600" />
+                      <span>Injecter données types</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveSchoolMenu(null);
+                        handleExportData(school);
+                      }}
+                      className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                    >
+                      <Download size={14} className="text-blue-600" />
+                      <span>Exporter données JSON</span>
+                    </button>
+                  </div>
+
+                  {!school.is_protected && (
+                    <div className="py-0.5">
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setStatusModal({ isOpen: true, schoolId: school.id, schoolName: school.name, currentStatus: school.status });
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-amber-50 hover:text-amber-700 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      >
+                        <Power size={14} className="text-amber-600" />
+                        <span>{school.status === 'ACTIVE' ? "Suspendre l'instance" : "Réactiver l'instance"}</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setCleanModal({ isOpen: true, schoolId: school.id, schoolName: school.name, confirmName: '' });
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-bold text-amber-700 hover:bg-amber-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      >
+                        <Eraser size={14} className="text-amber-600" />
+                        <span>Vider les données (Reset)</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setActiveSchoolMenu(null);
+                          setDeleteModal({ isOpen: true, schoolId: school.id, schoolName: school.name, confirmName: '' });
+                        }}
+                        className="w-full px-3.5 py-2 text-xs font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2.5 transition-colors cursor-pointer"
+                      >
+                        <Trash2 size={14} className="text-rose-600" />
+                        <span>Supprimer l'école</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          );
+        })(),
+        document.body
+      )}
     </div>
   );
 };

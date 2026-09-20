@@ -227,7 +227,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
         <ErrorBoundary>
           <Sidebar user={user} onLogout={purgeSystemState} />
         </ErrorBoundary>
-        <main className="flex-1 overflow-y-auto p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
+        <main className="flex-1 min-w-0 overflow-y-auto p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
           {user.role === UserRole.STUDENT && <StudentHeader user={user} />}
           <ConnectivityBanner />
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
@@ -242,7 +242,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -6 }}
                 transition={{ duration: 0.12, ease: 'easeOut' }}
-                className="w-full"
+                className="w-full min-w-0"
               >
                 <Routes location={location}>
               <Route path="/" element={<Dashboard user={user} />} />
