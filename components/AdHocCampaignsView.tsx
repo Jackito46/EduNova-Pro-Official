@@ -536,87 +536,89 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-6 bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-gray-100 relative">
-        <div className="md:ml-20">
-          <div className="flex items-center gap-2 text-indigo-600 font-extrabold text-xs uppercase tracking-widest mb-1">
-            <Rocket size={16} /> Campagnes & Événements Scolaies
+    <div className="max-w-6xl mx-auto space-y-4 md:space-y-4.5 animate-in fade-in duration-300 pb-12">
+      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-slate-200/80 relative">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5 text-indigo-600 font-black text-[11px] uppercase tracking-wider mb-1">
+            <Rocket size={14} className="shrink-0" /> Campagnes & Événements Scolaires
           </div>
-          <h2 className="text-2xl font-black text-gray-900 leading-tight">Frais Occasionnels & Activités</h2>
-          <p className="text-xs text-gray-500 font-medium mt-0.5">
-            Excursions, Stages, Cérémonies, Uniformes, Examens et activités à facturation ponctuelle.
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-tight truncate">
+            Frais Occasionnels & Activités
+          </h2>
+          <p className="text-xs text-slate-500 font-medium mt-0.5">
+            Excursions, stages, cérémonies, uniformes, examens et cotisations à facturation ponctuelle.
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2.5 shrink-0">
           <AcademicSessionPill
             academicYears={academicYears}
             selectedYearId={selectedYearId}
             onSelectYear={(yearId) => setSelectedYearId(yearId)}
-            size="md"
+            size="sm"
             colorScheme="indigo"
           />
           <button 
             disabled={isYearArchived}
             onClick={() => { setFormData({ id: '', name: '', description: '', amount: '', currency: 'HTG', due_date: '', type: 'AUTRE', duration_days: '', start_date: '', end_date: '', campus_id: user.campus_id || currentCampusId || '', class_id: '', status: 'DRAFT' }); setShowForm(true); }} 
-            className="flex justify-center items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white font-extrabold text-xs rounded-xl hover:bg-indigo-700 transition-all shadow-md shadow-indigo-100 disabled:opacity-40 disabled:hover:bg-indigo-600 active:scale-95 cursor-pointer"
+            className="flex justify-center items-center gap-1.5 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl transition-all shadow-xs hover:shadow-sm disabled:opacity-40 disabled:hover:bg-indigo-600 active:scale-95 cursor-pointer shrink-0"
             title={isYearArchived ? "Cette année académique est archivée" : "Créer une nouvelle campagne"}
           >
-            <Plus size={18} /> Nouvelle Campagne
+            <Plus size={16} /> <span>Nouvelle Campagne</span>
           </button>
         </div>
       </header>
 
       {/* KPI METRICS BANNER */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
-            <Rocket size={22} />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3">
+          <div className="p-2 sm:p-2.5 bg-indigo-50 text-indigo-600 rounded-lg sm:rounded-xl shrink-0">
+            <Rocket size={18} />
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Campagnes</p>
-            <p className="text-xl font-black text-slate-900 mt-0.5">{totalCampaignsCount}</p>
-          </div>
-        </div>
-
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
-            <RefreshCw size={22} />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">En Cours / Actives</p>
-            <p className="text-xl font-black text-blue-700 mt-0.5">{inProgressCampaignsCount}</p>
+          <div className="min-w-0">
+            <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 truncate">Total Campagnes</p>
+            <p className="text-lg sm:text-xl font-black text-slate-900 leading-tight mt-0.5">{totalCampaignsCount}</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-emerald-50 text-emerald-600 rounded-xl">
-            <Users size={22} />
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3">
+          <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-lg sm:rounded-xl shrink-0">
+            <RefreshCw size={18} />
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Total Inscrits</p>
-            <p className="text-xl font-black text-emerald-700 mt-0.5">{totalParticipantsAssigned}</p>
+          <div className="min-w-0">
+            <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 truncate">En Cours / Actives</p>
+            <p className="text-lg sm:text-xl font-black text-blue-700 leading-tight mt-0.5">{inProgressCampaignsCount}</p>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center gap-4">
-          <div className="p-3 bg-purple-50 text-purple-600 rounded-xl">
-            <CheckCircle size={22} />
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3">
+          <div className="p-2 sm:p-2.5 bg-emerald-50 text-emerald-600 rounded-lg sm:rounded-xl shrink-0">
+            <Users size={18} />
           </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Terminées</p>
-            <p className="text-xl font-black text-purple-700 mt-0.5">{completedCampaignsCount}</p>
+          <div className="min-w-0">
+            <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 truncate">Total Inscrits</p>
+            <p className="text-lg sm:text-xl font-black text-emerald-700 leading-tight mt-0.5">{totalParticipantsAssigned}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs hover:shadow-xs transition-all flex items-center gap-3">
+          <div className="p-2 sm:p-2.5 bg-purple-50 text-purple-600 rounded-lg sm:rounded-xl shrink-0">
+            <CheckCircle size={18} />
+          </div>
+          <div className="min-w-0">
+            <p className="text-[9.5px] font-black uppercase tracking-wider text-slate-400 truncate">Terminées</p>
+            <p className="text-lg sm:text-xl font-black text-purple-700 leading-tight mt-0.5">{completedCampaignsCount}</p>
           </div>
         </div>
       </div>
 
       {(selectedYear?.status === 'PREPARATION' || selectedYear?.status === 'FUTURE') && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 flex items-start gap-4 animate-in fade-in duration-300">
-          <div className="p-2.5 bg-emerald-100/50 border border-emerald-200 text-emerald-700 rounded-xl shrink-0">
-            <Rocket size={20} className="animate-pulse" />
+        <div className="bg-emerald-50/80 border border-emerald-200/80 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 animate-in fade-in duration-300">
+          <div className="p-2 bg-emerald-100 text-emerald-700 rounded-lg shrink-0">
+            <Rocket size={18} className="animate-pulse" />
           </div>
-          <div className="space-y-1">
-            <h4 className="font-extrabold text-emerald-900 text-sm">Session Future ou en Préparation ({selectedYear?.label})</h4>
+          <div className="space-y-0.5 min-w-0">
+            <h4 className="font-extrabold text-emerald-900 text-xs sm:text-sm">Session Future ou en Préparation ({selectedYear?.label})</h4>
             <p className="text-xs text-emerald-700 font-medium leading-relaxed">
               Planification anticipée active : Vous pouvez créer, configurer et préparer les campagnes de frais occasionnels à l'avance pour cette session. Elles seront prêtes à être lancées dès l'activation officielle de cette année académique.
             </p>
@@ -625,12 +627,12 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {isYearArchived && (
-        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-start gap-4 animate-in fade-in duration-300">
-          <div className="p-2.5 bg-amber-100/50 border border-amber-200 text-amber-700 rounded-xl shrink-0">
-            <Info size={20} />
+        <div className="bg-amber-50/80 border border-amber-200/80 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex items-start gap-3 animate-in fade-in duration-300">
+          <div className="p-2 bg-amber-100 text-amber-700 rounded-lg shrink-0">
+            <Info size={18} />
           </div>
-          <div className="space-y-1">
-            <h4 className="font-extrabold text-amber-900 text-sm">Année Académique Archivée ({selectedYear?.label})</h4>
+          <div className="space-y-0.5 min-w-0">
+            <h4 className="font-extrabold text-amber-900 text-xs sm:text-sm">Année Académique Archivée ({selectedYear?.label})</h4>
             <p className="text-xs text-amber-700 font-medium leading-relaxed">
               Cette session est archivée. Il n'est pas possible de créer de nouvelles campagnes, d'en modifier d'existantes, ou d'effectuer des suppressions de campagnes dans cette période de référence historique.
             </p>
@@ -639,107 +641,118 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* FILTER & SEARCH TOOLBAR */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Search Bar */}
-          <div className="relative flex-1">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+      <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
+          {/* Search Bar - Fluid and never squished */}
+          <div className="relative flex-1 min-w-0">
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Rechercher une campagne par nom, type, description, annexe..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+              placeholder="Rechercher une activité par nom, type, description, annexe..."
+              className="w-full h-9 pl-9.5 pr-8 bg-slate-50/90 border border-slate-200 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
             />
             {searchQuery && (
               <button 
+                type="button"
                 onClick={() => setSearchQuery('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs font-bold"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-200/60 text-xs font-bold transition-all cursor-pointer"
+                title="Effacer la recherche"
               >
                 ✕
               </button>
             )}
           </div>
 
-          {/* Campus Filter - Only if school has multiple campuses */}
-          {hasMultiCampus && (
-            <SelectPill
-              options={[
-                { value: '', label: '🏢 Toutes les Annexes / Campus' },
-                { value: 'GLOBAL', label: '🌐 Portée Globale (Siège)' },
-                ...campuses.map(camp => ({
-                  value: camp.id,
-                  label: `📍 ${camp.name}`
-                }))
-              ]}
-              value={campusFilter}
-              onChange={(val) => setCampusFilter(val)}
-              icon={Filter}
-              variant="field"
-              size="sm"
-              colorScheme="slate"
-            />
-          )}
+          {/* Filters wrapped with explicit width control */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+            {/* Campus Filter - Only if school has multiple campuses */}
+            {hasMultiCampus && (
+              <div className="w-full sm:w-56 shrink-0">
+                <SelectPill
+                  options={[
+                    { value: '', label: '🏢 Toutes les Annexes' },
+                    { value: 'GLOBAL', label: '🌐 Portée Siège' },
+                    ...campuses.map(camp => ({
+                      value: camp.id,
+                      label: `📍 ${camp.name}`
+                    }))
+                  ]}
+                  value={campusFilter}
+                  onChange={(val) => setCampusFilter(val)}
+                  icon={Filter}
+                  variant="field"
+                  size="sm"
+                  colorScheme="slate"
+                  className="w-full"
+                />
+              </div>
+            )}
 
-          {/* Type Filter */}
-          <SelectPill
-            options={[
-              { value: '', label: "🏷️ Tous les Types d'Activités" },
-              { value: 'EXCURSION', label: 'Excursion / Visite' },
-              { value: 'CEREMONIE', label: 'Cérémonie / Graduation' },
-              { value: 'UNIFORME', label: 'Uniforme / Kit' },
-              { value: 'STAGE', label: 'Stage / Pratique' },
-              { value: 'EXAMEN', label: 'Examen / Reprise' },
-              { value: 'CANTINE', label: 'Cantine / Restauration' },
-              { value: 'TRANSPORT', label: 'Transport Scolaire' },
-              { value: 'AUTRE', label: 'Autre Frais Occasionnel' }
-            ]}
-            value={typeFilter}
-            onChange={(val) => setTypeFilter(val)}
-            variant="field"
-            size="sm"
-            colorScheme="slate"
-          />
+            {/* Type Filter */}
+            <div className="w-full sm:w-60 shrink-0">
+              <SelectPill
+                options={[
+                  { value: '', label: "🏷️ Tous les Types d'Activités" },
+                  { value: 'EXCURSION', label: 'Excursion / Visite' },
+                  { value: 'CEREMONIE', label: 'Cérémonie / Graduation' },
+                  { value: 'UNIFORME', label: 'Uniforme / Kit' },
+                  { value: 'STAGE', label: 'Stage / Pratique' },
+                  { value: 'EXAMEN', label: 'Examen / Reprise' },
+                  { value: 'CANTINE', label: 'Cantine / Restauration' },
+                  { value: 'TRANSPORT', label: 'Transport Scolaire' },
+                  { value: 'AUTRE', label: 'Autre Frais Occasionnel' }
+                ]}
+                value={typeFilter}
+                onChange={(val) => setTypeFilter(val)}
+                variant="field"
+                size="sm"
+                colorScheme="slate"
+                className="w-full"
+              />
+            </div>
+          </div>
         </div>
 
         {/* Status Filter Tabs */}
-        <div className="flex items-center gap-1 border-t border-slate-100 pt-3 overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-1 border-t border-slate-100 pt-2.5 overflow-x-auto no-scrollbar">
           <button
             onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
               statusFilter === 'ALL'
-                ? 'bg-slate-900 text-white shadow-sm'
-                : 'text-slate-500 hover:bg-slate-100'
+                ? 'bg-slate-900 text-white shadow-2xs'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800'
             }`}
           >
             Toutes ({campaigns.length})
           </button>
           <button
             onClick={() => setStatusFilter('PROGRESS')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all flex items-center gap-1.5 cursor-pointer ${
               statusFilter === 'PROGRESS'
-                ? 'bg-blue-600 text-white shadow-sm'
+                ? 'bg-blue-600 text-white shadow-2xs'
                 : 'text-blue-600 hover:bg-blue-50'
             }`}
           >
-            <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
             En Cours ({campaigns.filter(c => c.status === 'PROGRESS').length})
           </button>
           <button
             onClick={() => setStatusFilter('DRAFT')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
               statusFilter === 'DRAFT'
-                ? 'bg-slate-700 text-white shadow-sm'
-                : 'text-slate-600 hover:bg-slate-100'
+                ? 'bg-slate-700 text-white shadow-2xs'
+                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'
             }`}
           >
             Brouillons ({campaigns.filter(c => (c.status || 'DRAFT') === 'DRAFT').length})
           </button>
           <button
             onClick={() => setStatusFilter('COMPLETED')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
               statusFilter === 'COMPLETED'
-                ? 'bg-emerald-600 text-white shadow-sm'
+                ? 'bg-emerald-600 text-white shadow-2xs'
                 : 'text-emerald-700 hover:bg-emerald-50'
             }`}
           >
@@ -749,38 +762,38 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {/* CAMPAIGNS GRID */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
         {loading ? (
-          <div className="col-span-full py-8 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-6">
+          <div className="col-span-full py-8 bg-white rounded-2xl border border-slate-200/80 shadow-2xs space-y-4">
             <FluidLoadingState 
-              message="Chargement des campagnes & événements ad hoc..." 
+              message="Chargement des campagnes & activités..." 
               subtext="Récupération sécurisée des appels de cotisations, sorties et activités occasionnelles..." 
             />
             <SkeletonCard count={3} />
           </div>
         ) : filteredCampaigns.length === 0 ? (
-          <div className="col-span-full py-16 text-center bg-white rounded-3xl border border-dashed border-slate-200 shadow-sm p-8">
-            <Rocket size={36} className="text-slate-300 mx-auto mb-3" />
-            <h4 className="font-black text-slate-800 text-base">Aucune campagne trouvée</h4>
+          <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-slate-200 shadow-2xs p-6">
+            <Rocket size={32} className="text-slate-300 mx-auto mb-2" />
+            <h4 className="font-black text-slate-800 text-sm sm:text-base">Aucune campagne trouvée</h4>
             <p className="text-slate-400 text-xs mt-1 max-w-md mx-auto font-medium">
-              Aucun frais occasionnel ne correspond aux filtres sélectionnés. Essayez de modifier la recherche ou créez une nouvelle campagne.
+              Aucun frais occasionnel ne correspond aux filtres sélectionnés. Modifiez la recherche ou créez une nouvelle campagne.
             </p>
           </div>
         ) : filteredCampaigns.map(c => (
-          <div key={c.id} className="bg-white rounded-3xl p-6 border border-slate-100 shadow-sm hover:shadow-xl hover:border-indigo-200 transition-all duration-300 flex flex-col justify-between group relative overflow-hidden">
+          <div key={c.id} className="bg-white rounded-2xl p-4 sm:p-4.5 border border-slate-200/80 shadow-2xs hover:shadow-md hover:border-indigo-300/80 transition-all duration-200 flex flex-col justify-between group relative overflow-hidden">
             {/* Gradient accent top border */}
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
             <div>
-              <div className="flex justify-between items-start gap-2 mb-3.5">
-                <div className="flex gap-1.5 items-center flex-wrap">
+              <div className="flex justify-between items-start gap-2 mb-2.5">
+                <div className="flex gap-1 items-center flex-wrap min-w-0">
                   {/* Type Badge */}
-                  <span className="inline-flex items-center px-2.5 py-1 bg-indigo-50/90 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-100/60 shadow-2xs">
+                  <span className="inline-flex items-center px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[9.5px] font-extrabold uppercase tracking-wider rounded-md border border-indigo-100/70">
                     {getCampaignTypeLabel(c.type)}
                   </span>
 
                   {/* Status Badge */}
-                  <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg shadow-2xs ${
+                  <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[9.5px] font-extrabold uppercase tracking-wider rounded-md ${
                     c.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60' :
                     c.status === 'PROGRESS' ? 'bg-blue-50 text-blue-800 border border-blue-200/60' :
                     'bg-slate-100 text-slate-700 border border-slate-200/60'
@@ -798,66 +811,66 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   {/* Campus Badge - ONLY if multi-campus school */}
                   {hasMultiCampus && (
                     c.school_campuses ? (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-[10px] font-black uppercase tracking-wider rounded-lg border border-emerald-100/60" title="Campus / Annexe dédiée">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-50 text-emerald-800 text-[9.5px] font-extrabold uppercase tracking-wider rounded-md border border-emerald-100/60 truncate" title="Campus / Annexe dédiée">
                         📍 {c.school_campuses.name}
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-slate-100 text-slate-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-slate-200/60" title="Portée globale siège">
-                        🌐 Portée Siège
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-[9.5px] font-extrabold uppercase tracking-wider rounded-md border border-slate-200/60" title="Portée globale siège">
+                        🌐 Siège
                       </span>
                     )
                   )}
 
                   {/* Class Badge */}
                   {c.classes && (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 bg-amber-50 text-amber-800 text-[10px] font-black uppercase tracking-wider rounded-lg border border-amber-200/60">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-amber-50 text-amber-800 text-[9.5px] font-extrabold uppercase tracking-wider rounded-md border border-amber-200/60 truncate">
                       🎓 {c.classes.name}
                     </span>
                   )}
                 </div>
                 
                 {/* Actions */}
-                <div className="flex gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/50 shrink-0 opacity-90 group-hover:opacity-100 transition-opacity">
+                <div className="flex gap-0.5 bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/60 shrink-0 opacity-85 group-hover:opacity-100 transition-opacity">
                   <button 
                     disabled={c.status === 'COMPLETED' || isYearArchived}
                     onClick={() => { setFormData({ id: c.id, name: c.name, description: c.description || '', currency: c.currency, amount: c.amount.toString(), due_date: c.due_date || '', type: c.type || 'AUTRE', duration_days: (c.duration_days||'').toString(), start_date: c.start_date || '', end_date: c.end_date || '', campus_id: c.campus_id || '', class_id: c.class_id || '', status: c.status || 'DRAFT' }); setShowForm(true); }} 
-                    className="p-1.5 text-indigo-600 hover:bg-white hover:shadow-2xs rounded-lg transition-all disabled:opacity-40 cursor-pointer"
-                    title={isYearArchived ? "Cette année académique est archivée" : c.status === 'COMPLETED' ? "Désactiver pour modifier (Remettre en Brouillon d'abord)" : "Modifier la campagne"}
+                    className="p-1.5 text-indigo-600 hover:bg-white hover:shadow-2xs rounded-md transition-all disabled:opacity-40 cursor-pointer"
+                    title={isYearArchived ? "Cette année académique est archivée" : c.status === 'COMPLETED' ? "Désactiver pour modifier" : "Modifier la campagne"}
                   >
-                    <Edit3 size={14} />
+                    <Edit3 size={13} />
                   </button>
                   <button 
                     disabled={(!isPrivilegedUser && (c.status === 'PROGRESS' || c.status === 'COMPLETED')) || isYearArchived}
                     onClick={() => handleDelete(c.id, c.name)} 
-                    className="p-1.5 text-rose-600 hover:bg-white hover:shadow-2xs rounded-lg transition-all disabled:opacity-40 cursor-pointer"
+                    className="p-1.5 text-rose-600 hover:bg-white hover:shadow-2xs rounded-md transition-all disabled:opacity-40 cursor-pointer"
                     title={
                       isYearArchived ? "Cette année académique est archivée" : 
                       (!isPrivilegedUser && (c.status === 'PROGRESS' || c.status === 'COMPLETED')) ? "Suppression réservée aux administrateurs" : 
                       "Supprimer la campagne"
                     }
                   >
-                    <Trash2 size={14} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>
 
               {/* Title */}
-              <h3 className="font-black text-lg text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-2 leading-snug mb-2">
+              <h3 className="font-black text-sm sm:text-base text-slate-900 group-hover:text-indigo-600 transition-colors line-clamp-1 leading-snug mb-1">
                 {c.name}
               </h3>
 
               {/* Description */}
-              <p className="text-xs text-slate-500 mb-4 line-clamp-2 min-h-[36px] font-medium leading-relaxed">
+              <p className="text-[11px] text-slate-500 mb-2.5 line-clamp-2 min-h-[28px] font-medium leading-relaxed">
                 {c.description || "Aucune description renseignée pour cette campagne."}
               </p>
               
               {/* Period Pill */}
               {c.duration_days && (
-                <div className="mb-4 text-[11px] font-bold text-slate-700 flex items-center gap-1.5 bg-slate-50 px-3 py-2 rounded-xl border border-slate-100/80 w-max">
-                  <CalendarDays size={14} className="text-indigo-500 shrink-0" /> 
+                <div className="mb-2.5 text-[10.5px] font-bold text-slate-700 flex items-center gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-lg border border-slate-200/60 w-max max-w-full truncate">
+                  <CalendarDays size={13} className="text-indigo-500 shrink-0" /> 
                   <span>{c.duration_days} jours d'activité</span>
                   {c.start_date && c.end_date && (
-                    <span className="text-slate-400 font-medium ml-0.5">
+                    <span className="text-slate-400 font-medium ml-0.5 truncate">
                       ({new Date(c.start_date).toLocaleDateString('fr-FR')} - {new Date(c.end_date).toLocaleDateString('fr-FR')})
                     </span>
                   )}
@@ -865,16 +878,16 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
               
               {/* Financial Box */}
-              <div className="flex items-center justify-between mb-4 bg-gradient-to-br from-slate-50 to-indigo-50/30 p-4 rounded-2xl border border-slate-100">
+              <div className="flex items-center justify-between mb-3 bg-slate-50/90 p-2.5 sm:p-3 rounded-xl border border-slate-100">
                 <div>
-                  <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Frais Exigé</p>
-                  <p className="font-black text-2xl text-slate-900 font-mono tracking-tight">
+                  <p className="text-[8.5px] text-slate-400 uppercase tracking-wider font-black mb-0.5">Frais Exigé</p>
+                  <p className="font-black text-base sm:text-lg text-slate-900 font-mono tracking-tight">
                     {c.amount.toLocaleString('fr-FR')} <span className="text-xs font-black text-indigo-600">{c.currency}</span>
                   </p>
                 </div>
                 <div className="text-right">
-                  <p className="text-[9px] text-slate-400 uppercase tracking-widest font-black mb-0.5">Échéance</p>
-                  <p className="font-extrabold text-xs text-slate-700">
+                  <p className="text-[8.5px] text-slate-400 uppercase tracking-wider font-black mb-0.5">Échéance</p>
+                  <p className="font-bold text-xs text-slate-700">
                     {c.due_date ? new Date(c.due_date).toLocaleDateString('fr-FR') : 'Indéfinie'}
                   </p>
                 </div>
@@ -884,9 +897,9 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
             {/* Manage CTA */}
             <button 
               onClick={() => setManagingCampaign(c)} 
-              className="w-full mt-2 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs tracking-wide rounded-xl transition-all shadow-md shadow-indigo-100/80 hover:shadow-indigo-200 flex items-center justify-center gap-2 active:scale-[0.98] cursor-pointer"
+              className="w-full py-2.5 px-3 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs tracking-wide rounded-xl transition-all shadow-2xs hover:shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
             >
-              <Users size={16} /> Gérer Participants ({c.assigned_count || 0}) & Caisse
+              <Users size={15} /> Gérer Participants ({c.assigned_count || 0}) & Caisse
             </button>
           </div>
         ))}
@@ -895,26 +908,26 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* Modal Formulaire Créer / Modifier une Campagne */}
       {showForm && (
-        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 md:p-6 overflow-y-auto">
-          <div className="bg-white max-w-2xl md:max-w-4xl lg:max-w-5xl w-full rounded-2xl md:rounded-3xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-100 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+        <div className="fixed inset-0 z-[100] bg-slate-950/70 backdrop-blur-md flex items-center justify-center p-2 sm:p-3 md:p-4 overflow-y-auto">
+          <div className="bg-white max-w-2xl md:max-w-4xl lg:max-w-5xl w-full rounded-2xl sm:rounded-3xl shadow-2xl animate-in duration-200 zoom-in-95 border border-slate-200/80 overflow-hidden my-auto max-h-[92vh] flex flex-col">
             
             {/* Modal Modern Compact Header */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 sm:px-6 py-3 sm:py-3.5 border-b border-slate-100 bg-slate-50/90 shrink-0">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 sm:px-5 py-2.5 sm:py-3 border-b border-slate-100 bg-slate-50/90 shrink-0">
               <div className="flex items-center gap-2.5">
-                <div className="p-2 sm:p-2.5 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-xl shadow-xs shrink-0">
-                  <Rocket size={18} />
+                <div className="p-2 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-xl shadow-2xs shrink-0">
+                  <Rocket size={16} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight leading-tight">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight">
                       {formData.id ? 'Modifier la Campagne' : 'Créer une Nouvelle Campagne'}
                     </h3>
-                    <span className="hidden sm:inline-block text-[9px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
+                    <span className="hidden sm:inline-block text-[8.5px] font-black px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-100 uppercase tracking-wider">
                       Frais Occasionnel
                     </span>
                   </div>
-                  <p className="text-[11px] text-slate-500 font-medium">
-                    Paramétrage de tarification, échéancier et ciblage d'étudiants
+                  <p className="text-[10.5px] text-slate-500 font-medium leading-none mt-0.5">
+                    Paramétrage de tarification, échéancier et ciblage d'élèves
                   </p>
                 </div>
               </div>
@@ -925,9 +938,9 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, status: 'DRAFT' })}
-                    className={`px-2 py-1 text-[9.5px] font-black rounded-lg transition-all ${
+                    className={`px-2 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
                       (formData.status || 'DRAFT') === 'DRAFT'
-                        ? 'bg-white text-slate-800 shadow-xs'
+                        ? 'bg-white text-slate-800 shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -936,9 +949,9 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, status: 'PROGRESS' })}
-                    className={`px-2 py-1 text-[9.5px] font-black rounded-lg transition-all ${
+                    className={`px-2 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
                       formData.status === 'PROGRESS'
-                        ? 'bg-blue-600 text-white shadow-xs'
+                        ? 'bg-blue-600 text-white shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -947,9 +960,9 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="button"
                     onClick={() => setFormData({ ...formData, status: 'COMPLETED' })}
-                    className={`px-2 py-1 text-[9.5px] font-black rounded-lg transition-all ${
+                    className={`px-2 py-1 text-[9px] font-black rounded-lg transition-all cursor-pointer ${
                       formData.status === 'COMPLETED'
-                        ? 'bg-emerald-600 text-white shadow-xs'
+                        ? 'bg-emerald-600 text-white shadow-2xs'
                         : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
@@ -963,23 +976,23 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   className="p-1.5 hover:bg-slate-200/70 rounded-xl text-slate-400 hover:text-slate-700 transition-all cursor-pointer active:scale-95"
                   title="Fermer"
                 >
-                  <X size={18} />
+                  <X size={16} />
                 </button>
               </div>
             </div>
 
             {/* Modal Form Body with Compact Spacing */}
             <form onSubmit={handleSave} className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="grid grid-cols-1 md:grid-cols-12 gap-3 sm:gap-4 p-3.5 sm:p-5 md:p-6 overflow-y-auto flex-1 bg-slate-50/40">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 sm:gap-3.5 p-3 sm:p-4 md:p-5 overflow-y-auto flex-1 bg-slate-50/40">
                 
                 {/* Profile & Multi-Tenant Context Banner (Streamlined) */}
-                <div className="md:col-span-12 bg-white/90 px-3.5 py-2.5 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="p-1.5 bg-slate-100 text-slate-600 rounded-lg shrink-0">
-                      <ShieldCheck size={16} />
+                <div className="md:col-span-12 bg-white/90 px-3 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1 bg-slate-100 text-slate-600 rounded-md shrink-0">
+                      <ShieldCheck size={14} />
                     </div>
                     <div>
-                      <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider block">Contexte Établissement</span>
+                      <span className="text-[8.5px] font-black uppercase text-slate-400 tracking-wider block">Contexte Établissement</span>
                       <p className="text-[11px] font-bold text-slate-800 leading-tight">
                         Calibrage : <span className="text-indigo-600 font-black">{isUniv ? 'Enseignement Supérieur & Professionnel' : 'Enseignement Général / Classique'}</span>
                       </p>
@@ -987,16 +1000,16 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   <div className="flex items-center gap-1.5 flex-wrap shrink-0">
-                    <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black tracking-wider uppercase ${isUniv ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black tracking-wider uppercase ${isUniv ? 'bg-indigo-50 text-indigo-700 border border-indigo-100' : 'bg-emerald-50 text-emerald-700 border border-emerald-100'}`}>
                       {isUniv ? '🎓 SUPÉRIEUR' : '🎒 CLASSIQUE'}
                     </span>
                     {hasMultiCampus && (
                       formData.campus_id ? (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black bg-blue-50 text-blue-700 border border-blue-100 uppercase tracking-wider">
                           📍 {campuses.find(c => c.id === formData.campus_id)?.name || 'Annexe Dédiée'}
                         </span>
                       ) : (
-                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[9.5px] font-black bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] font-black bg-purple-50 text-purple-700 border border-purple-100 uppercase tracking-wider">
                           🌐 Portée Siège
                         </span>
                       )
@@ -1005,22 +1018,22 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* Left Panel: Identité & Ciblage Structure (7 cols) */}
-                <div className="md:col-span-7 space-y-3 sm:space-y-3.5">
-                  <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-3 shadow-2xs">
-                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <span className="p-1 bg-indigo-50 text-indigo-600 rounded-md"><FileText size={13} /></span>
-                      <span>Informations Générales de l'Événement</span>
+                <div className="md:col-span-7 space-y-2.5 sm:space-y-3">
+                  <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5 shadow-2xs">
+                    <h4 className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-1.5">
+                      <span className="p-1 bg-indigo-50 text-indigo-600 rounded-md"><FileText size={12} /></span>
+                      <span>Informations Générales de l'Activité</span>
                     </h4>
 
                     {/* Name field */}
                     <div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                      <label className="text-[9.5px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Nom de la Campagne / Intitulé du Frais *
                       </label>
                       <input 
                         required 
                         placeholder={isUniv ? "Ex: Frais de Soutenance PFE 2026, Stage Pratique..." : "Ex: Excursion Botanique, Kits Uniformes, Frais de Labo..."} 
-                        className="w-full border border-slate-200 bg-slate-50/50 px-3 py-2 rounded-xl font-bold text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-400" 
+                        className="w-full h-9 border border-slate-200 bg-slate-50/50 px-3 py-1.5 rounded-xl font-bold text-xs text-slate-900 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all placeholder:text-slate-400 shadow-2xs" 
                         value={formData.name} 
                         onChange={e => setFormData({...formData, name: e.target.value})} 
                       />
@@ -1028,7 +1041,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Type selection */}
                     <div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                      <label className="text-[9.5px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Catégorie / Nature de la Charge
                       </label>
                       <SelectPill
@@ -1061,7 +1074,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         value={formData.type}
                         onChange={(val) => setFormData({ ...formData, type: val })}
                         variant="field"
-                        size="md"
+                        size="sm"
                         colorScheme="indigo"
                         className="w-full"
                         searchable
@@ -1070,13 +1083,13 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Description */}
                     <div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                      <label className="text-[9.5px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Description / Notes pour l'Économat et les Parents
                       </label>
                       <textarea 
                         rows={2} 
                         placeholder="Précisez les détails logistiques, conditions de participation ou matériel inclus..." 
-                        className="w-full border border-slate-200 bg-slate-50/50 px-3 py-2 rounded-xl text-xs font-bold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all" 
+                        className="w-full border border-slate-200 bg-slate-50/50 px-3 py-2 rounded-xl text-xs font-semibold text-slate-800 placeholder:text-slate-400 focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all shadow-2xs resize-none" 
                         value={formData.description} 
                         onChange={e => setFormData({...formData, description: e.target.value})} 
                       />
@@ -1084,22 +1097,22 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
 
                   {/* Ciblage de Structure / Scope */}
-                  <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-100 pb-2">
-                      <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
-                        <span className="p-1 bg-emerald-50 text-emerald-600 rounded-md"><Users2 size={13} /></span>
-                        <span>🎯 Périmètre de Ciblage (Rattachement)</span>
+                  <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                      <h4 className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-2">
+                        <span className="p-1 bg-emerald-50 text-emerald-600 rounded-md"><Users2 size={12} /></span>
+                        <span>🎯 Périmètre de Ciblage</span>
                       </h4>
-                      <span className="text-[10px] font-bold text-slate-400">
+                      <span className="text-[9.5px] font-bold text-slate-400">
                         Optionnel
                       </span>
                     </div>
 
-                    <div className={`grid gap-2.5 sm:gap-3 ${hasMultiCampus ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
+                    <div className={`grid gap-2 sm:gap-2.5 ${hasMultiCampus ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'}`}>
                       {hasMultiCampus && (
                         <div>
-                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
-                            Annexe / Campus *
+                          <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
+                            Annexe / Campus
                           </label>
                           <SelectPill
                             options={[
@@ -1109,7 +1122,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             value={formData.campus_id}
                             onChange={(val) => setFormData({ ...formData, campus_id: val, class_id: '' })}
                             variant="field"
-                            size="md"
+                            size="sm"
                             colorScheme="indigo"
                             className="w-full"
                           />
@@ -1117,7 +1130,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       )}
 
                       <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
+                        <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">
                           {terminology?.class || 'Classe'} / Promotion Spécifique
                         </label>
                         <SelectPill
@@ -1134,7 +1147,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           value={formData.class_id}
                           onChange={(val) => setFormData({ ...formData, class_id: val })}
                           variant="field"
-                          size="md"
+                          size="sm"
                           colorScheme="indigo"
                           className="w-full"
                           searchable={schoolClasses.length > 4}
@@ -1145,18 +1158,18 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* Right Panel: Finance & Period (5 cols) */}
-                <div className="md:col-span-5 space-y-3 sm:space-y-3.5">
+                <div className="md:col-span-5 space-y-2.5 sm:space-y-3">
                   
                   {/* Financial Configuration */}
-                  <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-3 shadow-2xs">
-                    <h4 className="text-xs font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-2">
-                      <span className="p-1 bg-purple-50 text-purple-600 rounded-md"><Settings2 size={13} /></span>
+                  <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 space-y-2.5 shadow-2xs">
+                    <h4 className="text-[11px] font-black uppercase text-slate-800 tracking-wider flex items-center gap-2 border-b border-slate-100 pb-1.5">
+                      <span className="p-1 bg-purple-50 text-purple-600 rounded-md"><Settings2 size={12} /></span>
                       <span>💰 Tarification & Échéance</span>
                     </h4>
 
                     {/* Amount & Currency */}
                     <div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                      <label className="text-[9.5px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Montant du Frais Exigé *
                       </label>
                       <div className="flex gap-2">
@@ -1167,15 +1180,15 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             min="0" 
                             step="any"
                             placeholder="0.00" 
-                            className="w-full border border-slate-200 bg-slate-50/50 pl-3.5 pr-12 py-2 rounded-xl font-black text-sm sm:text-base focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-mono text-slate-900" 
+                            className="w-full h-9 border border-slate-200 bg-slate-50/50 pl-3 pr-11 py-1.5 rounded-xl font-black text-sm focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all font-mono text-slate-900 shadow-2xs" 
                             value={formData.amount} 
                             onChange={e => setFormData({...formData, amount: e.target.value})} 
                           />
-                          <span className="absolute right-3 top-2 text-xs font-black text-indigo-600 font-mono">
+                          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-black text-indigo-600 font-mono pointer-events-none">
                             {formData.currency}
                           </span>
                         </div>
-                        <div className="w-24 sm:w-28">
+                        <div className="w-24 shrink-0">
                           <SelectPill
                             options={[
                               { value: 'HTG', label: 'HTG' },
@@ -1184,7 +1197,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             value={formData.currency}
                             onChange={(val) => setFormData({ ...formData, currency: val })}
                             variant="field"
-                            size="md"
+                            size="sm"
                             colorScheme="indigo"
                             className="w-full"
                           />
@@ -1193,15 +1206,15 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       {/* Quick Presets */}
                       <div className="mt-2 flex items-center gap-1 flex-wrap">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 mr-1">Raccourcis :</span>
+                        <span className="text-[8.5px] font-black uppercase tracking-wider text-slate-400 mr-0.5">Raccourcis :</span>
                         {(formData.currency === 'HTG' ? [500, 1000, 2500, 5000, 10000] : [10, 25, 50, 100, 250]).map(val => (
                           <button
                             type="button"
                             key={val}
                             onClick={() => setFormData({ ...formData, amount: val.toString() })}
-                            className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded-md text-[9.5px] font-black font-mono transition-all border border-slate-200/60"
+                            className="px-1.5 py-0.5 bg-slate-100 hover:bg-indigo-50 hover:text-indigo-700 text-slate-600 rounded-md text-[9px] font-black font-mono transition-all border border-slate-200/60 cursor-pointer active:scale-95"
                           >
-                            +{val} {formData.currency}
+                            +{val}
                           </button>
                         ))}
                       </div>
@@ -1209,7 +1222,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Payment Due Date */}
                     <div>
-                      <label className="text-[10px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
+                      <label className="text-[9.5px] font-black text-slate-600 uppercase tracking-wider mb-1 block">
                         Date Limite de Paiement (Échéance)
                       </label>
                       <DatePickerPill
@@ -1218,7 +1231,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         placeholder="Sélectionner une date..."
                         clearable
                         variant="field"
-                        size="md"
+                        size="sm"
                         colorScheme="indigo"
                         className="w-full"
                       />
@@ -1227,15 +1240,15 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   {/* Period Planning Block */}
                   {TYPES_WITH_DATES.includes(formData.type) ? (
-                    <div className="bg-indigo-50/50 p-3.5 sm:p-4 rounded-xl sm:rounded-2xl border border-indigo-100 space-y-3 shadow-2xs animate-in fade-in duration-300">
-                      <h4 className="text-xs font-black uppercase text-indigo-900 tracking-wider flex items-center gap-2 border-b border-indigo-100/80 pb-2">
-                        <CalendarDays size={14} className="text-indigo-600" />
+                    <div className="bg-indigo-50/50 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-indigo-100 space-y-2.5 shadow-2xs animate-in fade-in duration-300">
+                      <h4 className="text-[11px] font-black uppercase text-indigo-900 tracking-wider flex items-center gap-2 border-b border-indigo-100/80 pb-1.5">
+                        <CalendarDays size={13} className="text-indigo-600" />
                         <span>📅 Plage de Dates & Durée</span>
                       </h4>
                       
-                      <div className="grid grid-cols-2 gap-2.5">
+                      <div className="grid grid-cols-2 gap-2">
                         <div>
-                          <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Début</label>
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Début</label>
                           <DatePickerPill
                             selectedDate={formData.start_date}
                             onSelectDate={(d) => setFormData({ ...formData, start_date: d })}
@@ -1248,7 +1261,7 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           />
                         </div>
                         <div>
-                          <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Fin</label>
+                          <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Date Fin</label>
                           <DatePickerPill
                             selectedDate={formData.end_date}
                             onSelectDate={(d) => setFormData({ ...formData, end_date: d })}
@@ -1263,35 +1276,35 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
 
                       <div>
-                        <label className="text-[9.5px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Durée Évaluée (Jours)</label>
+                        <label className="text-[9px] font-black text-slate-500 uppercase tracking-wider mb-1 block">Durée Évaluée (Jours)</label>
                         <div className="relative">
                           <input 
                             type="number" 
                             min="1" 
                             placeholder="Auto-calculé..." 
-                            className="w-full border border-indigo-200 bg-white px-3 py-1.5 pr-14 rounded-xl font-black text-xs text-indigo-950 focus:border-indigo-500 outline-none transition-all" 
+                            className="w-full h-8.5 border border-indigo-200 bg-white px-3 py-1 pr-14 rounded-xl font-black text-xs text-indigo-950 focus:border-indigo-500 outline-none transition-all shadow-2xs" 
                             value={formData.duration_days} 
                             onChange={e => setFormData({...formData, duration_days: e.target.value})} 
                           />
-                          <span className="absolute right-2 top-1.5 text-[8px] font-black tracking-widest text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded-md uppercase">
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-black tracking-widest text-indigo-700 bg-indigo-100 px-1.5 py-0.5 rounded-md uppercase">
                             Auto
                           </span>
                         </div>
                       </div>
 
-                      <p className="text-[9.5px] text-indigo-700 font-semibold flex items-center gap-1.5">
+                      <p className="text-[9px] text-indigo-700 font-semibold flex items-center gap-1">
                         <Info size={11} className="shrink-0 text-indigo-500" />
                         Calcul automatique en fonction de la période saisie.
                       </p>
                     </div>
                   ) : (
-                    <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/70 flex items-center gap-2.5 shadow-2xs">
-                      <div className="p-2 bg-white text-slate-400 rounded-lg shrink-0 border border-slate-200/60">
-                        <CalendarDays size={16} />
+                    <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/70 flex items-center gap-2.5 shadow-2xs">
+                      <div className="p-1.5 bg-white text-slate-400 rounded-lg shrink-0 border border-slate-200/60">
+                        <CalendarDays size={14} />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[11px] font-black text-slate-700 uppercase tracking-wider leading-tight">Frais ponctuel</p>
-                        <p className="text-[10px] text-slate-500 font-medium truncate mt-0.5">
+                        <p className="text-[10px] font-black text-slate-700 uppercase tracking-wider leading-tight">Frais ponctuel</p>
+                        <p className="text-[9.5px] text-slate-500 font-medium truncate mt-0.5">
                           Aucune plage de dates requise pour cette catégorie.
                         </p>
                       </div>
@@ -1302,11 +1315,11 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
 
               {/* Action Buttons Sticky Footer with Compact Ergonomics */}
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-2.5 px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-50/90 border-t border-slate-200/80 shrink-0">
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-2 px-4 sm:px-5 py-2.5 sm:py-3 bg-slate-50/90 border-t border-slate-200/80 shrink-0">
                 <button 
                   type="button" 
                   onClick={() => setShowForm(false)} 
-                  className="w-full sm:w-auto px-5 py-2 bg-slate-200/80 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition-all cursor-pointer text-center active:scale-95"
+                  className="w-full sm:w-auto px-4 py-2 bg-slate-200/80 hover:bg-slate-200 text-slate-700 rounded-xl font-extrabold text-xs transition-all cursor-pointer text-center active:scale-95"
                 >
                   Annuler et Fermer
                 </button>
@@ -1315,25 +1328,24 @@ const AdHocCampaignsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button 
                     type="submit" 
                     disabled={isSubmitting} 
-                    className="w-full sm:w-auto px-6 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <>
-                        <RefreshCw size={14} className="animate-spin" /> Enregistrement...
+                        <RefreshCw size={13} className="animate-spin" /> Enregistrement...
                       </>
                     ) : formData.id ? (
                       <>
-                        <Save size={14} /> Enregistrer les Modifications
+                        <Save size={13} /> Enregistrer les Modifications
                       </>
                     ) : (
                       <>
-                        <Rocket size={14} /> Créer et Publier la Campagne
+                        <Check size={13} /> Créer et Publier la Campagne
                       </>
                     )}
                   </button>
                 </div>
               </div>
-
             </form>
           </div>
         </div>
@@ -1994,14 +2006,16 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
   };
 
   return (
-    <div className={`max-w-6xl mx-auto space-y-6 pb-20 animate-in slide-in-from-right duration-300 ${printPreview ? 'print:hidden' : 'print:p-0'}`}>
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-        <div className="flex items-center gap-4">
-          <button onClick={onBack} className="p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all active:scale-[0.97]"><ArrowLeft size={22} className="text-gray-600" /></button>
+    <div className={`max-w-6xl mx-auto space-y-3.5 sm:space-y-4 pb-12 animate-in slide-in-from-right duration-300 ${printPreview ? 'print:hidden' : 'print:p-0'}`}>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3 bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xs border border-slate-200/80">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-2 sm:p-2.5 bg-slate-50 hover:bg-slate-100 rounded-xl transition-all active:scale-[0.97] border border-slate-200/60 cursor-pointer">
+            <ArrowLeft size={18} className="text-slate-600" />
+          </button>
           <div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg inline-block">📋 Campagne Active</span>
-              <span className={`px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-lg inline-block ${
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-wider rounded-md inline-block border border-indigo-100">📋 Campagne Active</span>
+              <span className={`px-2 py-0.5 text-[9px] font-black uppercase tracking-wider rounded-md inline-block ${
                 currentCampaignStatus === 'DRAFT' ? 'bg-slate-100 text-slate-800' :
                 currentCampaignStatus === 'PROGRESS' ? 'bg-blue-100 text-blue-800' :
                 'bg-emerald-100 text-emerald-800'
@@ -2011,9 +2025,9 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                  'Terminé avec Succès'}
               </span>
             </div>
-            <h2 className="text-2xl font-black text-gray-900 leading-none mt-1.5">{campaign.name}</h2>
-            <p className="text-gray-500 font-medium text-xs mt-1">
-              Frais d'affectation : <span className="font-bold text-indigo-600 font-mono">{campaign.amount.toLocaleString()} {campaign.currency}</span>
+            <h2 className="text-lg sm:text-xl font-black text-gray-900 leading-tight mt-1">{campaign.name}</h2>
+            <p className="text-slate-500 font-medium text-xs mt-0.5">
+              Frais d'affectation : <span className="font-black text-indigo-600 font-mono">{campaign.amount.toLocaleString()} {campaign.currency}</span>
             </p>
           </div>
         </div>
@@ -2022,7 +2036,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
           {currentCampaignStatus === 'DRAFT' && (
             <button
               onClick={() => handleUpdateStatus('PROGRESS')}
-              className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+              className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs active:scale-[0.98] cursor-pointer"
               title="Débuter la campagne pour autoriser les suivis et encaissements"
             >
               <CheckCircle2 size={14} /> Débuter la Campagne
@@ -2033,14 +2047,14 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
             <>
               <button
                 onClick={() => handleUpdateStatus('COMPLETED')}
-                className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5 shadow-sm active:scale-[0.98]"
+                className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs transition-colors flex items-center gap-1.5 shadow-2xs active:scale-[0.98] cursor-pointer"
                 title="Clôturer la campagne avec succès"
               >
                 <CheckCircle2 size={14} /> Terminer avec Succès
               </button>
               <button
                 onClick={() => handleUpdateStatus('DRAFT')}
-                className="px-3 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-medium text-xs transition-colors active:scale-[0.98]"
+                className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl font-medium text-xs transition-colors active:scale-[0.98] cursor-pointer"
                 title="Repasser la campagne en brouillon"
               >
                 Retour en Brouillon
@@ -2049,7 +2063,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
           )}
 
           {currentCampaignStatus === 'COMPLETED' && (
-            <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-4 py-2.5 rounded-xl text-xs font-bold leading-none">
+            <div className="flex items-center gap-2 text-emerald-700 bg-emerald-50 border border-emerald-100 px-3 py-2 rounded-xl text-xs font-bold leading-none">
               <span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               Campagne Verrouillée (Terminée)
             </div>
@@ -2057,48 +2071,48 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
         </div>
       </div>
       
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 space-y-6">
+      <div className="bg-white p-3.5 sm:p-4 rounded-xl sm:rounded-2xl shadow-2xs border border-slate-200/80 space-y-3.5">
         {/* Financial Summary Dashboard */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 flex flex-col justify-center">
-            <span className="text-[10px] uppercase font-black tracking-wider text-slate-500 mb-1">Total Attendu</span>
-            <span className="text-xl font-black text-slate-800 font-mono">{totalExpected.toLocaleString()} {campaign.currency}</span>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/70 flex flex-col justify-center">
+            <span className="text-[9.5px] uppercase font-black tracking-wider text-slate-500 mb-0.5">Total Attendu</span>
+            <span className="text-base sm:text-lg font-black text-slate-800 font-mono">{totalExpected.toLocaleString()} {campaign.currency}</span>
           </div>
-          <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100 flex flex-col justify-center">
-            <span className="text-[10px] uppercase font-black tracking-wider text-emerald-600 mb-1">Total Encaissé</span>
-            <span className="text-xl font-black text-emerald-700 font-mono">{totalCollected.toLocaleString()} {campaign.currency}</span>
+          <div className="bg-emerald-50/40 p-3 rounded-xl border border-emerald-100/80 flex flex-col justify-center">
+            <span className="text-[9.5px] uppercase font-black tracking-wider text-emerald-600 mb-0.5">Total Encaissé</span>
+            <span className="text-base sm:text-lg font-black text-emerald-700 font-mono">{totalCollected.toLocaleString()} {campaign.currency}</span>
           </div>
-          <div className="bg-rose-50/50 p-4 rounded-2xl border border-rose-100 flex flex-col justify-center">
-            <span className="text-[10px] uppercase font-black tracking-wider text-rose-600 mb-1">Reste à Recouvrer</span>
-            <span className="text-xl font-black text-rose-700 font-mono">{totalRemaining.toLocaleString()} {campaign.currency}</span>
+          <div className="bg-rose-50/40 p-3 rounded-xl border border-rose-100/80 flex flex-col justify-center">
+            <span className="text-[9.5px] uppercase font-black tracking-wider text-rose-600 mb-0.5">Reste à Recouvrer</span>
+            <span className="text-base sm:text-lg font-black text-rose-700 font-mono">{totalRemaining.toLocaleString()} {campaign.currency}</span>
           </div>
-          <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100 flex flex-col justify-center relative overflow-hidden">
-            <span className="text-[10px] uppercase font-black tracking-wider text-indigo-600 mb-1">Taux de Recouv.</span>
-            <span className="text-2xl font-black text-indigo-700 font-mono">{recoveryRate}%</span>
-            <div className="absolute bottom-0 left-0 h-1.5 bg-indigo-200 w-full opacity-50">
+          <div className="bg-indigo-50/40 p-3 rounded-xl border border-indigo-100/80 flex flex-col justify-center relative overflow-hidden">
+            <span className="text-[9.5px] uppercase font-black tracking-wider text-indigo-600 mb-0.5">Taux Recouvrement</span>
+            <span className="text-base sm:text-lg font-black text-indigo-700 font-mono">{recoveryRate}%</span>
+            <div className="absolute bottom-0 left-0 h-1 bg-indigo-200/70 w-full">
               <div className="h-full bg-indigo-500 rounded-r-full transition-all duration-1000" style={{ width: `${recoveryRate}%` }} />
             </div>
           </div>
         </div>
 
         {/* Advanced Filters Block */}
-        <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 space-y-3">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="bg-slate-50/80 p-2.5 sm:p-3 rounded-xl border border-slate-200/70 space-y-2.5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 sm:gap-2.5">
             {/* Search Input */}
             <div className="relative">
               <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-slate-400">
-                <Search size={16} />
+                <Search size={14} />
               </span>
               <input
                 type="text"
                 placeholder={`Chercher par nom ou matricule...`}
-                className="w-full pl-9 pr-8 py-3 bg-white border border-slate-200 rounded-xl font-semibold text-xs text-gray-800 outline-none focus:border-indigo-500 placeholder:text-slate-400 transition-all font-sans"
+                className="w-full h-9 pl-8.5 pr-8 bg-white border border-slate-200/90 rounded-xl font-semibold text-xs text-gray-800 outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 placeholder:text-slate-400 transition-all shadow-2xs font-sans"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
               />
               {searchQuery && (
-                <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600">
-                  <X size={14} className="bg-slate-100 rounded-full p-0.5" />
+                <button onClick={() => setSearchQuery('')} className="absolute inset-y-0 right-2.5 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer">
+                  <X size={13} className="bg-slate-100 rounded-full p-0.5" />
                 </button>
               )}
             </div>
@@ -2114,7 +2128,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
                 value={filterCampus}
                 onChange={(val) => { setFilterCampus(val); setFilterClass(''); }}
                 variant="field"
-                size="md"
+                size="sm"
                 colorScheme="indigo"
                 className="w-full"
               />
@@ -2130,7 +2144,7 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
               value={filterClass}
               onChange={(val) => setFilterClass(val)}
               variant="field"
-              size="md"
+              size="sm"
               colorScheme="indigo"
               className="w-full"
               searchable={classes.length > 5}
@@ -2138,38 +2152,38 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
           </div>
 
           {/* Mass Actions Roster Bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 pt-3 border-t border-slate-200/60 font-sans">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-600 px-1 py-1 bg-slate-100 rounded-lg justify-center sm:justify-start">
-              <span>📋 Sélection : <b className="text-gray-900 font-mono text-[13px]">{filteredStudents.length}</b> {terminology.student.toLowerCase()}(s)</span>
+          <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-2.5 pt-2.5 border-t border-slate-200/60 font-sans">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-600 px-2 py-1 bg-white rounded-lg border border-slate-200/60 justify-center sm:justify-start">
+              <span>📋 Sélection : <b className="text-gray-900 font-mono text-xs">{filteredStudents.length}</b> {terminology.student.toLowerCase()}(s)</span>
               <span className="text-slate-300">|</span>
-              <span className="text-emerald-700">Assignés : <b className="font-mono text-[13px]">{visibleAssignedCount}</b></span>
+              <span className="text-emerald-700">Assignés : <b className="font-mono text-xs">{visibleAssignedCount}</b></span>
               <span className="text-slate-300">|</span>
-              <span className="text-slate-500">Non-assignés : <b className="font-mono text-[13px]">{visibleUnassignedCount}</b></span>
+              <span className="text-slate-500">Non-assignés : <b className="font-mono text-xs">{visibleUnassignedCount}</b></span>
             </div>
             
-            <div className="grid grid-cols-2 gap-2 sm:flex sm:justify-end">
+            <div className="grid grid-cols-3 gap-1.5 sm:flex sm:justify-end">
               <button 
                 onClick={assignAllVisible} 
                 disabled={currentCampaignStatus === 'COMPLETED'}
-                className="bg-emerald-600 text-white font-black text-[11px] px-4 py-2.5 rounded-xl hover:bg-emerald-700 hover:shadow-md hover:shadow-emerald-200/50 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+                className="bg-emerald-600 text-white font-black text-[10.5px] px-3 py-1.5 rounded-xl hover:bg-emerald-700 transition-all flex items-center justify-center gap-1 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
                 title={`Assigner tous les ${terminology.students?.toLowerCase() || 'élèves'} affichés ci-dessous`}
               >
-                <CheckCircle2 size={14} className="shrink-0" /> Tout Assigner
+                <CheckCircle2 size={13} className="shrink-0" /> Tout Assigner
               </button>
               <button 
                 onClick={unassignAllVisible} 
                 disabled={currentCampaignStatus === 'COMPLETED'}
-                className="bg-rose-600 text-white font-black text-[11px] px-4 py-2.5 rounded-xl hover:bg-rose-700 hover:shadow-md hover:shadow-rose-200/50 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:shadow-none"
+                className="bg-rose-600 text-white font-black text-[10.5px] px-3 py-1.5 rounded-xl hover:bg-rose-700 transition-all flex items-center justify-center gap-1 active:scale-[0.98] cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shadow-2xs"
                 title={`Retirer tous les ${terminology.students?.toLowerCase() || 'élèves'} d'un seul coup (Sauf s'ils ont payé)`}
               >
-                <X size={14} className="shrink-0" /> Tout Retirer
+                <X size={13} className="shrink-0" /> Tout Retirer
               </button>
               <button
                 onClick={() => window.print()}
-                className="bg-slate-800 text-white font-black text-[11px] px-4 py-2.5 rounded-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-1.5 active:scale-[0.98] cursor-pointer"
+                className="bg-slate-800 text-white font-black text-[10.5px] px-3 py-1.5 rounded-xl hover:bg-slate-900 transition-all flex items-center justify-center gap-1 active:scale-[0.98] cursor-pointer shadow-2xs"
                 title="Imprimer le rapport de la sélection actuelle"
               >
-                <Printer size={14} className="shrink-0" /> Imprimer Rapport
+                <Printer size={13} className="shrink-0" /> Imprimer
               </button>
             </div>
           </div>
