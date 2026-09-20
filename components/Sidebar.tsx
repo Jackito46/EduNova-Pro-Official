@@ -148,10 +148,12 @@ interface SidebarProps {
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
-  const { school, terminology, campuses, currentCampusId, setCurrentCampusId } = useSchool();
+  const { school, terminology, campuses, currentCampusId, setCurrentCampusId, isModuleEnabled } = useSchool();
   const location = useLocation();
-  const isPresencesEnabled = school?.global_settings?.modules?.presences ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
-  const isDisciplineEnabled = school?.global_settings?.modules?.discipline ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
+  const isFinanceEnabled = isModuleEnabled('finance');
+  const isExamsEnabled = isModuleEnabled('exams');
+  const isAttendanceEnabled = isModuleEnabled('attendance');
+  const isDisciplineEnabled = isModuleEnabled('discipline');
   const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === UserRole.SUPER_ADMIN || (user?.role as any) === 'SUPER_ADMIN');
   const isParent = Boolean(user?.role === UserRole.PARENT || (user?.role as any) === 'PARENT' || (user?.role as any) === 'parent');
   const canAccessShortcuts = Boolean(
@@ -437,8 +439,8 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                    {renderNavLink({ name: 'Mon Profil', path: '/profil' }, true, UserCircle)}
                    {renderNavLink({ name: 'Mes Cours', path: '/mes-cours' }, true, BookOpen)}
                    {renderNavLink({ name: 'Mon Horaire', path: '/mon-horaire' }, true, Clock)}
-                   {renderNavLink({ name: 'Mes Notes', path: '/mes-notes' }, true, TrendingUp)}
-                   {renderNavLink({ name: 'Mon Économat', path: '/mon-economat' }, true, Receipt)}
+                   {isExamsEnabled && renderNavLink({ name: 'Mes Notes', path: '/mes-notes' }, true, TrendingUp)}
+                   {isFinanceEnabled && renderNavLink({ name: 'Mon Économat', path: '/mon-economat' }, true, Receipt)}
                  </div>
                )}
             </div>
@@ -455,9 +457,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   {school?.school_type !== 'CLASSIC' && (
                     renderNavLink({ name: 'Syllabus d\'évaluations', path: '/enseignant/syllabus' }, true, BookOpen)
                   )}
-                  {renderNavLink({ name: 'Saisie des Notes', path: '/notes' }, true, ClipboardList)}
-                  {hasAccess(academicRoles) && isPresencesEnabled && renderNavLink({ name: 'Présences', path: '/presences' }, true, CalendarCheck)}
-                  {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: 'Bulletins', path: '/bulletins' }, true, Files)}
+                  {isExamsEnabled && renderNavLink({ name: 'Saisie des Notes', path: '/notes' }, true, ClipboardList)}
+                  {hasAccess(academicRoles) && isAttendanceEnabled && renderNavLink({ name: 'Présences', path: '/presences' }, true, CalendarCheck)}
+                  {hasAccess(restrictedAcademicRoles) && isExamsEnabled && renderNavLink({ name: 'Bulletins', path: '/bulletins' }, true, Files)}
                   {hasAccess(academicRoles) && isDisciplineEnabled && renderNavLink({ name: 'Discipline', path: '/discipline' }, true, ShieldAlert)}
                   {hasAccess(academicRoles) && renderNavLink({ name: 'Emplois du Temps', path: '/horaire' }, true, Clock)}
                 </div>
@@ -479,7 +481,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             </div>
           )}
 
-          {hasAccess(cashierRoles) && (
+          {hasAccess(cashierRoles) && isFinanceEnabled && (
             <div className="space-y-1">
               {renderMenuHeader("finance", "Finance", CircleDollarSign)}
               {openMenus.finance && (

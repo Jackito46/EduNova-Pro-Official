@@ -14,6 +14,9 @@ interface SchoolContextType {
   refreshCampuses: () => Promise<void>;
   activeAcademicYear: AcademicYear | null;
   refreshActiveYear: () => Promise<void>;
+  globalModules: string[];
+  isModuleEnabled: (moduleId: string) => boolean;
+  refreshModules: () => Promise<void>;
 }
 
 const SchoolContext = createContext<SchoolContextType | undefined>(undefined);
@@ -28,6 +31,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
   const [school, setSchool] = useState<School | null>(null);
   const [campuses, setCampuses] = useState<SchoolCampus[]>([]);
   const [activeAcademicYear, setActiveAcademicYear] = useState<AcademicYear | null>(null);
+  const [globalModules, setGlobalModules] = useState<string[]>(['finance', 'exams', 'attendance']);
   const [currentCampusId, setCurrentCampusIdState] = useState<string | null>(() => {
     try {
       if (user && user.campus_id && !isSuperUser) {
@@ -266,10 +270,90 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     }
   };
 
+  const fetchGlobalModules = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('global_settings')
+        .select('key, value')
+        .eq('key', 'modules_config')
+        .maybeSingle();
+
+      if (!error && data && data.value && Array.isArray((data.value as any).enabled_modules)) {
+        setGlobalModules((data.value as any).enabled_modules);
+      }
+    } catch (e) {
+      console.warn("Failed to fetch global modules config", e);
+    }
+  }, []);
+
+  const isModuleEnabled = useCallback((moduleId: string): boolean => {
+    // Standardize IDs: 'presences' -> 'attendance'
+    const normalizedId = moduleId === 'presences' ? 'attendance' : moduleId;
+
+    // 1. Global killswitch check:
+    // If globalModules array is loaded, module MUST be present in globalModules
+    if (globalModules && globalModules.length > 0) {
+      if (!globalModules.includes(normalizedId)) {
+        return false;
+      }
+    }
+
+    // 2. School-level override check (if school has configured specific modules)
+    const schoolModules = (school as any)?.global_settings?.modules;
+    if (schoolModules && typeof schoolModules === 'object') {
+      if (normalizedId === 'attendance' && schoolModules.presences === false) {
+        return false;
+      }
+      if (normalizedId === 'discipline' && schoolModules.discipline === false) {
+        return false;
+      }
+      if (schoolModules[normalizedId] === false) {
+        return false;
+      }
+    }
+
+    // Specific rules for higher-ed (university/professional)
+    if ((normalizedId === 'discipline' || normalizedId === 'attendance') && school) {
+      const isHigherEd = school.school_type === 'UNIVERSITY' || school.school_type === 'PROFESSIONAL';
+      if (isHigherEd && (!schoolModules || (schoolModules.presences === undefined && schoolModules.discipline === undefined))) {
+        return false;
+      }
+    }
+
+    return true;
+  }, [globalModules, school]);
+
   useEffect(() => {
     fetchSchool();
     fetchCampuses();
     fetchActiveAcademicYear();
+    fetchGlobalModules();
+
+    // Listen for custom module config update events (immediate in-app update)
+    const handleCustomModulesUpdate = (e: CustomEvent) => {
+      if (e.detail && Array.isArray(e.detail.enabled_modules)) {
+        setGlobalModules(e.detail.enabled_modules);
+      } else {
+        fetchGlobalModules();
+      }
+    };
+    window.addEventListener('edunova_modules_config_updated' as any, handleCustomModulesUpdate);
+
+    // Supabase Realtime for global_settings modules_config updates
+    const channel = supabase
+      .channel('public:global_settings_modules')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'global_settings', filter: 'key=eq.modules_config' },
+        (payload: any) => {
+          if (payload?.new?.value && Array.isArray(payload.new.value.enabled_modules)) {
+            setGlobalModules(payload.new.value.enabled_modules);
+          } else {
+            fetchGlobalModules();
+          }
+        }
+      )
+      .subscribe();
 
     // Robustly recover from initial session loading race conditions by listening to auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -278,13 +362,16 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
         fetchSchool();
         fetchCampuses();
         fetchActiveAcademicYear();
+        fetchGlobalModules();
       }
     });
 
     return () => {
+      window.removeEventListener('edunova_modules_config_updated' as any, handleCustomModulesUpdate);
+      supabase.removeChannel(channel);
       subscription.unsubscribe();
     };
-  }, [schoolId, user?.id, user?.campus_id]);
+  }, [schoolId, user?.id, user?.campus_id, fetchGlobalModules]);
 
   const terminology = useMemo(() => {
     return getTerminology((school?.school_type as SchoolType) || SchoolType.CLASSIC);
@@ -300,14 +387,20 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     setCurrentCampusId: handleSetCampusId,
     refreshCampuses: fetchCampuses,
     activeAcademicYear,
-    refreshActiveYear: fetchActiveAcademicYear
+    refreshActiveYear: fetchActiveAcademicYear,
+    globalModules,
+    isModuleEnabled,
+    refreshModules: fetchGlobalModules
   }), [
     school, 
     terminology, 
     loading, 
     campuses, 
     currentCampusId, 
-    activeAcademicYear
+    activeAcademicYear,
+    globalModules,
+    isModuleEnabled,
+    fetchGlobalModules
   ]);
 
   return (

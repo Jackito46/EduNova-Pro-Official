@@ -75,6 +75,7 @@ import WhatsAppModule from './components/WhatsAppModule';
 
 import { SessionGuard } from './components/SessionGuard';
 import { RoleGuard } from './components/RoleGuard';
+import { ModuleGuard } from './components/ModuleGuard';
 import { DesktopDeviceGuard } from './components/DesktopDeviceGuard';
 import { useSecurity } from './components/SecurityGuard';
 import { SchoolProvider } from './contexts/SchoolContext';
@@ -272,8 +273,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               {/* Student Portal Routes */}
               <Route path="/profil" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfileView user={user} /></RoleGuard>} />
               <Route path="/mes-cours" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesView user={user} /></RoleGuard>} />
-              <Route path="/mes-notes" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentGradesView user={user} /></RoleGuard>} />
-              <Route path="/mon-economat" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentFinanceView user={user} /></RoleGuard>} />
+              <Route path="/mes-notes" element={<ModuleGuard moduleId="exams" moduleName="Mes Notes" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentGradesView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/mon-economat" element={<ModuleGuard moduleId="finance" moduleName="Mon Économat" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentFinanceView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/mon-horaire" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentScheduleView user={user} /></RoleGuard>} />
               
               {/* Academic Routes */}
@@ -292,11 +293,11 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/matieres" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><ClassManagement user={user} /></RoleGuard>} />
               <Route path="/matieres/ajouter" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
               <Route path="/matieres/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
-              <Route path="/notes" element={<RoleGuard user={user} allowedRoles={academicRoles}><GradesView user={user} /></RoleGuard>} />
+              <Route path="/notes" element={<ModuleGuard moduleId="exams" moduleName="Saisie des Notes" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><GradesView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/enseignant/syllabus" element={<RoleGuard user={user} allowedRoles={academicRoles}><SyllabusHub user={user} /></RoleGuard>} />
-              <Route path="/presences" element={<RoleGuard user={user} allowedRoles={academicRoles}><AttendanceView user={user} /></RoleGuard>} />
-              <Route path="/bulletins" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><DesktopDeviceGuard user={user} moduleTitle="Édition & Clôture des Bulletins Scolaires"><ReportCardsView user={user} /></DesktopDeviceGuard></RoleGuard>} />
-              <Route path="/discipline" element={<RoleGuard user={user} allowedRoles={academicRoles}><DisciplinaryView user={user} /></RoleGuard>} />
+              <Route path="/presences" element={<ModuleGuard moduleId="attendance" moduleName="Suivi des Présences" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><AttendanceView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/bulletins" element={<ModuleGuard moduleId="exams" moduleName="Édition & Clôture des Bulletins Scolaires" user={user}><RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><DesktopDeviceGuard user={user} moduleTitle="Édition & Clôture des Bulletins Scolaires"><ReportCardsView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
+              <Route path="/discipline" element={<ModuleGuard moduleId="discipline" moduleName="Discipline & Vie Scolaire" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><DisciplinaryView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/horaire" element={<RoleGuard user={user} allowedRoles={academicRoles}><ScheduleView user={user} /></RoleGuard>} />
               <Route path="/enseignant/pointage" element={<RoleGuard user={user} allowedRoles={[UserRole.TEACHER, ...adminRoles, UserRole.SECRETARY]}><CourseSignatureView user={user} /></RoleGuard>} />
               
@@ -308,31 +309,31 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/personnel/pointage" element={<RoleGuard user={user} allowedRoles={hrRoles}><StaffAttendanceView user={user} /></RoleGuard>} />
               
               {/* Finance Routes */}
-              <Route path="/economat" element={<RoleGuard user={user} allowedRoles={financeRoles}><FinanceHub user={user} /></RoleGuard>} />
-              <Route path="/economat/frais" element={<RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard>} />
-              <Route path="/economat/paiement" element={<RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard>} />
-              <Route path="/economat/factures" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/facture/:id" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/recus" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/recu/:id" element={<RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/releves" element={<RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard>} />
-              <Route path="/economat/releve-compte" element={<RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard>} />
-              <Route path="/economat/suivi" element={<RoleGuard user={user} allowedRoles={cashierRoles}><StudentPaymentTracking user={user} /></RoleGuard>} />
-              <Route path="/economat/debiteurs" element={<RoleGuard user={user} allowedRoles={cashierRoles}><DebtorsListView user={user} /></RoleGuard>} />
-              <Route path="/economat/liste" element={<RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard>} />
-              <Route path="/economat/historique" element={<RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard>} />
-              <Route path="/economat/depenses" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpensesView user={user} /></RoleGuard>} />
-              <Route path="/economat/depenses/ajouter" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard>} />
-              <Route path="/economat/depenses/modifier/:id" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard>} />
-              <Route path="/economat/fournitures" element={<RoleGuard user={user} allowedRoles={cashierRoles}><SuppliesView user={user} /></RoleGuard>} />
-              <Route path="/economat/planification" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard>} />
-              <Route path="/economat/planning" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard>} />
-              <Route path="/economat/frais-occasionnels" element={<RoleGuard user={user} allowedRoles={financeRoles}><AdHocCampaignsView user={user} /></RoleGuard>} />
-              <Route path="/economat/derogations" element={<RoleGuard user={user} allowedRoles={adminRoles}><DiscountManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/rapport-reductions" element={<RoleGuard user={user} allowedRoles={financeRoles}><ReductionReportView user={user} /></RoleGuard>} />
-              <Route path="/economat/paie" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><PayrollManagementView user={user} /></RoleGuard>} />
-              <Route path="/economat/budget" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Planification Budgétaire & Arbitrages"><BudgetPlanningView user={user} /></DesktopDeviceGuard></RoleGuard>} />
-              <Route path="/economat/audit" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Audit Financier & Clôtures"><FinancialAuditView user={user} /></DesktopDeviceGuard></RoleGuard>} />
+              <Route path="/economat" element={<ModuleGuard moduleId="finance" moduleName="Direction Économat" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><FinanceHub user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/frais" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/paiement" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/factures" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/facture/:id" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/recus" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/recu/:id" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/releves" element={<ModuleGuard moduleId="finance" moduleName="Relevé de Compte" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/releve-compte" element={<ModuleGuard moduleId="finance" moduleName="Relevé de Compte" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/suivi" element={<ModuleGuard moduleId="finance" moduleName="Suivi des Paiements" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><StudentPaymentTracking user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/debiteurs" element={<ModuleGuard moduleId="finance" moduleName="Liste des Débiteurs" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><DebtorsListView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/liste" element={<ModuleGuard moduleId="finance" moduleName="Registre des Paiements" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/historique" element={<ModuleGuard moduleId="finance" moduleName="Registre des Paiements" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/depenses" element={<ModuleGuard moduleId="finance" moduleName="Registre des Dépenses" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpensesView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/depenses/ajouter" element={<ModuleGuard moduleId="finance" moduleName="Ajouter une Dépense" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/depenses/modifier/:id" element={<ModuleGuard moduleId="finance" moduleName="Modifier une Dépense" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/fournitures" element={<ModuleGuard moduleId="finance" moduleName="Fournitures & Stocks" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><SuppliesView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/planification" element={<ModuleGuard moduleId="finance" moduleName="Planification Frais" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/planning" element={<ModuleGuard moduleId="finance" moduleName="Planification Frais" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/frais-occasionnels" element={<ModuleGuard moduleId="finance" moduleName="Campagnes & Événements" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><AdHocCampaignsView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/derogations" element={<ModuleGuard moduleId="finance" moduleName="Dérogations & Réévaluations" user={user}><RoleGuard user={user} allowedRoles={adminRoles}><DiscountManagementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/rapport-reductions" element={<ModuleGuard moduleId="finance" moduleName="Rapports Réductions" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><ReductionReportView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/paie" element={<ModuleGuard moduleId="finance" moduleName="Gestion Payroll" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><PayrollManagementView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/budget" element={<ModuleGuard moduleId="finance" moduleName="Planification Budgétaire" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Planification Budgétaire & Arbitrages"><BudgetPlanningView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/audit" element={<ModuleGuard moduleId="finance" moduleName="Audit Financier" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Audit Financier & Clôtures"><FinancialAuditView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
               
               {/* Reports Routes */}
               <Route path="/rapports" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY]}><ReportsView user={user} /></RoleGuard>} />
