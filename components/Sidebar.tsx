@@ -216,6 +216,17 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
     logo_url: school?.logo_url || null
   }), [school?.name, school?.logo_url]);
 
+  const schoolNameLen = (schoolInfo.name || '').length;
+  const sidebarSchoolNameClasses = React.useMemo(() => {
+    if (schoolNameLen > 55) {
+      return "text-[11px] leading-[1.25] line-clamp-3";
+    }
+    if (schoolNameLen > 30) {
+      return "text-[12px] leading-[1.3] line-clamp-2";
+    }
+    return "text-[13px] leading-snug line-clamp-2";
+  }, [schoolNameLen]);
+
   const handleToggleMenu = React.useCallback((menuId: string) => {
     if (isNarrow && sidebarMode === 'collapsed') {
       setSidebarMode('expanded');
@@ -280,12 +291,12 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       >
         {/* LOGO & SCHOOL IDENTITY HEADER */}
         <div className={`relative border-b border-slate-200/80 bg-white/50 backdrop-blur-xs text-left transition-all duration-200 ${
-          isNarrow ? 'p-2.5 flex flex-col items-center justify-center gap-2' : 'px-3.5 py-3 flex items-center justify-between gap-2.5'
+          isNarrow ? 'p-2.5 flex flex-col items-center justify-center gap-2' : 'px-3.5 py-3 flex items-start justify-between gap-2.5'
         }`}>
-          <div className={`flex items-center gap-2.5 min-w-0 flex-1 ${isNarrow ? 'justify-center w-full' : ''}`}>
+          <div className={`flex items-start gap-2.5 min-w-0 flex-1 ${isNarrow ? 'justify-center w-full' : ''}`}>
             {/* Logo with rounded squircle badge and active ping */}
             <div 
-              className="relative shrink-0 flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
+              className="relative shrink-0 flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105 mt-0.5"
               onClick={() => isNarrow && setSidebarMode('expanded')}
               title={isNarrow ? `${schoolInfo.name} - Cliquer pour agrandir le menu` : schoolInfo.name}
             >
@@ -302,7 +313,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             {!isNarrow && (
               <div className="overflow-hidden flex-1 min-w-0 flex flex-col justify-center">
                 <h1 
-                  className="text-[13px] font-black tracking-tight text-slate-900 leading-tight truncate hover:text-blue-600 transition-colors cursor-default" 
+                  className={`${sidebarSchoolNameClasses} font-black tracking-tight text-slate-900 break-words hover:text-blue-600 transition-colors cursor-default select-text`} 
                   title={schoolInfo.name}
                 >
                   {schoolInfo.name}
@@ -334,10 +345,11 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                       );
                     }
                     
+                    const isUniversity = school?.school_type === 'UNIVERSITY' || /universit|faculté|institut sup/i.test(schoolInfo.name);
                     return (
-                      <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-500">
-                        <Sparkles size={11} className="text-amber-500" />
-                        <span>École Connectée</span>
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                        <Sparkles size={11} className={isUniversity ? "text-indigo-500" : "text-amber-500"} />
+                        <span>{isUniversity ? 'Université Connectée' : 'École Connectée'}</span>
                       </span>
                     );
                   })()}

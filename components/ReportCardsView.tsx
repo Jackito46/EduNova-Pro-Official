@@ -939,8 +939,8 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </span>
               )}
             </div>
-            <p className="text-slate-500 font-medium text-xs">
-              {school?.name || 'Établissement'} • Génération, calculs de moyennes et certification officielle
+            <p className="text-slate-500 font-medium text-xs break-words">
+              {school?.name || 'Établissement'} • {school?.school_type === 'UNIVERSITE' || school?.school_type === 'SUPERIEUR' ? 'Relevés de notes, moyennes et crédits académiques' : 'Génération, calculs de moyennes et certification officielle'}
             </p>
           </div>
         </div>

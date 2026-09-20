@@ -940,7 +940,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-200 text-[10px] font-black uppercase tracking-wider rounded-md border border-indigo-500/30">
+                <span className="px-2.5 py-0.5 bg-indigo-500/20 text-indigo-200 text-[10px] font-black uppercase tracking-wider rounded-md border border-indigo-500/30 break-words max-w-full">
                   {school?.name || 'EduNova Pro'}
                 </span>
                 {hasMultiCampus && (

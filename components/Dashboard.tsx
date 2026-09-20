@@ -1507,6 +1507,22 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     activeYearName: ''
   });
 
+  // Dynamic responsive typography for school/university name strictly on a single line
+  const schoolNameTypography = useMemo(() => {
+    const rawName = schoolInfo.name || '';
+    const len = rawName.length;
+    if (len > 45) {
+      // Noms extrêmement longs (> 45 car. ex: universités polytechniques, instituts pluri-facultaires)
+      return "text-[11px] sm:text-xs md:text-xs lg:text-xs xl:text-[13px] 2xl:text-sm font-black tracking-tight";
+    }
+    if (len > 25) {
+      // Noms modérément longs (25 à 45 car., ex: UNIVERSITÉ MODERNE D'HAÏTI (UMDH))
+      return "text-xs sm:text-xs md:text-sm lg:text-sm xl:text-[15px] 2xl:text-base font-black tracking-tight";
+    }
+    // Noms standards courts (< 25 car.)
+    return "text-sm sm:text-base md:text-base lg:text-base xl:text-lg 2xl:text-xl font-black tracking-tight";
+  }, [schoolInfo.name]);
+
   useEffect(() => {
     const fetchSchoolInfo = async () => {
       if (!user.school_id) return;
@@ -1719,38 +1735,38 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       />
 
       {/* Header Section */}
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 lg:gap-6">
-        <div className="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-          <div className="w-12 h-12 sm:w-14 sm:h-14 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
+      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-3.5 xl:gap-5">
+        <div className="flex items-center gap-2.5 sm:gap-3.5 flex-1 min-w-0">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
             {schoolInfo.logo_url ? (
-              <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5 sm:p-2" />
+              <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5" />
             ) : (
-              <School size={24} className="text-slate-400" />
+              <School size={22} className="text-slate-400" />
             )}
           </div>
           <div className="flex-1 min-w-0">
             <h1 
-              className="text-sm sm:text-base md:text-lg lg:text-xl font-black tracking-tight text-slate-900 truncate whitespace-nowrap block" 
+              className={`${schoolNameTypography} text-slate-900 truncate whitespace-nowrap block transition-all`} 
               title={schoolInfo.name}
             >
               {schoolInfo.name}
             </h1>
             
-            <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+            <div className="flex items-center gap-2 mt-1 flex-wrap">
               {/* User Identity Pill */}
-              <div className="inline-flex items-center gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2.5 py-1 rounded-xl transition-all shadow-2xs shrink-0">
+              <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl transition-all shadow-2xs shrink-0">
                 <span className="relative flex h-2 w-2">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                 </span>
                 <span 
                   id="dashboard-user-name-display"
-                  className="text-xs font-bold text-slate-800 truncate max-w-[150px] sm:max-w-[260px]"
+                  className="text-[11px] sm:text-xs font-bold text-slate-800 truncate max-w-[130px] sm:max-w-[220px]"
                   title={user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
                 >
                   {user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
                 </span> 
-                <span className="text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                   {roleLabels[user.role] || user.role.replace(/_/g, ' ')}
                 </span>
                 {user.role === UserRole.STUDENT && studentStats.className && (
@@ -1774,17 +1790,17 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 sm:gap-4 w-full lg:w-auto">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto shrink-0">
           {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR, UserRole.ACCOUNTANT].includes(user.role) && (
             <>
-              <div className="relative flex-1 lg:max-w-64 group">
-                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  {isSearching ? <Loader2 className="h-5 w-5 text-gray-400 animate-spin" /> : <Search className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />}
+              <div className="relative flex-1 lg:w-40 xl:w-52 2xl:w-64 group shrink-0">
+                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                  {isSearching ? <Loader2 className="h-4 w-4 text-gray-400 animate-spin" /> : <Search className="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />}
                 </div>
                 <input 
                   type="text"
                   placeholder={`Rechercher...`}
-                  className="block w-full pl-10 pr-3 py-3 min-h-[44px] text-gray-900 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all sm:text-sm"
+                  className="block w-full pl-8 pr-2.5 py-2 min-h-[38px] sm:min-h-[40px] text-gray-900 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs sm:text-sm"
                   value={globalSearch}
                   onChange={(e) => {
                     setGlobalSearch(e.target.value);
@@ -1850,18 +1866,18 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button 
                 onClick={() => fetchDashboardStats()}
                 disabled={loading}
-                className="inline-flex items-center justify-center px-3 py-2.5 min-h-[44px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none group shrink-0 active:scale-95 cursor-pointer"
+                className="inline-flex items-center justify-center px-2.5 sm:px-3 py-2 min-h-[38px] sm:min-h-[40px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none group shrink-0 active:scale-95 cursor-pointer"
                 title="Rafraîchir les données et statistiques du tableau de bord"
               >
-                <RefreshCcw size={16} className={`stroke-[2.2] transition-transform duration-500 ${loading ? 'animate-spin text-indigo-600' : 'group-hover:rotate-180'}`} />
-                <span className="hidden xl:inline-block ml-2 text-xs font-bold text-slate-700 group-hover:text-indigo-600">Actualiser</span>
+                <RefreshCcw size={15} className={`stroke-[2.2] transition-transform duration-500 ${loading ? 'animate-spin text-indigo-600' : 'group-hover:rotate-180'}`} />
+                <span className="hidden 2xl:inline-block ml-1.5 text-xs font-bold text-slate-700 group-hover:text-indigo-600">Actualiser</span>
               </button>
 
               <button 
                 onClick={() => navigate('/eleves/ajouter')}
-                className="inline-flex items-center justify-center px-4 py-3 min-h-[44px] border border-transparent text-sm font-medium rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap lg:w-auto"
+                className="inline-flex items-center justify-center px-3 sm:px-3.5 py-2 min-h-[38px] sm:min-h-[40px] border border-transparent text-xs sm:text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap shrink-0"
               >
-                <UserPlus size={18} className="mr-2" />
+                <UserPlus size={16} className="mr-1.5" />
                 {terminology.enrollment}
               </button>
             </>

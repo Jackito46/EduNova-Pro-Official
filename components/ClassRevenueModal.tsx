@@ -198,13 +198,20 @@ export const ClassRevenueModal: React.FC<ClassRevenueModalProps> = ({
                     <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight truncate leading-tight">
                       Recettes par {optionLabel} <span className="text-emerald-700 text-sm sm:text-base font-bold">(Global)</span>
                     </h3>
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                      École Connectée
-                    </span>
+                    {schoolName && /universit|faculté|institut sup/i.test(schoolName) ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/70 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse"></span>
+                        Université Connectée
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70 shrink-0">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        École Connectée
+                      </span>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-500 truncate mt-0.5">
-                    Détail consolidé des encaissements effectifs • {data.length} {optionsLabel.toLowerCase()}
+                  <p className="text-xs text-slate-500 break-words mt-0.5">
+                    {schoolName ? `${schoolName} • ` : ''}Détail consolidé des encaissements effectifs • {data.length} {optionsLabel.toLowerCase()}
                   </p>
                 </div>
               </div>

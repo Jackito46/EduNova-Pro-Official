@@ -701,7 +701,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
               <div id="parent-official-receipt-print" className="bg-white p-6 sm:p-8 max-w-[80mm] sm:max-w-[100mm] mx-auto shadow-xl rounded-2xl border border-slate-200 text-black font-sans leading-tight print:shadow-none print:border-none print:m-0 print:p-2 print:max-w-none print:w-[80mm]">
                 {/* Header établissement */}
                 <div className="text-center border-b-2 border-black pb-3 mb-3">
-                  <h2 className="font-black text-sm uppercase tracking-tight text-black">
+                  <h2 className="font-black text-xs sm:text-sm uppercase tracking-tight text-black break-words leading-tight">
                     {school?.name || "ÉTABLISSEMENT SCOLAIRE"}
                   </h2>
                   <p className="text-[10px] text-gray-700 mt-0.5">
@@ -1124,7 +1124,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-black text-slate-900">Contacter l'École</h3>
-                  <p className="text-xs text-slate-500 font-semibold mt-0.5">
+                  <p className="text-xs text-slate-500 font-semibold mt-0.5 break-words">
                     {school?.name || "Services Administratifs"}
                   </p>
                 </div>

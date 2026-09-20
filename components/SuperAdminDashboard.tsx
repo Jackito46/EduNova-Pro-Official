@@ -1985,7 +1985,7 @@ const handleDeleteSchool = async () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 p-6 animate-in fade-in duration-700 pb-20">
+    <div className="max-w-7xl mx-auto space-y-6 sm:space-y-8 animate-in fade-in duration-700 pb-20">
       {/* Header Super Admin Ergonomique & Centre de Contrôle */}
       <div className="space-y-4">
         {/* Top Hero Banner */}
@@ -2662,7 +2662,7 @@ const handleDeleteSchool = async () => {
                                     </div>
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 flex-wrap">
-                                        <p className="font-extrabold text-slate-900 text-sm tracking-tight leading-snug break-words">{school.name}</p>
+                                        <p className="font-extrabold text-slate-900 text-sm tracking-tight leading-snug truncate whitespace-nowrap" title={school.name}>{school.name}</p>
                                         {isCurrentWorkingSchool && (
                                           <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-full tracking-wider shrink-0">
                                             Actuelle
@@ -2960,7 +2960,7 @@ const handleDeleteSchool = async () => {
                                   )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <h3 className="font-black text-slate-900 text-sm md:text-base leading-snug break-words" title={school.name}>
+                                  <h3 className="font-black text-slate-900 text-sm md:text-base leading-snug truncate whitespace-nowrap" title={school.name}>
                                     {school.name}
                                   </h3>
                                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">

@@ -110,8 +110,16 @@ export const ReportCardItem: React.FC<{
               )}
             </div>
 
-            <div className="space-y-0.5">
-              <h1 className={`${isSuperDense ? 'text-base' : isDense ? 'text-lg' : 'text-xl'} font-black text-slate-950 tracking-tight leading-tight uppercase font-serif`}>
+            <div className="space-y-0.5 min-w-0">
+              <h1 className={`${
+                (school?.name || '').length > 55
+                  ? 'text-sm sm:text-base leading-snug'
+                  : (school?.name || '').length > 36 || isSuperDense
+                    ? 'text-base sm:text-lg leading-snug'
+                    : isDense
+                      ? 'text-lg leading-tight'
+                      : 'text-xl leading-tight'
+              } font-black text-slate-950 tracking-tight uppercase font-serif break-words`}>
                 {school?.name || "Établissement Académique"}
               </h1>
               {school?.motto && (

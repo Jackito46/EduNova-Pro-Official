@@ -379,9 +379,9 @@ export const MultiCampusDashboardView: React.FC<MultiCampusDashboardViewProps> =
                 <h1 className="text-base sm:text-lg md:text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight uppercase">
                   Supervision Multi-Annexes
                 </h1>
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-full border border-indigo-500/20 backdrop-blur-md">
-                  <Sparkles size={11} className="text-indigo-500" />
-                  UMDH Réseau
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase rounded-full border border-indigo-500/20 backdrop-blur-md max-w-full">
+                  <Sparkles size={11} className="text-indigo-500 shrink-0" />
+                  <span className="break-words">{school?.name || 'Réseau Académique'}</span>
                 </span>
               </div>
               <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 font-medium mt-0.5">

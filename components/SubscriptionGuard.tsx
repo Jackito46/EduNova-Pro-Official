@@ -36,41 +36,45 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ user, chil
   };
 
   useEffect(() => {
+    let isMounted = true;
+    let timeoutId: any = null;
+
     const checkSubscription = async () => {
       // Super admins are never blocked
-      if (user.is_super_admin || user.role === 'SUPER_ADMIN') {
-        setIsActive(true);
-        setLoading(false);
+      if (user?.is_super_admin || user?.role === 'SUPER_ADMIN') {
+        if (isMounted) {
+          setIsActive(true);
+          setLoading(false);
+        }
         return;
       }
 
-      if (!user.school_id) {
-        setIsActive(false);
-        setLoading(false);
+      if (!user?.school_id) {
+        if (isMounted) {
+          setIsActive(false);
+          setLoading(false);
+        }
         return;
       }
 
+      // 1. Check local cache first for instant UI response and resilience against network latency
+      let cachedSchool: any = null;
       try {
-        let timeoutId: any;
-        const queryPromise = supabase
-          .from('schools')
-          .select('*')
-          .eq('id', user.school_id)
-          .single();
-        const timeoutPromise = new Promise<{data: any, error: any}>((_, reject) => {
-          timeoutId = setTimeout(() => reject(new Error("Timeout subscription check")), 3000);
-        });
+        const cacheKey = `edunova_cached_school_${user.school_id}`;
+        const rawCached = localStorage.getItem(cacheKey) || sessionStorage.getItem(cacheKey);
+        if (rawCached) {
+          cachedSchool = JSON.parse(rawCached);
+        }
+      } catch (e) {
+        // ignore cache parsing error
+      }
 
-        const { data: school, error: schoolError } = await Promise.race([queryPromise, timeoutPromise]) as any;
-        clearTimeout(timeoutId);
-
-        if (schoolError) throw schoolError;
-
+      const evaluateSchoolSubscription = (school: any) => {
         let active = true;
 
-        if (school.subscription_plan === 'unlimited') {
+        if (school?.subscription_plan === 'unlimited') {
           active = true;
-        } else if (school.subscription_end_date) {
+        } else if (school?.subscription_end_date) {
           const endDate = new Date(school.subscription_end_date);
           const now = new Date();
           const isExpired = endDate < now;
@@ -83,37 +87,106 @@ export const SubscriptionGuard: React.FC<SubscriptionGuardProps> = ({ user, chil
 
           active = !isExpired || isGracePeriod;
 
-          setSubscriptionInfo({
-            endDate: school.subscription_end_date,
-            isExpired,
-            daysLeft,
-            isGracePeriod
-          });
+          if (isMounted) {
+            setSubscriptionInfo({
+              endDate: school.subscription_end_date,
+              isExpired,
+              daysLeft,
+              isGracePeriod
+            });
+          }
         }
 
-        setIsActive(active);
+        return active;
+      };
 
+      // If cached data is available, apply it immediately to unlock UI without waiting
+      if (cachedSchool) {
+        const cachedActive = evaluateSchoolSubscription(cachedSchool);
+        if (isMounted) {
+          setIsActive(cachedActive);
+          setLoading(false);
+        }
+      }
+
+      try {
+        const queryPromise = supabase
+          .from('schools')
+          .select('*')
+          .eq('id', user.school_id)
+          .single();
+
+        // 8-second timeout that gracefully resolves instead of rejecting with an unhandled exception
+        const timeoutPromise = new Promise<{ data: any; error: any; isTimeout?: boolean }>((resolve) => {
+          timeoutId = setTimeout(() => {
+            resolve({ data: cachedSchool || null, error: null, isTimeout: true });
+          }, 8000);
+        });
+
+        const raceResult = await Promise.race([queryPromise, timeoutPromise]) as any;
+        if (timeoutId) clearTimeout(timeoutId);
+
+        if (raceResult?.isTimeout) {
+          console.warn("Vérification de l'abonnement: Délai dépassé, maintien de l'accès actif / données en cache.");
+          if (isMounted && isActive === null) {
+            setIsActive(cachedSchool ? evaluateSchoolSubscription(cachedSchool) : true);
+          }
+          return;
+        }
+
+        const { data: school, error: schoolError } = raceResult;
+        if (schoolError) throw schoolError;
+
+        if (school) {
+          // Update cache for subsequent visits
+          try {
+            localStorage.setItem(`edunova_cached_school_${user.school_id}`, JSON.stringify(school));
+          } catch (e) {}
+
+          const active = evaluateSchoolSubscription(school);
+          if (isMounted) {
+            setIsActive(active);
+          }
+        } else if (cachedSchool) {
+          const active = evaluateSchoolSubscription(cachedSchool);
+          if (isMounted) setIsActive(active);
+        } else {
+          if (isMounted) setIsActive(true);
+        }
       } catch (err: any) {
-        const isNetworkError = 
+        const isNetworkOrTimeout = 
           err?.code === 'NETWORK_ERROR' || 
           err?.message?.includes('Erreur réseau') || 
           err?.message?.includes('Failed to fetch') ||
+          err?.message?.includes('Timeout') ||
+          err?.message?.includes('timeout') ||
+          err?.name === 'AbortError' ||
           err?.message === 'Failed to fetch';
 
-        if (isNetworkError) {
-          console.warn("Vérification de l'abonnement: Avertissement réseau (fallback actif):", err?.message || err);
+        if (isNetworkOrTimeout) {
+          console.warn("Vérification de l'abonnement: Avertissement réseau ou délai (fallback actif):", err?.message || err);
         } else {
-          console.error("Erreur lors de la vérification de l'abonnement:", err);
+          console.warn("Vérification de l'abonnement: Accès maintenu lors du contrôle:", err?.message || err);
         }
-        // Default to active on error so we don't lock out users just because of a network error
-        setIsActive(true);
+        // Default to active on error so we don't lock out users just because of a network error or latency
+        if (isMounted) {
+          setIsActive(cachedSchool ? evaluateSchoolSubscription(cachedSchool) : true);
+        }
       } finally {
-        setLoading(false);
+        if (timeoutId) clearTimeout(timeoutId);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     checkSubscription();
-  }, [user]);
+
+    return () => {
+      isMounted = false;
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [user?.id, user?.school_id, user?.role, user?.is_super_admin]);
 
   if (loading) {
     return (
