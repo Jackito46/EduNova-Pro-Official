@@ -37,6 +37,9 @@ import {
   HelpCircle,
   Keyboard,
   PanelLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
+  MapPin,
   Rocket,
   Download,
   UserCircle,
@@ -275,84 +278,134 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* LOGO AREA */}
-        <div className={`p-4 flex items-center gap-3 border-b border-slate-200 bg-transparent min-h-[88px] text-left ${isNarrow ? 'justify-center lg:px-2' : ''}`}>
-          <Logo src={schoolInfo.logo_url || "/logo.png"} size="md" className="ring-offset-2 ring-offset-slate-100" />
-          {!isNarrow && (
-            <div className="overflow-hidden flex-1 relative flex flex-col gap-1.5">
-              <h1 className="text-[12px] font-black tracking-tight text-slate-900 leading-tight uppercase line-clamp-3 md:line-clamp-2" title={schoolInfo.name}>
-                {schoolInfo.name}
-              </h1>
-              {(() => {
-                if (!school?.has_multi_campus || (campuses && campuses.length <= 1)) {
-                  return null;
-                }
-                if (!user.campus_id && campuses && campuses.length > 1) {
-                  return null;
-                }
-                const activeCampus = campuses?.find(c => c.id === currentCampusId);
-                if (activeCampus) {
-                  const isSiege = activeCampus.name.toLowerCase().includes('siège') || activeCampus.id === '3dd425c2-2e23-4e3c-a02a-c67ed85ca490';
-                  if (isSiege) {
-                    return (
-                      <span className="self-start px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-md text-[9px] font-black uppercase tracking-wider whitespace-nowrap">
-                        Siège Social
-                      </span>
-                    );
-                  } else {
-                    return (
-                      <span className="self-start px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-100 rounded-md text-[9px] font-bold uppercase tracking-wider whitespace-nowrap">
-                        📍 Annexe : {activeCampus.name}
-                      </span>
-                    );
-                  }
-                } else if (campuses && campuses.length > 1) {
-                  return (
-                    <span className="self-start px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded-md text-[9px] font-extrabold uppercase tracking-wider whitespace-nowrap">
-                      Vue Globale
-                    </span>
-                  );
-                }
-                return null;
-              })()}
+        {/* LOGO & SCHOOL IDENTITY HEADER */}
+        <div className={`relative border-b border-slate-200/80 bg-white/50 backdrop-blur-xs text-left transition-all duration-200 ${
+          isNarrow ? 'p-2.5 flex flex-col items-center justify-center gap-2' : 'px-3.5 py-3 flex items-center justify-between gap-2.5'
+        }`}>
+          <div className={`flex items-center gap-2.5 min-w-0 flex-1 ${isNarrow ? 'justify-center w-full' : ''}`}>
+            {/* Logo with rounded squircle badge and active ping */}
+            <div 
+              className="relative shrink-0 flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
+              onClick={() => isNarrow && setSidebarMode('expanded')}
+              title={isNarrow ? `${schoolInfo.name} - Cliquer pour agrandir le menu` : schoolInfo.name}
+            >
+              <div className="p-1 rounded-2xl bg-white shadow-xs border border-slate-200/90 flex items-center justify-center">
+                <Logo src={schoolInfo.logo_url || "/logo.png"} size="sm" className="w-9 h-9 object-contain rounded-xl" />
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-2 border-white"></span>
+              </span>
             </div>
-          )}
+
+            {/* School Name & Campus / Connecté Status Badges */}
+            {!isNarrow && (
+              <div className="overflow-hidden flex-1 min-w-0 flex flex-col justify-center">
+                <h1 
+                  className="text-[13px] font-black tracking-tight text-slate-900 leading-tight truncate hover:text-blue-600 transition-colors cursor-default" 
+                  title={schoolInfo.name}
+                >
+                  {schoolInfo.name}
+                </h1>
+
+                {/* Status / Campus pill */}
+                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                  {(() => {
+                    if (school?.has_multi_campus && campuses && campuses.length > 1) {
+                      const activeCampus = campuses.find(c => c.id === currentCampusId);
+                      if (activeCampus) {
+                        const isSiege = activeCampus.name.toLowerCase().includes('siège') || activeCampus.id === '3dd425c2-2e23-4e3c-a02a-c67ed85ca490';
+                        return (
+                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold tracking-wide uppercase ${
+                            isSiege 
+                              ? 'bg-blue-50 text-blue-700 border border-blue-200/70' 
+                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                          }`}>
+                            <MapPin size={10} className={isSiege ? 'text-blue-500' : 'text-emerald-500'} />
+                            <span className="truncate max-w-[130px]">{isSiege ? 'Siège Central' : activeCampus.name}</span>
+                          </span>
+                        );
+                      }
+                      return (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[9.5px] font-extrabold tracking-wide uppercase">
+                          <Building2 size={10} className="text-slate-500" />
+                          Vue Globale
+                        </span>
+                      );
+                    }
+                    
+                    return (
+                      <span className="inline-flex items-center gap-1 text-[10.5px] font-semibold text-slate-500">
+                        <Sparkles size={11} className="text-amber-500" />
+                        <span>École Connectée</span>
+                      </span>
+                    );
+                  })()}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Header Action Buttons (Quick Collapse/Expand Toggle on Desktop, Close on Mobile) */}
+          <div className={`flex items-center shrink-0 ${isNarrow ? 'w-full justify-center' : ''}`}>
+            {/* Desktop Quick Collapse/Expand Toggle */}
+            <button
+              type="button"
+              onClick={() => setSidebarMode(isNarrow ? 'expanded' : 'collapsed')}
+              className="hidden lg:flex items-center justify-center w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
+              title={isNarrow ? "Développer le menu latéral" : "Réduire le menu latéral"}
+              aria-label="Basculer l'affichage du menu"
+            >
+              {isNarrow ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+            </button>
+
+            {/* Mobile Drawer Close Button */}
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="lg:hidden flex items-center justify-center w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
+              aria-label="Fermer le menu"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* CAMPUS SELECTOR AREA */}
         {school?.has_multi_campus && hasAccess([UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR]) && (!user.campus_id || user.is_super_admin || user.role === UserRole.SUPER_ADMIN) && campuses && campuses.length > 1 && (
-          <div className={`px-4 py-3 border-b border-slate-200 bg-slate-50/50 ${isNarrow ? 'flex justify-center' : ''}`}>
+          <div className={`px-3 py-2 border-b border-slate-200/80 bg-slate-50/70 transition-all ${
+            isNarrow ? 'flex justify-center py-2 px-1' : ''
+          }`}>
             {isNarrow ? (
-              <div 
-                className="p-2.5 bg-white rounded-xl border border-slate-200 shadow-sm text-blue-600 cursor-pointer hover:bg-slate-50"
-                title={campuses.find(c => c.id === currentCampusId)?.name || 'Tous les campus'}
+              <button 
+                type="button"
+                className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200/90 shadow-2xs text-blue-600 hover:bg-blue-50/60 hover:border-blue-300 transition-all"
+                title={`Annexe : ${campuses.find(c => c.id === currentCampusId)?.name || 'Tous les campus'} (Cliquer pour développer)`}
                 onClick={() => setSidebarMode('expanded')}
               >
-                <School size={18} />
-              </div>
+                <School size={17} />
+              </button>
             ) : (
-              <div className="space-y-1.5">
-                <label className="block text-[9px] font-extrabold text-slate-400 uppercase tracking-widest leading-none">
-                  Filière / Campus / Annexe
-                </label>
-                <div className="relative">
+              <div className="relative group/campus">
+                <div className="relative flex items-center bg-white rounded-xl border border-slate-200/90 shadow-2xs hover:border-blue-300 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-100/80 transition-all">
+                  <div className="pl-2.5 pr-1 text-blue-600 pointer-events-none shrink-0">
+                    <Building2 size={14} />
+                  </div>
                   <select
                     value={currentCampusId || ''}
                     onChange={(e) => setCurrentCampusId(e.target.value ? e.target.value : null)}
-                    className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 focus:border-blue-500 focus:ring-1 focus:ring-blue-100 rounded-lg text-xs font-bold text-slate-700 appearance-none shadow-sm cursor-pointer hover:bg-slate-50/80 transition-all select-none"
+                    className="w-full py-1.5 pl-1 pr-7 bg-transparent text-[12px] font-bold text-slate-700 appearance-none focus:outline-none cursor-pointer truncate select-none"
+                    title="Sélectionner l'annexe ou le campus d'activité"
                   >
-                    <option value="">🌍 Vue Globale (Tous)</option>
+                    <option value="">🌍 Tous les Campus (Vue Globale)</option>
                     {campuses.map((campus) => (
                       <option key={campus.id} value={campus.id}>
                         📍 {campus.name}
                       </option>
                     ))}
                   </select>
-                  <div className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                    <School size={14} className="text-slate-400" />
-                  </div>
-                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none">
-                    <ChevronDown size={12} className="text-slate-400" />
+                  <div className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none shrink-0">
+                    <ChevronDown size={13} className="transition-transform group-hover/campus:translate-y-0.5" />
                   </div>
                 </div>
               </div>
