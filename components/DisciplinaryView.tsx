@@ -731,7 +731,7 @@ const DisciplinaryView: React.FC<{ user: UserProfile }> = ({ user }) => {
           doc.setFontSize(8);
           doc.setTextColor(148, 163, 184);
           doc.text(
-            `EduNova Pro • Page ${data.pageNumber} / ${doc.internal.pages.length - 1} • Document d'administration scolaire confidentiel`,
+            `${school?.name || "Administration Scolaire"} • Page ${data.pageNumber} / ${doc.internal.pages.length - 1} • Document officiel`,
             14,
             202
           );

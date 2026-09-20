@@ -172,7 +172,7 @@ const SettlementSlip: React.FC<SettlementSlipProps> = ({ staff, schoolName, curr
               <div className="school-info">
                 <h1 className="school-name">${schoolName}</h1>
                 <div className="school-sub">DIRECTION DES RESSOURCES HUMAINES</div>
-                <div className="school-system">Système de Gestion Éducative EduNova Pro</div>
+                <div className="school-system">Système de Gestion Scolaire</div>
               </div>
               <div className="doc-type">
                 <div className="doc-label">Document Administratif</div>
@@ -266,7 +266,7 @@ const SettlementSlip: React.FC<SettlementSlipProps> = ({ staff, schoolName, curr
             </div>
 
             <div className="footer-meta">
-              <div>Généré par EduNova Pro ERP - ${new Date().toLocaleString('fr-FR')}</div>
+              <div>Document Administratif Officiel • ${new Date().toLocaleString('fr-FR')}</div>
               <div>Page 1 sur 1</div>
             </div>
           </div>
@@ -336,7 +336,7 @@ const SettlementSlip: React.FC<SettlementSlipProps> = ({ staff, schoolName, curr
             <div>
               <h1 style={{ margin: 0, fontSize: '18px', fontWeight: 800, color: '#1e1b4b', textTransform: 'uppercase', letterSpacing: '-0.025em' }}>{schoolName}</h1>
               <p style={{ margin: '2px 0 0 0', fontSize: '11px', color: '#475569', fontWeight: 600 }}>DIRECTION DES RESSOURCES HUMAINES</p>
-              <p style={{ margin: '1px 0 0 0', fontSize: '11px', color: '#64748b' }}>Système de Gestion Éducative EduNova Pro</p>
+              <p style={{ margin: '1px 0 0 0', fontSize: '11px', color: '#64748b' }}>Système de Gestion Scolaire</p>
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: '10px', fontWeight: 700, color: '#6366f1', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '2px' }}>Document Administratif</div>

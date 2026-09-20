@@ -3153,7 +3153,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 <div className="mt-8 pt-4 border-t border-slate-100 text-center">
                   <p className="text-[8px] font-bold text-slate-300 uppercase tracking-[0.3em]">
-                    Ce document est généré électroniquement par EduNova Pro et est valide sans signature manuscrite.
+                    Ce document est généré électroniquement et est certifié conforme par l'établissement.
                   </p>
                 </div>
               </div>

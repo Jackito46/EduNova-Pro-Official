@@ -708,7 +708,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     
     // Header styling
     doc.setFontSize(18);
-    doc.text(school?.name || 'EduNova Pro - Bilan Financier', 14, 18);
+    doc.text(school?.name || 'Bilan Financier', 14, 18);
     doc.setFontSize(14);
     doc.text('Rapport du Bilan Financier', 14, 26);
     
@@ -821,7 +821,7 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
     const listToExport = filteredStudents;
     
     doc.setFontSize(18);
-    doc.text(school?.name || 'EduNova Pro', 14, 18);
+    doc.text(school?.name || 'Administration Scolaire', 14, 18);
     doc.setFontSize(14);
     doc.text(`Liste des ${terminology.students}`, 14, 26);
     

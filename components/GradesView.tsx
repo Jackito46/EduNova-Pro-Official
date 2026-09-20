@@ -178,7 +178,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [subjects, setSubjects] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [existingGrades, setExistingGrades] = useState<any[]>([]);
-  const [schoolName, setSchoolName] = useState("EduNova Pro");
+  const [schoolName, setSchoolName] = useState("Établissement Scolaire");
 
   // Filtres de Contexte
   const [selectedYearId, setSelectedYearId] = useState("");
@@ -328,7 +328,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       ]);
 
       if (schoolRes.data) {
-        setSchoolName(schoolRes.data.name || "EduNova Pro");
+        setSchoolName(schoolRes.data.name || "Établissement Scolaire");
       }
 
       if (ayRes.data) {
@@ -2234,7 +2234,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               {filteredStudents.length} élève(s) affiché(s) • Raccourci: Ctrl+S
             </span>
             <span className="font-mono text-[10px] text-slate-400">
-              EDUNOVA PRO • MULTI-TENANT & CAMPUS READY
+              GESTION DES NOTES • MULTI-CAMPUS
             </span>
           </div>
         </div>
