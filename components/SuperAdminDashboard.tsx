@@ -2368,70 +2368,140 @@ const handleDeleteSchool = async () => {
         </div>
       )}
 
-      {/* Seed Confirmation Modal */}
-      {seedModal.isOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-4 mb-4">
-              <div className="w-12 h-12 bg-indigo-100 text-indigo-600 rounded-full flex items-center justify-center shrink-0">
-                <Database size={24} />
+      {/* Seed Confirmation Modal - Modern & Compact */}
+      <AnimatePresence>
+        {seedModal.isOpen && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+              onClick={() => !isSubmitting && setSeedModal({ isOpen: false, schoolId: '', schoolName: '' })}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col z-10 my-auto"
+            >
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50 border border-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 shadow-2xs">
+                    <Database size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">Injecter des Données Types</h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 truncate" title={seedModal.schoolName}>
+                      {seedModal.schoolName}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => !isSubmitting && setSeedModal({ isOpen: false, schoolId: '', schoolName: '' })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Injection de Données</h3>
-                <p className="text-sm text-slate-500">Données standards pour l'établissement</p>
-              </div>
-            </div>
-            
-            <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-4 mb-6">
-              <p className="text-sm text-indigo-800 font-medium mb-2">
-                Voulez-vous injecter les données standards pour l'établissement <span className="font-bold">"{seedModal.schoolName}"</span> ?
-              </p>
-              <ul className="text-xs text-indigo-700 space-y-1 list-disc list-inside">
-                {seedModal.schoolType === SchoolType.UNIVERSITY ? (
-                  <>
-                    <li>Facultés et Départements universitaires préconfigurés</li>
-                    <li>Centaines de matières académiques avec descriptions</li>
-                    <li>Frais universitaires de base (Inscription, Scolarité)</li>
-                  </>
-                ) : seedModal.schoolType === SchoolType.PROFESSIONAL ? (
-                  <>
-                    <li>Filières professionnelles certifiantes (Informatique, Mécanique, etc.)</li>
-                    <li>Matières techniques, ateliers et stages pré-associés</li>
-                    <li>Catalogue de frais de base</li>
-                  </>
-                ) : (
-                  <>
-                    <li>Classes par défaut (Maternelle, Primaire, Secondaire)</li>
-                    <li>Matières standards (Maths, Français, etc.) pré-assignées</li>
-                    <li>Catalogue de frais de base</li>
-                  </>
-                )}
-              </ul>
-              <p className="text-xs text-indigo-600 mt-3 font-medium flex items-center gap-1">
-                <AlertCircle size={12} /> Cette action est irréversible.
-              </p>
-            </div>
 
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setSeedModal({ isOpen: false, schoolId: '', schoolName: '' })}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 rounded-lg transition-colors"
-                disabled={isSubmitting}
-              >
-                Annuler
-              </button>
-              <button
-                onClick={handleSeedSchool}
-                disabled={isSubmitting}
-                className="px-4 py-2 text-sm font-medium bg-indigo-600 text-white hover:bg-indigo-700 rounded-lg transition-colors flex items-center gap-2"
-              >
-                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Database size={16} />}
-                Confirmer l'injection
-              </button>
-            </div>
+              {/* Content */}
+              <div className="p-4 sm:p-5 space-y-3.5 text-left">
+                <div className="flex items-center justify-between gap-2 p-2.5 bg-indigo-50/60 border border-indigo-100/80 rounded-xl">
+                  <span className="text-[11px] font-bold text-indigo-900">Type de structure cible :</span>
+                  <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-indigo-600 text-white rounded-md tracking-wider">
+                    {seedModal.schoolType === SchoolType.UNIVERSITY ? 'Université' : seedModal.schoolType === SchoolType.PROFESSIONAL ? 'Formation Pro' : 'Enseignement Général'}
+                  </span>
+                </div>
+
+                <div className="p-3 bg-slate-50 border border-slate-100 rounded-xl space-y-2">
+                  <p className="text-[11px] font-bold text-slate-700">Jeux de données prédéfinis inclus :</p>
+                  <ul className="text-xs text-slate-600 space-y-1.5">
+                    {seedModal.schoolType === SchoolType.UNIVERSITY ? (
+                      <>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Facultés, filières et départements académiques</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Unités d'enseignement et crédits modulaires</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Frais types (Inscription, Droits de scolarité)</span>
+                        </li>
+                      </>
+                    ) : seedModal.schoolType === SchoolType.PROFESSIONAL ? (
+                      <>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Filières techniques et cycles certifiants</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Modules pratiques, ateliers et coefficients</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Grille tarifaire professionnelle standard</span>
+                        </li>
+                      </>
+                    ) : (
+                      <>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Cycles & niveaux scolaires (Maternelle, Primaire, Secondaire)</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Matières fondamentales avec coefficients officiels</span>
+                        </li>
+                        <li className="flex items-start gap-2">
+                          <CheckCircle2 size={13} className="text-indigo-600 shrink-0 mt-0.5" />
+                          <span>Types de frais scolaires standards</span>
+                        </li>
+                      </>
+                    )}
+                  </ul>
+                </div>
+
+                <div className="p-2.5 bg-amber-50/70 border border-amber-200/70 rounded-xl flex items-start gap-2 text-amber-800">
+                  <AlertCircle size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                  <p className="text-[11px] font-medium leading-snug">
+                    Les données seront injectées dans cet établissement. Les configurations existantes ne seront pas écrasées.
+                  </p>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50/70 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setSeedModal({ isOpen: false, schoolId: '', schoolName: '' })}
+                  className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                  disabled={isSubmitting}
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSeedSchool}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 active:scale-95"
+                >
+                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Database size={14} />}
+                  Confirmer l'injection
+                </button>
+              </div>
+            </motion.div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
       {/* Switch School Confirmation Modal */}
       {switchSchoolModal.isOpen && switchSchoolModal.school && (
@@ -6176,49 +6246,68 @@ const handleDeleteSchool = async () => {
         </div>
       )}
 
-      {/* Modal Gestion des Admins */}
+      {/* Modal Gestion des Admins - Modern & Fluid */}
       {adminListModalOpen && selectedSchool && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-[2rem] shadow-2xl w-full max-w-2xl max-h-[90vh] md:max-h-[85vh] flex flex-col overflow-hidden border border-slate-100"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            onClick={() => setAdminListModalOpen(false)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ duration: 0.15 }}
+            className="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] md:max-h-[85vh] flex flex-col overflow-hidden border border-slate-200/90 z-10 my-auto"
           >
-            {/* Header section (Fixed height, no shrink) */}
-            <div className="p-5 sm:p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 shrink-0">
-              <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 text-white rounded-xl sm:rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
-                  <Users size={20} className="sm:w-6 sm:h-6" />
+            {/* Header section (Compact & Modern) */}
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                  <Users size={17} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className="text-lg sm:text-2xl font-black text-slate-900 tracking-tight truncate">Administrateurs</h2>
-                  <p className="text-[10px] sm:text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5 truncate">{selectedSchool.name}</p>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">Comptes Administrateurs</h2>
+                    <span className="text-[10px] font-bold px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded-full shrink-0">
+                      {schoolAdmins.length} compte{schoolAdmins.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 truncate mt-0.5" title={selectedSchool.name}>
+                    {selectedSchool.name}
+                  </p>
                 </div>
               </div>
               <button 
+                type="button"
                 onClick={() => setAdminListModalOpen(false)}
-                className="p-2 sm:p-3 text-slate-500 hover:text-slate-900 hover:bg-white rounded-xl sm:rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100 shrink-0"
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                title="Fermer"
               >
-                <X size={18} className="sm:w-5 sm:h-5" />
+                <X size={16} />
               </button>
             </div>
 
             {/* Local Search input within the modal */}
             {schoolAdmins.length > 0 && (
-              <div className="px-5 sm:px-8 py-3 bg-slate-50 border-b border-slate-100 flex items-center gap-3 shrink-0">
+              <div className="px-4 py-2.5 sm:px-5 bg-slate-50/60 border-b border-slate-100 flex items-center gap-2 shrink-0">
                 <div className="relative w-full group">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-500 transition-colors" size={16} />
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-blue-600 transition-colors" size={14} />
                   <input 
                     type="text" 
-                    placeholder="Rechercher par nom ou email..." 
-                    className="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-800 focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400 shadow-sm"
+                    placeholder="Rechercher par nom ou adresse email..." 
+                    className="w-full pl-9 pr-8 py-1.5 sm:py-2 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
                     value={adminSearchTerm}
                     onChange={(e) => setAdminSearchTerm(e.target.value)}
                   />
                   {adminSearchTerm && (
                     <button 
+                      type="button"
                       onClick={() => setAdminSearchTerm('')}
-                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-sm bg-slate-100 px-1.5 py-0.2 rounded-md hover:bg-slate-200 transition-all"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 font-bold text-xs bg-slate-100 w-4 h-4 rounded-full flex items-center justify-center hover:bg-slate-200 transition-all cursor-pointer"
                     >
                       ×
                     </button>
@@ -6227,19 +6316,21 @@ const handleDeleteSchool = async () => {
               </div>
             )}
 
-            {/* List content section (Auto-scrolled, flexible) */}
-            <div className="p-5 sm:p-8 overflow-y-auto custom-scrollbar flex-1">
+            {/* List content section (Auto-scrolled, flexible, compact) */}
+            <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 overscroll-contain">
               {loadingAdmins ? (
-                <div className="flex flex-col items-center justify-center py-12 gap-4">
-                  <Loader2 className="animate-spin text-blue-500" size={32} />
-                  <p className="text-xs font-bold text-slate-500 uppercase tracking-widest">Récupération des accès...</p>
+                <div className="flex flex-col items-center justify-center py-10 gap-3">
+                  <Loader2 className="animate-spin text-blue-600" size={26} />
+                  <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Chargement des comptes...</p>
                 </div>
               ) : schoolAdmins.length === 0 ? (
-                <div className="text-center py-12">
-                  <p className="text-slate-500 font-bold text-sm">Aucun utilisateur trouvé pour cet établissement.</p>
+                <div className="text-center py-10 px-4 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
+                  <Users size={28} className="mx-auto text-slate-300 mb-2" />
+                  <p className="text-slate-700 font-bold text-xs">Aucun compte administrateur répertorié</p>
+                  <p className="text-slate-400 text-[11px] mt-1">Cet établissement ne possède actuellement aucun compte administrateur rattaché.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <div className="space-y-2 sm:space-y-2.5">
                   {schoolAdmins
                     .filter(admin => 
                       !adminSearchTerm || 
@@ -6249,25 +6340,29 @@ const handleDeleteSchool = async () => {
                     .map(admin => (
                       <div 
                         key={admin.id} 
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-5 border border-slate-100 rounded-2xl hover:bg-slate-50 transition-all group"
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-3 sm:p-3.5 bg-white border border-slate-200/80 hover:border-blue-200 hover:shadow-2xs rounded-xl sm:rounded-2xl transition-all group"
                       >
-                        <div className="flex items-center gap-3 sm:gap-4 min-w-0">
-                          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors shrink-0">
-                            <Users size={16} className="sm:w-[18px] sm:h-[18px]" />
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50/80 border border-blue-100 rounded-xl flex items-center justify-center text-blue-600 font-black text-xs shrink-0 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                            {admin.full_name ? admin.full_name.charAt(0).toUpperCase() : <Users size={14} />}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">{admin.full_name}</p>
-                            <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">{admin.email}</p>
-                            <span className="inline-block mt-1 px-2 py-0.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-wider rounded-lg border border-blue-100">
-                              {roleLabels[admin.role] || admin.role}
-                            </span>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">{admin.full_name || 'Sans nom'}</p>
+                              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[9px] font-black uppercase tracking-wider rounded-md border border-blue-100">
+                                {roleLabels[admin.role] || admin.role}
+                              </span>
+                            </div>
+                            <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">{admin.email}</p>
                           </div>
                         </div>
                         <button
+                          type="button"
                           onClick={() => setResetModal({ isOpen: true, userId: admin.id, fullName: admin.full_name || admin.email, newPassword: '', forceChange: true })}
-                          className="w-full sm:w-auto text-center px-4 py-2 bg-white hover:bg-slate-900 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-all shadow-sm border border-slate-100 shrink-0"
+                          className="w-full sm:w-auto text-center px-3 py-1.5 sm:px-3.5 sm:py-2 bg-slate-50 hover:bg-slate-900 hover:text-white text-slate-700 text-xs font-bold rounded-xl transition-all border border-slate-200 flex items-center justify-center gap-1.5 shrink-0 cursor-pointer active:scale-95"
                         >
-                          Réinitialiser le mot de passe
+                          <KeyRound size={13} />
+                          <span>Réinitialiser mot de passe</span>
                         </button>
                       </div>
                     ))}
@@ -6277,198 +6372,302 @@ const handleDeleteSchool = async () => {
                     admin.full_name?.toLowerCase().includes(adminSearchTerm.toLowerCase()) || 
                     admin.email?.toLowerCase().includes(adminSearchTerm.toLowerCase())
                   ).length === 0 && (
-                    <div className="text-center py-12 bg-slate-50 rounded-2xl border border-dashed border-slate-200">
-                      <p className="text-slate-400 text-xs font-bold uppercase tracking-wider">Aucun résultat pour "{adminSearchTerm}"</p>
+                    <div className="text-center py-8 bg-slate-50 rounded-xl border border-dashed border-slate-200">
+                      <Search size={22} className="mx-auto text-slate-300 mb-1.5" />
+                      <p className="text-slate-500 text-xs font-bold">Aucun administrateur trouvé pour « {adminSearchTerm} »</p>
                     </div>
                   )}
                 </div>
               )}
             </div>
+
+            {/* Footer */}
+            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end shrink-0">
+              <button
+                type="button"
+                onClick={() => setAdminListModalOpen(false)}
+                className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-700 rounded-xl text-xs font-bold transition-all cursor-pointer"
+              >
+                Fermer
+              </button>
+            </div>
           </motion.div>
         </div>
       )}
 
-      {/* Modal Renouvellement Abonnement */}
+      {/* Modal Renouvellement Abonnement - Modern & Compact */}
       {renewModalOpen && selectedSchool && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
           <motion.div 
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-[1.5rem] md:rounded-[2rem] shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto border border-slate-100 custom-scrollbar"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+            onClick={() => !isRenewing && setRenewModalOpen(false)}
+          />
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.96, y: 12 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: 12 }}
+            transition={{ duration: 0.15 }}
+            className="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-slate-200/90 z-10 my-auto"
           >
-            <div className="p-5 md:p-8 border-b border-slate-50 flex justify-between items-center bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-emerald-600 text-white rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-200 shrink-0">
-                  <CalendarPlus size={20} className="md:w-6 md:h-6" />
+            {/* Header */}
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 sm:w-9 sm:h-9 bg-emerald-50 border border-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                  <CalendarPlus size={17} />
                 </div>
-                <div>
-                  <h2 className="text-lg md:text-2xl font-black text-slate-900 tracking-tight">Abonnement</h2>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5 truncate max-w-[150px] md:max-w-none">{selectedSchool.name}</p>
+                <div className="min-w-0">
+                  <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">Gérer l'Abonnement</h2>
+                  <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 truncate mt-0.5" title={selectedSchool.name}>
+                    {selectedSchool.name}
+                  </p>
                 </div>
               </div>
               <button 
-                onClick={() => setRenewModalOpen(false)}
-                className="p-2 md:p-3 text-slate-500 hover:text-slate-900 hover:bg-white rounded-xl md:rounded-2xl transition-all shadow-sm border border-transparent hover:border-slate-100"
+                type="button"
+                onClick={() => !isRenewing && setRenewModalOpen(false)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                title="Fermer"
               >
-                <X size={18} className="md:w-5 md:h-5" />
+                <X size={16} />
               </button>
             </div>
 
-            <div className="p-6 md:p-10">
-              <form onSubmit={handleRenewSubscription} className="space-y-6 md:space-y-8">
-                <div className="space-y-2 md:space-y-3">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Plan d'abonnement</label>
-                  <select 
-                    value={renewPlan}
-                    onChange={(e) => setRenewPlan(e.target.value)}
-                    className="w-full px-4 md:px-5 py-3 md:py-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-sm font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
-                  >
-                    <option value="trial">Essai Gratuit</option>
-                    <option value="monthly">Mensuel</option>
-                    <option value="yearly">Annuel</option>
-                    <option value="unlimited">Illimité</option>
-                  </select>
+            {/* Form body */}
+            <form onSubmit={handleRenewSubscription} className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-3.5 overscroll-contain">
+              {/* Plan selection */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Formule d'abonnement</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { id: 'trial', label: 'Essai Gratuit', desc: 'Évaluation' },
+                    { id: 'monthly', label: 'Mensuel', desc: 'Renouvelable' },
+                    { id: 'yearly', label: 'Annuel', desc: 'Recommandé' },
+                    { id: 'unlimited', label: 'Illimité', desc: 'Permanent' },
+                  ].map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setRenewPlan(p.id)}
+                      className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                        renewPlan === p.id 
+                          ? 'bg-emerald-50/80 border-emerald-500 text-emerald-900 ring-2 ring-emerald-500/20 shadow-2xs' 
+                          : 'bg-slate-50/60 border-slate-200 text-slate-700 hover:bg-slate-100/80'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black">{p.label}</span>
+                        {renewPlan === p.id && <CheckCircle2 size={13} className="text-emerald-600" />}
+                      </div>
+                      <span className="text-[10px] text-slate-500 block mt-0.5">{p.desc}</span>
+                    </button>
+                  ))}
                 </div>
+              </div>
 
-                {/* Multi-campus Addon Feature Select */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-start gap-3.5">
-                  <input
-                    type="checkbox"
-                    id="hasMultiCampus"
-                    checked={hasMultiCampus}
-                    onChange={(e) => setHasMultiCampus(e.target.checked)}
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 accent-indigo-600 cursor-pointer shrink-0"
-                  />
-                  <div className="flex-1">
-                    <label htmlFor="hasMultiCampus" className="text-xs font-black text-slate-800 uppercase tracking-wider cursor-pointer flex items-center gap-2">
-                      <span>Option : Multi-Annexes / Campus</span>
-                      {hasMultiCampus ? (
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-black">Actif</span>
-                      ) : (
-                        <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-bold">Inactif</span>
-                      )}
-                    </label>
-                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">
-                      Permet d'ajouter, diviser et gérer plusieurs annexes, campus ou filiales pour cet établissement.
-                    </p>
-                  </div>
-                </div>
-
-                {renewPlan !== 'unlimited' && (
-                  <div className="space-y-2 md:space-y-3">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] ml-1">Durée à ajouter (jours)</label>
-                    <input 
-                      type="number" 
-                      min="1"
-                      required
-                      value={renewDays}
-                      onChange={(e) => setRenewDays(parseInt(e.target.value))}
-                      className="w-full px-4 md:px-5 py-3 md:py-4 bg-slate-50 border border-slate-200 rounded-xl md:rounded-2xl text-sm font-bold text-slate-900 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
-                    />
-                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
-                      Les jours seront ajoutés à la date d'expiration actuelle ou démarreront aujourd'hui si expiré.
-                    </p>
-                  </div>
-                )}
-
-                <div className="pt-4 md:pt-6 flex flex-col-reverse sm:flex-row justify-end gap-3 md:gap-4">
-                  <button 
-                    type="button"
-                    onClick={() => setRenewModalOpen(false)}
-                    className="w-full sm:w-auto px-6 md:px-8 py-3 md:py-4 text-slate-500 font-bold text-sm hover:bg-slate-50 rounded-xl md:rounded-2xl transition-all"
-                  >
-                    Annuler
-                  </button>
-                  <button 
-                    type="submit"
-                    disabled={isRenewing}
-                    className="w-full sm:w-auto px-8 md:px-10 py-3 md:py-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl md:rounded-2xl transition-all shadow-lg shadow-emerald-200 disabled:opacity-50 flex items-center justify-center gap-3"
-                  >
-                    {isRenewing ? (
-                      <>
-                        <Loader2 size={18} className="animate-spin" />
-                        Mise à jour...
-                      </>
+              {/* Multi-campus Addon Feature Select */}
+              <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-start gap-3">
+                <input
+                  type="checkbox"
+                  id="hasMultiCampus"
+                  checked={hasMultiCampus}
+                  onChange={(e) => setHasMultiCampus(e.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 mt-0.5 accent-emerald-600 cursor-pointer shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <label htmlFor="hasMultiCampus" className="text-xs font-bold text-slate-800 cursor-pointer flex items-center justify-between gap-2">
+                    <span>Option Multi-Annexes / Campus</span>
+                    {hasMultiCampus ? (
+                      <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[9px] font-black">Actif</span>
                     ) : (
-                      <>
-                        <ShieldCheck size={18} />
-                        Valider
-                      </>
+                      <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-bold">Inactif</span>
                     )}
-                  </button>
+                  </label>
+                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">
+                    Permet la gestion de filiales, annexes et campus secondaires.
+                  </p>
                 </div>
-              </form>
-            </div>
+              </div>
+
+              {renewPlan !== 'unlimited' && (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Durée à ajouter (jours)</label>
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">
+                      +{renewDays || 0} jours
+                    </span>
+                  </div>
+                  
+                  <input 
+                    type="number" 
+                    min="1"
+                    required
+                    value={renewDays}
+                    onChange={(e) => setRenewDays(parseInt(e.target.value) || 0)}
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  />
+
+                  {/* Quick pills */}
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] text-slate-400 font-bold">Raccourcis :</span>
+                    {[
+                      { days: 30, label: '+30 j' },
+                      { days: 90, label: '+90 j' },
+                      { days: 180, label: '+180 j' },
+                      { days: 365, label: '+1 an' }
+                    ].map((item) => (
+                      <button
+                        key={item.days}
+                        type="button"
+                        onClick={() => setRenewDays(item.days)}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-colors cursor-pointer ${
+                          renewDays === item.days 
+                            ? 'bg-emerald-600 text-white shadow-2xs' 
+                            : 'bg-slate-100 hover:bg-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed">
+                    Les jours s'ajoutent à l'échéance actuelle ou partent d'aujourd'hui si le forfait est expiré.
+                  </p>
+                </div>
+              )}
+
+              {/* Footer */}
+              <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+                <button 
+                  type="button"
+                  onClick={() => setRenewModalOpen(false)}
+                  disabled={isRenewing}
+                  className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button 
+                  type="submit"
+                  disabled={isRenewing}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  {isRenewing ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Mise à jour...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={14} />
+                      <span>Valider l'abonnement</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </motion.div>
         </div>
       )}
-      {/* Edit User Modal */}
+      {/* Edit User Modal - Modern, Compact & Responsive */}
       <AnimatePresence>
         {editUserModal.isOpen && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
               onClick={() => !isSubmitting && setEditUserModal({ ...editUserModal, isOpen: false })}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col z-10 my-auto"
             >
-              <div className="p-8 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
-                <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
-                  <Edit2 size={24} />
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                    <Edit2 size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">Modifier l'Administrateur</h2>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 truncate mt-0.5">
+                      {editUserModal.email}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">Modifier l'utilisateur</h2>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">Mise à jour du profil</p>
-                </div>
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setEditUserModal({ ...editUserModal, isOpen: false })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              <form onSubmit={handleEditUser} className="p-8 space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Nom complet</label>
+              {/* Body */}
+              <form onSubmit={handleEditUser} className="p-4 sm:p-5 space-y-3.5">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Nom complet *</label>
                   <input 
                     type="text" 
                     required
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
+                    autoFocus
+                    placeholder="Ex: Jean Dupont"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all placeholder:text-slate-400"
                     value={editUserModal.fullName}
                     onChange={e => setEditUserModal({ ...editUserModal, fullName: e.target.value })}
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Email de connexion</label>
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Identifiant / Email</label>
+                    <span className="text-[9px] font-bold text-slate-400">Verrouillé</span>
+                  </div>
                   <input 
                     type="email" 
                     readOnly
-                    className="w-full px-6 py-4 bg-slate-100 border border-slate-200 rounded-2xl text-sm font-bold text-slate-500 cursor-not-allowed outline-none"
+                    className="w-full px-3.5 py-2 bg-slate-100 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-500 cursor-not-allowed outline-none"
                     value={editUserModal.email}
                     title="L'email de connexion ne peut pas être modifié pour des raisons de sécurité."
                   />
-                  <p className="text-[10px] text-slate-500 ml-4">L'email de connexion est utilisé pour l'authentification et ne peut pas être modifié ici.</p>
+                  <p className="text-[10px] text-slate-500 leading-tight">L'adresse de messagerie sert d'identifiant unique et ne peut pas être modifiée.</p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                {/* Footer buttons */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                   <button 
                     type="button"
                     onClick={() => setEditUserModal({ ...editUserModal, isOpen: false })} 
                     disabled={isSubmitting}
-                    className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-semibold text-[10px] tracking-tight hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     Annuler
                   </button>
                   <button 
                     type="submit"
-                    disabled={isSubmitting || !editUserModal.fullName}
-                    className="py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold text-[10px] tracking-tight shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    disabled={isSubmitting || !editUserModal.fullName.trim()}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                   >
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    Enregistrer
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Enregistrement...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        <span>Enregistrer</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -6477,75 +6676,107 @@ const handleDeleteSchool = async () => {
         )}
       </AnimatePresence>
 
-      {/* Password Reset Modal */}
+      {/* Password Reset Modal - Modern, Compact & Responsive */}
       <AnimatePresence>
         {resetModal.isOpen && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
               onClick={() => !isSubmitting && setResetModal({ ...resetModal, isOpen: false })}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl border border-amber-200/90 overflow-hidden flex flex-col z-10 my-auto"
             >
-              <div className="p-10 text-center space-y-6">
-                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner">
-                  <ShieldAlert size={40} />
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-amber-100 flex items-center justify-between bg-amber-50/60 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-100 border border-amber-200 text-amber-700 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                    <ShieldAlert size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">Réinitialiser le Mot de Passe</h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-amber-700 truncate mt-0.5" title={resetModal.fullName}>
+                      {resetModal.fullName}
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-semibold text-slate-900 tracking-tighter leading-none">Réinitialiser le mot de passe</h3>
-                  <p className="text-slate-500 text-[11px] font-bold tracking-tight leading-relaxed px-4">
-                    Vous allez réinitialiser le mot de passe de <span className="text-slate-900">{resetModal.fullName}</span>.
-                  </p>
-                </div>
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setResetModal({ ...resetModal, isOpen: false })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
-                <div className="space-y-2 text-left">
-                  <label className="flex items-start gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 cursor-pointer hover:bg-slate-100 transition-colors mx-4">
-                    <div className="pt-0.5">
-                      <input 
-                        type="checkbox" 
-                        className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500 border-gray-300"
-                        checked={resetModal.forceChange}
-                        onChange={(e) => setResetModal({ ...resetModal, forceChange: e.target.checked })}
-                      />
-                    </div>
-                    <div className="flex-1 text-[10px] font-bold text-slate-600 leading-relaxed">
-                      Forcer le changement de mot de passe à la prochaine connexion. Décochez cette case si vous attribuez un mot de passe définitif.
-                    </div>
-                  </label>
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4 mt-4 block">Nouveau mot de passe temporaire</label>
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-3.5">
+                <p className="text-[11px] text-slate-600 leading-relaxed">
+                  Définissez un nouveau mot de passe pour <strong className="text-slate-900">{resetModal.fullName}</strong>.
+                </p>
+
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Nouveau mot de passe *</label>
                   <input 
                     type="text" 
                     autoFocus
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-amber-500/5 focus:border-amber-500 transition-all"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400"
                     placeholder="Min. 6 caractères"
                     value={resetModal.newPassword || ''}
                     onChange={e => setResetModal({ ...resetModal, newPassword: e.target.value })}
                   />
+                  {resetModal.newPassword && resetModal.newPassword.length < 6 && (
+                    <p className="text-[10px] text-rose-500 font-semibold mt-0.5">Le mot de passe doit comporter au moins 6 caractères.</p>
+                  )}
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                <label className="flex items-start gap-2.5 p-3 bg-slate-50 border border-slate-200/80 rounded-xl cursor-pointer hover:bg-slate-100/70 transition-colors">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500 mt-0.5 accent-amber-600 cursor-pointer shrink-0"
+                    checked={resetModal.forceChange}
+                    onChange={(e) => setResetModal({ ...resetModal, forceChange: e.target.checked })}
+                  />
+                  <div className="text-[10px] sm:text-[11px] font-medium text-slate-600 leading-relaxed">
+                    <span className="font-bold text-slate-800">Forcer le renouvellement :</span> l'utilisateur devra obligatoirement modifier ce mot de passe dès sa prochaine connexion.
+                  </div>
+                </label>
+
+                {/* Footer buttons */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                   <button 
+                    type="button"
                     onClick={() => setResetModal({ ...resetModal, isOpen: false })} 
                     disabled={isSubmitting}
-                    className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-semibold text-[10px] tracking-tight hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     Annuler
                   </button>
                   <button 
+                    type="button"
                     onClick={resetUserPassword} 
-                    disabled={isSubmitting || resetModal.newPassword.length < 6}
-                    className="py-5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-semibold text-[10px] tracking-tight shadow-xl shadow-amber-200 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    disabled={isSubmitting || !resetModal.newPassword || resetModal.newPassword.length < 6}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
                   >
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-                    Confirmer
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Enregistrement...</span>
+                      </>
+                    ) : (
+                      <>
+                        <ShieldCheck size={14} />
+                        <span>Confirmer le mot de passe</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -6554,66 +6785,111 @@ const handleDeleteSchool = async () => {
         )}
       </AnimatePresence>
 
-      {/* School Deletion Modal */}
+      {/* School Deletion Modal - Modern & Compact */}
       <AnimatePresence>
         {deleteModal.isOpen && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-950/65 backdrop-blur-xs"
               onClick={() => !isSubmitting && setDeleteModal({ ...deleteModal, isOpen: false })}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-rose-200/90 z-10 my-auto flex flex-col"
             >
-              <div className="p-10 text-center space-y-6">
-                <div className="w-20 h-20 bg-rose-100 text-rose-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner">
-                  <AlertCircle size={40} />
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-rose-100 flex justify-between items-center bg-rose-50/50 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-rose-100/80 border border-rose-200 text-rose-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                    <Trash2 size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Supprimer l'Établissement</h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-rose-600 truncate mt-0.5" title={deleteModal.schoolName}>
+                      {deleteModal.schoolName}
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-semibold text-slate-900 tracking-tighter leading-none">Suppression Critique</h3>
-                  <p className="text-rose-500 text-[11px] font-bold tracking-tight leading-relaxed px-4">
-                    ATTENTION: La suppression de <span 
-                      className="font-black underline cursor-pointer hover:text-rose-700 transition-colors inline-block active:scale-95" 
-                      onClick={() => setDeleteModal({ ...deleteModal, confirmName: deleteModal.schoolName })}
-                      title="Cliquer pour remplir automatiquement"
-                    >{deleteModal.schoolName}</span> est irréversible et supprimera TOUTES ses données en cascade.
-                  </p>
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setDeleteModal({ ...deleteModal, isOpen: false })} 
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-3.5">
+                {/* Warning note */}
+                <div className="p-3 bg-rose-50 border border-rose-200/80 rounded-xl flex items-start gap-2.5">
+                  <AlertCircle size={17} className="text-rose-600 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-rose-900 font-medium leading-relaxed">
+                    <p className="font-bold text-rose-950 mb-0.5">Action irréversible</p>
+                    Toutes les données de cette école (comptes, élèves, notes, paiements et configurations) seront définitivement effacées du système.
+                  </div>
                 </div>
 
-                <div className="space-y-2 text-left">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Tapez le nom de l'école pour confirmer</label>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <span>Confirmation requise</span>
+                    <button 
+                      type="button"
+                      onClick={() => setDeleteModal({ ...deleteModal, confirmName: deleteModal.schoolName })}
+                      className="text-rose-600 hover:text-rose-800 underline cursor-pointer"
+                      title="Cliquer pour auto-compléter"
+                    >
+                      Copier le nom
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Tapez <strong className="text-slate-900 font-mono select-all bg-slate-100 px-1.5 py-0.5 rounded">{deleteModal.schoolName}</strong> ci-dessous :
+                  </p>
                   <input 
                     type="text" 
                     autoFocus
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-rose-500/5 focus:border-rose-500 transition-all"
-                    placeholder={deleteModal.schoolName}
+                    disabled={isSubmitting}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all placeholder:text-slate-400 disabled:opacity-50"
+                    placeholder={`Recopiez "${deleteModal.schoolName}"`}
                     value={deleteModal.confirmName || ''}
                     onChange={e => setDeleteModal({ ...deleteModal, confirmName: e.target.value })}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                {/* Actions */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                   <button 
+                    type="button"
                     onClick={() => setDeleteModal({ ...deleteModal, isOpen: false })} 
                     disabled={isSubmitting}
-                    className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-semibold text-[10px] tracking-tight hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     Annuler
                   </button>
                   <button 
+                    type="button"
                     onClick={handleDeleteSchool} 
                     disabled={isSubmitting || deleteModal.confirmName !== deleteModal.schoolName}
-                    className="py-5 bg-rose-600 hover:bg-rose-700 text-white rounded-2xl font-semibold text-[10px] tracking-tight shadow-xl shadow-rose-200 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    Supprimer
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Suppression...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Trash2 size={14} />
+                        <span>Supprimer définitivement</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -6622,68 +6898,111 @@ const handleDeleteSchool = async () => {
         )}
       </AnimatePresence>
 
-      {/* Clean School Modal */}
+      {/* Clean School Modal (Reset) - Modern & Compact */}
       <AnimatePresence>
         {cleanModal.isOpen && (
-          <div className="fixed inset-0 min-h-screen bg-slate-900/60 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0"
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
               onClick={() => !isSubmitting && setCleanModal({ ...cleanModal, isOpen: false })}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl overflow-hidden border border-white/20"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative bg-white w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden border border-amber-200/90 z-10 my-auto flex flex-col"
             >
-              <div className="p-10 text-center space-y-6">
-                <div className="w-20 h-20 bg-amber-100 text-amber-600 rounded-[2rem] flex items-center justify-center mx-auto shadow-inner">
-                  <Eraser size={40} />
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-amber-100 flex justify-between items-center bg-amber-50/50 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-amber-100/80 border border-amber-200 text-amber-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                    <Eraser size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Vider les Données (Reset)</h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-amber-600 truncate mt-0.5" title={cleanModal.schoolName}>
+                      {cleanModal.schoolName}
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-semibold text-slate-900 tracking-tighter leading-none">Nettoyage des Données</h3>
-                  <p className="text-amber-600 text-[11px] font-bold tracking-tight leading-relaxed px-4">
-                    ATTENTION: Le nettoyage de <span 
-                      className="font-black underline cursor-pointer hover:text-amber-700 transition-colors inline-block active:scale-95"
-                      onClick={() => setCleanModal({ ...cleanModal, confirmName: cleanModal.schoolName })}
-                      title="Cliquer pour remplir automatiquement"
-                    >{cleanModal.schoolName}</span> supprimera toutes les données transactionnelles (élèves, paiements, inscriptions) mais gardera la configuration (classes, frais, accès administrateurs).
-                  </p>
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setCleanModal({ ...cleanModal, isOpen: false })} 
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-3.5">
+                {/* Info note */}
+                <div className="p-3 bg-amber-50 border border-amber-200/80 rounded-xl flex items-start gap-2.5">
+                  <AlertCircle size={17} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div className="text-[11px] text-amber-900 font-medium leading-relaxed">
+                    <p className="font-bold text-amber-950 mb-0.5">Réinitialisation opérationnelle</p>
+                    Supprime les élèves, paiements, inscriptions et présences. La configuration pédagogique (classes, frais, matières et comptes administrateurs) est conservée.
+                  </div>
                 </div>
 
-                <div className="space-y-2 text-left">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-4 shrink-0 block">
-                    Confirmez le nom de l'école
-                  </label>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                    <span>Confirmation requise</span>
+                    <button 
+                      type="button"
+                      onClick={() => setCleanModal({ ...cleanModal, confirmName: cleanModal.schoolName })}
+                      className="text-amber-600 hover:text-amber-800 underline cursor-pointer"
+                      title="Cliquer pour auto-compléter"
+                    >
+                      Copier le nom
+                    </button>
+                  </div>
+                  <p className="text-[11px] text-slate-600">
+                    Tapez <strong className="text-slate-900 font-mono select-all bg-slate-100 px-1.5 py-0.5 rounded">{cleanModal.schoolName}</strong> ci-dessous :
+                  </p>
                   <input
                     type="text"
-                    placeholder={cleanModal.schoolName}
+                    autoFocus
+                    placeholder={`Recopiez "${cleanModal.schoolName}"`}
                     disabled={isSubmitting}
-                    className="w-full bg-slate-50 border-0 text-slate-900 font-bold px-6 py-5 rounded-2xl outline-none focus:ring-4 focus:ring-amber-500/10 focus:bg-white transition-all text-sm shadow-inner placeholder:text-slate-300 disabled:opacity-50"
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 outline-none focus:bg-white focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all placeholder:text-slate-400 disabled:opacity-50"
                     value={cleanModal.confirmName}
                     onChange={e => setCleanModal({ ...cleanModal, confirmName: e.target.value })}
                   />
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4">
+                {/* Actions */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                   <button 
+                    type="button"
                     onClick={() => setCleanModal({ ...cleanModal, isOpen: false })} 
                     disabled={isSubmitting}
-                    className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-semibold text-[10px] tracking-tight hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     Annuler
                   </button>
                   <button 
+                    type="button"
                     onClick={handleCleanSchool} 
                     disabled={isSubmitting || cleanModal.confirmName !== cleanModal.schoolName}
-                    className="py-5 bg-amber-600 hover:bg-amber-700 text-white rounded-2xl font-semibold text-[10px] tracking-tight shadow-xl shadow-amber-200 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Eraser size={16} />}
-                    Nettoyer
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Réinitialisation...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Eraser size={14} />
+                        <span>Réinitialiser les données</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
@@ -6694,28 +7013,69 @@ const handleDeleteSchool = async () => {
       {/* Edit School Modal */}
       <AnimatePresence>
         
-        {/* Modal Configuration des Modules */}
+        {/* Modal Configuration des Modules - Modern & Compact */}
         {modulesModal.isOpen && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-            <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden">
-              <div className="bg-gradient-to-r from-indigo-600 to-indigo-800 p-6 text-white">
-                <div className="flex items-center gap-3">
-                  <Settings className="text-indigo-200" size={24} />
-                  <div>
-                    <h3 className="text-xl font-bold">Configuration des Modules</h3>
-                    <p className="text-indigo-200 text-sm">{modulesModal.schoolName}</p>
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+            <motion.div 
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
+              onClick={() => !isSubmitting && setModulesModal({ ...modulesModal, isOpen: false })}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative bg-white rounded-2xl sm:rounded-3xl shadow-2xl w-full max-w-md max-h-[90vh] flex flex-col overflow-hidden border border-indigo-200/90 z-10 my-auto"
+            >
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-indigo-100 flex justify-between items-center bg-indigo-50/50 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-100/80 border border-indigo-200 text-indigo-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                    <Settings size={17} />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Modules & Options</h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-indigo-600 truncate mt-0.5" title={modulesModal.schoolName}>
+                      {modulesModal.schoolName}
+                    </p>
                   </div>
                 </div>
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setModulesModal({ ...modulesModal, isOpen: false })} 
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              <div className="p-6 space-y-6">
-                <div className="space-y-4">
-                  <label className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <div>
-                      <p className="font-semibold text-slate-900">Module Présences</p>
-                      <p className="text-xs text-slate-500">Activer le registre d'appel et de présences</p>
+              {/* Body */}
+              <div className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-3 overscroll-contain">
+                <p className="text-[11px] text-slate-500 font-medium leading-relaxed">
+                  Activez ou désactivez les fonctionnalités optionnelles pour cet établissement scolaire.
+                </p>
+
+                <div className="space-y-2.5">
+                  {/* Module Présences */}
+                  <label className="flex items-center justify-between p-3 sm:p-3.5 bg-slate-50/80 hover:bg-slate-100/70 border border-slate-200/80 rounded-xl sm:rounded-2xl cursor-pointer transition-all">
+                    <div className="min-w-0 pr-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900">Module Présences & Appels</p>
+                        {modulesModal.modules.presences ? (
+                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded">Actif</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-bold rounded">Inactif</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5">
+                        Registre d'appel numérique, suivi des absences et retards élèves.
+                      </p>
                     </div>
-                    <div className="relative inline-flex items-center">
+                    <div className="relative inline-flex items-center shrink-0">
                       <input 
                         type="checkbox" 
                         checked={modulesModal.modules.presences}
@@ -6725,16 +7085,26 @@ const handleDeleteSchool = async () => {
                         })}
                         className="sr-only peer" 
                       />
-                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </div>
                   </label>
 
-                  <label className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl cursor-pointer hover:bg-slate-100 transition-colors">
-                    <div>
-                      <p className="font-semibold text-slate-900">Module Discipline</p>
-                      <p className="text-xs text-slate-500">Activer le suivi des comportements et sanctions</p>
+                  {/* Module Discipline */}
+                  <label className="flex items-center justify-between p-3 sm:p-3.5 bg-slate-50/80 hover:bg-slate-100/70 border border-slate-200/80 rounded-xl sm:rounded-2xl cursor-pointer transition-all">
+                    <div className="min-w-0 pr-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900">Module Discipline & Conduite</p>
+                        {modulesModal.modules.discipline ? (
+                          <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-black rounded">Actif</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-bold rounded">Inactif</span>
+                        )}
+                      </div>
+                      <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5">
+                        Suivi des incidents, avertissements, retenues et conseils de discipline.
+                      </p>
                     </div>
-                    <div className="relative inline-flex items-center">
+                    <div className="relative inline-flex items-center shrink-0">
                       <input 
                         type="checkbox" 
                         checked={modulesModal.modules.discipline}
@@ -6744,110 +7114,143 @@ const handleDeleteSchool = async () => {
                         })}
                         className="sr-only peer" 
                       />
-                      <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                      <div className="w-10 h-5.5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4.5 after:w-4.5 after:transition-all peer-checked:bg-indigo-600"></div>
                     </div>
                   </label>
                 </div>
-
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => setModulesModal({ ...modulesModal, isOpen: false })}
-                    className="flex-1 px-4 py-3 bg-white border border-slate-200 text-slate-700 rounded-xl font-medium hover:bg-slate-50 transition-colors"
-                  >
-                    Annuler
-                  </button>
-                  <button
-                    onClick={handleUpdateModules}
-                    disabled={isSubmitting}
-                    className="flex-1 px-4 py-3 bg-indigo-600 text-white rounded-xl font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-                  >
-                    {isSubmitting ? (
-                      <Loader2 size={18} className="animate-spin" />
-                    ) : (
-                      <>
-                        <CheckCircle2 size={18} />
-                        Enregistrer
-                      </>
-                    )}
-                  </button>
-                </div>
               </div>
-            </div>
+
+              {/* Footer */}
+              <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setModulesModal({ ...modulesModal, isOpen: false })}
+                  disabled={isSubmitting}
+                  className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={handleUpdateModules}
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={14} className="animate-spin" />
+                      <span>Enregistrement...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={14} />
+                      <span>Enregistrer les modules</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
 
-{editSchoolModal.isOpen && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+        {/* Modal Modifier l'établissement - Modern, Compact & Responsive */}
+        {editSchoolModal.isOpen && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
               onClick={() => !isSubmitting && setEditSchoolModal({ ...editSchoolModal, isOpen: false })}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-lg bg-white rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-lg bg-white rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] md:max-h-[85vh] border border-slate-200/90 z-10 my-auto"
             >
-              <div className="p-8 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50 sticky top-0 z-10 backdrop-blur-sm">
-                <div className="w-12 h-12 bg-blue-600 text-white rounded-2xl flex items-center justify-center shadow-lg shadow-blue-200 shrink-0">
-                  <Edit2 size={24} />
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex justify-between items-center bg-slate-50/80 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-blue-50 border border-blue-100 text-blue-600 rounded-xl flex items-center justify-center shadow-2xs shrink-0">
+                    <Edit2 size={16} />
+                  </div>
+                  <div className="min-w-0">
+                    <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">Modifier l'Établissement</h2>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 truncate mt-0.5" title={editSchoolModal.name}>
+                      {editSchoolModal.name || 'Informations de l\'école'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">Modifier l'école</h2>
-                  <p className="text-xs text-slate-500 font-bold uppercase tracking-widest mt-0.5">Mise à jour des informations</p>
-                </div>
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setEditSchoolModal({ ...editSchoolModal, isOpen: false })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              <form onSubmit={handleEditSchool} className="p-8 overflow-y-auto custom-scrollbar space-y-6">
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Nom de l'établissement</label>
+              {/* Form Content */}
+              <form onSubmit={handleEditSchool} className="p-4 sm:p-5 overflow-y-auto custom-scrollbar flex-1 space-y-3 sm:space-y-3.5 overscroll-contain">
+                {/* School Name */}
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Nom de l'établissement *</label>
                   <input 
                     type="text" 
                     required
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
+                    className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
+                    placeholder="Ex: Complexe Scolaire Saint-Joseph"
                     value={editSchoolModal.name}
                     onChange={e => setEditSchoolModal({ ...editSchoolModal, name: e.target.value })}
                   />
                 </div>
                 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Email de contact / Directeur</label>
-                  <input 
-                    type="email" 
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
-                    value={editSchoolModal.email}
-                    onChange={e => setEditSchoolModal({ ...editSchoolModal, email: e.target.value })}
-                  />
-                </div>
+                {/* 2-col Grid: Email & Director Name */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Email de contact</label>
+                    <input 
+                      type="email" 
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="contact@ecole.com"
+                      value={editSchoolModal.email}
+                      onChange={e => setEditSchoolModal({ ...editSchoolModal, email: e.target.value })}
+                    />
+                  </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Nom du directeur</label>
-                  <input 
-                    type="text" 
-                    className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
-                    value={editSchoolModal.director_name}
-                    onChange={e => setEditSchoolModal({ ...editSchoolModal, director_name: e.target.value })}
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Téléphone</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Chef d'établissement / Dir.</label>
                     <input 
                       type="text" 
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="Nom du directeur"
+                      value={editSchoolModal.director_name}
+                      onChange={e => setEditSchoolModal({ ...editSchoolModal, director_name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                {/* 2-col Grid: Phone & Address */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Téléphone</label>
+                    <input 
+                      type="text" 
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="+243 ..."
                       value={editSchoolModal.phone}
                       onChange={e => setEditSchoolModal({ ...editSchoolModal, phone: e.target.value })}
                     />
                   </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-4">Adresse</label>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">Adresse physique</label>
                     <input 
                       type="text" 
-                      className="w-full px-6 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold text-slate-900 outline-none focus:ring-4 focus:ring-blue-500/5 focus:border-blue-500 transition-all"
+                      className="w-full px-3.5 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm font-semibold text-slate-900 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-slate-400"
+                      placeholder="Commune, Ville"
                       value={editSchoolModal.address}
                       onChange={e => setEditSchoolModal({ ...editSchoolModal, address: e.target.value })}
                     />
@@ -6855,45 +7258,55 @@ const handleDeleteSchool = async () => {
                 </div>
 
                 {/* Option Multi-Annexes toggle */}
-                <div className="p-4 bg-slate-50 rounded-2xl border border-slate-200 flex items-start gap-3.5">
+                <div className="p-3 bg-slate-50 border border-slate-200/80 rounded-xl flex items-start gap-3">
                   <input
                     type="checkbox"
                     id="editHasMultiCampusToggle"
                     checked={editSchoolModal.has_multi_campus}
                     onChange={(e) => setEditSchoolModal({ ...editSchoolModal, has_multi_campus: e.target.checked })}
-                    className="h-5 w-5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 mt-0.5 accent-indigo-600 cursor-pointer shrink-0"
+                    className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 mt-0.5 accent-blue-600 cursor-pointer shrink-0"
                   />
-                  <div className="flex-1">
-                    <label htmlFor="editHasMultiCampusToggle" className="text-xs font-black text-slate-800 uppercase tracking-wider cursor-pointer flex items-center gap-2">
-                      <span>Option : Multi-Annexes / Campus</span>
+                  <div className="flex-1 min-w-0">
+                    <label htmlFor="editHasMultiCampusToggle" className="text-xs font-bold text-slate-800 cursor-pointer flex items-center justify-between gap-2">
+                      <span>Option Multi-Annexes / Campus</span>
                       {editSchoolModal.has_multi_campus ? (
-                        <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded text-[9px] font-black">Actif</span>
+                        <span className="px-1.5 py-0.5 bg-blue-100 text-blue-800 rounded text-[9px] font-black">Actif</span>
                       ) : (
-                        <span className="px-2 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-bold">Inactif</span>
+                        <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 rounded text-[9px] font-bold">Inactif</span>
                       )}
                     </label>
-                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">
-                      Activer la gestion multi-sites / annexes pour cet établissement.
+                    <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">
+                      Activer la gestion multi-sites / annexes pour cet établissement scolaire.
                     </p>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 sticky bottom-0 bg-white pb-2">
+                {/* Footer buttons */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                   <button 
                     type="button"
                     onClick={() => setEditSchoolModal({ ...editSchoolModal, isOpen: false })} 
                     disabled={isSubmitting}
-                    className="py-5 bg-slate-100 text-slate-500 rounded-2xl font-semibold text-[10px] tracking-tight hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     Annuler
                   </button>
                   <button 
                     type="submit"
                     disabled={isSubmitting || !editSchoolModal.name}
-                    className="py-5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-semibold text-[10px] tracking-tight shadow-xl shadow-blue-200 transition-all flex items-center justify-center gap-3 active:scale-95 disabled:opacity-50"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    Enregistrer
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Enregistrement...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Save size={14} />
+                        <span>Enregistrer</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </form>
@@ -6902,59 +7315,101 @@ const handleDeleteSchool = async () => {
         )}
       </AnimatePresence>
 
-      {/* School Status Modal */}
+      {/* School Status Modal - Modern, Compact & Responsive */}
       <AnimatePresence>
         {statusModal.isOpen && (
-          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
             <motion.div 
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+              className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs"
               onClick={() => !isSubmitting && setStatusModal({ ...statusModal, isOpen: false })}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="relative w-full max-w-md bg-white rounded-[2rem] shadow-2xl overflow-hidden"
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.15 }}
+              className="relative w-full max-w-md bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col z-10 my-auto"
             >
-              <div className="p-8">
-                <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mb-6 shadow-inner ${
-                  statusModal.currentStatus === 'ACTIVE' ? 'bg-amber-100 text-amber-600' : 'bg-emerald-100 text-emerald-600'
-                }`}>
-                  {statusModal.currentStatus === 'ACTIVE' ? <Pause size={32} /> : <Play size={32} />}
+              {/* Header */}
+              <div className="px-4 py-3 sm:px-5 sm:py-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/80 shrink-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className={`w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center shadow-2xs shrink-0 ${
+                    statusModal.currentStatus === 'ACTIVE' 
+                      ? 'bg-amber-100/80 text-amber-700 border border-amber-200' 
+                      : 'bg-emerald-100/80 text-emerald-700 border border-emerald-200'
+                  }`}>
+                    {statusModal.currentStatus === 'ACTIVE' ? <Pause size={17} /> : <Play size={17} />}
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">
+                      {statusModal.currentStatus === 'ACTIVE' ? 'Suspendre l\'Établissement' : 'Réactiver l\'Établissement'}
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] font-bold text-slate-500 truncate mt-0.5" title={statusModal.schoolName}>
+                      {statusModal.schoolName}
+                    </p>
+                  </div>
                 </div>
-                
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-semibold text-slate-900 tracking-tighter leading-none">
-                    {statusModal.currentStatus === 'ACTIVE' ? 'Suspendre' : 'Réactiver'} l'établissement
-                  </h3>
-                  <p className="text-slate-500 text-sm leading-relaxed">
-                    Voulez-vous vraiment {statusModal.currentStatus === 'ACTIVE' ? 'suspendre' : 'réactiver'} <span className="font-bold text-slate-900">{statusModal.schoolName}</span> ? 
-                    {statusModal.currentStatus === 'ACTIVE' ? ' Tous ses utilisateurs ne pourront plus se connecter.' : ' Les utilisateurs pourront à nouveau se connecter.'}
+                <button 
+                  type="button"
+                  onClick={() => !isSubmitting && setStatusModal({ ...statusModal, isOpen: false })}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 transition-colors cursor-pointer shrink-0"
+                  title="Fermer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-3.5">
+                <div className={`p-3 rounded-xl border flex items-start gap-2.5 ${
+                  statusModal.currentStatus === 'ACTIVE'
+                    ? 'bg-amber-50/80 border-amber-200/80 text-amber-900'
+                    : 'bg-emerald-50/80 border-emerald-200/80 text-emerald-900'
+                }`}>
+                  <AlertCircle size={16} className={`shrink-0 mt-0.5 ${statusModal.currentStatus === 'ACTIVE' ? 'text-amber-600' : 'text-emerald-600'}`} />
+                  <p className="text-xs font-medium leading-relaxed">
+                    {statusModal.currentStatus === 'ACTIVE' ? (
+                      <>La suspension bloquera immédiatement l'accès de l'ensemble des administrateurs, enseignants, parents et élèves de <strong className="text-slate-900">{statusModal.schoolName}</strong>.</>
+                    ) : (
+                      <>La réactivation rétablira immédiatement tous les accès pour les utilisateurs de <strong className="text-slate-900">{statusModal.schoolName}</strong>.</>
+                    )}
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-8">
+                {/* Footer buttons */}
+                <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-2 shrink-0">
                   <button 
+                    type="button"
                     onClick={() => setStatusModal({ ...statusModal, isOpen: false })} 
                     disabled={isSubmitting}
-                    className="py-4 bg-slate-100 text-slate-500 rounded-2xl font-semibold text-sm hover:bg-slate-200 transition-all active:scale-95 disabled:opacity-50"
+                    className="px-3.5 py-2 bg-white border border-slate-200 hover:bg-slate-100 text-slate-600 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50"
                   >
                     Annuler
                   </button>
                   <button 
+                    type="button"
                     onClick={toggleSchoolStatus} 
                     disabled={isSubmitting}
-                    className={`py-4 text-white rounded-2xl font-semibold text-sm transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 ${
+                    className={`px-4 py-2 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50 ${
                       statusModal.currentStatus === 'ACTIVE' 
-                        ? 'bg-amber-500 hover:bg-amber-600 shadow-lg shadow-amber-200' 
-                        : 'bg-emerald-500 hover:bg-emerald-600 shadow-lg shadow-emerald-200'
+                        ? 'bg-amber-600 hover:bg-amber-700' 
+                        : 'bg-emerald-600 hover:bg-emerald-700'
                     }`}
                   >
-                    {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : (statusModal.currentStatus === 'ACTIVE' ? <Pause size={18} /> : <Play size={18} />)}
-                    Confirmer
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 size={14} className="animate-spin" />
+                        <span>Traitement...</span>
+                      </>
+                    ) : (
+                      <>
+                        {statusModal.currentStatus === 'ACTIVE' ? <Pause size={14} /> : <Play size={14} />}
+                        <span>Confirmer {statusModal.currentStatus === 'ACTIVE' ? 'la suspension' : 'la réactivation'}</span>
+                      </>
+                    )}
                   </button>
                 </div>
               </div>
