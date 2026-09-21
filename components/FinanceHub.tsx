@@ -166,7 +166,15 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           if (p.pendingPayments !== undefined) setPendingPayments(p.pendingPayments);
           if (p.economatPenetration !== undefined) setEconomatPenetration(p.economatPenetration);
           if (p.txBreakdown) setTxBreakdown(p.txBreakdown);
-          if (p.recentTransactions) setRecentTransactions(p.recentTransactions);
+          if (p.recentTransactions && Array.isArray(p.recentTransactions)) {
+            setRecentTransactions(
+              p.recentTransactions.map((tx: any) => ({
+                ...tx,
+                date: tx.date ? new Date(tx.date) : new Date(),
+                icon: tx.color?.includes('indigo') ? GraduationCap : BookOpen
+              }))
+            );
+          }
           if (p.netBalance) setNetBalance(p.netBalance);
           if (p.reevaluatedStudents) setReevaluatedStudents(p.reevaluatedStudents);
           if (p.exchangeRate) setExchangeRate(p.exchangeRate);
@@ -594,7 +602,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       setTxBreakdown(breakdown);
       
       // Sort recent transactions by date descending and take top 5
-      allRecentTx.sort((a, b) => b.date.getTime() - a.date.getTime());
+      allRecentTx.sort((a, b) => {
+        const timeA = a.date instanceof Date ? a.date.getTime() : new Date(a.date).getTime();
+        const timeB = b.date instanceof Date ? b.date.getTime() : new Date(b.date).getTime();
+        return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
+      });
       setRecentTransactions(allRecentTx.slice(0, 5));
 
       // 3. Calcul du taux de change & classes (déjà récupérés en parallèle)
@@ -1508,25 +1520,33 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <p className="text-xs font-medium">Chargement...</p>
                 </div>
               ) : recentTransactions.length > 0 ? (
-                recentTransactions.map((tx, i) => (
-                  <div key={i} className="flex items-center justify-between p-2.5 sm:p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.bg} ${tx.color} shrink-0`}>
-                        <tx.icon size={16} />
+                recentTransactions.map((tx, i) => {
+                  const dateObj = tx.date instanceof Date ? tx.date : new Date(tx.date || Date.now());
+                  const formattedTime = !isNaN(dateObj.getTime())
+                    ? dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+                    : '--:--';
+                  const IconComp = typeof tx.icon === 'function' ? tx.icon : (tx.color?.includes('indigo') ? GraduationCap : BookOpen);
+
+                  return (
+                    <div key={i} className="flex items-center justify-between p-2.5 sm:p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.bg || 'bg-indigo-50'} ${tx.color || 'text-indigo-600'} shrink-0`}>
+                          <IconComp size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{tx.type}</p>
+                          <p className="text-[11px] font-medium text-gray-500">{formattedTime} • {tx.method}</p>
+                        </div>
                       </div>
-                      <div className="min-w-0">
-                        <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{tx.type}</p>
-                        <p className="text-[11px] font-medium text-gray-500">{tx.date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})} • {tx.method}</p>
+                      <div className="text-right shrink-0">
+                        <p className="text-xs sm:text-sm font-bold text-gray-900 font-mono">+{tx.currencyAmount ? tx.currencyAmount.toLocaleString() : tx.amount.toLocaleString()} {tx.currency || 'HTG'}</p>
+                        {tx.currency === 'USD' && (
+                          <p className="text-[9px] text-gray-500 font-medium">({tx.amount.toLocaleString()} HTG eq.)</p>
+                        )}
                       </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-xs sm:text-sm font-bold text-gray-900 font-mono">+{tx.currencyAmount ? tx.currencyAmount.toLocaleString() : tx.amount.toLocaleString()} {tx.currency || 'HTG'}</p>
-                      {tx.currency === 'USD' && (
-                        <p className="text-[9px] text-gray-500 font-medium">({tx.amount.toLocaleString()} HTG eq.)</p>
-                      )}
-                    </div>
-                  </div>
-                ))
+                  );
+                })
               ) : (
                 <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
                   <p className="text-xs font-medium text-gray-500">Aucune transaction aujourd'hui</p>
