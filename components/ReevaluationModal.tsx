@@ -753,23 +753,28 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                               </div>
                             </td>
 
-                            {/* Scolarité Brute */}
+                            {/* Scolarité Brute - Affichage en clair */}
                             <td className="p-3.5 text-right font-mono font-medium text-slate-700">
                               {st.tuitionUSD > 0 && (
                                 <p className="font-bold text-indigo-700">{st.tuitionUSD.toLocaleString()} USD</p>
                               )}
-                              <p className={st.tuitionUSD > 0 ? 'text-[11px] text-slate-500' : 'font-bold'}>
-                                {st.tuitionHTG.toLocaleString()} HTG
-                              </p>
+                              {st.tuitionHTG > 0 && (
+                                <p className={st.tuitionUSD > 0 ? 'text-[11px] text-slate-500 font-semibold' : 'font-bold'}>
+                                  {st.tuitionHTG.toLocaleString()} HTG
+                                </p>
+                              )}
+                              {st.tuitionUSD === 0 && st.tuitionHTG === 0 && (
+                                <span className="text-slate-400 italic text-[11px]">—</span>
+                              )}
                             </td>
 
-                            {/* Frais Annexes / Divers */}
+                            {/* Frais Annexes / Divers - Affichage en clair */}
                             <td className="p-3.5 text-right font-mono font-medium text-slate-700">
                               {st.miscUSD > 0 && (
                                 <p className="font-bold text-indigo-700">{st.miscUSD.toLocaleString()} USD</p>
                               )}
                               {st.miscHTG > 0 && (
-                                <p className={st.miscUSD > 0 ? 'text-[11px] text-slate-500' : 'font-bold'}>
+                                <p className={st.miscUSD > 0 ? 'text-[11px] text-slate-500 font-semibold' : 'font-bold'}>
                                   {st.miscHTG.toLocaleString()} HTG
                                 </p>
                               )}
@@ -778,7 +783,7 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                               )}
                             </td>
 
-                            {/* Déduction Accordée */}
+                            {/* Déduction Accordée - Affichage en clair */}
                             <td className="p-3.5 text-right font-mono font-bold text-amber-700">
                               {st.reductionUSD > 0 && (
                                 <p className="font-bold text-amber-700">-{st.reductionUSD.toLocaleString()} USD</p>
@@ -789,29 +794,50 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                               {st.reductionUSD === 0 && st.reductionHTG === 0 && (
                                 <span className="text-slate-400">0 HTG</span>
                               )}
-                              <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-200">
-                                -{Math.round(reductionEq).toLocaleString()} HTG eq.
-                              </span>
+                              {st.reductionUSD > 0 && (
+                                <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                                  -{Math.round(reductionEq).toLocaleString()} HTG eq.
+                                </span>
+                              )}
                             </td>
 
-                            {/* Solde Net Exigible */}
+                            {/* Solde Net Exigible - Indicateurs et Badges adaptatifs */}
                             <td className="p-3.5 text-right font-mono font-black text-emerald-700 bg-emerald-50/30">
-                              {st.netUSD > 0 && (
-                                <p className="text-emerald-800 font-bold">{st.netUSD.toLocaleString()} USD</p>
-                              )}
-                              <p className="text-emerald-900 font-black">{st.netHTG.toLocaleString()} HTG</p>
                               {netEq === 0 ? (
-                                <span className="inline-block mt-0.5 text-[9px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
-                                  {st.grossUSD > 0 && st.grossHTG === 0 
-                                    ? 'Bourse Complète (0 USD Dû)' 
-                                    : st.grossUSD > 0 
-                                    ? 'Bourse Complète (0 Dû / Soldé)' 
-                                    : 'Bourse Complète (0 HTG Dû)'}
-                                </span>
+                                <>
+                                  {/* Montant en clair selon la composition des frais de l'élève */}
+                                  {st.grossUSD > 0 && st.grossHTG === 0 ? (
+                                    <p className="text-emerald-800 font-bold font-mono">0 USD</p>
+                                  ) : st.grossUSD > 0 && st.grossHTG > 0 ? (
+                                    <p className="text-emerald-800 font-bold font-mono text-[11px]">0 HTG • 0 USD</p>
+                                  ) : (
+                                    <p className="text-emerald-900 font-black font-mono">0 HTG</p>
+                                  )}
+
+                                  {/* Badge de synthèse adaptatif */}
+                                  <span className="inline-block mt-0.5 text-[9px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
+                                    {st.grossUSD > 0 && st.grossHTG === 0 
+                                      ? 'Bourse Complète (0 USD Dû)' 
+                                      : st.grossUSD > 0 
+                                      ? 'Bourse Complète (0 Dû / Soldé)' 
+                                      : 'Bourse Complète (0 HTG Dû)'}
+                                  </span>
+                                </>
                               ) : (
-                                <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">
-                                  {Math.round(netEq).toLocaleString()} HTG net
-                                </span>
+                                <>
+                                  {/* Montants nets exigibles non nuls affichés en clair */}
+                                  {st.netUSD > 0 && (
+                                    <p className="text-emerald-800 font-bold font-mono">{st.netUSD.toLocaleString()} USD</p>
+                                  )}
+                                  {st.netHTG > 0 && (
+                                    <p className="text-emerald-900 font-black font-mono">{st.netHTG.toLocaleString()} HTG</p>
+                                  )}
+                                  {st.netUSD > 0 && (
+                                    <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">
+                                      {Math.round(netEq).toLocaleString()} HTG net
+                                    </span>
+                                  )}
+                                </>
                               )}
                             </td>
                           </tr>
@@ -827,15 +853,20 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                                     </p>
                                     <div className="flex items-center gap-2 flex-wrap text-slate-300 font-mono text-xs pt-1">
                                       <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-200">
-                                        Assiette Brute : {Math.round(grossEq).toLocaleString()} HTG
+                                        Assiette Brute : {st.grossUSD > 0 ? `${st.grossUSD.toLocaleString()} USD ${st.grossHTG > 0 ? '+ ' : ''}` : ''}{st.grossHTG > 0 ? `${st.grossHTG.toLocaleString()} HTG` : ''} {st.grossUSD > 0 && `(${Math.round(grossEq).toLocaleString()} HTG eq.)`}
                                       </span>
                                       <span className="text-amber-400 font-bold">-</span>
                                       <span className="px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
-                                        Allègement ({badgeInfo.scopeLabel}) : -{Math.round(reductionEq).toLocaleString()} HTG
+                                        Allègement ({badgeInfo.scopeLabel}) : -{st.reductionUSD > 0 ? `${st.reductionUSD.toLocaleString()} USD ${st.reductionHTG > 0 ? '+ ' : ''}` : ''}{st.reductionHTG > 0 ? `${st.reductionHTG.toLocaleString()} HTG` : ''} {st.reductionUSD > 0 && `(-${Math.round(reductionEq).toLocaleString()} HTG eq.)`}
                                       </span>
                                       <span className="text-emerald-400 font-bold">=</span>
                                       <span className="px-2 py-1 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-black">
-                                        Net Exigible : {Math.round(netEq).toLocaleString()} HTG
+                                        Net Exigible : {netEq === 0 ? (
+                                          st.grossUSD > 0 && st.grossHTG === 0 ? '0 USD (Bourse Complète)' :
+                                          st.grossUSD > 0 ? '0 Dû (Soldé)' : '0 HTG (Bourse Complète)'
+                                        ) : (
+                                          `${st.netUSD > 0 ? `${st.netUSD.toLocaleString()} USD ` : ''}${st.netHTG > 0 ? `${st.netHTG.toLocaleString()} HTG ` : ''}${st.netUSD > 0 ? `(${Math.round(netEq).toLocaleString()} HTG eq.)` : ''}`
+                                        )}
                                       </span>
                                     </div>
                                   </div>
@@ -874,19 +905,23 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                         </td>
                         <td className="p-3.5 text-right font-mono font-bold">
                           {filteredTotals.tuitionUSD > 0 && <p className="text-indigo-700">{filteredTotals.tuitionUSD.toLocaleString()} USD</p>}
-                          <p>{filteredTotals.tuitionHTG.toLocaleString()} HTG</p>
+                          {filteredTotals.tuitionHTG > 0 && <p>{filteredTotals.tuitionHTG.toLocaleString()} HTG</p>}
+                          {filteredTotals.tuitionUSD === 0 && filteredTotals.tuitionHTG === 0 && <p>0 HTG</p>}
                         </td>
                         <td className="p-3.5 text-right font-mono font-bold">
                           {filteredTotals.miscUSD > 0 && <p className="text-indigo-700">{filteredTotals.miscUSD.toLocaleString()} USD</p>}
-                          <p>{filteredTotals.miscHTG.toLocaleString()} HTG</p>
+                          {filteredTotals.miscHTG > 0 && <p>{filteredTotals.miscHTG.toLocaleString()} HTG</p>}
+                          {filteredTotals.miscUSD === 0 && filteredTotals.miscHTG === 0 && <span className="text-slate-400 italic text-[11px]">—</span>}
                         </td>
                         <td className="p-3.5 text-right font-mono font-black text-amber-700">
                           {filteredTotals.reductionUSD > 0 && <p>-{filteredTotals.reductionUSD.toLocaleString()} USD</p>}
-                          <p>-{filteredTotals.reductionHTG.toLocaleString()} HTG</p>
+                          {filteredTotals.reductionHTG > 0 && <p>-{filteredTotals.reductionHTG.toLocaleString()} HTG</p>}
+                          {filteredTotals.reductionUSD === 0 && filteredTotals.reductionHTG === 0 && <p>0 HTG</p>}
                         </td>
                         <td className="p-3.5 text-right font-mono font-black text-emerald-800 bg-emerald-100/50">
                           {filteredTotals.netUSD > 0 && <p>{filteredTotals.netUSD.toLocaleString()} USD</p>}
-                          <p>{filteredTotals.netHTG.toLocaleString()} HTG</p>
+                          {filteredTotals.netHTG > 0 && <p>{filteredTotals.netHTG.toLocaleString()} HTG</p>}
+                          {filteredTotals.netUSD === 0 && filteredTotals.netHTG === 0 && <p>0 HTG</p>}
                         </td>
                       </tr>
                     </tfoot>

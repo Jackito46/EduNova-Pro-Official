@@ -428,6 +428,17 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <p className="text-sm font-black text-slate-900 font-mono tracking-tight">
                           -{Number(student.discount_amount).toLocaleString()} <span className="text-xs font-bold text-amber-600">HTG</span>
                         </p>
+                        {student.discount_label?.includes('100%') || student.discount_label?.toLowerCase().includes('bourse complète') ? (
+                          <span className="inline-block mt-0.5 text-[9px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
+                            {student.discount_label?.includes('USD') 
+                              ? 'Bourse Complète (0 USD Dû)' 
+                              : 'Bourse Complète (0 HTG Dû)'}
+                          </span>
+                        ) : (
+                          <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-amber-100/80 text-amber-900 font-bold border border-amber-200">
+                            Allègement Partiel
+                          </span>
+                        )}
                       </td>
                       <td className="px-5 py-3.5 text-center">
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 font-bold text-[10px] uppercase rounded-full border border-emerald-200">
