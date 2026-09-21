@@ -802,7 +802,11 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                               <p className="text-emerald-900 font-black">{st.netHTG.toLocaleString()} HTG</p>
                               {netEq === 0 ? (
                                 <span className="inline-block mt-0.5 text-[9px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
-                                  Bourse Complète (0 HTG Dû)
+                                  {st.grossUSD > 0 && st.grossHTG === 0 
+                                    ? 'Bourse Complète (0 USD Dû)' 
+                                    : st.grossUSD > 0 
+                                    ? 'Bourse Complète (0 Dû / Soldé)' 
+                                    : 'Bourse Complète (0 HTG Dû)'}
                                 </span>
                               ) : (
                                 <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">

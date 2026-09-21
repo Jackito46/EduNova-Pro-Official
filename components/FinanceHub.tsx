@@ -681,7 +681,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             let sReductUSD = 0;
 
             if (studentDiscount > 0) {
-              const isCompleteScholarship = Boolean(
+              const isExplicitComplete = Boolean(
                 discountLabel && (
                   discountLabel.includes('complète') ||
                   discountLabel.includes('complete') ||
@@ -689,47 +689,51 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                   discountLabel.includes('frais divers') ||
                   discountLabel.includes('intégrale') ||
                   discountLabel.includes('totale') ||
-                  (discountLabel.includes('excellence') && !discountLabel.includes('pure')) ||
-                  studentDiscount >= studentGrossHTG ||
-                  studentDiscount > tuitionHTG
+                  (discountLabel.includes('excellence') && !discountLabel.includes('pure'))
                 )
               );
-
-              // Si bourse complète : prise en charge intégrale de la scolarité et de l'ensemble des frais obligatoires
-              const eligibleHTG = isCompleteScholarship ? studentGrossHTG : tuitionHTG;
-              const eligibleUSD_raw = isCompleteScholarship ? studentGrossUSD_raw : tuitionUSD_raw;
 
               const matchPct = discountLabel.match(/(\d+)\s*%/);
               let pct: number | null = null;
 
               if (matchPct) {
                 pct = parseFloat(matchPct[1]);
-              } else if (discountLabel.includes('excellence') || discountLabel.includes('intégrale') || discountLabel.includes('totale')) {
+              } else if (isExplicitComplete || discountLabel.includes('excellence')) {
                 pct = 100;
               } else if (discountLabel.includes('demi') || discountLabel.includes('collaborateur')) {
                 pct = 50;
               }
 
-              // Cas d'une bourse complète ou d'une allocation explicite
-              if (studentDiscount > 0 && Math.abs(studentDiscount - studentGrossHTG) <= 10) {
-                sReductHTG = studentGrossHTG;
-                sReductUSD = studentGrossUSD_raw;
-              } else if (studentDiscount > 0 && studentDiscount > tuitionHTG) {
-                sReductHTG = Math.min(studentGrossHTG, studentDiscount);
+              // Détection d'une couverture intégrale : libellé explicite, 100%, ou montant couvrant l'assiette totale
+              const isCompleteScholarship = isExplicitComplete || 
+                pct === 100 || 
+                (studentGross > 0 && Math.abs(studentDiscount - studentGross) <= (15 * (currentExchangeRate || 1))) ||
+                (studentGrossHTG > 0 && studentGrossUSD_raw === 0 && studentDiscount >= studentGrossHTG);
+
+              // Si bourse complète : prise en charge intégrale de la scolarité et de l'ensemble des frais obligatoires
+              const eligibleHTG = isCompleteScholarship ? studentGrossHTG : tuitionHTG;
+              const eligibleUSD_raw = isCompleteScholarship ? studentGrossUSD_raw : tuitionUSD_raw;
+
+              if (isCompleteScholarship) {
+                // Prise en charge intégrale : annulation totale dans les devises respectives (0 HTG et 0 USD dû)
+                sReductHTG = eligibleHTG;
+                sReductUSD = eligibleUSD_raw;
               } else if (pct !== null && pct > 0) {
                 const ratio = Math.min(100, Math.max(0, pct)) / 100;
                 sReductHTG = eligibleHTG * ratio;
                 sReductUSD = eligibleUSD_raw * ratio;
               } else {
+                // Allocation forfaitaire en Gourdes : on impute d'abord sur la part HTG éligible
                 sReductHTG = Math.min(eligibleHTG, studentDiscount);
                 const overflowHTG = Math.max(0, studentDiscount - sReductHTG);
-                if (overflowHTG > 0 && currentExchangeRate > 0) {
+                // Le reliquat de réduction en HTG s'impute sur la part USD au taux de change
+                if (overflowHTG > 0 && currentExchangeRate > 0 && eligibleUSD_raw > 0) {
                   sReductUSD = Math.min(eligibleUSD_raw, overflowHTG / currentExchangeRate);
                 }
               }
 
-              // Sécurité de cohérence avec l'allocation enregistrée en base :
-              if (studentDiscount > 0 && sReductHTG < studentDiscount && studentDiscount <= studentGrossHTG) {
+              // Sécurité de cohérence avec l'allocation enregistrée en base pour les cas 100% HTG
+              if (studentGrossUSD_raw === 0 && studentDiscount > 0 && sReductHTG < studentDiscount && studentDiscount <= studentGrossHTG) {
                 sReductHTG = studentDiscount;
               }
 
@@ -753,7 +757,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 reductionUSD: sReductUSD,
                 netHTG: Math.max(0, studentGrossHTG - sReductHTG),
                 netUSD: Math.max(0, studentGrossUSD_raw - sReductUSD),
-                isCompleteScholarship: isCompleteScholarship || sReductHTG >= studentGrossHTG
+                isCompleteScholarship: isCompleteScholarship || (sReductHTG >= studentGrossHTG && sReductUSD >= studentGrossUSD_raw)
               });
             }
 
