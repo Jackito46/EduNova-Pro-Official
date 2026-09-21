@@ -931,7 +931,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 px-3 sm:px-4 md:px-0">
       {/* Header Banner - Concise & Ergonomic */}
-      <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 relative overflow-hidden">
+      <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/50 rounded-full -mr-32 -mt-32 blur-2xl pointer-events-none"></div>
         
         <div className="relative z-10 space-y-1.5">
@@ -979,25 +979,55 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Navigation Tabs - 3 Onglets Harmonieux */}
-        <div className="flex bg-slate-100 p-1 rounded-xl border border-slate-200 relative z-10 shadow-inner w-full md:w-auto">
+        {/* Navigation Tabs - Dynamiquement Responsive sur Mobile, Tablette et Desktop */}
+        <div className="flex items-center bg-slate-100 p-1 sm:p-1.5 rounded-2xl border border-slate-200 relative z-10 shadow-inner w-full lg:w-auto overflow-x-auto scrollbar-none">
           <button
+            type="button"
             onClick={() => setActiveTab('form')}
-            className={`flex-1 md:flex-none px-4 sm:px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'form' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 lg:flex-none px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap min-h-[40px] cursor-pointer ${
+              activeTab === 'form' 
+                ? 'bg-white text-indigo-700 shadow-sm border border-slate-200 ring-1 ring-slate-900/5' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
           >
-            <Edit3 size={15} /> Acte de Réévaluation
+            <Edit3 size={15} className="shrink-0 text-indigo-600" /> 
+            <span className="hidden sm:inline">Acte de Réévaluation</span>
+            <span className="sm:hidden">Acte</span>
           </button>
+          
           <button
+            type="button"
             onClick={() => setActiveTab('register')}
-            className={`flex-1 md:flex-none px-4 sm:px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'register' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 lg:flex-none px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap min-h-[40px] cursor-pointer ${
+              activeTab === 'register' 
+                ? 'bg-white text-indigo-700 shadow-sm border border-slate-200 ring-1 ring-slate-900/5' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
           >
-            <Award size={15} /> Registre & Audit ({discountedStudents.length})
+            <Award size={15} className="shrink-0 text-indigo-600" /> 
+            <span className="hidden md:inline">Registre & Audit</span>
+            <span className="md:hidden">Registre</span>
+            <span className="ml-0.5 px-1.5 py-0.2 bg-indigo-100 text-indigo-800 text-[10px] rounded-full font-mono font-bold">
+              {discountedStudents.length}
+            </span>
           </button>
+          
           <button
+            type="button"
             onClick={() => setActiveTab('report')}
-            className={`flex-1 md:flex-none px-4 sm:px-5 py-2.5 rounded-lg text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-2 ${activeTab === 'report' ? 'bg-white text-indigo-600 shadow-sm border border-slate-200' : 'text-slate-600 hover:text-slate-900'}`}
+            className={`flex-1 lg:flex-none px-3 sm:px-4 lg:px-5 py-2 sm:py-2.5 rounded-xl text-xs font-black uppercase tracking-tight transition-all duration-200 flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap min-h-[40px] cursor-pointer ${
+              activeTab === 'report' 
+                ? 'bg-white text-indigo-700 shadow-sm border border-slate-200 ring-1 ring-slate-900/5' 
+                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
+            }`}
           >
-            <FileSpreadsheet size={15} /> Grand Livre & Rapport ({filteredRegisterStudents.length})
+            <FileSpreadsheet size={15} className="shrink-0 text-indigo-600" /> 
+            <span className="hidden xl:inline">Grand Livre & Rapport</span>
+            <span className="xl:hidden hidden sm:inline">Grand Livre</span>
+            <span className="sm:hidden">Rapport</span>
+            <span className="ml-0.5 px-1.5 py-0.2 bg-indigo-100 text-indigo-800 text-[10px] rounded-full font-mono font-bold">
+              {filteredRegisterStudents.length}
+            </span>
           </button>
         </div>
       </div>
@@ -1006,17 +1036,21 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       {activeTab === 'form' && (
         <div className="space-y-6">
           {/* Controls Bar for Scope selection */}
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col md:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider">
-              <Layers size={16} className="text-indigo-600" /> Périmètre d'application :
+          <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-500 uppercase tracking-wider shrink-0">
+              <Layers size={16} className="text-indigo-600" /> 
+              <span>Périmètre d'application :</span>
             </div>
             
-            <div className="flex items-center gap-2 w-full md:w-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full sm:w-auto">
               {(['student', 'class', 'school'] as TargetType[]).map(t => (
                 <button
                   key={t}
+                  type="button"
                   onClick={() => { setTargetType(t); resetForm(); }}
-                  className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-200 ${targetType === t ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'}`}
+                  className={`px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl text-xs font-bold transition-all duration-200 text-center whitespace-nowrap min-h-[38px] cursor-pointer ${
+                    targetType === t ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                  }`}
                 >
                   {t === 'student' ? `Révision Individuelle (${terminology.student})` : t === 'class' ? `Ajustement ${terminology.class}` : 'Souveraineté Établissement'}
                 </button>

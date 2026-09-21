@@ -87,7 +87,11 @@ export const getDiscountBadgeInfo = (st: ReevaluatedStudentItem) => {
     lower.includes('complete') || 
     lower.includes('sociale') || 
     lower.includes('frais divers') ||
-    lower.includes('totale')
+    lower.includes('totale') ||
+    lower.includes('intégrale') ||
+    (st.reductionHTG && st.grossHTG && st.reductionHTG >= st.grossHTG) ||
+    (st.discountAmountHTG && st.grossHTG && st.discountAmountHTG >= st.grossHTG) ||
+    (lower.includes('excellence') && !lower.includes('pure'))
   );
 
   const matchPct = label.match(/(\d+)\s*%/);
@@ -105,14 +109,14 @@ export const getDiscountBadgeInfo = (st: ReevaluatedStudentItem) => {
   let categoryTitle = 'Ajustement Économat';
   let scopeLabel = '';
 
-  if (lower.includes('excellence') || pct === 100) {
+  if (lower.includes('excellence') || pct === 100 || isComplete) {
     categoryKey = 'excellence';
     badgeStyle = 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400/20';
     icon = Award;
-    categoryTitle = "Bourse d'Excellence";
+    categoryTitle = isComplete ? "Bourse d'Excellence Complète (100%)" : "Bourse d'Excellence";
     scopeLabel = isComplete 
-      ? 'Prise en charge intégrale (Scolarité + Frais Obligatoires)' 
-      : 'Exonération Totale de Scolarité (100%)';
+      ? 'Prise en charge intégrale (100% Scolarité + Frais + Inscription)' 
+      : 'Exonération Totale de Scolarité (100% Scolarité Pure)';
   } else if (lower.includes('social')) {
     categoryKey = 'social';
     badgeStyle = 'bg-purple-50 text-purple-900 border-purple-200 ring-1 ring-purple-400/20';
@@ -796,9 +800,15 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                                 <p className="text-emerald-800 font-bold">{st.netUSD.toLocaleString()} USD</p>
                               )}
                               <p className="text-emerald-900 font-black">{st.netHTG.toLocaleString()} HTG</p>
-                              <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">
-                                {Math.round(netEq).toLocaleString()} HTG net
-                              </span>
+                              {netEq === 0 ? (
+                                <span className="inline-block mt-0.5 text-[9px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
+                                  Bourse Complète (0 HTG Dû)
+                                </span>
+                              ) : (
+                                <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">
+                                  {Math.round(netEq).toLocaleString()} HTG net
+                                </span>
+                              )}
                             </td>
                           </tr>
 
@@ -899,20 +909,20 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
             }`}
           >
-            <div className={`w-2.5 h-2.5 rounded-full ${isTargetReevaluated ? 'bg-indigo-600 animate-pulse' : 'bg-slate-400'}`} />
-            <span>
+            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isTargetReevaluated ? 'bg-indigo-600 animate-pulse' : 'bg-slate-400'}`} />
+            <span className="text-center sm:text-left">
               Mode Tableau de Bord : <strong>{isTargetReevaluated ? 'Objectif Corrigé (Actif)' : 'Objectif Brut Initial'}</strong>
             </span>
           </button>
 
           {/* Primary Actions */}
-          <div className="flex items-center gap-2.5 justify-end">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 w-full sm:w-auto">
             <button
               type="button"
               onClick={handleExportExcel}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap min-h-[42px]"
             >
-              <Download size={14} className="text-slate-600" />
+              <Download size={14} className="text-slate-600 shrink-0" />
               <span>Exporter XLSX</span>
             </button>
 
@@ -922,10 +932,10 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                 onConfirmReevaluation();
                 onClose();
               }}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-indigo-500/25 transition-all flex items-center gap-2 cursor-pointer active:scale-95"
+              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap min-h-[42px]"
             >
-              <Check size={16} />
-              <span>Valider & Enregistrer l'Objectif</span>
+              <Check size={16} className="shrink-0" />
+              <span>Valider & Enregistrer</span>
             </button>
           </div>
 

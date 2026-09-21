@@ -281,10 +281,10 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* TOOLBAR FILTERS (DESKTOP 14-INCH OPTIMIZED & ERGONOMIC) */}
-        <div className="my-6 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex flex-col md:flex-row items-center justify-between gap-3 print:hidden">
-          <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto flex-1">
+        <div className="my-6 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 print:hidden">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full xl:w-auto flex-1 flex-wrap">
             {/* Search Bar */}
-            <div className="relative w-full sm:w-64 lg:w-80">
+            <div className="relative w-full sm:w-64 lg:w-72">
               <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
               <input 
                 type="text" 
@@ -296,7 +296,7 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             {/* Class Filter Dropdown - Style Pilule Harmonisé */}
-            <div className="w-full sm:w-auto min-w-[200px]">
+            <div className="w-full sm:w-auto min-w-[180px]">
               <SelectPill
                 value={selectedClassId}
                 onChange={(val) => setSelectedClassId(val)}
@@ -319,7 +319,7 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Campus Filter Dropdown (ONLY if multi-campus or multi-tenant annexes) - Style Pilule Harmonisé */}
             {hasMultipleCampuses && !user.campus_id && (
-              <div className="w-full sm:w-auto min-w-[200px]">
+              <div className="w-full sm:w-auto min-w-[180px]">
                 <SelectPill
                   value={selectedCampusFilter}
                   onChange={(val) => setSelectedCampusFilter(val)}
@@ -338,10 +338,10 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {/* Action Export Buttons */}
-          <div className="flex items-center gap-2 w-full md:w-auto justify-end pt-2 md:pt-0 border-t md:border-t-0 border-slate-200">
+          <div className="flex items-center gap-2 w-full xl:w-auto justify-end pt-2 xl:pt-0 border-t xl:border-t-0 border-slate-200 flex-wrap sm:flex-nowrap">
             <button
               onClick={fetchData}
-              className="p-2.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs"
+              className="p-2.5 text-slate-600 hover:text-slate-900 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition-all shadow-2xs min-h-[40px] shrink-0"
               title="Rafraîchir les données"
             >
               <RefreshCw size={15} />
@@ -350,20 +350,22 @@ const ReductionReportView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button 
               onClick={handleExportPDF}
               disabled={isExporting || filteredStudents.length === 0}
-              className="px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-3 sm:px-4 py-2.5 bg-slate-900 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-800 transition-all shadow-sm disabled:opacity-50 min-h-[40px] whitespace-nowrap cursor-pointer"
             >
-              {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} className="text-amber-400" />}
-              <span>Imprimer Rapport PDF</span>
+              {isExporting ? <Loader2 size={15} className="animate-spin" /> : <Printer size={15} className="text-amber-400 shrink-0" />}
+              <span className="hidden sm:inline">Imprimer Rapport PDF</span>
+              <span className="sm:hidden">Imprimer</span>
             </button>
 
             <button 
               onClick={handleExportExcel}
               disabled={filteredStudents.length === 0}
-              className="px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center gap-2 hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50"
+              className="flex-1 sm:flex-initial px-3 sm:px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-emerald-700 transition-all shadow-sm disabled:opacity-50 min-h-[40px] whitespace-nowrap cursor-pointer"
               title="Exporter au format Excel"
             >
-              <FileSpreadsheet size={15} />
-              <span>Export Excel</span>
+              <FileSpreadsheet size={15} className="shrink-0" />
+              <span className="hidden sm:inline">Export Excel</span>
+              <span className="sm:hidden">Excel</span>
             </button>
           </div>
         </div>

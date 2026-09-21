@@ -547,12 +547,17 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 discountLabel.includes('complète') ||
                 discountLabel.includes('complete') ||
                 discountLabel.includes('sociale') ||
-                discountLabel.includes('frais divers')
+                discountLabel.includes('frais divers') ||
+                discountLabel.includes('intégrale') ||
+                discountLabel.includes('totale') ||
+                (discountLabel.includes('excellence') && !discountLabel.includes('pure')) ||
+                discount >= expectedGrossHTG ||
+                discount > tuitionHTG
               )
             );
 
-            const eligibleHTG = isCompleteScholarship ? (tuitionHTG + miscHTG) : tuitionHTG;
-            const eligibleUSD_raw = isCompleteScholarship ? (tuitionUSD_raw + miscUSD_raw) : tuitionUSD_raw;
+            const eligibleHTG = isCompleteScholarship ? expectedGrossHTG : tuitionHTG;
+            const eligibleUSD_raw = isCompleteScholarship ? expectedGrossUSD : tuitionUSD_raw;
 
             const matchPct = discountLabel.match(/(\d+)\s*%/);
             let pct: number | null = null;
@@ -564,7 +569,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               pct = 50;
             }
 
-            if (pct !== null && pct > 0) {
+            if (discount > 0 && Math.abs(discount - expectedGrossHTG) <= 10) {
+              studentReductionsHTG = expectedGrossHTG;
+              studentReductionsUSD = expectedGrossUSD;
+            } else if (discount > 0 && discount > tuitionHTG) {
+              studentReductionsHTG = Math.min(expectedGrossHTG, discount);
+            } else if (pct !== null && pct > 0) {
               const ratio = Math.min(100, Math.max(0, pct)) / 100;
               studentReductionsHTG = eligibleHTG * ratio;
               studentReductionsUSD = eligibleUSD_raw * ratio;
@@ -574,6 +584,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               if (overflowHTG > 0 && currentExchangeRate > 0) {
                 studentReductionsUSD = Math.min(eligibleUSD_raw, overflowHTG / currentExchangeRate);
               }
+            }
+
+            if (discount > 0 && studentReductionsHTG < discount && discount <= expectedGrossHTG) {
+              studentReductionsHTG = discount;
             }
           }
 

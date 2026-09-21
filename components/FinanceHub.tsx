@@ -686,16 +686,18 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                   discountLabel.includes('complète') ||
                   discountLabel.includes('complete') ||
                   discountLabel.includes('sociale') ||
-                  discountLabel.includes('frais divers')
+                  discountLabel.includes('frais divers') ||
+                  discountLabel.includes('intégrale') ||
+                  discountLabel.includes('totale') ||
+                  (discountLabel.includes('excellence') && !discountLabel.includes('pure')) ||
+                  studentDiscount >= studentGrossHTG ||
+                  studentDiscount > tuitionHTG
                 )
               );
 
-              // Assiette éligible :
-              // - Scolarité Pure (Standard) : Seule la scolarité (tuitionHTG / tuitionUSD_raw) est exonérée
-              // - Bourse Complète / Sociale : Scolarité + Frais Divers obligatoires
-              // Les frais d'admission / réinscription ne sont jamais couverts par une bourse de scolarité
-              const eligibleHTG = isCompleteScholarship ? (tuitionHTG + miscHTG) : tuitionHTG;
-              const eligibleUSD_raw = isCompleteScholarship ? (tuitionUSD_raw + miscUSD_raw) : tuitionUSD_raw;
+              // Si bourse complète : prise en charge intégrale de la scolarité et de l'ensemble des frais obligatoires
+              const eligibleHTG = isCompleteScholarship ? studentGrossHTG : tuitionHTG;
+              const eligibleUSD_raw = isCompleteScholarship ? studentGrossUSD_raw : tuitionUSD_raw;
 
               const matchPct = discountLabel.match(/(\d+)\s*%/);
               let pct: number | null = null;
@@ -708,7 +710,13 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 pct = 50;
               }
 
-              if (pct !== null && pct > 0) {
+              // Cas d'une bourse complète ou d'une allocation explicite
+              if (studentDiscount > 0 && Math.abs(studentDiscount - studentGrossHTG) <= 10) {
+                sReductHTG = studentGrossHTG;
+                sReductUSD = studentGrossUSD_raw;
+              } else if (studentDiscount > 0 && studentDiscount > tuitionHTG) {
+                sReductHTG = Math.min(studentGrossHTG, studentDiscount);
+              } else if (pct !== null && pct > 0) {
                 const ratio = Math.min(100, Math.max(0, pct)) / 100;
                 sReductHTG = eligibleHTG * ratio;
                 sReductUSD = eligibleUSD_raw * ratio;
@@ -718,6 +726,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 if (overflowHTG > 0 && currentExchangeRate > 0) {
                   sReductUSD = Math.min(eligibleUSD_raw, overflowHTG / currentExchangeRate);
                 }
+              }
+
+              // Sécurité de cohérence avec l'allocation enregistrée en base :
+              if (studentDiscount > 0 && sReductHTG < studentDiscount && studentDiscount <= studentGrossHTG) {
+                sReductHTG = studentDiscount;
               }
 
               reevaluatedList.push({
@@ -740,7 +753,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 reductionUSD: sReductUSD,
                 netHTG: Math.max(0, studentGrossHTG - sReductHTG),
                 netUSD: Math.max(0, studentGrossUSD_raw - sReductUSD),
-                isCompleteScholarship
+                isCompleteScholarship: isCompleteScholarship || sReductHTG >= studentGrossHTG
               });
             }
 
