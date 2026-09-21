@@ -1321,61 +1321,92 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       {/* BILAN NET & LIQUIDITÉ RÉELLE */}
       {canViewSensitiveStats && (
-        <div className="bg-white p-4 sm:p-5 lg:p-5.5 rounded-2xl shadow-2xs border border-gray-200/90">
-          <div className="flex items-center gap-2 text-indigo-600 font-bold text-[10px] tracking-[0.2em] mb-3 sm:mb-4">
-            <TrendingUp size={14} />
-            ANALYSE DU FLUX DE TRÉSORERIE (BILAN NET)
+        <div className="bg-white p-3 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/80">
+          <div className="flex items-center justify-between gap-2 mb-2.5 sm:mb-3">
+            <div className="flex items-center gap-1.5 text-indigo-600 font-extrabold text-[10px] sm:text-[11px] tracking-wider uppercase">
+              <TrendingUp size={14} />
+              <span>Analyse du flux de trésorerie (Bilan Net)</span>
+            </div>
+            <span className="text-[9px] font-bold text-slate-500 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60 hidden sm:inline-block">
+              Encaissements vs Décaissements
+            </span>
           </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6 items-center">
-            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-3.5 sm:gap-4">
-              <div className="space-y-1 min-w-0">
-                <p className="text-[10px] font-bold text-gray-500 tracking-wider">RECETTES TOTALES</p>
-                <p className="text-base sm:text-xl font-bold text-emerald-600 font-mono" title={`+${netBalance.income.toLocaleString()} HTG`}>+{netBalance.income.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
-                <div className="h-1 w-full bg-emerald-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500 w-full"></div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-2.5 sm:gap-3 items-stretch">
+            {/* 3 Flux metrics */}
+            <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
+              {/* Recettes */}
+              <div className="p-2.5 sm:p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                    Recettes Totales
+                  </span>
+                </div>
+                <p className="text-sm sm:text-base font-black text-emerald-600 font-mono tracking-tight" title={`+${netBalance.income.toLocaleString('fr-FR')} HTG`}>
+                  +{Math.round(netBalance.income).toLocaleString('fr-FR')} <span className="text-[10px] font-sans font-bold">HTG</span>
+                </p>
+                <div className="h-1 w-full bg-emerald-100 rounded-full overflow-hidden mt-1.5">
+                  <div className="h-full bg-emerald-500 w-full rounded-full" />
                 </div>
               </div>
               
-              <div className="space-y-1 min-w-0">
-                <p className="text-[10px] font-bold text-gray-500 tracking-wider">DÉPENSES</p>
-                <p className="text-base sm:text-xl font-bold text-rose-600 font-mono" title={`-${netBalance.expenses.toLocaleString()} HTG`}>-{netBalance.expenses.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
-                <div className="h-1 w-full bg-rose-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-rose-500 w-full"></div>
+              {/* Dépenses */}
+              <div className="p-2.5 sm:p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+                    Dépenses
+                  </span>
+                </div>
+                <p className="text-sm sm:text-base font-black text-rose-600 font-mono tracking-tight" title={`-${netBalance.expenses.toLocaleString('fr-FR')} HTG`}>
+                  -{Math.round(netBalance.expenses).toLocaleString('fr-FR')} <span className="text-[10px] font-sans font-bold">HTG</span>
+                </p>
+                <div className="h-1 w-full bg-rose-100 rounded-full overflow-hidden mt-1.5">
+                  <div className="h-full bg-rose-500 w-full rounded-full" />
                 </div>
               </div>
               
-              <div className="space-y-1 min-w-0">
-                <p className="text-[10px] font-bold text-gray-500 tracking-wider">SALAIRES PAYÉS</p>
-                <p className="text-base sm:text-xl font-bold text-amber-600 font-mono" title={`-${netBalance.salaries.toLocaleString()} HTG`}>-{netBalance.salaries.toLocaleString()} <span className="text-xs font-sans">HTG</span></p>
-                <div className="h-1 w-full bg-amber-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-amber-500 w-full"></div>
+              {/* Salaires */}
+              <div className="p-2.5 sm:p-3 rounded-xl border border-slate-100 bg-slate-50/60 hover:bg-slate-50 transition-all flex flex-col justify-between">
+                <div className="flex items-center justify-between gap-1 mb-1">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />
+                    Salaires Payés
+                  </span>
+                </div>
+                <p className="text-sm sm:text-base font-black text-amber-600 font-mono tracking-tight" title={`-${netBalance.salaries.toLocaleString('fr-FR')} HTG`}>
+                  -{Math.round(netBalance.salaries).toLocaleString('fr-FR')} <span className="text-[10px] font-sans font-bold">HTG</span>
+                </p>
+                <div className="h-1 w-full bg-amber-100 rounded-full overflow-hidden mt-1.5">
+                  <div className="h-full bg-amber-500 w-full rounded-full" />
                 </div>
               </div>
             </div>
 
+            {/* Liquidité nette */}
             <div className="lg:col-span-4 min-w-0">
-              <div className={`p-3.5 sm:p-4 rounded-xl border-2 ${netBalance.net >= 0 ? 'bg-emerald-50/80 border-emerald-200' : 'bg-amber-50/80 border-amber-200'} flex flex-col justify-center min-w-0 h-full shadow-2xs`}>
+              <div className={`p-2.5 sm:p-3 rounded-xl border ${netBalance.net >= 0 ? 'bg-emerald-50/50 border-emerald-200/80 text-emerald-950' : 'bg-amber-50/50 border-amber-200/80 text-amber-950'} flex flex-col justify-between h-full shadow-2xs`}>
                 <div className="flex items-center justify-between gap-1 mb-1">
-                  <p className="text-[10px] font-extrabold text-slate-600 tracking-wider uppercase">LIQUIDITÉ RÉELLE NETTE</p>
-                  <span className={`px-2 py-0.5 text-[9px] font-black rounded-md ${netBalance.net >= 0 ? 'bg-emerald-200/60 text-emerald-800' : 'bg-amber-200/70 text-amber-900'}`}>
-                    {netBalance.net >= 0 ? 'BÉNÉFICIAIRE' : 'DÉFICIT CASH'}
+                  <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-700">Liquidité Réelle Nette</p>
+                  <span className={`px-2 py-0.5 text-[8.5px] font-black rounded-md uppercase tracking-wider ${netBalance.net >= 0 ? 'bg-emerald-200/70 text-emerald-800' : 'bg-amber-200/80 text-amber-900'}`}>
+                    {netBalance.net >= 0 ? 'Bénéficiaire' : 'Déficit Cash'}
                   </span>
                 </div>
                 
-                <div className="flex flex-col gap-0.5">
-                   <p className={`text-lg sm:text-xl font-black font-mono tracking-tighter ${netBalance.netHTG >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} title={`Solde Gourdes: ${netBalance.netHTG.toLocaleString()} HTG`}>
-                     {netBalance.netHTG.toLocaleString()} <span className="text-xs font-sans tracking-normal">HTG</span>
-                   </p>
-                   <p className={`text-xs sm:text-sm font-bold font-mono tracking-tighter ${netBalance.netUSD >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} title={`Solde Dollars: $${netBalance.netUSD.toLocaleString()} USD`}>
-                     {netBalance.netUSD > 0 ? '+' : ''}{netBalance.netUSD.toLocaleString()} <span className="text-[10px] font-sans tracking-normal">USD</span>
-                   </p>
+                <div className="flex items-baseline justify-between gap-2 my-0.5">
+                  <p className={`text-base sm:text-lg font-black font-mono tracking-tight ${netBalance.netHTG >= 0 ? 'text-emerald-700' : 'text-rose-700'}`} title={`Solde Gourdes: ${netBalance.netHTG.toLocaleString('fr-FR')} HTG`}>
+                    {netBalance.netHTG.toLocaleString('fr-FR')} <span className="text-[10px] font-sans tracking-normal font-bold">HTG</span>
+                  </p>
+                  <p className={`text-xs font-bold font-mono ${netBalance.netUSD >= 0 ? 'text-emerald-600' : 'text-rose-600'}`} title={`Solde Dollars: $${netBalance.netUSD.toLocaleString('fr-FR')} USD`}>
+                    {netBalance.netUSD > 0 ? '+' : ''}{netBalance.netUSD.toLocaleString('fr-FR')} <span className="text-[9px] font-sans tracking-normal">USD</span>
+                  </p>
                 </div>
 
-                <div className="mt-2 pt-1.5 border-t border-slate-200/80 flex items-center justify-between text-[10px] font-semibold text-slate-600">
+                <div className="pt-1.5 mt-1 border-t border-slate-200/70 flex items-center justify-between text-[9.5px] font-semibold text-slate-600">
                   <span>Solde Consolidé eq. :</span>
                   <span className={`font-mono font-bold ${netBalance.net >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>
-                    {netBalance.net > 0 ? '+' : ''}{Math.round(netBalance.net).toLocaleString()} HTG
+                    {netBalance.net > 0 ? '+' : ''}{Math.round(netBalance.net).toLocaleString('fr-FR')} HTG
                   </span>
                 </div>
               </div>
@@ -1385,138 +1416,159 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {/* DASHBOARD PREVIEW */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 items-start">
-        <div className={`bg-white p-4 sm:p-5 rounded-2xl shadow-2xs border border-gray-100 space-y-4 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 items-start">
+        <div className={`bg-white p-3.5 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/80 space-y-3 sm:space-y-3.5 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
           {canViewSensitiveStats && (
             <>
+              {/* Header Recouvrement */}
               <div className="flex items-center justify-between flex-wrap gap-2">
-                <h3 className="text-lg sm:text-xl font-black text-gray-900 flex items-center gap-2.5">
-                  <TrendingUp size={20} className="text-indigo-600" />
-                  Recouvrement Institutionnel
+                <h3 className="text-base sm:text-lg font-black text-slate-900 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0 border border-indigo-100">
+                    <TrendingUp size={15} />
+                  </div>
+                  <span>Recouvrement Institutionnel</span>
                 </h3>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => setIsReevaluationModalOpen(true)}
-                    className="flex items-center gap-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl border border-indigo-200 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                    className="flex items-center gap-1.5 text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1.5 rounded-xl border border-indigo-200/80 transition-all active:scale-95 shadow-2xs cursor-pointer"
                   >
-                    <Calculator size={14} />
+                    <Calculator size={13} />
                     <span>Réévaluer Objectif</span>
                   </button>
-                  <span className="text-[10px] font-black uppercase tracking-widest bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-100">Live</span>
+                  <span className="text-[9px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full border border-emerald-200/60">Live</span>
                 </div>
               </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-4">
-              <div className="flex justify-between items-end gap-2 flex-wrap">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-500 tracking-wider uppercase" title={`Objectif ${terminology.tuition}`}>
+              {/* Stats Synthèse Recouvrement */}
+              <div className="grid grid-cols-1 sm:grid-cols-12 gap-3 items-end bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+                <div className="sm:col-span-8 min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap mb-0.5">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-slate-500 tracking-wider uppercase" title={`Objectif ${terminology.tuition}`}>
                       Objectif {terminology.tuition} {isTargetReevaluated ? "(Réévalué)" : "(Brut)"}
                     </p>
                     {isTargetReevaluated && (
-                      <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Corrigé par bourses</span>
+                      <span className="text-[8.5px] font-bold bg-emerald-100/80 text-emerald-800 px-1.5 py-0.5 rounded-md border border-emerald-200/60">
+                        Corrigé par bourses
+                      </span>
                     )}
                   </div>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 mt-0.5" title={activeExpected.toLocaleString()}>
-                    {loading ? <RefreshCcw className="animate-spin inline-block mt-1" size={18} /> : activeExpected.toLocaleString()} <span className="text-[10px] sm:text-xs font-sans text-gray-600">HTG{(activeExpectedUSD > 0) ? " eq." : ""}</span>
+                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight" title={activeExpected.toLocaleString('fr-FR')}>
+                    {loading ? <RefreshCcw className="animate-spin inline-block mt-1" size={16} /> : Math.round(activeExpected).toLocaleString('fr-FR')} <span className="text-xs font-sans font-medium text-slate-600">HTG{(activeExpectedUSD > 0) ? " eq." : ""}</span>
                   </p>
                   {!loading && (
-                    <div className="flex flex-col gap-0.5 mt-1">
-                      <span className="text-[9px] font-black uppercase tracking-wider text-gray-600">
-                        {activeExpectedHTG.toLocaleString()} HTG
+                    <div className="flex items-center gap-2 flex-wrap text-[9px] font-bold text-slate-600 mt-1">
+                      <span className="bg-white px-2 py-0.5 rounded-md border border-slate-200/70 font-mono">
+                        {Math.round(activeExpectedHTG).toLocaleString('fr-FR')} HTG
                       </span>
-                      <span className="text-[9px] font-black uppercase tracking-wider text-indigo-700 font-mono">
-                        {activeExpectedUSD.toLocaleString()} USD
+                      <span className="bg-white px-2 py-0.5 rounded-md border border-indigo-200/70 text-indigo-700 font-mono">
+                        {Math.round(activeExpectedUSD).toLocaleString('fr-FR')} USD
                       </span>
                       {isTargetReevaluated && totalReductionsUSD > 0 && (
-                        <span className="text-[8px] text-amber-600 font-bold">
-                          (-{totalReductionsUSD.toLocaleString()} USD déduits des bourses)
+                        <span className="text-amber-700 font-semibold">
+                          (-{Math.round(totalReductionsUSD).toLocaleString('fr-FR')} USD bourses)
                         </span>
                       )}
                     </div>
                   )}
                 </div>
-                <div className="text-right min-w-0 shrink-0">
-                  <p className="text-[9px] sm:text-[10px] font-bold text-indigo-500 tracking-wider uppercase" title="Taux de Pénétration">Taux de Pénétration</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-indigo-700 mt-0.5" title={`${activeCollectionRate.toFixed(1)}%`}>{activeCollectionRate.toFixed(1)}%</p>
-                  
-                  {/* Economat penetration addition */}
-                  <div className="flex items-center justify-end gap-1 mt-0.5">
-                    <span className="text-[8px] sm:text-[9px] font-bold text-amber-500 tracking-wider uppercase">Économat:</span>
-                    <span className="text-[10px] sm:text-xs font-black text-amber-600">{economatPenetration.toFixed(1)}%</span>
+
+                <div className="sm:col-span-4 text-left sm:text-right min-w-0 shrink-0 sm:border-l sm:border-slate-200/70 sm:pl-3">
+                  <p className="text-[9px] sm:text-[10px] font-bold text-indigo-600 tracking-wider uppercase" title="Taux de Pénétration">Taux de Pénétration</p>
+                  <p className="text-xl sm:text-2xl font-black text-indigo-700 font-mono mt-0.5" title={`${activeCollectionRate.toFixed(1)}%`}>
+                    {activeCollectionRate.toFixed(1)}%
+                  </p>
+                  <div className="flex items-center sm:justify-end gap-1 mt-0.5">
+                    <span className="text-[8px] sm:text-[9px] font-bold text-amber-600 tracking-wider uppercase">Économat:</span>
+                    <span className="text-[10px] sm:text-xs font-black text-amber-700 font-mono">{economatPenetration.toFixed(1)}%</span>
                   </div>
                 </div>
               </div>
 
-              <div className="relative pt-1 pb-2">
-                <div className="flex justify-between items-start text-[9px] sm:text-[11px] font-bold mb-2 gap-2 flex-wrap">
-                  <span className="text-indigo-600 bg-indigo-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-indigo-100" title={`Encaissement ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${totalCollectedTuition.toLocaleString()} HTG`}>Encaissement: <span className="whitespace-nowrap">{totalCollectedTuition.toLocaleString()} HTG</span></span>
-                  <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-gray-600 bg-gray-100 px-2 sm:px-2.5 py-0.5 rounded-full border border-gray-200" title={`Reste ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${Math.max(0, activeExpected - totalCollectedTuition).toLocaleString()} HTG`}>Reste: <span className="whitespace-nowrap">{Math.max(0, activeExpected - totalCollectedTuition).toLocaleString()} HTG</span></span>
-                    {!loading && (totalCollectedTuitionUSD > 0 || activeExpectedUSD > 0) && (
-                      <div className="flex gap-2 text-gray-600 px-1 opacity-90">
-                        <span className="text-[9px] uppercase">{Math.max(0, activeExpectedHTG - totalCollectedTuitionHTG).toLocaleString()} HTG</span>
-                        <span className="text-[9px] uppercase">{Math.max(0, activeExpectedUSD - totalCollectedTuitionUSD).toLocaleString()} USD</span>
-                      </div>
-                    )}
-                  </div>
+              {/* Progress Bar & Repères */}
+              <div className="space-y-1.5 pt-0.5">
+                <div className="flex justify-between items-center text-[10px] sm:text-[11px] font-bold gap-2 flex-wrap">
+                  <span className="text-indigo-700 bg-indigo-50/80 px-2.5 py-0.5 rounded-lg border border-indigo-100 flex items-center gap-1.5" title={`Encaissement: ${Math.round(totalCollectedTuition).toLocaleString('fr-FR')} HTG`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-600 shrink-0" />
+                    Encaissement : <span className="font-mono">{Math.round(totalCollectedTuition).toLocaleString('fr-FR')} HTG</span>
+                  </span>
+                  <span className="text-slate-700 bg-slate-100/80 px-2.5 py-0.5 rounded-lg border border-slate-200/70 flex items-center gap-1.5" title={`Reste: ${Math.max(0, Math.round(activeExpected - totalCollectedTuition)).toLocaleString('fr-FR')} HTG`}>
+                    <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0" />
+                    Reste : <span className="font-mono">{Math.max(0, Math.round(activeExpected - totalCollectedTuition)).toLocaleString('fr-FR')} HTG</span>
+                  </span>
                 </div>
-                <div className="h-3.5 sm:h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-0.5">
+                
+                <div className="h-2.5 sm:h-3 bg-slate-100 rounded-full overflow-hidden border border-slate-200/80 p-0.5">
                   <div 
-                    className="h-full bg-indigo-600 rounded-full transition-all duration-1000 relative" 
+                    className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full transition-all duration-1000 relative" 
                     style={{ width: `${activeExpected > 0 ? Math.min(100, (totalCollectedTuition / activeExpected) * 100) : 0}%` }}
                   >
-                     <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-[pulse_2s_ease-in-out_infinite]"></div>
+                     <div className="absolute inset-0 bg-white/20 animate-[pulse_2s_ease-in-out_infinite] rounded-full" />
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-2.5 sm:gap-3 mt-4 sm:mt-5">
-                  <div className="bg-emerald-50 rounded-xl p-2.5 sm:p-3 border border-emerald-100 overflow-hidden min-w-0 flex flex-col justify-center">
-                    <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-1 text-emerald-600 mb-1">
-                      <CheckCircle size={13} className="shrink-0 hidden 2xl:block" />
-                      <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider leading-tight" title={`${terminology.tuition} Récoltée`}>{terminology.tuition} Récoltée</p>
-                    </div>
-                    <p className="text-sm sm:text-base lg:text-lg font-bold text-emerald-700 tracking-tight" title={totalCollectedTuition.toLocaleString()}>{totalCollectedTuition.toLocaleString()} <span className="text-[9px] sm:text-xs font-medium">HTG{(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}</span></p>
-                    {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
-                      <div className="flex flex-col gap-0.5 mt-1">
-                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600/70">{totalCollectedTuitionHTG.toLocaleString()} HTG</span>
-                        <span className="text-[9px] font-black uppercase tracking-wider text-emerald-600/70">{totalCollectedTuitionUSD.toLocaleString()} USD</span>
-                      </div>
-                    )}
+              {/* Deux cartes métriques adaptées */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="bg-emerald-50/50 rounded-xl p-2.5 sm:p-3 border border-emerald-100/90 overflow-hidden min-w-0 flex flex-col justify-between hover:bg-emerald-50/70 transition-all">
+                  <div className="flex items-center gap-1.5 text-emerald-800 mb-1">
+                    <CheckCircle size={13} className="shrink-0 text-emerald-600" />
+                    <p className="text-[9px] font-black uppercase tracking-wider truncate" title={`${terminology.tuition} Récoltée`}>
+                      {terminology.tuition} Récoltée
+                    </p>
                   </div>
-                  <div className="bg-rose-50 rounded-xl p-2.5 sm:p-3 border border-rose-100 overflow-hidden min-w-0 flex flex-col justify-center">
-                    <div className="flex flex-col 2xl:flex-row 2xl:items-center gap-1 text-rose-600 mb-1">
-                       <AlertCircle size={13} className="shrink-0 hidden 2xl:block" />
-                       <p className="text-[8px] sm:text-[9px] font-black uppercase tracking-wider leading-tight" title="Reste à recouvrer">Reste à recouvrer</p>
+                  <p className="text-base sm:text-lg font-black text-emerald-700 font-mono tracking-tight" title={totalCollectedTuition.toLocaleString('fr-FR')}>
+                    {Math.round(totalCollectedTuition).toLocaleString('fr-FR')} <span className="text-[10px] font-sans font-medium text-emerald-800">HTG{(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? " eq." : ""}</span>
+                  </p>
+                  {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
+                    <div className="flex items-center gap-2 mt-1 pt-1 border-t border-emerald-100/70 text-[9px] font-bold text-emerald-700/80 font-mono">
+                      <span>{Math.round(totalCollectedTuitionHTG).toLocaleString('fr-FR')} HTG</span>
+                      <span>•</span>
+                      <span>{Math.round(totalCollectedTuitionUSD).toLocaleString('fr-FR')} USD</span>
                     </div>
-                    <p className="text-sm sm:text-base lg:text-lg font-bold text-rose-700 tracking-tight" title={totalArrears.toLocaleString()}>{totalArrears.toLocaleString()} <span className="text-[9px] sm:text-xs font-medium">HTG</span></p>
+                  )}
+                </div>
+
+                <div className="bg-rose-50/50 rounded-xl p-2.5 sm:p-3 border border-rose-100/90 overflow-hidden min-w-0 flex flex-col justify-between hover:bg-rose-50/70 transition-all">
+                  <div className="flex items-center gap-1.5 text-rose-800 mb-1">
+                    <AlertCircle size={13} className="shrink-0 text-rose-600" />
+                    <p className="text-[9px] font-black uppercase tracking-wider truncate" title="Reste à recouvrer">
+                      Reste à recouvrer
+                    </p>
                   </div>
+                  <p className="text-base sm:text-lg font-black text-rose-700 font-mono tracking-tight" title={totalArrears.toLocaleString('fr-FR')}>
+                    {Math.round(totalArrears).toLocaleString('fr-FR')} <span className="text-[10px] font-sans font-medium text-rose-800">HTG{(activeExpectedUSD > 0) ? " eq." : ""}</span>
+                  </p>
+                  {!loading && (activeExpectedUSD > 0 || totalCollectedTuitionUSD > 0) && (
+                    <div className="flex items-center gap-2 mt-1 pt-1 border-t border-rose-100/70 text-[9px] font-bold text-rose-700/80 font-mono">
+                      <span>{Math.max(0, Math.round(activeExpectedHTG - totalCollectedTuitionHTG)).toLocaleString('fr-FR')} HTG</span>
+                      <span>•</span>
+                      <span>{Math.max(0, Math.round(activeExpectedUSD - totalCollectedTuitionUSD)).toLocaleString('fr-FR')} USD</span>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          </div>
-          </>
+            </>
           )}
 
           {/* RECENT TRANSACTIONS LIST */}
-          <div className={canViewSensitiveStats ? "pt-4 sm:pt-5 border-t border-gray-100" : ""}>
-            <div className="flex items-center justify-between mb-3">
-              <h4 className="text-xs sm:text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <ClipboardList size={15} className="text-gray-500" />
-                Dernières Opérations (Aujourd'hui)
+          <div className={canViewSensitiveStats ? "pt-3 border-t border-slate-100" : ""}>
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-xs sm:text-sm font-bold text-slate-900 flex items-center gap-2">
+                <ClipboardList size={14} className="text-slate-500" />
+                <span>Dernières Opérations (Aujourd'hui)</span>
               </h4>
               {canViewSensitiveStats && (
-                <button onClick={() => navigate('/economat/liste')} className="text-[11px] font-black uppercase tracking-widest text-indigo-600 hover:text-indigo-700 cursor-pointer">
+                <button onClick={() => navigate('/economat/liste')} className="text-[10px] font-extrabold uppercase tracking-wider text-indigo-600 hover:text-indigo-700 cursor-pointer">
                   Tout le registre
                 </button>
               )}
             </div>
             
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               {loading ? (
-                <div className="text-center py-6 text-gray-500">
-                  <RefreshCcw className="animate-spin inline-block mb-1.5" size={20} />
+                <div className="text-center py-4 text-slate-500">
+                  <RefreshCcw className="animate-spin inline-block mb-1" size={16} />
                   <p className="text-xs font-medium">Chargement...</p>
                 </div>
               ) : recentTransactions.length > 0 ? (
@@ -1528,28 +1580,28 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                   const IconComp = typeof tx.icon === 'function' ? tx.icon : (tx.color?.includes('indigo') ? GraduationCap : BookOpen);
 
                   return (
-                    <div key={i} className="flex items-center justify-between p-2.5 sm:p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${tx.bg || 'bg-indigo-50'} ${tx.color || 'text-indigo-600'} shrink-0`}>
-                          <IconComp size={16} />
+                    <div key={i} className="flex items-center justify-between p-2 sm:p-2.5 bg-slate-50/60 rounded-xl hover:bg-slate-100/80 border border-slate-100 transition-colors">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${tx.bg || 'bg-indigo-50'} ${tx.color || 'text-indigo-600'} shrink-0`}>
+                          <IconComp size={14} />
                         </div>
                         <div className="min-w-0">
-                          <p className="text-xs sm:text-sm font-semibold text-gray-900 truncate">{tx.type}</p>
-                          <p className="text-[11px] font-medium text-gray-500">{formattedTime} • {tx.method}</p>
+                          <p className="text-xs font-semibold text-slate-900 truncate">{tx.type}</p>
+                          <p className="text-[10px] font-medium text-slate-500">{formattedTime} • {tx.method}</p>
                         </div>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className="text-xs sm:text-sm font-bold text-gray-900 font-mono">+{tx.currencyAmount ? tx.currencyAmount.toLocaleString() : tx.amount.toLocaleString()} {tx.currency || 'HTG'}</p>
+                      <div className="text-right shrink-0 pl-2">
+                        <p className="text-xs sm:text-sm font-bold text-slate-900 font-mono">+{tx.currencyAmount ? Math.round(tx.currencyAmount).toLocaleString('fr-FR') : Math.round(tx.amount).toLocaleString('fr-FR')} {tx.currency || 'HTG'}</p>
                         {tx.currency === 'USD' && (
-                          <p className="text-[9px] text-gray-500 font-medium">({tx.amount.toLocaleString()} HTG eq.)</p>
+                          <p className="text-[9px] text-slate-500 font-medium">({Math.round(tx.amount).toLocaleString('fr-FR')} HTG eq.)</p>
                         )}
                       </div>
                     </div>
                   );
                 })
               ) : (
-                <div className="text-center py-6 bg-gray-50 rounded-xl border border-dashed border-gray-200">
-                  <p className="text-xs font-medium text-gray-500">Aucune transaction aujourd'hui</p>
+                <div className="text-center py-4 bg-slate-50/60 rounded-xl border border-dashed border-slate-200">
+                  <p className="text-xs font-medium text-slate-500">Aucune transaction aujourd'hui</p>
                 </div>
               )}
             </div>
@@ -1557,51 +1609,53 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {canViewSensitiveStats && (
-        <div className="lg:col-span-4 bg-white p-3.5 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/90 space-y-3 relative overflow-hidden">
-          <div className="absolute top-0 right-0 w-28 h-28 bg-slate-50 rounded-full -mr-12 -mt-12 opacity-40 pointer-events-none" />
-          
-          <div className="flex items-center justify-between relative z-10">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold border border-indigo-100/80 shrink-0">
-                <Target size={15} />
-              </div>
-              <div className="min-w-0">
-                <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight truncate">
-                  Alertes Solvabilité
-                </h3>
-                <p className="text-[10px] text-slate-500 font-medium truncate">Pilotage Direction</p>
-              </div>
-            </div>
-            <div className="w-6 h-6 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center shrink-0">
-              <ClipboardList size={13} />
-            </div>
-          </div>
-
-          <div className="space-y-2 relative z-10">
-            {[
-              { label: 'Réévaluations validées', count: `${loading ? '...' : discountedStudents} Dossiers`, color: 'text-amber-600', borderColor: 'border-l-amber-500', path: '/economat/rapport-reductions' },
-              { label: 'Paiements en attente', count: `${loading ? '...' : pendingPayments} Sessions`, color: 'text-indigo-600', borderColor: 'border-l-indigo-500', path: '/economat/liste', state: { filterStatus: 'En attente' } },
-            ].map((item, i) => (
-              <div 
-                key={i} 
-                onClick={() => navigate(item.path, { state: item.state })}
-                className={`flex justify-between items-center px-3 py-2 bg-slate-50/80 border border-slate-100 border-l-4 ${item.borderColor} rounded-r-xl cursor-pointer hover:bg-slate-100/90 transition-all group`}
-              >
-                <p className="text-xs font-semibold text-slate-700 truncate pr-2">{item.label}</p>
-                <div className="flex items-center gap-1.5 shrink-0">
-                  <p className={`text-xs font-bold ${item.color}`}>{item.count}</p>
-                  <ArrowUpRight size={13} className="text-slate-300 group-hover:text-slate-600 transition-colors" />
+        <div className="lg:col-span-4 bg-white p-3.5 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/80 space-y-3 relative overflow-hidden flex flex-col justify-between">
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center font-bold border border-indigo-100/80 shrink-0">
+                  <Target size={14} />
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 leading-tight truncate">
+                    Alertes Solvabilité
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-medium truncate">Pilotage Direction</p>
                 </div>
               </div>
-            ))}
+              <div className="w-6 h-6 bg-slate-100 text-slate-500 rounded-lg flex items-center justify-center shrink-0">
+                <ClipboardList size={12} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {[
+                { label: 'Réévaluations validées', count: `${loading ? '...' : discountedStudents} Dossiers`, color: 'text-amber-700', bgBadge: 'bg-amber-50 border-amber-200/70', path: '/economat/rapport-reductions' },
+                { label: 'Paiements en attente', count: `${loading ? '...' : pendingPayments} Sessions`, color: 'text-indigo-700', bgBadge: 'bg-indigo-50 border-indigo-200/70', path: '/economat/liste', state: { filterStatus: 'En attente' } },
+              ].map((item, i) => (
+                <div 
+                  key={i} 
+                  onClick={() => navigate(item.path, { state: item.state })}
+                  className="flex justify-between items-center px-3 py-2.5 bg-slate-50/70 border border-slate-200/70 rounded-xl cursor-pointer hover:bg-slate-100/80 transition-all group"
+                >
+                  <p className="text-xs font-semibold text-slate-700 truncate pr-2">{item.label}</p>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className={`text-[11px] font-bold px-2 py-0.5 rounded-md border ${item.bgBadge} ${item.color}`}>
+                      {item.count}
+                    </span>
+                    <ArrowUpRight size={13} className="text-slate-400 group-hover:text-slate-700 transition-colors" />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           
           <button 
             onClick={() => navigate('/economat/suivi')}
-            className="w-full py-2.5 px-3 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800 transition-all shadow-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            className="w-full mt-2 py-2 px-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-[0.98]"
           >
-            <ArrowRight size={15} />
-            Rapport Complet de Solvabilité
+            <ArrowRight size={14} />
+            <span>Rapport Complet de Solvabilité</span>
           </button>
         </div>
         )}
