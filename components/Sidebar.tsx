@@ -154,6 +154,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const isExamsEnabled = isModuleEnabled('exams');
   const isAttendanceEnabled = isModuleEnabled('attendance');
   const isDisciplineEnabled = isModuleEnabled('discipline');
+  const isInventoryEnabled = isModuleEnabled('inventory');
   const isSuperAdmin = Boolean(user?.is_super_admin || (user?.role as any) === UserRole.SUPER_ADMIN || (user?.role as any) === 'SUPER_ADMIN');
   const isParent = Boolean(user?.role === UserRole.PARENT || (user?.role as any) === 'PARENT' || (user?.role as any) === 'parent');
   const canAccessShortcuts = Boolean(
@@ -493,7 +494,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Registre & Validations', path: '/economat/liste' }, true, History)}
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Registre Dépenses', path: '/economat/depenses' }, true, ArrowRight)}
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Gestion Payroll', path: '/economat/paie' }, true, Wallet)}
-                  {renderNavLink({ name: 'Fournitures', path: '/economat/fournitures' }, true, Package)}
+                  {isInventoryEnabled && renderNavLink({ name: 'Fournitures & Stocks', path: '/economat/fournitures' }, true, Package)}
                   {hasAccess(adminRoles) && renderNavLink({ name: 'Réévaluations', path: '/economat/derogations' }, true, RefreshCcw)}
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Campagnes & Événements', path: '/economat/frais-occasionnels' }, true, Rocket)}
                 </div>

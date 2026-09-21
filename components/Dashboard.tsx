@@ -74,9 +74,11 @@ import { ClassRevenueModal } from './ClassRevenueModal';
 
 const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
-  const { terminology, currentCampusId, campuses, school, activeAcademicYear } = useSchool();
-  const isPresencesEnabled = school?.global_settings?.modules?.presences ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
-  const isDisciplineEnabled = school?.global_settings?.modules?.discipline ?? (school?.school_type !== 'UNIVERSITY' && school?.school_type !== 'PROFESSIONAL');
+  const { terminology, currentCampusId, campuses, school, activeAcademicYear, isModuleEnabled } = useSchool();
+  const isPresencesEnabled = isModuleEnabled('attendance');
+  const isDisciplineEnabled = isModuleEnabled('discipline');
+  const isFinanceEnabled = isModuleEnabled('finance');
+  const isExamsEnabled = isModuleEnabled('exams');
 
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [selectedYearId, setSelectedYearId] = useState<string>('');
@@ -2808,7 +2810,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </Link>
                 )}
                 
-                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
+                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && isFinanceEnabled && (
                 <Link to="/economat/frais" className="flex items-center p-2.5 rounded-xl hover:bg-emerald-50/50 border border-slate-100 hover:border-emerald-200 transition-all group shadow-2xs">
                   <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-emerald-100/60">
                     <Receipt size={16} />
@@ -2821,7 +2823,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </Link>
                 )}
 
-                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
+                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && isFinanceEnabled && (
                 <Link to="/economat/fournitures" className="flex items-center p-2.5 rounded-xl hover:bg-purple-50/50 border border-slate-100 hover:border-purple-200 transition-all group shadow-2xs">
                   <div className="w-8 h-8 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-purple-100/60">
                     <ShoppingCart size={16} />
@@ -2860,7 +2862,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </Link>
                 )}
 
-                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT].includes(user.role) && (
+                {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT].includes(user.role) && isFinanceEnabled && (
                 <Link to="/economat/paie" className="flex items-center p-2.5 rounded-xl hover:bg-rose-50/50 border border-slate-100 hover:border-rose-200 transition-all group shadow-2xs">
                   <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0 border border-rose-100/60">
                     <HandCoins size={16} />
@@ -2892,7 +2894,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </Link>
                   )}
 
-                  {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && (
+                  {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY].includes(user.role) && isFinanceEnabled && (
                   <Link to="/economat/suivi" className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-indigo-200 hover:shadow-2xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group active:scale-98">
                     <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs border border-indigo-100/60">
                       <Activity size={16} />
@@ -2914,6 +2916,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </Link>
 
+                  {isFinanceEnabled && (
                   <Link to="/economat/factures" className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/50 hover:bg-white hover:border-rose-200 hover:shadow-2xs transition-all flex flex-col items-center justify-center text-center gap-1.5 group active:scale-98">
                     <div className="w-8 h-8 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs border border-rose-100/60">
                       <Receipt size={16} />
@@ -2923,6 +2926,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <p className="text-[9.5px] text-slate-400 mt-0.5">Reçus émis</p>
                     </div>
                   </Link>
+                  )}
                 </div>
               </div>
             )}

@@ -90,7 +90,7 @@ export default defineConfig(({ mode }) => {
           srcDir: 'src',
           filename: 'sw.js',
           registerType: 'autoUpdate',
-          injectRegister: 'inline',
+          injectRegister: null, // Contrôlé explicitement dans index.tsx pour éviter tout conflit ou double enregistrement
           includeAssets: [
             'sw.js',
             'favicon.ico', 

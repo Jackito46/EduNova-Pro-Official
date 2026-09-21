@@ -1,5 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Layers, ChevronDown, Check, Search, X, BookOpen } from 'lucide-react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
+import { Layers, ChevronDown, Check, Search, X } from 'lucide-react';
 
 export interface SubjectSelectorItem {
   id: string;
@@ -15,6 +16,8 @@ export interface SubjectSelectorPillProps {
   onSelectSubject: (subjectId: string) => void;
   labelPrefix?: string;
   allLabel?: string;
+  allowAll?: boolean;
+  emptyLabel?: string;
   variant?: 'pill' | 'field' | 'compact' | 'minimal';
   size?: 'xs' | 'sm' | 'md' | 'lg';
   colorScheme?: 'blue' | 'indigo' | 'emerald' | 'slate' | 'purple' | 'amber';
@@ -23,6 +26,7 @@ export interface SubjectSelectorPillProps {
   disabled?: boolean;
   showIcon?: boolean;
   title?: string;
+  portal?: boolean;
 }
 
 export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
@@ -31,6 +35,8 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
   onSelectSubject,
   labelPrefix = 'Matière :',
   allLabel,
+  allowAll = true,
+  emptyLabel = 'Sélectionner une matière',
   variant = 'pill',
   size = 'sm',
   colorScheme = 'blue',
@@ -38,16 +44,93 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
   dropdownAlign = 'left',
   disabled = false,
   showIcon = true,
-  title = 'Filtrer par matière'
+  title = 'Filtrer par matière',
+  portal = true
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
+  const popoverRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const [popoverCoords, setPopoverCoords] = useState<{
+    top?: number;
+    bottom?: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+    openUpward: boolean;
+  } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current || typeof window === 'undefined') return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    const minWidth = variant === 'field' ? Math.max(rect.width, 280) : 280;
+    const popoverWidth = Math.min(minWidth, Math.max(viewportWidth - 24, 240));
+
+    const spaceBelow = viewportHeight - rect.bottom - 8;
+    const spaceAbove = rect.top - 8;
+    const preferUpward = spaceBelow < 250 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(160, Math.min(320, preferUpward ? spaceAbove - 12 : spaceBelow - 12));
+
+    let left = rect.left;
+    if (dropdownAlign === 'right') {
+      left = rect.right - popoverWidth;
+    }
+
+    if (left + popoverWidth > viewportWidth - 12) {
+      left = viewportWidth - popoverWidth - 12;
+    }
+    if (left < 12) {
+      left = 12;
+    }
+
+    if (preferUpward) {
+      setPopoverCoords({
+        bottom: viewportHeight - rect.top + 4,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: true
+      });
+    } else {
+      setPopoverCoords({
+        top: rect.bottom + 4,
+        left,
+        width: popoverWidth,
+        maxHeight,
+        openUpward: false
+      });
+    }
+  }, [variant, dropdownAlign]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    updatePosition();
+
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('resize', handleScrollOrResize, { passive: true });
+    window.addEventListener('scroll', handleScrollOrResize, { passive: true, capture: true });
+
+    return () => {
+      window.removeEventListener('resize', handleScrollOrResize);
+      window.removeEventListener('scroll', handleScrollOrResize, { capture: true });
+    };
+  }, [isOpen, updatePosition]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+      const target = event.target as Node;
+      const clickedInsideTrigger = containerRef.current && containerRef.current.contains(target);
+      const clickedInsidePopover = popoverRef.current && popoverRef.current.contains(target);
+
+      if (!clickedInsideTrigger && !clickedInsidePopover) {
         setIsOpen(false);
       }
     };
@@ -70,29 +153,31 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
     };
   }, [isOpen]);
 
-  const isAllSelected = !selectedSubjectId || selectedSubjectId === 'ALL' || selectedSubjectId === 'all';
-  const selectedSubject = isAllSelected ? null : subjects.find(s => s.id === selectedSubjectId);
+  const isAllSelected = allowAll && (!selectedSubjectId || selectedSubjectId === 'ALL' || selectedSubjectId === 'all');
+  const selectedSubject = (!isAllSelected && selectedSubjectId) 
+    ? subjects.find(s => s.id === selectedSubjectId) 
+    : null;
 
   const defaultAllLabel = allLabel || `Toutes les matières (${subjects.length})`;
 
   // Color mappings
   const colorMap = {
     blue: {
-      activeBorder: 'border-blue-300 ring-2 ring-blue-500/20 bg-blue-50/70',
+      activeBorder: 'border-blue-400 ring-2 ring-blue-500/20 bg-blue-50/70',
       badge: 'bg-blue-50 text-blue-700 border-blue-100',
       iconText: 'text-blue-600',
       highlightBg: 'bg-blue-50/90 text-blue-950 border-blue-200/70',
       checkColor: 'text-blue-600'
     },
     indigo: {
-      activeBorder: 'border-indigo-300 ring-2 ring-indigo-500/20 bg-indigo-50/70',
+      activeBorder: 'border-indigo-400 ring-2 ring-indigo-500/20 bg-indigo-50/70',
       badge: 'bg-indigo-50 text-indigo-700 border-indigo-100',
       iconText: 'text-indigo-600',
       highlightBg: 'bg-indigo-50/90 text-indigo-950 border-indigo-200/70',
       checkColor: 'text-indigo-600'
     },
     emerald: {
-      activeBorder: 'border-emerald-300 ring-2 ring-emerald-500/20 bg-emerald-50/70',
+      activeBorder: 'border-emerald-400 ring-2 ring-emerald-500/20 bg-emerald-50/70',
       badge: 'bg-emerald-50 text-emerald-700 border-emerald-100',
       iconText: 'text-emerald-600',
       highlightBg: 'bg-emerald-50/90 text-emerald-950 border-emerald-200/70',
@@ -106,14 +191,14 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
       checkColor: 'text-slate-700'
     },
     purple: {
-      activeBorder: 'border-purple-300 ring-2 ring-purple-500/20 bg-purple-50/70',
+      activeBorder: 'border-purple-400 ring-2 ring-purple-500/20 bg-purple-50/70',
       badge: 'bg-purple-50 text-purple-700 border-purple-100',
       iconText: 'text-purple-600',
       highlightBg: 'bg-purple-50/90 text-purple-950 border-purple-200/70',
       checkColor: 'text-purple-600'
     },
     amber: {
-      activeBorder: 'border-amber-300 ring-2 ring-amber-500/20 bg-amber-50/70',
+      activeBorder: 'border-amber-400 ring-2 ring-amber-500/20 bg-amber-50/70',
       badge: 'bg-amber-50 text-amber-700 border-amber-100',
       iconText: 'text-amber-600',
       highlightBg: 'bg-amber-50/90 text-amber-950 border-amber-200/70',
@@ -137,7 +222,7 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
 
   const getButtonClass = () => {
     if (variant === 'field') {
-      return `w-full flex items-center justify-between px-3.5 py-2 bg-white hover:bg-slate-50 border rounded-xl text-left transition-all duration-200 shadow-2xs ${
+      return `w-full flex items-center justify-between px-3 py-2 bg-white hover:bg-slate-50 border rounded-xl text-left transition-all duration-200 shadow-2xs min-h-[38px] ${
         isOpen 
           ? scheme.activeBorder 
           : 'border-slate-200 hover:border-slate-300 text-slate-800'
@@ -159,6 +244,159 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
     }`;
   };
 
+  const renderDropdownContent = () => (
+    <div 
+      ref={popoverRef}
+      style={
+        portal && popoverCoords
+          ? {
+              position: 'fixed',
+              left: `${popoverCoords.left}px`,
+              top: popoverCoords.top !== undefined ? `${popoverCoords.top}px` : 'auto',
+              bottom: popoverCoords.bottom !== undefined ? `${popoverCoords.bottom}px` : 'auto',
+              width: `${popoverCoords.width}px`,
+              zIndex: 9999
+            }
+          : undefined
+      }
+      className={`${
+        portal && popoverCoords
+          ? 'animate-in fade-in zoom-in-95 duration-150'
+          : `absolute ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 z-[100]`
+      } bg-white rounded-2xl shadow-2xl border border-slate-200 p-2`}
+    >
+      {/* Dropdown Header */}
+      <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
+        <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+          <Layers size={12} className={scheme.iconText} />
+          {labelPrefix ? labelPrefix.replace(':', '').trim() : 'Matières'}
+        </span>
+        <span className="text-[10px] font-bold text-slate-400">
+          {subjects.length} matière{subjects.length > 1 ? 's' : ''}
+        </span>
+      </div>
+
+      {/* Search Input */}
+      {subjects.length > 4 && (
+        <div className="relative mb-2 px-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
+          <input
+            ref={searchInputRef}
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Rechercher une matière..."
+            className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-semibold text-slate-800 placeholder:text-slate-400 rounded-xl border border-slate-200 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+      )}
+
+      <div 
+        className="space-y-1 overflow-y-auto custom-scrollbar p-0.5"
+        style={{ maxHeight: popoverCoords ? `${popoverCoords.maxHeight}px` : '240px' }}
+      >
+        {/* Option "Toutes" si allowAll est actif */}
+        {allowAll && (
+          <button
+            type="button"
+            onClick={() => {
+              onSelectSubject('ALL');
+              setIsOpen(false);
+            }}
+            className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+              isAllSelected 
+                ? scheme.highlightBg + ' shadow-2xs font-bold' 
+                : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+            }`}
+          >
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className={`w-2 h-2 rounded-full shrink-0 ${isAllSelected ? 'bg-indigo-600 ring-2 ring-indigo-500/20' : 'bg-slate-300'}`} />
+              <div className="min-w-0">
+                <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
+                  {defaultAllLabel}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400 block">
+                  Toutes les disciplines
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0 ml-2">
+              <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
+                Toutes
+              </span>
+              {isAllSelected && (
+                <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+              )}
+            </div>
+          </button>
+        )}
+
+        {/* Subject Items */}
+        {filteredSubjects.length === 0 ? (
+          <div className="p-3 text-center text-slate-400 text-xs font-medium">
+            Aucune matière trouvée
+          </div>
+        ) : (
+          filteredSubjects.map((s) => {
+            const isSelected = selectedSubjectId === s.id;
+
+            return (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => {
+                  onSelectSubject(s.id);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
+                  isSelected 
+                    ? scheme.highlightBg + ' shadow-2xs font-bold' 
+                    : 'hover:bg-slate-50 text-slate-700 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-indigo-600 ring-2 ring-indigo-500/20' : 'bg-slate-300'}`} />
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-black text-slate-900 tracking-tight">
+                        {s.name}
+                      </span>
+                      {s.code && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded border border-slate-200">
+                          {s.code}
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400">
+                      {s.coefficient !== undefined && <span>Coef : {s.coefficient}</span>}
+                      {s.maxScore !== undefined && <span>• Sur {s.maxScore} pts</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  {isSelected && (
+                    <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
+                  )}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+
   return (
     <div 
       className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${isOpen ? 'z-[60]' : 'z-10'} ${className}`} 
@@ -175,7 +413,7 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
         title={title}
         aria-expanded={isOpen}
       >
-        <div className="flex items-center gap-1.5 min-w-0">
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
           {showIcon && (
             <div className={`flex items-center gap-1 shrink-0 ${scheme.iconText}`}>
               <Layers size={size === 'xs' ? 12 : size === 'lg' ? 15 : 13} className="stroke-[2.4]" />
@@ -196,167 +434,32 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
               <span className="font-extrabold text-slate-900 tracking-tight truncate">
                 {selectedSubject.name}
               </span>
-              {selectedSubject.coefficient !== undefined && (
-                <span className="text-[9px] px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded font-black shrink-0 hidden sm:inline">
-                  Coef {selectedSubject.coefficient}
+              {selectedSubject.code && (
+                <span className="text-[9px] px-1.5 py-0.2 bg-slate-100 text-slate-700 rounded font-black shrink-0 hidden sm:inline">
+                  {selectedSubject.code}
                 </span>
               )}
             </div>
           ) : (
-            <span className="font-semibold text-slate-500 tracking-tight truncate">
-              Sélectionner une matière
+            <span className="font-semibold text-slate-500 tracking-tight text-xs truncate" title={emptyLabel}>
+              {emptyLabel}
             </span>
           )}
         </div>
 
-        <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
-          {!isAllSelected && selectedSubject ? (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-blue-50 text-blue-700 border border-blue-200">
-              {selectedSubject.maxScore ? `/${selectedSubject.maxScore}` : 'Choix'}
-            </span>
-          ) : (
-            <span className="px-1.5 py-0.5 rounded-md text-[10px] font-black bg-slate-100 text-slate-600 border border-slate-200">
-              {subjects.length}
-            </span>
-          )}
-
+        <div className="flex items-center gap-1 shrink-0 ml-1">
           <ChevronDown 
             size={size === 'xs' ? 12 : 14} 
-            className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? 'rotate-180 text-blue-600' : ''}`} 
+            className={`text-slate-400 transition-transform duration-200 shrink-0 ${isOpen ? `rotate-180 ${scheme.iconText}` : ''}`} 
           />
         </div>
       </button>
 
-      {/* Modern Floating Dropdown Menu */}
+      {/* Dropdown Menu (Portal or Absolute) */}
       {isOpen && (
-        <div 
-          className={`absolute ${dropdownAlign === 'right' ? 'right-0' : 'left-0'} top-full mt-2 w-72 sm:w-80 bg-white rounded-2xl shadow-2xl border border-slate-200 p-2 z-[100] animate-in fade-in zoom-in-95 duration-150`}
-        >
-          {/* Dropdown Header */}
-          <div className="px-2.5 py-1.5 border-b border-slate-100 mb-2 flex items-center justify-between">
-            <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-              <Layers size={12} className={scheme.iconText} />
-              {labelPrefix ? labelPrefix.replace(':', '').trim() : 'Matières'}
-            </span>
-            <span className="text-[10px] font-bold text-slate-400">
-              {subjects.length} matière{subjects.length > 1 ? 's' : ''}
-            </span>
-          </div>
-
-          {/* Search Input */}
-          {subjects.length > 4 && (
-            <div className="relative mb-2 px-1">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={13} />
-              <input
-                ref={searchInputRef}
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Rechercher une matière..."
-                className="w-full pl-8 pr-7 py-1.5 bg-slate-50 hover:bg-slate-100/80 focus:bg-white text-xs font-semibold text-slate-800 placeholder:text-slate-400 rounded-xl border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 rounded-full"
-                >
-                  <X size={12} />
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-1 max-h-60 overflow-y-auto custom-scrollbar p-0.5">
-            {/* Allow All Option */}
-            <button
-              type="button"
-              onClick={() => {
-                onSelectSubject('ALL');
-                setIsOpen(false);
-              }}
-              className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                isAllSelected 
-                  ? scheme.highlightBg + ' shadow-2xs font-bold' 
-                  : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-              }`}
-            >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${isAllSelected ? 'bg-blue-600 ring-2 ring-blue-500/20' : 'bg-slate-300'}`} />
-                <div className="min-w-0">
-                  <span className="text-xs font-black text-slate-900 tracking-tight block truncate">
-                    {defaultAllLabel}
-                  </span>
-                  <span className="text-[10px] font-medium text-slate-400 block">
-                    Afficher toutes les colonnes de notation
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                <span className="text-[9px] font-black px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200">
-                  Vue Grille
-                </span>
-                {isAllSelected && (
-                  <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                )}
-              </div>
-            </button>
-
-            {/* Subject Items */}
-            {filteredSubjects.length === 0 ? (
-              <div className="p-3 text-center text-slate-400 text-xs font-medium">
-                Aucune matière trouvée
-              </div>
-            ) : (
-              filteredSubjects.map((s) => {
-                const isSelected = selectedSubjectId === s.id;
-
-                return (
-                  <button
-                    key={s.id}
-                    type="button"
-                    onClick={() => {
-                      onSelectSubject(s.id);
-                      setIsOpen(false);
-                    }}
-                    className={`w-full flex items-center justify-between p-2 rounded-xl text-left transition-all duration-150 cursor-pointer ${
-                      isSelected 
-                        ? scheme.highlightBg + ' shadow-2xs font-bold' 
-                        : 'hover:bg-slate-50 text-slate-700 border border-transparent'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className={`w-2 h-2 rounded-full shrink-0 ${isSelected ? 'bg-blue-600 ring-2 ring-blue-500/20' : 'bg-slate-300'}`} />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-xs font-black text-slate-900 tracking-tight">
-                            {s.name}
-                          </span>
-                          {s.code && (
-                            <span className="text-[9px] font-bold px-1.5 py-0.2 bg-slate-100 text-slate-600 rounded">
-                              {s.code}
-                            </span>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-2 text-[10px] font-medium text-slate-400">
-                          {s.coefficient !== undefined && <span>Coef : {s.coefficient}</span>}
-                          {s.maxScore !== undefined && <span>• Sur {s.maxScore} pts</span>}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                      {isSelected && (
-                        <Check size={13} className={`${scheme.checkColor} stroke-[3]`} />
-                      )}
-                    </div>
-                  </button>
-                );
-              })
-            )}
-          </div>
-        </div>
+        portal && typeof document !== 'undefined'
+          ? createPortal(renderDropdownContent(), document.body)
+          : renderDropdownContent()
       )}
     </div>
   );

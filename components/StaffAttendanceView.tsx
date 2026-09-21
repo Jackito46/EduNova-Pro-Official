@@ -853,8 +853,27 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
     return Array.from(map.values());
   }, [classesList, allSchoolAssignments]);
 
-  // Subjects list for selector (with fallback from assignments)
+  // Subjects list for selector (filtré strictement par la classe si une classe est sélectionnée)
   const availableSubjects = useMemo(() => {
+    if (selectedClassFilter !== 'ALL') {
+      const classSubjectMap = new Map<string, { id: string; name: string; code?: string }>();
+      
+      allSchoolAssignments
+        .filter(a => a.class_id === selectedClassFilter)
+        .forEach(a => {
+          if (a.subject_id && a.subject_name && !classSubjectMap.has(a.subject_id)) {
+            const fromGlobal = subjectsList.find(s => s.id === a.subject_id);
+            classSubjectMap.set(a.subject_id, {
+              id: a.subject_id,
+              name: a.subject_name,
+              code: fromGlobal?.code
+            });
+          }
+        });
+
+      return Array.from(classSubjectMap.values());
+    }
+
     if (subjectsList.length > 0) return subjectsList;
     const map = new Map<string, { id: string; name: string }>();
     allSchoolAssignments.forEach(a => {
@@ -863,7 +882,7 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
       }
     });
     return Array.from(map.values());
-  }, [subjectsList, allSchoolAssignments]);
+  }, [subjectsList, allSchoolAssignments, selectedClassFilter]);
 
   // Active filters detection & reset for Weekly view
   const hasActiveWeeklyFilters = useMemo(() => {
@@ -1395,7 +1414,17 @@ const StaffAttendanceView: React.FC<StaffAttendanceViewProps> = ({ user }) => {
                   <ClassSelectorPill
                     classes={availableClasses}
                     selectedClassId={selectedClassFilter}
-                    onSelectClass={(id) => setSelectedClassFilter(id)}
+                    onSelectClass={(id) => {
+                      setSelectedClassFilter(id);
+                      if (id !== 'ALL' && selectedSubjectFilter !== 'ALL') {
+                        const subjectsInNewClass = allSchoolAssignments
+                          .filter(a => a.class_id === id)
+                          .map(a => a.subject_id);
+                        if (!subjectsInNewClass.includes(selectedSubjectFilter)) {
+                          setSelectedSubjectFilter('ALL');
+                        }
+                      }
+                    }}
                     allowAll={true}
                     allLabel="Toutes les classes"
                     emptyLabel="Choisir une classe..."

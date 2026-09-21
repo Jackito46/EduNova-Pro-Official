@@ -33,6 +33,7 @@ import {
   Building2
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
+import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ReevaluationModal, ReevaluatedStudentItem } from './ReevaluationModal';
@@ -59,7 +60,38 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [totalReductionsUSD, setTotalReductionsUSD] = useState(0);
   const [reevaluatedStudents, setReevaluatedStudents] = useState<ReevaluatedStudentItem[]>([]);
   const [isReevaluationModalOpen, setIsReevaluationModalOpen] = useState(false);
-  const [isTargetReevaluated, setIsTargetReevaluated] = useState(true);
+  const [isTargetReevaluated, setIsTargetReevaluated] = useState<boolean>(() => {
+    try {
+      const saved = localStorage.getItem(`edunova_target_reevaluated_${user?.school_id || 'default'}`);
+      return saved !== null ? saved === 'true' : true;
+    } catch (e) {
+      return true;
+    }
+  });
+
+  const handleToggleTargetReevaluated = () => {
+    setIsTargetReevaluated(prev => {
+      const next = !prev;
+      try {
+        localStorage.setItem(`edunova_target_reevaluated_${user?.school_id || 'default'}`, String(next));
+      } catch (e) {}
+      if (next) {
+        toast.info("Objectif réévalué actif : déduction des bourses et remises prise en compte.");
+      } else {
+        toast.info("Objectif brut théorique actif : assiette 100% sans déduction de bourses.");
+      }
+      return next;
+    });
+  };
+
+  const handleConfirmReevaluation = () => {
+    setIsTargetReevaluated(true);
+    try {
+      localStorage.setItem(`edunova_target_reevaluated_${user?.school_id || 'default'}`, 'true');
+    } catch (e) {}
+    toast.success("Objectif de recouvrement institutionnel validé avec succès !");
+  };
+
   const [totalCollected, setTotalCollected] = useState(0);
   const [totalCollectedHTG, setTotalCollectedHTG] = useState(0);
   const [totalCollectedUSD, setTotalCollectedUSD] = useState(0);
@@ -846,6 +878,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const canViewSensitiveStats = [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT].includes(user.role);
 
+  const activeExpected = isTargetReevaluated ? totalExpected : totalGrossExpected;
+  const activeExpectedHTG = isTargetReevaluated ? totalExpectedHTG : totalGrossExpectedHTG;
+  const activeExpectedUSD = isTargetReevaluated ? totalExpectedUSD : totalGrossExpectedUSD;
+  const activeCollectionRate = activeExpected > 0 ? (totalCollectedTuition / activeExpected) * 100 : 0;
+
   return (
     <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 lg:space-y-4.5 animate-in fade-in duration-500 pb-8">
       
@@ -1202,16 +1239,16 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">Corrigé par bourses</span>
                     )}
                   </div>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 mt-0.5" title={(isTargetReevaluated ? totalExpected : totalGrossExpected).toLocaleString()}>
-                    {loading ? <RefreshCcw className="animate-spin inline-block mt-1" size={18} /> : (isTargetReevaluated ? totalExpected : totalGrossExpected).toLocaleString()} <span className="text-[10px] sm:text-xs font-sans text-gray-600">HTG{(totalExpectedUSD > 0 || totalGrossExpectedUSD > 0) ? " eq." : ""}</span>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-gray-900 mt-0.5" title={activeExpected.toLocaleString()}>
+                    {loading ? <RefreshCcw className="animate-spin inline-block mt-1" size={18} /> : activeExpected.toLocaleString()} <span className="text-[10px] sm:text-xs font-sans text-gray-600">HTG{(activeExpectedUSD > 0) ? " eq." : ""}</span>
                   </p>
                   {!loading && (
                     <div className="flex flex-col gap-0.5 mt-1">
                       <span className="text-[9px] font-black uppercase tracking-wider text-gray-600">
-                        {(isTargetReevaluated ? totalExpectedHTG : totalGrossExpectedHTG).toLocaleString()} HTG
+                        {activeExpectedHTG.toLocaleString()} HTG
                       </span>
                       <span className="text-[9px] font-black uppercase tracking-wider text-indigo-700 font-mono">
-                        {(isTargetReevaluated ? totalExpectedUSD : totalGrossExpectedUSD).toLocaleString()} USD
+                        {activeExpectedUSD.toLocaleString()} USD
                       </span>
                       {isTargetReevaluated && totalReductionsUSD > 0 && (
                         <span className="text-[8px] text-amber-600 font-bold">
@@ -1223,7 +1260,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
                 <div className="text-right min-w-0 shrink-0">
                   <p className="text-[9px] sm:text-[10px] font-bold text-indigo-500 tracking-wider uppercase" title="Taux de Pénétration">Taux de Pénétration</p>
-                  <p className="text-lg sm:text-xl md:text-2xl font-black text-indigo-700 mt-0.5" title={`${collectionRate.toFixed(1)}%`}>{collectionRate.toFixed(1)}%</p>
+                  <p className="text-lg sm:text-xl md:text-2xl font-black text-indigo-700 mt-0.5" title={`${activeCollectionRate.toFixed(1)}%`}>{activeCollectionRate.toFixed(1)}%</p>
                   
                   {/* Economat penetration addition */}
                   <div className="flex items-center justify-end gap-1 mt-0.5">
@@ -1237,11 +1274,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="flex justify-between items-start text-[9px] sm:text-[11px] font-bold mb-2 gap-2 flex-wrap">
                   <span className="text-indigo-600 bg-indigo-50 px-2 sm:px-2.5 py-0.5 rounded-full border border-indigo-100" title={`Encaissement ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${totalCollectedTuition.toLocaleString()} HTG`}>Encaissement: <span className="whitespace-nowrap">{totalCollectedTuition.toLocaleString()} HTG</span></span>
                   <div className="flex flex-col items-end gap-0.5">
-                    <span className="text-gray-600 bg-gray-100 px-2 sm:px-2.5 py-0.5 rounded-full border border-gray-200" title={`Reste ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${Math.max(0, totalExpected - totalCollectedTuition).toLocaleString()} HTG`}>Reste: <span className="whitespace-nowrap">{Math.max(0, totalExpected - totalCollectedTuition).toLocaleString()} HTG</span></span>
-                    {!loading && (totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) && (
+                    <span className="text-gray-600 bg-gray-100 px-2 sm:px-2.5 py-0.5 rounded-full border border-gray-200" title={`Reste ${(totalCollectedTuitionUSD > 0 || totalExpectedUSD > 0) ? "eq. " : ""}: ${Math.max(0, activeExpected - totalCollectedTuition).toLocaleString()} HTG`}>Reste: <span className="whitespace-nowrap">{Math.max(0, activeExpected - totalCollectedTuition).toLocaleString()} HTG</span></span>
+                    {!loading && (totalCollectedTuitionUSD > 0 || activeExpectedUSD > 0) && (
                       <div className="flex gap-2 text-gray-600 px-1 opacity-90">
-                        <span className="text-[9px] uppercase">{Math.max(0, totalExpectedHTG - totalCollectedTuitionHTG).toLocaleString()} HTG</span>
-                        <span className="text-[9px] uppercase">{Math.max(0, totalExpectedUSD - totalCollectedTuitionUSD).toLocaleString()} USD</span>
+                        <span className="text-[9px] uppercase">{Math.max(0, activeExpectedHTG - totalCollectedTuitionHTG).toLocaleString()} HTG</span>
+                        <span className="text-[9px] uppercase">{Math.max(0, activeExpectedUSD - totalCollectedTuitionUSD).toLocaleString()} USD</span>
                       </div>
                     )}
                   </div>
@@ -1249,7 +1286,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="h-3.5 sm:h-4 bg-gray-100 rounded-full overflow-hidden border border-gray-200 p-0.5">
                   <div 
                     className="h-full bg-indigo-600 rounded-full transition-all duration-1000 relative" 
-                    style={{ width: `${totalExpected > 0 ? Math.min(100, (totalCollectedTuition / totalExpected) * 100) : 0}%` }}
+                    style={{ width: `${activeExpected > 0 ? Math.min(100, (totalCollectedTuition / activeExpected) * 100) : 0}%` }}
                   >
                      <div className="absolute top-0 right-0 bottom-0 left-0 bg-white/20 animate-[pulse_2s_ease-in-out_infinite]"></div>
                   </div>
@@ -1396,8 +1433,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         totalExpectedUSD={totalExpectedUSD}
         discountedStudents={discountedStudents}
         isTargetReevaluated={isTargetReevaluated}
-        onToggleTargetReevaluated={() => setIsTargetReevaluated(!isTargetReevaluated)}
-        onConfirmReevaluation={() => setIsTargetReevaluated(true)}
+        onToggleTargetReevaluated={handleToggleTargetReevaluated}
+        onConfirmReevaluation={handleConfirmReevaluation}
         exchangeRate={exchangeRate}
         school={school}
         user={user}

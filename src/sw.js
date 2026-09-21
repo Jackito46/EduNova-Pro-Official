@@ -67,7 +67,7 @@ registerRoute(
   new NavigationRoute(
     async (params) => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 2500);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
 
       try {
         const response = await fetch(params.event.request, { signal: controller.signal });

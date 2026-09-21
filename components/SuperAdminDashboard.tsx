@@ -348,7 +348,7 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
     trialDays: 14,
     defaultStudentLimit: 100,
     defaultTeacherLimit: 10,
-    enabledModules: ['academic', 'finance', 'communication'],
+    enabledModules: ['finance', 'exams', 'attendance', 'inventory'],
     dataRetentionMonths: 12,
     maintenanceMode: false,
     defaultSessionMode: 'auto',
@@ -1138,6 +1138,13 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
       });
 
       toast.success("Configuration enregistrée avec succès !");
+      try {
+        window.dispatchEvent(new CustomEvent('edunova_modules_config_updated', { 
+          detail: { enabled_modules: config.enabledModules } 
+        }));
+      } catch (e) {
+        console.warn("Failed to dispatch modules config update event", e);
+      }
     } catch (err: any) {
       toast.error("Erreur lors de l'enregistrement : " + err.message);
     } finally {
@@ -5811,62 +5818,129 @@ const handleDeleteSchool = async () => {
                 {(configCategory === 'ALL' || configCategory === 'MODULES') && (
                   <ConfigSection 
                     title="Modules & Fonctionnalités ERP" 
-                    subtitle="Activation/désactivation des fonctionnalités globales autorisées"
+                    subtitle="Activation / désactivation des fonctionnalités globales autorisées pour l'ensemble des établissements"
                     icon={Zap}
                     iconBg="bg-purple-50"
                     iconColor="text-purple-600"
                     badge="Fonctionnalités"
                   >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {[
-                        { id: 'finance', label: 'Gestion Financière', desc: 'Comptabilité, écolages & reçus', icon: DollarSign },
-                        { id: 'exams', label: 'Examens & Bulletins', desc: 'Notes, moyennes & relevés', icon: GraduationCap },
-                        { id: 'attendance', label: 'Suivi de Présence', desc: 'Pointage, retards & absences', icon: Clock },
-                        { id: 'transport', label: 'Transport Scolaire', desc: 'Bus scolaires & circuits', icon: Bus },
-                        { id: 'library', label: 'Bibliothèque', desc: 'Emprunts & catalogue', icon: BookOpen },
-                        { id: 'inventory', label: 'Inventaire / ERP', desc: 'Stock matériel & équipements', icon: Package }
-                      ].map(module => {
-                        const isChecked = config.enabledModules.includes(module.id);
-                        const IconComp = module.icon;
-                        return (
-                          <label 
-                            key={module.id} 
-                            className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex items-start gap-3 ${
-                              isChecked 
-                                ? 'bg-purple-50/80 border-purple-300 ring-1 ring-purple-400/30 text-purple-950 shadow-xs' 
-                                : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600'
-                            }`}
-                          >
-                            <input 
-                              type="checkbox"
-                              checked={isChecked}
-                              onChange={e => {
-                                const newModules = e.target.checked 
-                                  ? [...config.enabledModules, module.id]
-                                  : config.enabledModules.filter(m => m !== module.id);
-                                setConfig({...config, enabledModules: newModules});
-                              }}
-                              className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 mt-0.5 accent-purple-600 shrink-0 cursor-pointer"
-                            />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between gap-1">
-                                <div className="flex items-center gap-1.5 min-w-0">
-                                  <IconComp size={14} className={isChecked ? 'text-purple-600' : 'text-slate-400'} />
-                                  <span className="text-xs font-black text-slate-900 truncate">
-                                    {module.label}
-                                  </span>
+                    <div className="space-y-3">
+                      <div className="p-3 bg-purple-50/60 border border-purple-200/70 rounded-xl text-xs text-purple-900 flex items-start gap-2.5">
+                        <ShieldCheck size={16} className="text-purple-600 shrink-0 mt-0.5" />
+                        <div className="space-y-0.5">
+                          <p className="font-bold text-[11px]">Règle de gestion des éléments décochés :</p>
+                          <p className="text-[10px] sm:text-[11px] text-purple-800/90 leading-relaxed">
+                            Tout module <strong>décoché</strong> est instantanément masqué dans le menu latéral et son accès direct est verrouillé par écran de garde pour l'ensemble des utilisateurs (hors Super Admin).
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {[
+                          { 
+                            id: 'finance', 
+                            label: 'Gestion Financière', 
+                            desc: 'Comptabilité, écolages, caisse & reçus', 
+                            icon: DollarSign, 
+                            status: 'ready',
+                            statusLabel: 'Opérationnel' 
+                          },
+                          { 
+                            id: 'exams', 
+                            label: 'Examens & Bulletins', 
+                            desc: 'Notes, moyennes, délibérations & relevés', 
+                            icon: GraduationCap, 
+                            status: 'ready',
+                            statusLabel: 'Opérationnel' 
+                          },
+                          { 
+                            id: 'attendance', 
+                            label: 'Suivi de Présence', 
+                            desc: 'Pointage, fiches présences, retards & absences', 
+                            icon: Clock, 
+                            status: 'ready',
+                            statusLabel: 'Opérationnel' 
+                          },
+                          { 
+                            id: 'inventory', 
+                            label: 'Inventaire / ERP', 
+                            desc: 'Fournitures, stocks matériel, réceptions & fiches A4', 
+                            icon: Package, 
+                            status: 'ready',
+                            statusLabel: 'Opérationnel' 
+                          },
+                          { 
+                            id: 'transport', 
+                            label: 'Transport Scolaire', 
+                            desc: 'Bus scolaires, circuits, arrêts & abonnements', 
+                            icon: Bus, 
+                            status: 'roadmap',
+                            statusLabel: 'Roadmap v2.5' 
+                          },
+                          { 
+                            id: 'library', 
+                            label: 'Bibliothèque Scolaire', 
+                            desc: 'Catalogue d\'ouvrages, prêts & retours de livres', 
+                            icon: BookOpen, 
+                            status: 'roadmap',
+                            statusLabel: 'Roadmap v2.5' 
+                          }
+                        ].map(module => {
+                          const isChecked = config.enabledModules.includes(module.id);
+                          const IconComp = module.icon;
+                          const isRoadmap = module.status === 'roadmap';
+                          return (
+                            <label 
+                              key={module.id} 
+                              className={`p-3.5 rounded-2xl border cursor-pointer transition-all flex flex-col justify-between gap-2.5 ${
+                                isChecked 
+                                  ? 'bg-purple-50/80 border-purple-300 ring-1 ring-purple-400/30 text-purple-950 shadow-xs' 
+                                  : 'bg-slate-50 border-slate-200 hover:bg-slate-100 text-slate-600'
+                              }`}
+                            >
+                              <div className="flex items-start gap-3">
+                                <input 
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={e => {
+                                    const newModules = e.target.checked 
+                                      ? [...config.enabledModules, module.id]
+                                      : config.enabledModules.filter(m => m !== module.id);
+                                    setConfig({...config, enabledModules: newModules});
+                                  }}
+                                  className="w-4 h-4 rounded text-purple-600 focus:ring-purple-500 border-slate-300 mt-0.5 accent-purple-600 shrink-0 cursor-pointer"
+                                />
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <IconComp size={15} className={`shrink-0 ${isChecked ? 'text-purple-600' : 'text-slate-400'}`} />
+                                    <span className="text-xs font-black text-slate-900 leading-snug whitespace-normal break-words">
+                                      {module.label}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-1">
+                                    {module.desc}
+                                  </p>
                                 </div>
-                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              </div>
+
+                              <div className="flex items-center justify-between pt-2 border-t border-slate-200/60 text-[9px]">
+                                <span className={`font-black uppercase px-2 py-0.5 rounded-md ${
                                   isChecked ? 'bg-purple-200 text-purple-950' : 'bg-slate-200 text-slate-600'
                                 }`}>
-                                  {isChecked ? 'Actif' : 'Désactivé'}
+                                  {isChecked ? '✓ Actif' : '✗ Désactivé'}
+                                </span>
+                                <span className={`font-bold px-1.5 py-0.5 rounded ${
+                                  isRoadmap 
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-200' 
+                                    : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                                }`}>
+                                  {module.statusLabel}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-slate-500 font-medium leading-relaxed mt-0.5">{module.desc}</p>
-                            </div>
-                          </label>
-                        );
-                      })}
+                            </label>
+                          );
+                        })}
+                      </div>
                     </div>
                   </ConfigSection>
                 )}

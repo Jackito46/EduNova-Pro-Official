@@ -298,8 +298,251 @@
           <span class="edunova-pulse-dot"></span>
           <span>Chargement en cours...</span>
         </div>
+
+        <div id="edunova-splash-actions" style="display: none; margin-top: 24px; flex-direction: column; align-items: center; gap: 10px; max-width: 320px; width: 100%; z-index: 10;">
+          <button id="edunova-emergency-login" type="button" style="width: 100%; padding: 11px 18px; background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; border: none; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
+            <span>Accéder à la Page de Connexion</span>
+            <span style="font-size: 15px;">→</span>
+          </button>
+          <button id="edunova-emergency-reload" type="button" style="width: 100%; padding: 9px 14px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;">
+            <span>Vider le cache &amp; Recharger</span>
+          </button>
+          <div id="edunova-splash-hint" style="font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.4;">
+            Initialisation du système EduNova Pro...
+          </div>
+        </div>
       </div>
     </div>
+<script>
+  (function() {
+    var startTime = performance.now();
+    window.__edunovaAppReady = false;
+    window.__edunovaDiagnostics = {
+      startTime: new Date().toISOString(),
+      environment: {
+        url: window.location.href,
+        hostname: window.location.hostname,
+        protocol: window.location.protocol,
+        userAgent: navigator.userAgent,
+        hasServiceWorker: 'serviceWorker' in navigator,
+        hasCaches: 'caches' in window,
+        isPreview: window.location.hostname.includes('run.app') || 
+                   window.location.hostname === 'localhost' || 
+                   window.location.hostname === '127.0.0.1'
+      },
+      events: [],
+      resourceFailures: [],
+      errors: [],
+      serviceWorkers: []
+    };
+
+    function logDiag(category, message, details) {
+      var elapsed = Math.round(performance.now() - startTime);
+      var entry = { elapsedMs: elapsed, category: category, message: message, details: details || null };
+      window.__edunovaDiagnostics.events.push(entry);
+      console.log('🔍 [EduNova Diag +' + elapsed + 'ms][' + category + ']', message, details || '');
+    }
+
+    logDiag('INIT', 'Script de diagnostic démarré', window.__edunovaDiagnostics.environment);
+
+    // Fonction globale pour afficher le rapport de diagnostic dans la console
+    window.getEduNovaDiagnostics = function() {
+      console.group('📊 [EduNova Diagnostic Report]');
+      console.table(window.__edunovaDiagnostics.events);
+      if (window.__edunovaDiagnostics.errors.length > 0) {
+        console.group('❌ Uncaught Errors / Rejections:');
+        console.table(window.__edunovaDiagnostics.errors);
+        console.groupEnd();
+      }
+      if (window.__edunovaDiagnostics.resourceFailures.length > 0) {
+        console.group('⚠️ Resource Load Failures:');
+        console.table(window.__edunovaDiagnostics.resourceFailures);
+        console.groupEnd();
+      }
+      console.groupEnd();
+      return window.__edunovaDiagnostics;
+    };
+
+    // Fonction de fermeture sécurisée du splashscreen
+    window.__dismissEduNovaSplash = function() {
+      logDiag('LIFECYCLE', 'Signal de fermeture du splashscreen reçu');
+      var splash = document.getElementById('edunova-pwa-splash');
+      if (splash) {
+        splash.style.transition = 'opacity 0.25s ease-out';
+        splash.style.opacity = '0';
+        setTimeout(function() {
+          if (splash && splash.parentNode) {
+            splash.parentNode.removeChild(splash);
+            logDiag('LIFECYCLE', 'Splashscreen retiré du DOM');
+          }
+        }, 250);
+      }
+    };
+
+    // Diagnostic et inspection des Service Workers & Caches
+    if ('serviceWorker' in navigator) {
+      var controller = navigator.serviceWorker.controller;
+      logDiag('SW', 'Contrôleur Service Worker actuel', controller ? {
+        scriptURL: controller.scriptURL,
+        state: controller.state
+      } : 'Aucun contrôleur actif');
+
+      navigator.serviceWorker.getRegistrations().then(function(regs) {
+        logDiag('SW', 'Nombre de Service Workers enregistrés trouvés', regs.length);
+        for (var i = 0; i < regs.length; i++) {
+          var r = regs[i];
+          var swInfo = {
+            scope: r.scope,
+            active: r.active ? { scriptURL: r.active.scriptURL, state: r.active.state } : null,
+            waiting: r.waiting ? { scriptURL: r.waiting.scriptURL, state: r.waiting.state } : null,
+            installing: r.installing ? { scriptURL: r.installing.scriptURL, state: r.installing.state } : null
+          };
+          window.__edunovaDiagnostics.serviceWorkers.push(swInfo);
+          logDiag('SW', 'Enregistrement SW #' + (i + 1), swInfo);
+
+          if (window.__edunovaDiagnostics.environment.isPreview) {
+            logDiag('SW', 'Désinscription du Service Worker sur environnement preview', r.scope);
+            r.unregister().then(function(success) {
+              logDiag('SW', 'Résultat désinscription SW: ' + (success ? 'Succès' : 'Échec'), r.scope);
+            }).catch(function(err) {
+              logDiag('SW_ERR', 'Erreur désinscription SW', String(err));
+            });
+          }
+        }
+      }).catch(function(err) {
+        logDiag('SW_ERR', 'Erreur lors de la lecture des enregistrements SW', String(err));
+      });
+
+      if (window.__edunovaDiagnostics.environment.isPreview && 'caches' in window) {
+        caches.keys().then(function(keys) {
+          logDiag('CACHE', 'Caches PWA détectés', keys);
+          for (var j = 0; j < keys.length; j++) {
+            (function(cacheName) {
+              caches.delete(cacheName).then(function(deleted) {
+                logDiag('CACHE', 'Nettoyage du cache: ' + cacheName, { deleted: deleted });
+              });
+            })(keys[j]);
+          }
+        }).catch(function(err) {
+          logDiag('CACHE_ERR', 'Erreur scan caches', String(err));
+        });
+      }
+    }
+
+    // Capture des erreurs de chargement de ressources (scripts, styles, polices) en phase de capture
+    window.addEventListener('error', function(event) {
+      var target = event.target;
+      if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK' || target.tagName === 'IMG')) {
+        var srcOrHref = target.src || target.href || 'inconnu';
+        var failure = {
+          tagName: target.tagName,
+          source: srcOrHref,
+          type: event.type,
+          elapsedMs: Math.round(performance.now() - startTime)
+        };
+        window.__edunovaDiagnostics.resourceFailures.push(failure);
+        logDiag('RESOURCE_ERR', 'Échec de chargement de ressource', failure);
+
+        showEmergencyActions('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
+      } else {
+        var errInfo = {
+          message: event.message,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          error: event.error ? (event.error.stack || event.error.message) : null
+        };
+        window.__edunovaDiagnostics.errors.push(errInfo);
+        logDiag('SCRIPT_ERR', 'Erreur script non capturée', errInfo);
+
+        showEmergencyActions('Erreur : ' + (event.message || 'Script bloqué'));
+      }
+    }, true);
+
+    // Capture des rejets de Promesses non gérés
+    window.addEventListener('unhandledrejection', function(event) {
+      var reason = event.reason;
+      var reasonStr = reason ? (reason.stack || reason.message || String(reason)) : 'Raison inconnue';
+      var rejInfo = {
+        reason: reasonStr
+      };
+      window.__edunovaDiagnostics.errors.push(rejInfo);
+      logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté', rejInfo);
+
+      showEmergencyActions('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
+    });
+
+    function showEmergencyActions(cause) {
+      var actions = document.getElementById('edunova-splash-actions');
+      if (actions && !window.__edunovaAppReady) {
+        actions.style.display = 'flex';
+        var hint = document.getElementById('edunova-splash-hint');
+        if (hint && cause) {
+          hint.textContent = 'Incident détecté (' + cause + '). Cliquez ci-dessous pour débloquer.';
+          hint.style.color = '#f87171';
+        }
+        var btnLogin = document.getElementById('edunova-emergency-login');
+        if (btnLogin) btnLogin.onclick = clearStorageAndGoLogin;
+        var btnReload = document.getElementById('edunova-emergency-reload');
+        if (btnReload) btnReload.onclick = clearStorageAndGoLogin;
+      }
+    }
+
+    // Gestionnaire de réinitialisation d'urgence
+    function clearStorageAndGoLogin() {
+      logDiag('ACTION', 'Déclenchement réinitialisation complète du cache & session');
+      try {
+        localStorage.removeItem('edunova_user_profile');
+        localStorage.removeItem('edunova-auth-token');
+        localStorage.removeItem('supabase.auth.token');
+        localStorage.setItem('edunova_logged_out', 'true');
+        sessionStorage.clear();
+      } catch(e) {}
+
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var i = 0; i < regs.length; i++) {
+            regs[i].unregister();
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(keys) {
+          for (var i = 0; i < keys.length; i++) {
+            caches.delete(keys[i]);
+          }
+        });
+      }
+
+      window.location.href = window.location.pathname + '#/';
+      setTimeout(function() {
+        window.location.reload();
+      }, 100);
+    }
+
+    // Watchdog : inspection de l'état après 2200ms
+    setTimeout(function() {
+      if (!window.__edunovaAppReady) {
+        logDiag('WATCHDOG', 'Délai d’attente dépassé (2200ms). L’application React n’a pas encore signalé son montage.');
+        
+        // Audit des ressources réseau chargées
+        if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
+          var resources = performance.getEntriesByType('resource');
+          var slowOrPending = resources.filter(function(r) { return r.duration > 1500; });
+          logDiag('PERF_AUDIT', 'Ressources lentes (>1.5s) ou chargées', {
+            totalResources: resources.length,
+            slowCount: slowOrPending.length,
+            slowList: slowOrPending.map(function(r) { return { name: r.name.split('/').pop(), durationMs: Math.round(r.duration) }; })
+          });
+        }
+
+        showEmergencyActions('Délai d’attente dépassé');
+      } else {
+        logDiag('WATCHDOG', 'Vérification 2200ms : Application montée avec succès');
+      }
+    }, 2200);
+  })();
+</script>
 <script type="module" src="/index.tsx"></script>
 </body>
 </html>

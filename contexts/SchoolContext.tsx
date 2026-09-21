@@ -31,7 +31,7 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
   const [school, setSchool] = useState<School | null>(null);
   const [campuses, setCampuses] = useState<SchoolCampus[]>([]);
   const [activeAcademicYear, setActiveAcademicYear] = useState<AcademicYear | null>(null);
-  const [globalModules, setGlobalModules] = useState<string[]>(['finance', 'exams', 'attendance']);
+  const [globalModules, setGlobalModules] = useState<string[]>(['finance', 'exams', 'attendance', 'inventory']);
   const [currentCampusId, setCurrentCampusIdState] = useState<string | null>(() => {
     try {
       if (user && user.campus_id && !isSuperUser) {
@@ -291,8 +291,9 @@ export const SchoolProvider: React.FC<{ user: UserProfile | null, schoolId: stri
     const normalizedId = moduleId === 'presences' ? 'attendance' : moduleId;
 
     // 1. Global killswitch check:
-    // If globalModules array is loaded, module MUST be present in globalModules
-    if (globalModules && globalModules.length > 0) {
+    // Any module must be explicitly present in globalModules array to be considered active.
+    // If unchecked (absent from the array), it is disabled globally.
+    if (globalModules && Array.isArray(globalModules)) {
       if (!globalModules.includes(normalizedId)) {
         return false;
       }

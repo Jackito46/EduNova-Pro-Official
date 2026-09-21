@@ -219,24 +219,15 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     };
   }, [formData.class_id, formData.staff_id, editingSchedule, classes, classSubjects, allAssignments, subjects, staff]);
 
-  // Options for subject SelectPill
+  // Options for subject SelectPill - STRICTEMENT restreint au programme de la classe
   const subjectSelectOptions: SelectOption[] = useMemo(() => {
     if (affiliatedSubjects.length > 0) {
-      const options: SelectOption[] = affiliatedSubjects.map(s => ({
+      return affiliatedSubjects.map(s => ({
         value: s.id,
         label: s.name,
         badge: 'Au programme',
         description: s.code ? `Code : ${s.code}` : (s.description || undefined)
       }));
-      if (otherSubjects.length > 0) {
-        options.push(...otherSubjects.map(s => ({
-          value: s.id,
-          label: s.name,
-          badge: s.code || 'Hors prog.',
-          description: s.description || undefined
-        })));
-      }
-      return options;
     }
     return subjects.map(s => ({
       value: s.id,
@@ -244,7 +235,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
       badge: s.code || undefined,
       description: s.description || undefined
     }));
-  }, [affiliatedSubjects, otherSubjects, subjects]);
+  }, [affiliatedSubjects, subjects]);
 
   // Options for Day of Week SelectPill
   const daySelectOptions: SelectOption[] = useMemo(() => {
@@ -540,6 +531,12 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     const selectedSubject = subjects.find(s => s.id === formData.subject_id);
     const selectedClass = classes.find(c => c.id === formData.class_id);
     const selectedStaff = staff.find(s => s.id === formData.staff_id);
+
+    // Validation stricte : vérifier que la matière appartient au programme de la classe
+    if (affiliatedSubjects.length > 0 && !affiliatedSubjects.some(s => s.id === formData.subject_id)) {
+      showToast(`La matière sélectionnée ("${selectedSubject?.name || ''}") ne fait pas partie du programme de la classe "${selectedClass?.name || ''}".`, 'error');
+      return;
+    }
 
     // Fonction utilitaire pour vérifier le chevauchement strict
     const checkOverlap = (start1: string, end1: string, start2: string, end2: string) => {

@@ -13,53 +13,85 @@ import { isRefreshTokenError, clearAuthStorage } from './supabase';
 
 import { registerSW } from 'virtual:pwa-register';
 
-if ('serviceWorker' in navigator && (import.meta.env.PROD || !window.location.hostname.includes('run.app'))) {
-  let isRefreshing = false;
+// Détection d'environnement : Cloud Run / AI Studio preview ou développement local
+const isPreviewOrDevHost = 
+  typeof window !== 'undefined' && (
+    window.location.hostname.includes('run.app') || 
+    window.location.hostname === 'localhost' || 
+    window.location.hostname === '127.0.0.1'
+  );
 
-  // Forcer le rechargement automatique dès que le nouveau Service Worker prend le contrôle
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      console.log("⚡ [EduNova SW] Nouveau Service Worker activé, rechargement automatique de l'interface...");
-      window.location.reload();
-    }
-  });
-
-  try {
-    const updateSW = registerSW({
-      immediate: true,
-      onNeedRefresh() {
-        console.log("⚡ [EduNova SW] Nouvelle version détectée, application immédiate de la mise à jour...");
-        updateSW(true);
-      },
-      onOfflineReady() {
-        console.log("⚡ [EduNova SW] Prêt pour le fonctionnement hors-ligne.");
-      },
-      onRegistered(registration) {
-        console.log('⚡ [EduNova SW] Enregistré avec succès :', registration);
-        if (registration) {
-          registration.update().catch(() => {});
-
-          const checkForUpdates = () => {
-            registration.update().catch(err => console.debug('SW update check error:', err));
-          };
-
-          document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') {
-              checkForUpdates();
-            }
-          });
-
-          window.addEventListener('focus', checkForUpdates);
-          setInterval(checkForUpdates, 10 * 60 * 1000);
-        }
-      },
-      onRegisterError(error) {
-        console.debug('SW registration notice:', error);
+if ('serviceWorker' in navigator) {
+  if (isPreviewOrDevHost) {
+    // Dans l'environnement Cloud Run / AI Studio preview, purger tout Service Worker
+    // pour éviter les caches obsolètes, 404 sur les chunks et les blocages au splashscreen.
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        reg.unregister().catch(() => {});
       }
     });
-  } catch (err) {
-    console.debug('SW registration skipped:', err);
+    if ('caches' in window) {
+      caches.keys().then((keys) => {
+        keys.forEach((k) => caches.delete(k));
+      });
+    }
+  } else if (import.meta.env.PROD) {
+    // Uniquement sur les domaines de production dédiés (ex: edunova.pro, onrender.com)
+    let isRefreshing = false;
+
+    // Protection anti-boucle : rechargement au plus une fois par minute
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!isRefreshing) {
+        isRefreshing = true;
+        try {
+          const lastReload = sessionStorage.getItem('edunova_sw_last_reload');
+          const now = Date.now();
+          if (!lastReload || now - parseInt(lastReload, 10) > 60000) {
+            sessionStorage.setItem('edunova_sw_last_reload', String(now));
+            console.log("⚡ [EduNova SW] Nouveau Service Worker activé, rechargement contrôlé...");
+            window.location.reload();
+          }
+        } catch (e) {
+          window.location.reload();
+        }
+      }
+    });
+
+    try {
+      const updateSW = registerSW({
+        immediate: true,
+        onNeedRefresh() {
+          console.log("⚡ [EduNova SW] Nouvelle version détectée, mise à jour...");
+          updateSW(true);
+        },
+        onOfflineReady() {
+          console.log("⚡ [EduNova SW] Prêt pour le fonctionnement hors-ligne.");
+        },
+        onRegistered(registration) {
+          if (registration) {
+            registration.update().catch(() => {});
+
+            const checkForUpdates = () => {
+              registration.update().catch(err => console.debug('SW update check notice:', err));
+            };
+
+            document.addEventListener('visibilitychange', () => {
+              if (document.visibilityState === 'visible') {
+                checkForUpdates();
+              }
+            });
+
+            window.addEventListener('focus', checkForUpdates);
+            setInterval(checkForUpdates, 15 * 60 * 1000);
+          }
+        },
+        onRegisterError(error) {
+          console.debug('SW registration notice:', error);
+        }
+      });
+    } catch (err) {
+      console.debug('SW registration skipped:', err);
+    }
   }
 }
 
@@ -194,6 +226,14 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+// Notification au document que React prend la main
+if (typeof window !== 'undefined') {
+  (window as any).__edunovaAppReady = true;
+  if (typeof (window as any).__dismissEduNovaSplash === 'function') {
+    (window as any).__dismissEduNovaSplash();
+  }
+}
+
 const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
@@ -204,3 +244,15 @@ root.render(
     </ErrorBoundary>
   </React.StrictMode>
 );
+
+// Nettoyage de secours garanti après montage
+if (typeof window !== 'undefined') {
+  requestAnimationFrame(() => {
+    const splash = document.getElementById('edunova-pwa-splash');
+    if (splash) {
+      splash.style.transition = 'opacity 0.25s ease-out';
+      splash.style.opacity = '0';
+      setTimeout(() => splash.remove(), 250);
+    }
+  });
+}

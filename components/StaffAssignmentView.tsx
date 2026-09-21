@@ -21,6 +21,9 @@ import {
 } from '../utils/subjectMatching';
 import { toast } from 'sonner';
 import Modal from './Modal';
+import { ClassSelectorPill, ClassSelectorItem } from './ClassSelectorPill';
+import { SubjectSelectorPill, SubjectSelectorItem } from './SubjectSelectorPill';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 const DAYS_SHORT: Record<string, string> = {
@@ -104,6 +107,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
   }>>([]);
 
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [allowAllSubjects, setAllowAllSubjects] = useState(false);
   const [newAssignment, setNewAssignment] = useState({
     subject_id: '',
     class_id: '',
@@ -560,6 +564,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
 
   const cancelEdit = () => {
     setEditingId(null);
+    setAllowAllSubjects(false);
     setNewAssignment({ subject_id: '', class_id: '', day: 'Lundi', start: '08:00', end: '10:00', hourly_rate: staff?.amount?.toString() || '' });
     setFormError(null);
   };
@@ -605,7 +610,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     const targetClassName = targetCls?.name || '';
     const affiliatedIds = new Set<string>();
 
-    // 1. Filtrer les matières associées à cette classe dans class_subjects
+    // 1. Filtrer les matières strictement associées à cette classe dans class_subjects (programme officiel)
     classSubjects.forEach(cs => {
       if (cs.class_id === newAssignment.class_id || matchClasses(cs.class_id, targetClassName || newAssignment.class_id, allClasses)) {
         const found = findSubjectInList(cs.subject_id, availableSubjects) || (cs.subject as any);
@@ -614,7 +619,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       }
     });
       
-    // 2. Ajouter les matières déjà attribuées pour cette classe dans les assignations existantes
+    // 2. Ajouter les matières déjà attribuées pour cette classe dans les assignations existantes de l'école
     assignments.forEach(a => {
       if (a.class_id === newAssignment.class_id || matchClasses(a.class_name || a.class_id, targetClassName || newAssignment.class_id, allClasses)) {
         const found = findSubjectInList(a.subject_id || a.subject_name, availableSubjects);
@@ -623,10 +628,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       }
     });
 
-    // 3. Ajouter la matière de spécialité de l'enseignant
-    if ((staff as any)?.subject) {
-      const found = findSubjectInList(String((staff as any).subject), availableSubjects);
-      if (found) affiliatedIds.add(found.id);
+    // 3. En mode modification, préserver la matière du cours en cours d'édition pour cette classe
+    if (editingId) {
+      const currentEditing = assignments.find(a => a.id === editingId);
+      if (currentEditing && (currentEditing.class_id === newAssignment.class_id || matchClasses(currentEditing.class_name || currentEditing.class_id, targetClassName || newAssignment.class_id, allClasses))) {
+        const found = findSubjectInList(currentEditing.subject_id || currentEditing.subject_name, availableSubjects);
+        if (found) affiliatedIds.add(found.id);
+        else if (currentEditing.subject_id) affiliatedIds.add(currentEditing.subject_id);
+      }
     }
 
     const affiliated = availableSubjects.filter(s => affiliatedIds.has(s.id));
@@ -636,10 +645,68 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       affiliatedSubjects: affiliated,
       otherSubjects: others
     };
-  }, [newAssignment.class_id, classSubjects, availableSubjects, assignments, allClasses, staff]);
+  }, [newAssignment.class_id, classSubjects, availableSubjects, assignments, allClasses, editingId]);
 
   // Backward compatibility alias
   const filteredSubjects = affiliatedSubjects.length > 0 ? affiliatedSubjects : availableSubjects;
+
+  const classSelectorItems: ClassSelectorItem[] = useMemo(() => {
+    return availableClasses.map(c => ({
+      id: c.id,
+      name: `${c.name} (${c.enrollment_count} inscrit${c.enrollment_count > 1 ? 's' : ''})`,
+      students_count: c.enrollment_count,
+      level: c.level || undefined
+    }));
+  }, [availableClasses]);
+
+  // STRICTITÉ ABSOLUE : restreint exactement aux matières de la classe sélectionnée
+  const subjectSelectorItems: SubjectSelectorItem[] = useMemo(() => {
+    if (!newAssignment.class_id) {
+      return availableSubjects.map(s => ({
+        id: s.id,
+        name: s.name,
+        code: s.code
+      }));
+    }
+
+    // Cas 1 : La classe a des matières au programme et le mode secours n'est pas activé
+    // => STRICTEMENT ET UNIQUEMENT les matières de cette classe !
+    if (affiliatedSubjects.length > 0 && !allowAllSubjects) {
+      return affiliatedSubjects.map(s => ({
+        id: s.id,
+        name: s.name,
+        code: s.code ? `${s.code} • Au programme` : 'Au programme'
+      }));
+    }
+
+    // Cas 2 : Mode secours activé OU classe sans matière configurée
+    const list: SubjectSelectorItem[] = [];
+    const seen = new Set<string>();
+
+    affiliatedSubjects.forEach(s => {
+      if (!seen.has(s.id)) {
+        seen.add(s.id);
+        list.push({
+          id: s.id,
+          name: s.name,
+          code: s.code ? `${s.code} • Au programme` : 'Au programme'
+        });
+      }
+    });
+
+    otherSubjects.forEach(s => {
+      if (!seen.has(s.id)) {
+        seen.add(s.id);
+        list.push({
+          id: s.id,
+          name: s.name,
+          code: s.code ? `${s.code} • Hors programme` : 'Hors programme'
+        });
+      }
+    });
+
+    return list;
+  }, [newAssignment.class_id, affiliatedSubjects, otherSubjects, availableSubjects, allowAllSubjects]);
 
   const removeAssignment = useCallback((aid: string) => {
     setAssignments(prev => prev.filter(a => String(a.id) !== String(aid)));
@@ -681,6 +748,18 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
 
     const sub = availableSubjects.find(s => String(s.id) === String(newAssignment.subject_id));
     const cls = allClasses.find(c => String(c.id) === String(newAssignment.class_id));
+
+    // Vérification stricte : s'assurer que la matière appartient au programme de la classe choisie
+    if (affiliatedSubjects.length > 0 && !allowAllSubjects) {
+      const isAffiliated = affiliatedSubjects.some(s => String(s.id) === String(newAssignment.subject_id));
+      if (!isAffiliated) {
+        setFormError({
+          title: "Matière non conforme au programme",
+          message: `La matière "${sub?.name || 'sélectionnée'}" n'est pas inscrite au programme officiel de la classe "${cls?.name || 'choisie'}". Veuillez choisir une matière de cette classe.`
+        });
+        return;
+      }
+    }
 
     // Fonction utilitaire pour vérifier le chevauchement strict
     // Si start1 == end2 ou start2 == end1, ce n'est PAS un chevauchement (les cours peuvent s'enchaîner)
@@ -1187,30 +1266,18 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
             </div>
           </div>
 
-          {/* Sélecteur d'Année Académique */}
+          {/* Sélecteur d'Année Académique Harmonisé (Style Pillule) */}
           <div className="relative min-w-[200px] sm:min-w-[220px]">
-            <label htmlFor="target_year_select" className="sr-only">Année Cible</label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-              <select
-                id="target_year_select"
-                value={selectedYearId || ''}
-                onChange={(e) => handleYearSwitch(e.target.value)}
-                className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-bold pl-8 pr-8 py-2.5 rounded-xl border border-slate-200 outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer appearance-none transition-colors"
-              >
-                {allAcademicYears.map(y => {
-                  const isAct = y.status === 'ACTIVE' || y.is_active === true;
-                  const isPrep = y.status === 'FUTURE' || y.status === 'PREPARATION';
-                  const statusBadge = isAct ? '🟢 En cours' : isPrep ? '🟡 Préparation' : '⚪ Clôturée';
-                  return (
-                    <option key={y.id} value={y.id}>
-                      {y.label} ({statusBadge})
-                    </option>
-                  );
-                })}
-              </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={14} />
-            </div>
+            <AcademicSessionPill
+              academicYears={allAcademicYears}
+              selectedYearId={selectedYearId || ''}
+              onSelectYear={(yearId) => handleYearSwitch(yearId)}
+              variant="pill"
+              size="sm"
+              colorScheme="indigo"
+              labelPrefix="Session :"
+              portal={true}
+            />
           </div>
         </div>
       </div>
@@ -1237,18 +1304,22 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         
         {/* Formulaire d'assignation moderne et fluide */}
-        <div className="lg:col-span-5 space-y-6 lg:sticky lg:top-8 self-start">
-           <div className={`p-6 rounded-3xl shadow-xl border-2 transition-all space-y-5 max-h-[calc(100vh-140px)] overflow-y-auto custom-scrollbar ${editingId ? 'bg-indigo-50/70 border-indigo-300 ring-4 ring-indigo-500/10' : 'bg-white border-slate-100 shadow-slate-200/50'}`}>
-              <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-                <div className="flex items-center gap-3">
-                  <div className={`p-2.5 rounded-2xl shadow-sm ${editingId ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
-                    {editingId ? <RefreshCw size={20} className="animate-spin-slow" /> : <Plus size={20} />}
+        <div className="lg:col-span-5 space-y-4 lg:sticky lg:top-8 self-start">
+           <div className={`p-4 sm:p-5 rounded-2xl shadow-sm border transition-all space-y-3.5 max-h-[calc(100vh-120px)] overflow-y-auto custom-scrollbar ${
+             editingId 
+               ? 'bg-indigo-50/70 border-indigo-300 ring-4 ring-indigo-500/10' 
+               : 'bg-white border-slate-200/90 shadow-slate-200/40'
+           }`}>
+              <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className={`p-2 rounded-xl shadow-xs shrink-0 ${editingId ? 'bg-indigo-600 text-white' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
+                    {editingId ? <RefreshCw size={17} className="animate-spin-slow" /> : <Plus size={17} />}
                   </div>
-                  <div>
-                    <h3 className="text-base font-black text-slate-900 tracking-tight">
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight truncate">
                       {editingId ? 'Modifier l\'assignation' : 'Assigner un nouveau cours'}
                     </h3>
-                    <p className="text-[11px] text-slate-500 font-medium">
+                    <p className="text-[11px] text-slate-500 font-medium truncate">
                       {editingId ? 'Ajustez les paramètres et validez la mise à jour' : 'Remplissez les détails du cours et créneau'}
                     </p>
                   </div>
@@ -1256,20 +1327,20 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 {editingId && (
                   <button 
                     onClick={cancelEdit} 
-                    className="px-2.5 py-1 text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1 border border-slate-200"
+                    className="px-2.5 py-1 text-xs font-bold text-slate-600 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all flex items-center gap-1 border border-slate-200 shrink-0 cursor-pointer"
                     title="Annuler la modification"
                   >
-                    <X size={14} /> Annuler
+                    <X size={13} /> Annuler
                   </button>
                 )}
               </div>
 
-              <div className="space-y-4">
-                {/* 1. Sélection de la Classe / Promotion */}
-                <div className="space-y-1.5">
+              <div className="space-y-3">
+                {/* 1. Sélection de la Classe / Promotion (Pillule harmonisée) */}
+                <div className="space-y-1">
                    <div className="flex items-center justify-between">
-                     <label htmlFor="class_id" className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
-                       <Layers size={14} className="text-indigo-600" />
+                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                       <Layers size={13} className="text-indigo-600" />
                        {terminology.class} <span className="text-rose-500 font-bold">*</span>
                      </label>
                      {availableClasses.length > 0 && (
@@ -1278,25 +1349,26 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                        </span>
                      )}
                    </div>
-                   <div className="relative">
-                     <select 
-                      id="class_id"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-semibold outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none transition-all cursor-pointer" 
-                      value={newAssignment.class_id} 
-                      onChange={e => {setNewAssignment({...newAssignment, class_id: e.target.value}); setFormError(null);}}
-                     >
-                       <option value="">-- Choisir un(e) {terminology.class.toLowerCase()} --</option>
-                       {availableClasses.map(c => (
-                         <option key={c.id} value={c.id}>
-                           {c.name} ({c.enrollment_count} inscrit{c.enrollment_count > 1 ? 's' : ''})
-                         </option>
-                       ))}
-                     </select>
-                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                   </div>
+                   <ClassSelectorPill
+                     classes={classSelectorItems}
+                     selectedClassId={newAssignment.class_id}
+                     onSelectClass={(id) => {
+                       setNewAssignment(prev => ({ ...prev, class_id: id, subject_id: '' }));
+                       setAllowAllSubjects(false);
+                       setFormError(null);
+                     }}
+                     allowAll={false}
+                     emptyLabel={`-- Choisir un(e) ${terminology.class.toLowerCase()} --`}
+                     variant="field"
+                     size="sm"
+                     colorScheme="indigo"
+                     labelPrefix=""
+                     className="w-full"
+                     portal={true}
+                   />
                    {availableClasses.length === 0 && (
-                     <div className="p-3 bg-amber-50 rounded-xl border border-amber-200 text-amber-800 text-xs flex items-start gap-2 animate-in fade-in">
-                       <AlertCircle size={16} className="shrink-0 mt-0.5 text-amber-600" />
+                     <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-start gap-2 animate-in fade-in">
+                       <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-600" />
                        <div>
                          <span className="font-bold">Aucune classe éligible :</span> Aucun élève n'est encore inscrit pour cette session.
                        </div>
@@ -1304,63 +1376,102 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                    )}
                 </div>
 
-                {/* 2. Sélection de la Matière */}
-                <div className="space-y-1.5">
+                {/* 2. Sélection de la Matière (Strictement filtrée par la classe) */}
+                <div className="space-y-1">
                    <div className="flex items-center justify-between">
-                     <label htmlFor="subject_id" className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
-                       <BookOpen size={14} className="text-indigo-600" />
+                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                       <BookOpen size={13} className="text-indigo-600" />
                        Matière / Cours <span className="text-rose-500 font-bold">*</span>
                      </label>
-                     {newAssignment.class_id && affiliatedSubjects.length > 0 && (
-                       <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md">
-                         {affiliatedSubjects.length} au programme
-                       </span>
+                     {newAssignment.class_id && (
+                       <div className="flex items-center gap-1.5">
+                         {affiliatedSubjects.length > 0 ? (
+                           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                             {affiliatedSubjects.length} au programme
+                           </span>
+                         ) : (
+                           <span className="text-[10px] font-bold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                             Non configuré
+                           </span>
+                         )}
+                       </div>
                      )}
                    </div>
-                   <div className="relative">
-                     <select 
-                      id="subject_id"
-                      className="w-full px-3.5 py-2.5 bg-slate-50 hover:bg-white focus:bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-semibold outline-none focus:ring-4 focus:ring-indigo-500/10 appearance-none transition-all disabled:opacity-50 disabled:bg-slate-100 cursor-pointer" 
-                      value={newAssignment.subject_id} 
-                      onChange={e => {setNewAssignment({...newAssignment, subject_id: e.target.value}); setFormError(null);}}
-                      disabled={!newAssignment.class_id}
-                     >
-                       <option value="">
-                         {!newAssignment.class_id 
-                           ? `-- Sélectionnez d'abord un(e) ${terminology.class.toLowerCase()} --` 
-                           : "-- Choisir une matière --"}
-                       </option>
-                       {affiliatedSubjects.length > 0 ? (
-                         <>
-                           <optgroup label={`✨ Matières associées à la classe (${affiliatedSubjects.length})`}>
-                             {affiliatedSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)}
-                           </optgroup>
-                           {otherSubjects.length > 0 && (
-                             <optgroup label={`📚 Autres matières de l'école (${otherSubjects.length})`}>
-                               {otherSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)}
-                             </optgroup>
+                   <SubjectSelectorPill
+                     subjects={subjectSelectorItems}
+                     selectedSubjectId={newAssignment.subject_id}
+                     onSelectSubject={(id) => {
+                       setNewAssignment(prev => ({ ...prev, subject_id: id }));
+                       setFormError(null);
+                     }}
+                     allowAll={false}
+                     emptyLabel={!newAssignment.class_id 
+                       ? `-- Choisissez d'abord un(e) ${terminology.class.toLowerCase()} --` 
+                       : affiliatedSubjects.length === 0 && !allowAllSubjects
+                         ? `-- Aucune matière au programme --`
+                         : "-- Choisir une matière au programme --"}
+                     variant="field"
+                     size="sm"
+                     colorScheme="indigo"
+                     labelPrefix=""
+                     className="w-full"
+                     disabled={!newAssignment.class_id}
+                     title={!newAssignment.class_id ? `Sélectionnez d'abord un(e) ${terminology.class.toLowerCase()}` : "Choisir une matière"}
+                     portal={true}
+                   />
+
+                   {/* Notification d'aide & verrouillage strict */}
+                   {newAssignment.class_id && (
+                     <div className="flex items-center justify-between pt-0.5 text-[10px]">
+                       {affiliatedSubjects.length === 0 ? (
+                         <div className="text-amber-700 flex items-center gap-1 font-medium">
+                           <span>⚠️ Aucune matière associée à cette classe.</span>
+                           {!allowAllSubjects && (
+                             <button
+                               type="button"
+                               onClick={() => setAllowAllSubjects(true)}
+                               className="font-bold underline text-indigo-700 hover:text-indigo-900 cursor-pointer ml-1"
+                             >
+                               Débloquer catalogue général
+                             </button>
                            )}
-                         </>
+                         </div>
                        ) : (
-                         availableSubjects.map(s => <option key={s.id} value={s.id}>{s.name} {s.code ? `(${s.code})` : ''}</option>)
+                         <div className="w-full flex items-center justify-between text-slate-400">
+                           <span className="text-[10px] text-slate-500 font-medium">
+                             🔒 Liste strictement restreinte à cette classe
+                           </span>
+                           <button
+                             type="button"
+                             onClick={() => {
+                               setAllowAllSubjects(prev => !prev);
+                               setNewAssignment(p => ({ ...p, subject_id: '' }));
+                             }}
+                             className="text-[10px] font-medium text-slate-400 hover:text-indigo-600 underline cursor-pointer transition-colors"
+                           >
+                             {allowAllSubjects ? "Restreindre au programme" : "+ Matière hors programme ?"}
+                           </button>
+                         </div>
                        )}
-                     </select>
-                     <ChevronDown className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
-                   </div>
+                     </div>
+                   )}
                 </div>
 
-                {/* 3. Sélecteur de Jour avec Boutons Pills Tactiles */}
-                <div className="space-y-1.5">
+                {/* 3. Sélecteur de Jour avec Boutons Tactiles */}
+                <div className="space-y-1">
                    <div className="flex items-center justify-between">
-                     <label className="text-xs font-bold text-slate-700 tracking-tight flex items-center gap-1.5">
-                       <Calendar size={14} className="text-indigo-600" />
+                     <label className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                       <Calendar size={13} className="text-indigo-600" />
                        Jour de cours <span className="text-rose-500 font-bold">*</span>
                      </label>
-                     <span className="text-[11px] font-bold text-indigo-700">{newAssignment.day}</span>
+                     <span className="text-[11px] font-extrabold text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                       {newAssignment.day}
+                     </span>
                    </div>
                    
                    {/* Boutons de sélection rapide du jour */}
-                   <div className="grid grid-cols-6 gap-1.5">
+                   <div className="grid grid-cols-6 gap-1">
                      {DAYS.map(d => {
                        const isSelected = newAssignment.day === d;
                        return (
@@ -1368,12 +1479,12 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                            key={d}
                            type="button"
                            onClick={() => {
-                             setNewAssignment({ ...newAssignment, day: d });
+                             setNewAssignment(prev => ({ ...prev, day: d }));
                              setFormError(null);
                            }}
-                           className={`py-2 text-center text-xs font-bold rounded-xl transition-all border ${
+                           className={`py-1.5 text-center text-xs font-bold rounded-xl transition-all border cursor-pointer ${
                              isSelected 
-                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20 scale-[1.02]' 
+                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs scale-[1.02]' 
                                : 'bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                            }`}
                            title={d}
@@ -1385,18 +1496,18 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                    </div>
                 </div>
 
-                {/* 4. Horaires & Durée Dynamique */}
-                <div className="space-y-2 bg-slate-50/80 p-3.5 rounded-2xl border border-slate-200/80">
+                {/* 4. Horaires & Durée Dynamique (Compact et Ergonomique) */}
+                <div className="space-y-2 bg-slate-50/90 p-3 rounded-xl border border-slate-200/80">
                    <div className="flex items-center justify-between">
-                     <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                       <Clock size={14} className="text-indigo-600" />
+                     <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                       <Clock size={13} className="text-indigo-600" />
                        Horaires du cours
                      </span>
                      {currentSlotDuration && (
-                       <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-lg border flex items-center gap-1 ${
+                       <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-lg border flex items-center gap-1 ${
                          currentSlotDuration.valid 
-                           ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
-                           : 'bg-rose-50 text-rose-700 border-rose-200 animate-pulse'
+                           ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                           : 'bg-rose-50 text-rose-800 border-rose-200 animate-pulse'
                        }`}>
                          ⚡ {currentSlotDuration.text}
                        </span>
@@ -1404,71 +1515,74 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                    </div>
 
                    {/* Créneaux rapides populaires */}
-                   <div className="flex flex-wrap gap-1.5 pb-1">
-                     {QUICK_TIME_SLOTS.map(slot => (
-                       <button
-                         key={slot.label}
-                         type="button"
-                         onClick={() => {
-                           setNewAssignment({
-                             ...newAssignment,
-                             start: slot.start,
-                             end: slot.end
-                           });
-                           setFormError(null);
-                         }}
-                         className={`px-2 py-1 text-[10px] font-bold rounded-lg border transition-all ${
-                           newAssignment.start === slot.start && newAssignment.end === slot.end
-                             ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
-                             : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 hover:text-indigo-600'
-                         }`}
-                       >
-                         {slot.label}
-                       </button>
-                     ))}
+                   <div className="flex flex-wrap gap-1">
+                     {QUICK_TIME_SLOTS.map(slot => {
+                       const isSelected = newAssignment.start === slot.start && newAssignment.end === slot.end;
+                       return (
+                         <button
+                           key={slot.label}
+                           type="button"
+                           onClick={() => {
+                             setNewAssignment(prev => ({
+                               ...prev,
+                               start: slot.start,
+                               end: slot.end
+                             }));
+                             setFormError(null);
+                           }}
+                           className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
+                             isSelected
+                               ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                               : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-indigo-700'
+                           }`}
+                         >
+                           {slot.label}
+                         </button>
+                       );
+                     })}
                    </div>
 
-                   <div className="grid grid-cols-2 gap-3">
+                   <div className="grid grid-cols-2 gap-2.5 pt-0.5">
                       <div className="space-y-1">
-                         <label htmlFor="start" className="text-[11px] font-bold text-slate-600">Début</label>
+                         <label htmlFor="start" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Début</label>
                          <input 
                            id="start" 
                            type="time" 
-                           className="w-full px-3 py-2 bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono" 
+                           className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono shadow-2xs" 
                            value={newAssignment.start} 
-                           onChange={e => {setNewAssignment({...newAssignment, start: e.target.value}); setFormError(null);}} 
+                           onChange={e => {setNewAssignment(prev => ({...prev, start: e.target.value})); setFormError(null);}} 
                          />
                       </div>
                       <div className="space-y-1">
-                         <label htmlFor="end" className="text-[11px] font-bold text-slate-600">Fin</label>
+                         <label htmlFor="end" className="text-[10px] font-bold uppercase tracking-wider text-slate-500">Fin</label>
                          <input 
                            id="end" 
                            type="time" 
-                           className="w-full px-3 py-2 bg-white text-slate-900 border-2 border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-4 focus:ring-indigo-500/10 transition-all font-mono" 
+                           className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono shadow-2xs" 
                            value={newAssignment.end} 
-                           onChange={e => {setNewAssignment({...newAssignment, end: e.target.value}); setFormError(null);}} 
+                           onChange={e => {setNewAssignment(prev => ({...prev, end: e.target.value})); setFormError(null);}} 
                          />
                       </div>
                    </div>
                 </div>
 
                 {/* 5. Taux horaire & Rémunération */}
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   <div className="flex items-center justify-between">
-                    <label htmlFor="hourly_rate" className="text-xs font-bold text-emerald-800 tracking-tight flex items-center gap-1.5">
-                      <TrendingUp size={14} className="text-emerald-600" />
-                      Taux Horaire Spécifique (HTG/h)
+                    <label htmlFor="hourly_rate" className="text-[11px] font-bold uppercase tracking-wider text-emerald-900 flex items-center gap-1.5">
+                      <TrendingUp size={13} className="text-emerald-600" />
+                      Taux Horaire Spécifique
                     </label>
                     {staff?.pay_type === 'Horaire' && staff?.amount && Number(staff.amount) > 0 && (
                       <button
                         type="button"
                         onClick={() => {
-                          setNewAssignment({ ...newAssignment, hourly_rate: String(staff.amount) });
+                          setNewAssignment(prev => ({ ...prev, hourly_rate: String(staff.amount) }));
                           setFormError(null);
                         }}
-                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline"
+                        className="text-[10px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
                       >
-                        Utiliser taux base ({staff.amount} HTG)
+                        Taux base ({staff.amount} HTG)
                       </button>
                     )}
                   </div>
@@ -1477,26 +1591,26 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                       id="hourly_rate" 
                       type="number" 
                       step="0.01" 
-                      className="w-full px-3.5 py-2.5 bg-emerald-50/60 border-2 border-emerald-200 rounded-xl text-xs font-black text-emerald-950 outline-none focus:border-emerald-600 focus:ring-4 focus:ring-emerald-500/10 transition-all font-mono" 
+                      className="w-full px-3 py-1.5 bg-emerald-50/60 border border-emerald-300 rounded-xl text-xs font-black text-emerald-950 outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 transition-all font-mono" 
                       value={newAssignment.hourly_rate} 
-                      onChange={e => {setNewAssignment({...newAssignment, hourly_rate: e.target.value}); setFormError(null);}} 
+                      onChange={e => {setNewAssignment(prev => ({...prev, hourly_rate: e.target.value})); setFormError(null);}} 
                       placeholder={staff?.pay_type === 'Horaire' ? (staff?.amount?.toString() || "0.00") : "0.00"}
                     />
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-700/60 pointer-events-none">
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[11px] font-bold text-emerald-800 pointer-events-none">
                       HTG/h
                     </span>
                   </div>
-                  <p className="text-[10px] text-emerald-700/80 font-medium px-1">
+                  <p className="text-[10px] text-emerald-800 font-medium px-0.5">
                     {staff?.pay_type === 'Horaire' 
-                      ? `💡 Laissez vide ou à 0 pour utiliser le taux par défaut du contrat (${staff?.amount || 0} HTG/h).`
-                      : `💡 Laissez à 0 si inclus dans le salaire fixe (${staff?.amount || 0} HTG). Sinon, indiquez le taux additionnel.`}
+                      ? `💡 Laissez vide pour utiliser le taux standard (${staff?.amount || 0} HTG/h).`
+                      : `💡 Laissez à 0 si déjà couvert par le salaire mensuel fixe (${staff?.amount || 0} HTG).`}
                   </p>
                 </div>
 
                 {/* Erreurs de validation visuelles */}
                 {formError && (
-                  <div className="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 flex items-start gap-2.5 animate-in fade-in slide-in-from-top-2">
-                    <AlertTriangle className="text-rose-500 shrink-0 mt-0.5" size={16} />
+                  <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
+                    <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={15} />
                     <div className="flex-1 min-w-0">
                       <h4 className="text-xs font-bold text-rose-900 mb-0.5">{formError.title}</h4>
                       <p className="text-[11px] text-rose-700 whitespace-pre-line leading-relaxed">
@@ -1510,13 +1624,13 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 <button 
                   onClick={handleProcessAssignment} 
                   type="button"
-                  className={`w-full py-3 rounded-2xl font-black text-xs tracking-tight transition-all flex items-center justify-center gap-2 active:scale-95 shadow-md ${
+                  className={`w-full py-2.5 rounded-xl font-black text-xs tracking-tight transition-all flex items-center justify-center gap-2 active:scale-98 shadow-xs cursor-pointer ${
                     editingId 
                       ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20' 
                       : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
                   }`}
                 >
-                   {editingId ? <RefreshCw size={16} /> : <Plus size={16} />}
+                   {editingId ? <RefreshCw size={15} /> : <Plus size={15} />}
                    {editingId ? 'Valider la modification du créneau' : 'Ajouter au planning de cours'}
                 </button>
               </div>
