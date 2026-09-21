@@ -30,7 +30,7 @@ function computeGitBlobSha(buffer: Buffer): string {
   return crypto.createHash('sha1').update(Buffer.concat([header, buffer])).digest('hex');
 }
 
-function getProjectFiles(dir: string, base: string = ''): { relPath: string; fullPath: string; isBinary: boolean; size: number }[] {
+export function getProjectFiles(dir: string, base: string = ''): { relPath: string; fullPath: string; isBinary: boolean; size: number }[] {
   let results: { relPath: string; fullPath: string; isBinary: boolean; size: number }[] = [];
   const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -75,13 +75,53 @@ export async function exportProjectToGitHub(
   commitMessage: string = 'Exportation automatique du projet depuis EduNova Pro',
   onProgress?: ExportProgressCallback
 ) {
-  const headers = {
-    'Authorization': `token ${token.trim()}`,
+  const cleanToken = token.trim();
+  const headers: Record<string, string> = {
+    'Authorization': `token ${cleanToken}`,
     'Accept': 'application/vnd.github.v3+json',
     'User-Agent': 'EduNova-GitHub-Exporter'
   };
 
-  onProgress?.('Analyse des fichiers du projet...', 5);
+  onProgress?.('Validation des autorisations du dépôt GitHub...', 5);
+
+  // Pre-flight test: verify token validity and repository access immediately
+  try {
+    const testRes = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+      headers,
+      signal: AbortSignal.timeout(12000)
+    });
+
+    if (testRes.status === 401) {
+      throw new Error("Token GitHub (PAT) invalide ou expiré (401 Unauthorized). Veuillez renouveler votre jeton d'accès dans les Paramètres.");
+    }
+
+    if (testRes.status === 403) {
+      const remaining = testRes.headers.get('x-ratelimit-remaining');
+      if (remaining === '0') {
+        throw new Error("Quota d'appels API GitHub atteint (Rate limit 403). Veuillez patienter quelques minutes.");
+      }
+      throw new Error(`Accès refusé au dépôt GitHub "${owner}/${repo}" (403 Forbidden). Vérifiez que votre token possède les autorisations "repo" (lecture et écriture).`);
+    }
+
+    if (testRes.status === 404) {
+      throw new Error(`Le dépôt GitHub "${owner}/${repo}" est introuvable ou privé sans accès (404 Not Found). Vérifiez l'orthographe du propriétaire et du nom du dépôt.`);
+    }
+
+    if (!testRes.ok) {
+      const errText = await testRes.text();
+      throw new Error(`Erreur d'accès au dépôt GitHub (${testRes.status}): ${errText}`);
+    }
+  } catch (testErr: any) {
+    if (testErr.name === 'TimeoutError' || testErr.name === 'AbortError') {
+      throw new Error("Délai d'attente dépassé lors de la connexion à l'API GitHub. Vérifiez votre connexion Internet.");
+    }
+    if (testErr.message && (testErr.message.includes('fetch failed') || testErr.message.includes('network error') || testErr.message.includes('ENOTFOUND'))) {
+      throw new Error("Erreur de connexion réseau à l'API GitHub. Vérifiez votre connexion Internet.");
+    }
+    throw testErr;
+  }
+
+  onProgress?.('Analyse des fichiers du projet...', 10);
 
   const localFiles = getProjectFiles(process.cwd());
   if (localFiles.length === 0) {
@@ -89,27 +129,36 @@ export async function exportProjectToGitHub(
   }
 
   // 1. Get reference commit and existing base tree
-  onProgress?.(`Vérification de la branche "${branch}" sur GitHub...`, 10);
+  onProgress?.(`Vérification de la branche "${branch}" sur GitHub...`, 15);
   let parentCommitSha: string | null = null;
   let parentTreeSha: string | null = null;
   const remoteTreeMap = new Map<string, string>();
 
   try {
-    const refRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`, { headers });
+    const refRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/ref/heads/${branch}`, {
+      headers,
+      signal: AbortSignal.timeout(12000)
+    });
     if (refRes.ok) {
       const refData = await refRes.json();
       parentCommitSha = refData.object?.sha || null;
       
       if (parentCommitSha) {
         // Fetch commit data to get parent tree sha
-        const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${parentCommitSha}`, { headers });
+        const commitRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/commits/${parentCommitSha}`, {
+          headers,
+          signal: AbortSignal.timeout(12000)
+        });
         if (commitRes.ok) {
           const commitData = await commitRes.json();
           parentTreeSha = commitData.tree?.sha || null;
         }
 
         // Fetch remote tree recursively to enable zero-upload diffing
-        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${parentCommitSha}?recursive=1`, { headers });
+        const treeRes = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/${parentCommitSha}?recursive=1`, {
+          headers,
+          signal: AbortSignal.timeout(15000)
+        });
         if (treeRes.ok) {
           const treeData = await treeRes.json();
           if (Array.isArray(treeData.tree)) {
@@ -122,8 +171,8 @@ export async function exportProjectToGitHub(
         }
       }
     }
-  } catch (err) {
-    console.warn('Could not fetch existing remote ref:', err);
+  } catch (err: any) {
+    console.warn('Could not fetch existing remote ref:', err?.message || err);
   }
 
   // 2. Identify which files actually changed
