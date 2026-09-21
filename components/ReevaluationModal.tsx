@@ -180,8 +180,6 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
   const [sortBy, setSortBy] = useState<SortOption>('reduction-desc');
   const [expandedStudentId, setExpandedStudentId] = useState<string | null>(null);
 
-  if (!isOpen) return null;
-
   // Compute available classes with counts and sums
   const availableClasses = useMemo(() => {
     const classSet = new Set(reevaluatedStudents.map(st => st.className || 'Non spécifiée'));
@@ -337,6 +335,8 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
   const handlePrintSummary = () => {
     window.print();
   };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md animate-fade-in">

@@ -17,6 +17,11 @@ const __dirname = path.dirname(__filename);
 function renderServiceWorkerHashPlugin(deployHash: string, buildTimestamp: string) {
   return {
     name: 'render-sw-hash-injection',
+    transformIndexHtml(html: string) {
+      return html
+        .replace(/%DEPLOY_HASH%/g, deployHash)
+        .replace(/%BUILD_TIMESTAMP%/g, buildTimestamp);
+    },
     closeBundle() {
       const swDistPath = path.resolve(__dirname, 'dist', 'sw.js');
       if (fs.existsSync(swDistPath)) {

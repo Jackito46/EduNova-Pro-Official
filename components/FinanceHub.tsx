@@ -41,7 +41,7 @@ import { GatewayWebhookSimulatorModal } from './GatewayWebhookSimulatorModal';
 
 const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
-  const { terminology, currentCampusId, school } = useSchool();
+  const { terminology, currentCampusId, campuses, school, activeAcademicYear } = useSchool();
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
   const [isWebhookSimulatorOpen, setIsWebhookSimulatorOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(132.50);
@@ -123,6 +123,58 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   });
   
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const financeCacheKey = `edunova_finance_cache_${user?.school_id || 'default'}_${currentCampusId || 'all'}`;
+
+  // Hydratation instantanée du cache (< 5ms) au montage pour éliminer la latence
+  useEffect(() => {
+    try {
+      const cached = sessionStorage.getItem(financeCacheKey);
+      if (cached) {
+        const p = JSON.parse(cached);
+        if (p && (Date.now() - (p.timestamp || 0) < 300000)) { // 5 minutes de validité
+          if (p.todayCollection !== undefined) setTodayCollection(p.todayCollection);
+          if (p.todayCollectionHTG !== undefined) setTodayCollectionHTG(p.todayCollectionHTG);
+          if (p.todayCollectionUSD !== undefined) setTodayCollectionUSD(p.todayCollectionUSD);
+          if (p.totalExpected !== undefined) setTotalExpected(p.totalExpected);
+          if (p.totalExpectedHTG !== undefined) setTotalExpectedHTG(p.totalExpectedHTG);
+          if (p.totalExpectedUSD !== undefined) setTotalExpectedUSD(p.totalExpectedUSD);
+          if (p.totalGrossExpected !== undefined) setTotalGrossExpected(p.totalGrossExpected);
+          if (p.totalGrossExpectedHTG !== undefined) setTotalGrossExpectedHTG(p.totalGrossExpectedHTG);
+          if (p.totalGrossExpectedUSD !== undefined) setTotalGrossExpectedUSD(p.totalGrossExpectedUSD);
+          if (p.totalReductions !== undefined) setTotalReductions(p.totalReductions);
+          if (p.totalReductionsHTG !== undefined) setTotalReductionsHTG(p.totalReductionsHTG);
+          if (p.totalReductionsUSD !== undefined) setTotalReductionsUSD(p.totalReductionsUSD);
+          if (p.totalCollected !== undefined) setTotalCollected(p.totalCollected);
+          if (p.totalCollectedHTG !== undefined) setTotalCollectedHTG(p.totalCollectedHTG);
+          if (p.totalCollectedUSD !== undefined) setTotalCollectedUSD(p.totalCollectedUSD);
+          if (p.totalCollectedTuition !== undefined) setTotalCollectedTuition(p.totalCollectedTuition);
+          if (p.totalCollectedTuitionHTG !== undefined) setTotalCollectedTuitionHTG(p.totalCollectedTuitionHTG);
+          if (p.totalCollectedTuitionUSD !== undefined) setTotalCollectedTuitionUSD(p.totalCollectedTuitionUSD);
+          if (p.totalCollectedSupplies !== undefined) setTotalCollectedSupplies(p.totalCollectedSupplies);
+          if (p.totalCollectedSuppliesHTG !== undefined) setTotalCollectedSuppliesHTG(p.totalCollectedSuppliesHTG);
+          if (p.totalCollectedSuppliesUSD !== undefined) setTotalCollectedSuppliesUSD(p.totalCollectedSuppliesUSD);
+          if (p.totalArrears !== undefined) setTotalArrears(p.totalArrears);
+          if (p.collectionRate !== undefined) setCollectionRate(p.collectionRate);
+          if (p.todayTransactions !== undefined) setTodayTransactions(p.todayTransactions);
+          if (p.cashOnHandHTG !== undefined) setCashOnHandHTG(p.cashOnHandHTG);
+          if (p.cashOnHandUSD !== undefined) setCashOnHandUSD(p.cashOnHandUSD);
+          if (p.paymentMethodBreakdown) setPaymentMethodBreakdown(p.paymentMethodBreakdown);
+          if (p.criticalDelays !== undefined) setCriticalDelays(p.criticalDelays);
+          if (p.discountedStudents !== undefined) setDiscountedStudents(p.discountedStudents);
+          if (p.pendingPayments !== undefined) setPendingPayments(p.pendingPayments);
+          if (p.economatPenetration !== undefined) setEconomatPenetration(p.economatPenetration);
+          if (p.txBreakdown) setTxBreakdown(p.txBreakdown);
+          if (p.recentTransactions) setRecentTransactions(p.recentTransactions);
+          if (p.netBalance) setNetBalance(p.netBalance);
+          if (p.reevaluatedStudents) setReevaluatedStudents(p.reevaluatedStudents);
+          if (p.exchangeRate) setExchangeRate(p.exchangeRate);
+          setLoading(false);
+        }
+      }
+    } catch (e) {}
+  }, [financeCacheKey]);
 
   // Mobile Money Gateways status & visual badges
   const [simulatorOperator, setSimulatorOperator] = useState<'moncash' | 'natcash'>('moncash');
@@ -197,54 +249,108 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   }, [user?.school_id]);
 
-  const fetchFinanceData = useCallback(async () => {
+  const fetchFinanceData = useCallback(async (isSilent = false) => {
     if (!user?.school_id) return;
-    const activeCampusId = user.campus_id || currentCampusId;
+    const isMultiCampus = Boolean(campuses && campuses.length > 1);
+    const activeCampusId = isMultiCampus ? (user.campus_id || currentCampusId) : null;
     try {
-      setLoading(true);
+      if (!isSilent && !sessionStorage.getItem(financeCacheKey)) {
+        setLoading(true);
+      } else {
+        setIsRefreshing(true);
+      }
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      // 1. Fetch Payments
+      // Lancement simultané de TOUTES les requêtes en parallèle (1 seul aller-retour réseau)
       let paymentsQuery = supabase
         .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name)')
+        .select('id, amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, fee_type, nature, ad_hoc_campaign_id, created_at, student_id, campaign:ad_hoc_campaigns(id, name)')
         .eq('school_id', user.school_id);
       if (activeCampusId && isValidUuid(activeCampusId)) {
         paymentsQuery = paymentsQuery.eq('campus_id', activeCampusId);
       }
-      const { data: payments } = await paymentsQuery;
-        
-      // 2. Fetch Supplies Sales
+
       let suppliesQuery = supabase
         .from('school_supplies')
-        .select('*, payments:supply_payments(*)')
+        .select('id, transaction_id, student_id, total_amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, created_at, academic_year_id, payments:supply_payments(amount, amount_htg_equivalent, currency, payment_date)')
         .eq('school_id', user.school_id);
       if (activeCampusId && isValidUuid(activeCampusId)) {
         suppliesQuery = suppliesQuery.eq('campus_id', activeCampusId);
       }
-      const { data: supplies } = await suppliesQuery;
       
-      // 3. Fetch Expenses
       let expensesQuery = supabase
         .from('expenses')
-        .select('*')
+        .select('id, amount, amount_htg_equivalent, currency')
         .eq('school_id', user.school_id);
       if (activeCampusId && isValidUuid(activeCampusId)) {
-        expensesQuery = expensesQuery.eq('campus_id', activeCampusId);
+        expensesQuery = expensesQuery.or(`campus_id.eq.${activeCampusId},campus_id.is.null`);
       }
-      const { data: expensesData } = await expensesQuery;
 
-      // 4. Fetch Paid Salaries
       let payrollQuery = supabase
         .from('payroll_slips')
-        .select('*, staff!inner(id, campus_id)')
+        .select('id, net_salary, base_salary, status, staff:staff_id(id, campus_id)')
         .eq('school_id', user.school_id)
         .eq('status', 'PAID');
+
+      let studentsQuery = supabase
+        .from('students')
+        .select('id, reference_number, first_name, last_name, gender, status, class_id, campus_id, discount_amount, discount_label, created_at')
+        .eq('school_id', user.school_id);
       if (activeCampusId && isValidUuid(activeCampusId)) {
-        payrollQuery = payrollQuery.eq('staff.campus_id', activeCampusId);
+        studentsQuery = studentsQuery.eq('campus_id', activeCampusId);
       }
-      const { data: salaryData } = await payrollQuery;
+
+      const plansQuery = supabase.from('fee_plans').select('*').eq('school_id', user.school_id);
+      const enrollmentsQuery = supabase.from('enrollments').select('student_id, academic_year_id, class_id').eq('school_id', user.school_id);
+      const classesQuery = supabase.from('classes').select('id, name').eq('school_id', user.school_id);
+      const rateQuery = supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('effective_date', { ascending: false }).limit(1);
+      const activeYearQuery = supabase.from('academic_years').select('*').eq('school_id', user.school_id).order('created_at', { ascending: false });
+
+      const [
+        paymentsRes,
+        suppliesRes,
+        expensesRes,
+        payrollRes,
+        studentsRes,
+        plansRes,
+        enrollmentsRes,
+        classesRes,
+        rateRes,
+        activeYearRes
+      ] = await Promise.all([
+        paymentsQuery,
+        suppliesQuery,
+        expensesQuery,
+        payrollQuery,
+        studentsQuery,
+        plansQuery,
+        enrollmentsQuery,
+        classesQuery,
+        rateQuery,
+        activeYearQuery
+      ]);
+
+      const payments = paymentsRes.data || [];
+      const supplies = suppliesRes.data || [];
+      const expensesData = expensesRes.data || [];
+      const salaryData = payrollRes.data || [];
+      const students = studentsRes.data || [];
+      let plans = plansRes.data || [];
+      if (plansRes.error || plans.length === 0) {
+        const fallbackPlans = await supabase.from('fee_plans').select('*').eq('school_id', user.school_id);
+        if (fallbackPlans.data && fallbackPlans.data.length > 0) {
+          plans = fallbackPlans.data;
+        }
+      }
+      const enrollments = enrollmentsRes.data || [];
+      const classesData = classesRes.data || [];
+      const rateData = rateRes.data || [];
+      const allYears = activeYearRes.data || [];
+      const activeYear = activeAcademicYear || 
+                         allYears.find((y: any) => y.id === activeAcademicYear?.id) || 
+                         allYears.find((y: any) => y.is_active || y.status === 'ACTIVE') || 
+                         allYears[0];
         
       let allRecentTx: any[] = [];
       let breakdown = { academique: 0, inscription: 0, fournitures: 0, autres: 0 };
@@ -305,7 +411,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           else breakdown.autres++;
 
           let paymentTypeStr = 'Frais Divers';
-          if (p.campaign?.name) paymentTypeStr = `Campagne : ${p.campaign.name}`;
+          const campaignObj: any = Array.isArray(p.campaign) ? p.campaign[0] : p.campaign;
+          if (campaignObj?.name) paymentTypeStr = `Campagne : ${campaignObj.name}`;
           else if (p.ad_hoc_campaign_id) paymentTypeStr = 'Frais de Campagne';
           else if (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE'))) paymentTypeStr = terminology.tuition;
           else if (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") paymentTypeStr = 'Inscription';
@@ -462,9 +569,12 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       const totalExpensesHTG = expensesData?.filter(e => !e.currency || e.currency === 'HTG').reduce((sum, e) => sum + Number(e.amount || 0), 0) || 0;
       const totalExpensesUSD = expensesData?.filter(e => e.currency === 'USD').reduce((sum, e) => sum + Number(e.amount || 0), 0) || 0;
 
-      const totalSalaries = salaryData?.reduce((sum, s) => sum + (s.net_amount_htg_equivalent || s.net_salary || 0), 0) || 0;
-      const totalSalariesHTG = salaryData?.filter(s => !s.currency || s.currency === 'HTG').reduce((sum, s) => sum + (s.net_salary || 0), 0) || 0;
-      const totalSalariesUSD = salaryData?.filter(s => s.currency === 'USD').reduce((sum, s) => sum + (s.net_salary || 0), 0) || 0;
+      const filteredSalaries = activeCampusId && isValidUuid(activeCampusId)
+        ? salaryData.filter((s: any) => !s.staff?.campus_id || s.staff?.campus_id === activeCampusId)
+        : salaryData;
+      const totalSalaries = filteredSalaries.reduce((sum: number, s: any) => sum + Number(s.net_salary || s.base_salary || 0), 0);
+      const totalSalariesHTG = totalSalaries;
+      const totalSalariesUSD = 0;
 
       setNetBalance({
         income: totalIncome,
@@ -487,17 +597,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       allRecentTx.sort((a, b) => b.date.getTime() - a.date.getTime());
       setRecentTransactions(allRecentTx.slice(0, 5));
 
-      // 3. Fetch Students, Fee Plans, Enrollments & Exchange Rate
-      let studentsQuery = supabase.from('students').select('*').eq('school_id', user.school_id);
-      if (activeCampusId) {
-        studentsQuery = studentsQuery.eq('campus_id', activeCampusId);
-      }
-      const { data: students } = await studentsQuery;
-      const { data: plans } = await supabase.from('fee_plans').select('*').eq('school_id', user.school_id);
-      const { data: enrollments } = await supabase.from('enrollments').select('student_id, academic_year_id, class_id').eq('school_id', user.school_id);
-      const { data: classesData } = await supabase.from('classes').select('id, name').eq('school_id', user.school_id);
-      const { data: rateData } = await supabase.from('exchange_rates').select('*').eq('school_id', user.school_id).order('effective_date', { ascending: false }).limit(1);
-      
+      // 3. Calcul du taux de change & classes (déjà récupérés en parallèle)
       const currentExchangeRate = rateData?.[0]?.rate_usd_to_htg || rateData?.[0]?.rate || 132.50;
       setExchangeRate(currentExchangeRate);
 
@@ -505,19 +605,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       classesData?.forEach(c => classesMap.set(c.id, c.name));
 
       if (students && plans) {
-        // Get active year ID for filtering plans and checking enrollment history
-        const { data: activeYear } = await supabase
-          .from('academic_years')
-          .select('id')
-          .eq('school_id', user.school_id)
-          .or('is_active.eq.true,status.eq.ACTIVE')
-          .maybeSingle();
-
         const plansMap = new Map();
         // Filter plans for the active year specifically to avoid using old fee structures
-        const activePlans = plans.filter(p => p.academic_year_id === activeYear?.id);
+        const activePlans = plans.filter((p: any) => !p.academic_year_id || p.academic_year_id === activeYear?.id);
         const finalPlans = activePlans.length > 0 ? activePlans : plans;
-        finalPlans.forEach(p => plansMap.set(p.class_id, p));
+        finalPlans.forEach((p: any) => plansMap.set(p.class_id, p));
 
         // Group enrollments by student to identify returning students and active class
         const studentEnrollments = new Map<string, string[]>();
@@ -546,7 +638,9 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         
         // Filter students to only those registered for the current active year
         const activeStudentIds = new Set(enrollments?.filter(e => e.academic_year_id === activeYear?.id).map(e => e.student_id));
-        const activeStudents = students.filter(s => activeStudentIds.has(s.id));
+        const activeStudents = activeStudentIds.size > 0 
+          ? students.filter(s => activeStudentIds.has(s.id))
+          : students.filter(s => s.status === 'Actif' || s.status === 'ACTIVE' || !s.status);
 
         activeStudents.forEach(s => {
           const activeClassId = studentActiveClassMap.get(s.id) || s.class_id;
@@ -628,11 +722,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
 
               reevaluatedList.push({
                 studentId: s.id,
-                matricule: s.matricule || s.reference_number || s.nisu || s.id?.slice(0, 8),
+                matricule: s.reference_number || (s as any).matricule || (s as any).nisu || s.id?.slice(0, 8),
                 firstName: s.first_name,
                 lastName: s.last_name,
                 gender: s.gender,
-                regime: s.regime || s.boarding_type || null,
+                regime: (s as any).regime || (s as any).boarding_type || null,
                 className: studentClassName,
                 discountLabel: s.discount_label || 'Bourse / Réduction',
                 discountAmountHTG: studentDiscount,
@@ -685,29 +779,16 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         });
         
-        // Calculate Economat Penetration Rate
-        // Fetch all non-canceled supplies
-        let supplyQuery = supabase
-          .from('school_supplies')
-          .select('student_id, payment_method, status')
-          .eq('school_id', user.school_id)
-          .eq('academic_year_id', activeYear?.id || '');
-          
-        if (activeCampusId) {
-          supplyQuery = supplyQuery.eq('campus_id', activeCampusId);
-        }
-        
-        const { data: supplyData } = await supplyQuery;
-          
-        if (supplyData) {
-          const validSupplies = supplyData.filter(s => 
-            s.status !== 'ANNULE' && 
-            !s.payment_method?.includes('EN ATTENTE') && 
-            !s.payment_method?.includes('REJETÉ')
-          );
-          const uniqueBuyers = new Set(validSupplies.map(s => s.student_id).filter(Boolean));
-          setEconomatPenetration(activeStudents.length > 0 ? (uniqueBuyers.size / activeStudents.length) * 100 : 0);
-        }
+        // Taux de pénétration de l'économat (calculé directement sur les fournitures déjà chargées)
+        const validSupplies = supplies.filter(s => 
+          s.status !== 'ANNULE' && 
+          (!activeYear?.id || s.academic_year_id === activeYear.id) &&
+          !s.payment_method?.includes('EN ATTENTE') && 
+          !s.payment_method?.includes('REJETÉ')
+        );
+        const uniqueBuyers = new Set(validSupplies.map(s => s.student_id).filter(Boolean));
+        const computedEconomatPenetration = activeStudents.length > 0 ? (uniqueBuyers.size / activeStudents.length) * 100 : 0;
+        setEconomatPenetration(computedEconomatPenetration);
 
         setTotalExpected(expected);
         setTotalExpectedHTG(expectedHTG);
@@ -723,13 +804,70 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         setCollectionRate(expected > 0 ? (tuitionTotal / expected) * 100 : 0);
         setDiscountedStudents(discountedCount);
         setCriticalDelays(criticalCount);
+
+        // Sauvegarde dans le cache sessionStorage pour un affichage instantané lors des visites suivantes
+        try {
+          sessionStorage.setItem(financeCacheKey, JSON.stringify({
+            todayCollection: todayTotal,
+            todayCollectionHTG: todayTotalHTG,
+            todayCollectionUSD: todayTotalUSD,
+            totalExpected: expected,
+            totalExpectedHTG: expectedHTG,
+            totalExpectedUSD: expectedUSD,
+            totalGrossExpected: grossExpected,
+            totalGrossExpectedHTG: grossExpectedHTG,
+            totalGrossExpectedUSD: grossExpectedUSD,
+            totalReductions: reductions,
+            totalReductionsHTG: reductionsHTG,
+            totalReductionsUSD: reductionsUSD,
+            totalCollected: tuitionTotal + suppliesTotal,
+            totalCollectedHTG: tuitionTotalHTG + suppliesTotalHTG,
+            totalCollectedUSD: tuitionTotalUSD + suppliesTotalUSD,
+            totalCollectedTuition: tuitionTotal,
+            totalCollectedTuitionHTG: tuitionTotalHTG,
+            totalCollectedTuitionUSD: tuitionTotalUSD,
+            totalCollectedSupplies: suppliesTotal,
+            totalCollectedSuppliesHTG: suppliesTotalHTG,
+            totalCollectedSuppliesUSD: suppliesTotalUSD,
+            totalArrears: expected - tuitionTotal,
+            collectionRate: expected > 0 ? (tuitionTotal / expected) * 100 : 0,
+            todayTransactions: todayCount,
+            cashOnHandHTG: cashTotalHTG,
+            cashOnHandUSD: cashTotalUSD,
+            paymentMethodBreakdown: methodBreakdown,
+            criticalDelays: criticalCount,
+            discountedStudents: discountedCount,
+            pendingPayments: payments.filter(p => (p.payment_method?.includes('EN ATTENTE') || p.status === 'EN_ATTENTE' || p.moncash_status === 'PENDING') && p.status !== 'ANNULE').length,
+            economatPenetration: computedEconomatPenetration,
+            txBreakdown: breakdown,
+            recentTransactions: allRecentTx.slice(0, 5),
+            netBalance: {
+              income: totalIncome,
+              incomeHTG: totalIncomeHTG,
+              incomeUSD: totalIncomeUSD,
+              expenses: totalExpenses,
+              expensesHTG: totalExpensesHTG,
+              expensesUSD: totalExpensesUSD,
+              salaries: totalSalaries,
+              salariesHTG: totalSalariesHTG,
+              salariesUSD: totalSalariesUSD,
+              net: totalIncome - totalExpenses - totalSalaries,
+              netHTG: totalIncomeHTG - totalExpensesHTG - totalSalariesHTG,
+              netUSD: totalIncomeUSD - totalExpensesUSD - totalSalariesUSD
+            },
+            reevaluatedStudents: reevaluatedList,
+            exchangeRate: currentExchangeRate,
+            timestamp: Date.now()
+          }));
+        } catch (e) {}
       }
     } catch (error) {
       console.error("Error fetching finance data:", error);
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
-  }, [user?.school_id, currentCampusId]);
+  }, [user?.school_id, currentCampusId, financeCacheKey]);
 
   useEffect(() => {
     fetchFinanceData();
@@ -921,7 +1059,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               title={`Recalculer l'objectif net après déduction des bourses et réductions de ${terminology.tuition}`}
             >
               <Calculator size={15} className="shrink-0 text-indigo-200" />
-              <span className="whitespace-nowrap">Réévaluer Objectif</span>
+              <span className="whitespace-nowrap">Réévaluer</span>
             </button>
 
             {/* Button 2: Clôture de Caisse */}
@@ -932,7 +1070,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               title="Rapport officiel de clôture et audit de caisse journalière"
             >
               <ShieldCheck size={15} className="shrink-0 text-slate-950" />
-              <span className="whitespace-nowrap">Clôture de Caisse</span>
+              <span className="whitespace-nowrap">Clôture Caisse</span>
             </button>
 
             {/* Button 3: Encaisser un Frais */}
@@ -943,7 +1081,19 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               title={`Encaisser un versement de ${terminology.tuition} ou autre frais`}
             >
               <PlusCircle size={15} className="shrink-0 text-indigo-300" />
-              <span className="whitespace-nowrap">Encaisser un Frais</span>
+              <span className="whitespace-nowrap">Encaisser</span>
+            </button>
+
+            {/* Button 4: Rafraîchir instantané */}
+            <button
+              type="button"
+              onClick={() => fetchFinanceData(false)}
+              disabled={isRefreshing || loading}
+              className="w-full sm:w-auto min-h-[38px] px-2.5 sm:px-3 py-2 bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white font-medium text-xs sm:text-xs rounded-xl transition-all border border-white/15 flex items-center justify-center gap-1.5 active:scale-[0.98] backdrop-blur-md whitespace-nowrap cursor-pointer"
+              title="Rafraîchir les données en temps réel"
+            >
+              <RefreshCcw size={14} className={`shrink-0 text-slate-300 ${(isRefreshing || loading) ? 'animate-spin text-indigo-400' : ''}`} />
+              <span className="hidden xl:inline">Rafraîchir</span>
             </button>
           </div>
         </div>
@@ -1421,25 +1571,27 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {/* MODAL DE RÉÉVALUATION & VENTILATION DE L'OBJECTIF FINANCIER */}
-      <ReevaluationModal
-        isOpen={isReevaluationModalOpen}
-        onClose={() => setIsReevaluationModalOpen(false)}
-        reevaluatedStudents={reevaluatedStudents}
-        totalGrossExpectedHTG={totalGrossExpectedHTG}
-        totalGrossExpectedUSD={totalGrossExpectedUSD}
-        totalReductionsHTG={totalReductionsHTG}
-        totalReductionsUSD={totalReductionsUSD}
-        totalExpectedHTG={totalExpectedHTG}
-        totalExpectedUSD={totalExpectedUSD}
-        discountedStudents={discountedStudents}
-        isTargetReevaluated={isTargetReevaluated}
-        onToggleTargetReevaluated={handleToggleTargetReevaluated}
-        onConfirmReevaluation={handleConfirmReevaluation}
-        exchangeRate={exchangeRate}
-        school={school}
-        user={user}
-        terminology={terminology}
-      />
+      {isReevaluationModalOpen && (
+        <ReevaluationModal
+          isOpen={isReevaluationModalOpen}
+          onClose={() => setIsReevaluationModalOpen(false)}
+          reevaluatedStudents={reevaluatedStudents}
+          totalGrossExpectedHTG={totalGrossExpectedHTG}
+          totalGrossExpectedUSD={totalGrossExpectedUSD}
+          totalReductionsHTG={totalReductionsHTG}
+          totalReductionsUSD={totalReductionsUSD}
+          totalExpectedHTG={totalExpectedHTG}
+          totalExpectedUSD={totalExpectedUSD}
+          discountedStudents={discountedStudents}
+          isTargetReevaluated={isTargetReevaluated}
+          onToggleTargetReevaluated={handleToggleTargetReevaluated}
+          onConfirmReevaluation={handleConfirmReevaluation}
+          exchangeRate={exchangeRate}
+          school={school}
+          user={user}
+          terminology={terminology}
+        />
+      )}
 
       <DailyCashClosureModal
         isOpen={isClosureModalOpen}

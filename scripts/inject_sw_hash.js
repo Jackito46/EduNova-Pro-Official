@@ -16,16 +16,17 @@ const buildTimestamp = new Date().toISOString();
 
 if (fs.existsSync(swDistPath)) {
   let content = fs.readFileSync(swDistPath, 'utf-8');
-  const header = `/**\n * EduNova Pro - Render Service Worker Cache Buster\n * Deployment Hash: ${deployHash}\n * Build Timestamp: ${buildTimestamp}\n */\n`;
   
-  if (!content.includes('Deployment Hash:')) {
-    content = header + content;
+  if (content.includes('Deployment Hash:')) {
+    const existingMatch = content.match(/Deployment Hash:\s*([^\n\r*]+)/);
+    const currentHash = existingMatch ? existingMatch[1].trim() : 'stamped';
+    console.log(`✨ [Render SW Buster] Service Worker dist/sw.js already stamped with deploy hash: ${currentHash}`);
   } else {
-    content = content.replace(/\/\*\*[\s\S]*?Deployment Hash:[\s\S]*?\*\/\n/, header);
+    const header = `/**\n * EduNova Pro - Render Service Worker Cache Buster\n * Deployment Hash: ${deployHash}\n * Build Timestamp: ${buildTimestamp}\n */\n`;
+    content = header + content;
+    fs.writeFileSync(swDistPath, content, 'utf-8');
+    console.log(`✨ [Render SW Buster] Service Worker dist/sw.js stamped with deploy hash: ${deployHash}`);
   }
-  
-  fs.writeFileSync(swDistPath, content, 'utf-8');
-  console.log(`✨ [Render SW Buster] Service Worker dist/sw.js stamped with deploy hash: ${deployHash}`);
 } else {
   console.warn(`⚠️ [Render SW Buster] dist/sw.js not found at ${swDistPath}`);
 }

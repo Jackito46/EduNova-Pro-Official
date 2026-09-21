@@ -15,6 +15,8 @@
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <meta name="edunova-deploy-hash" content="%DEPLOY_HASH%">
+    <meta name="edunova-build-timestamp" content="%BUILD_TIMESTAMP%">
     <title>EduNova Pro - Système de Gestion Scolaire</title>
     <meta name="description" content="Une plateforme SaaS complète pour la gestion des écoles maternelles, fondamentales et secondaires, intégrant la gestion académique, financière et une IA d'analyse pédagogique.">
     <meta property="og:title" content="EduNova Pro - Système de Gestion Scolaire">
@@ -379,13 +381,150 @@
       }
     };
 
-    // Diagnostic et inspection des Service Workers & Caches
-    if ('serviceWorker' in navigator) {
+    // =========================================================================
+    // Détection & synchronisation stricte du Hash de Déploiement (Anti-Blocage SW)
+    // =========================================================================
+    var deployMeta = document.querySelector('meta[name="edunova-deploy-hash"]');
+    var currentDeployHash = (deployMeta && deployMeta.content && !deployMeta.content.startsWith('%'))
+      ? deployMeta.content.trim()
+      : (typeof __DEPLOY_HASH__ !== 'undefined' ? __DEPLOY_HASH__ : '%DEPLOY_HASH%');
+    window.__edunovaCurrentDeployHash = currentDeployHash;
+    logDiag('DEPLOY', 'Hash de déploiement courant de la page', currentDeployHash);
+
+    // En environnement de prévisualisation (run.app, localhost), désactiver formellement les rechargements SW
+    var isPreviewEnv = window.__edunovaDiagnostics.environment.isPreview;
+    if (isPreviewEnv) {
+      logDiag('PREVIEW', 'Environnement Preview détecté : SW désactivé et purge silencieuse des caches sans rechargement.');
+      try {
+        localStorage.removeItem('edunova_active_sw_hash');
+      } catch(e) {}
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          for (var idx = 0; idx < regs.length; idx++) {
+            regs[idx].unregister().catch(function() {});
+          }
+        }).catch(function() {});
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(keys) {
+          for (var cIdx = 0; cIdx < keys.length; cIdx++) {
+            caches.delete(keys[cIdx]);
+          }
+        }).catch(function() {});
+      }
+    }
+
+    // Fonction de purge et de désinscription forcée en cas de discordance (Production uniquement)
+    function forceUnregisterAndReload(reason) {
+      if (isPreviewEnv) {
+        logDiag('SW_PREVIEW_SKIP', 'Rechargement SW ignoré en environnement Preview : ' + reason);
+        return;
+      }
+      logDiag('SW_MISMATCH', 'Discordance de version détectée: ' + reason);
+      console.warn('⚡ [EduNova PWA] ' + reason + ' -> Forçage unregister() immédiat et rechargement...');
+
+      var antiLoopKey = 'edunova_sw_mismatch_reload';
+      var lastReload = sessionStorage.getItem(antiLoopKey);
+      var now = Date.now();
+      // Protection anti-boucle : max 1 rechargement forcé par 10 secondes
+      if (lastReload && (now - parseInt(lastReload, 10)) < 10000) {
+        logDiag('SW_MISMATCH', 'Protection anti-boucle active, rechargement différé ou ignoré.');
+        return;
+      }
+      sessionStorage.setItem(antiLoopKey, String(now));
+
+      var unregisterPromise = ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.getRegistrations().then(function(regs) {
+            return Promise.all(regs.map(function(r) {
+              logDiag('SW_UNREGISTER', 'Désinscription forcée du Service Worker obsolète', r.scope);
+              return r.unregister();
+            }));
+          }).catch(function(err) {
+            logDiag('SW_ERR', 'Erreur désinscription SW obsolète', String(err));
+          })
+        : Promise.resolve();
+
+      var cachePromise = ('caches' in window)
+        ? caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(k) {
+              logDiag('CACHE_PURGE', 'Purge du cache obsolète', k);
+              return caches.delete(k);
+            }));
+          }).catch(function(err) {
+            logDiag('CACHE_ERR', 'Erreur purge caches obsolètes', String(err));
+          })
+        : Promise.resolve();
+
+      Promise.all([unregisterPromise, cachePromise]).then(function() {
+        try {
+          localStorage.setItem('edunova_active_sw_hash', currentDeployHash);
+        } catch (e) {}
+        logDiag('RELOAD', 'Rechargement immédiat pour appliquer les ressources du déploiement actuel');
+        window.location.reload();
+      }).catch(function() {
+        window.location.reload();
+      });
+    }
+
+    // Diagnostic et inspection des Service Workers & Caches (hors preview)
+    if ('serviceWorker' in navigator && !isPreviewEnv) {
       var controller = navigator.serviceWorker.controller;
       logDiag('SW', 'Contrôleur Service Worker actuel', controller ? {
         scriptURL: controller.scriptURL,
         state: controller.state
       } : 'Aucun contrôleur actif');
+
+      var storedSwHash = null;
+      try {
+        storedSwHash = localStorage.getItem('edunova_active_sw_hash');
+      } catch (e) {}
+      if (storedSwHash) {
+        logDiag('SW', 'Hash SW stocké dans localStorage', storedSwHash);
+      }
+
+      var isValidDeployHash = currentDeployHash && !currentDeployHash.startsWith('%') && currentDeployHash !== 'unknown';
+
+      // 1. Vérification par hash stocké : si un contrôleur est actif mais que le hash stocké ne correspond pas au hash de cette page
+      if (controller && isValidDeployHash && storedSwHash && storedSwHash !== currentDeployHash) {
+        forceUnregisterAndReload('Hash stocké obsolète avec contrôleur actif (' + storedSwHash + ' !== ' + currentDeployHash + ')');
+      }
+
+      // 2. Vérification dynamique en temps réel : interrogation directe du contrôleur en cours d'exécution
+      if (controller && isValidDeployHash) {
+        var channel = new MessageChannel();
+        var swReplied = false;
+
+        channel.port1.onmessage = function(event) {
+          swReplied = true;
+          var data = event.data;
+          if (data && data.type === 'DEPLOY_HASH_RESPONSE') {
+            var runningHash = data.deployHash;
+            logDiag('SW', 'Hash d\'exécution rapporté par le contrôleur SW', runningHash);
+            if (runningHash && runningHash !== currentDeployHash) {
+              forceUnregisterAndReload('Discordance de hash du contrôleur SW (En exécution: ' + runningHash + ' !== Actuel: ' + currentDeployHash + ')');
+            } else if (runningHash) {
+              try { localStorage.setItem('edunova_active_sw_hash', runningHash); } catch(e) {}
+            }
+          }
+        };
+
+        try {
+          controller.postMessage({ type: 'GET_DEPLOY_HASH' }, [channel.port2]);
+        } catch (e) {
+          logDiag('SW_WARN', 'Échec de l\'envoi du message GET_DEPLOY_HASH au contrôleur', String(e));
+        }
+
+        // Timeout de sécurité si le contrôleur en cours d'exécution est un ancien SW silencieux
+        setTimeout(function() {
+          if (!swReplied && controller) {
+            var currentStored = null;
+            try { currentStored = localStorage.getItem('edunova_active_sw_hash'); } catch(e) {}
+            if (currentStored && currentStored !== currentDeployHash) {
+              forceUnregisterAndReload('Contrôleur silencieux et hash obsolète en cache (' + currentStored + ' !== ' + currentDeployHash + ')');
+            }
+          }
+        }, 500);
+      }
 
       navigator.serviceWorker.getRegistrations().then(function(regs) {
         logDiag('SW', 'Nombre de Service Workers enregistrés trouvés', regs.length);
@@ -443,7 +582,12 @@
         window.__edunovaDiagnostics.resourceFailures.push(failure);
         logDiag('RESOURCE_ERR', 'Échec de chargement de ressource', failure);
 
-        showEmergencyActions('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
+        // Ne pas déclencher immédiatement l'écran d'urgence si l'application est en cours de montage
+        setTimeout(function() {
+          if (!window.__edunovaAppReady) {
+            showEmergencyActions('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
+          }
+        }, 4000);
       } else {
         var errInfo = {
           message: event.message,
@@ -455,7 +599,11 @@
         window.__edunovaDiagnostics.errors.push(errInfo);
         logDiag('SCRIPT_ERR', 'Erreur script non capturée', errInfo);
 
-        showEmergencyActions('Erreur : ' + (event.message || 'Script bloqué'));
+        setTimeout(function() {
+          if (!window.__edunovaAppReady) {
+            showEmergencyActions('Erreur : ' + (event.message || 'Script bloqué'));
+          }
+        }, 4000);
       }
     }, true);
 
@@ -469,7 +617,14 @@
       window.__edunovaDiagnostics.errors.push(rejInfo);
       logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté', rejInfo);
 
-      showEmergencyActions('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
+      // Si React est déjà prêt, ne pas perturber l'interface
+      if (!window.__edunovaAppReady) {
+        setTimeout(function() {
+          if (!window.__edunovaAppReady) {
+            showEmergencyActions('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
+          }
+        }, 4000);
+      }
     });
 
     function showEmergencyActions(cause) {
@@ -520,10 +675,10 @@
       }, 100);
     }
 
-    // Watchdog : inspection de l'état après 2200ms
+    // Watchdog : inspection de l'état après 8000ms (adapté aux connexions à latence et 19 Mbps)
     setTimeout(function() {
       if (!window.__edunovaAppReady) {
-        logDiag('WATCHDOG', 'Délai d’attente dépassé (2200ms). L’application React n’a pas encore signalé son montage.');
+        logDiag('WATCHDOG', 'Délai d’attente dépassé (8000ms). L’application React n’a pas encore signalé son montage.');
         
         // Audit des ressources réseau chargées
         if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
@@ -538,9 +693,9 @@
 
         showEmergencyActions('Délai d’attente dépassé');
       } else {
-        logDiag('WATCHDOG', 'Vérification 2200ms : Application montée avec succès');
+        logDiag('WATCHDOG', 'Vérification 8000ms : Application montée avec succès');
       }
-    }, 2200);
+    }, 8000);
   })();
 </script>
 <script type="module" src="/index.tsx"></script>

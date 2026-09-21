@@ -43,8 +43,6 @@ export const UnitHarmonizationModal: React.FC<UnitHarmonizationModalProps> = ({
   user,
   onSuccess
 }) => {
-  if (!isOpen) return null;
-
   // Local state holding the working unit for each item
   const [itemUnits, setItemUnits] = useState<Record<string, string>>(() => {
     const initial: Record<string, string> = {};
@@ -177,6 +175,8 @@ export const UnitHarmonizationModal: React.FC<UnitHarmonizationModalProps> = ({
   };
 
   const categories = ['Tous', 'Uniforme', 'Manuel', 'Fourniture', 'Papeterie', 'Service'];
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[1000] bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-3 md:p-6 animate-in fade-in duration-200">

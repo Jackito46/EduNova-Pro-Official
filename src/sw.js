@@ -211,7 +211,7 @@ registerRoute(
   'DELETE'
 );
 
-// 9. Écouteur de messages (Skip waiting, purge sélective et nettoyage forcé)
+// 9. Écouteur de messages (Skip waiting, purge sélective, vérification du hash et nettoyage forcé)
 self.addEventListener('message', (event) => {
   if (event.data) {
     if (event.data.type === 'SKIP_WAITING' || event.data === 'SKIP_WAITING') {
@@ -219,6 +219,20 @@ self.addEventListener('message', (event) => {
     }
     if (event.data.type === 'CLAIM_CLIENTS') {
       self.clients.claim();
+    }
+    // Répondre à la vérification d'intégrité du hash de déploiement
+    if (event.data.type === 'GET_DEPLOY_HASH' || event.data.type === 'CHECK_DEPLOY_HASH') {
+      const swDeployHash = typeof __DEPLOY_HASH__ !== 'undefined' ? __DEPLOY_HASH__ : null;
+      const responsePayload = {
+        type: 'DEPLOY_HASH_RESPONSE',
+        deployHash: swDeployHash,
+        version: CACHE_VERSION
+      };
+      if (event.ports && event.ports[0]) {
+        event.ports[0].postMessage(responsePayload);
+      } else if (event.source && typeof event.source.postMessage === 'function') {
+        event.source.postMessage(responsePayload);
+      }
     }
     // Purge de l'ensemble des anciens caches à la demande
     if (event.data.type === 'CLEAR_OUTDATED_CACHES' || event.data.type === 'CLEAR_CACHE') {

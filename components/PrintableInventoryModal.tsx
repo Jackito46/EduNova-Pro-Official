@@ -32,9 +32,9 @@ export const PrintableInventoryModal: React.FC<PrintableInventoryModalProps> = (
   selectedCategory = 'Tous',
   selectedDiscipline = 'Tous'
 }) => {
-  if (!isOpen) return null;
-
   const printAreaRef = useRef<HTMLDivElement>(null);
+
+  if (!isOpen) return null;
 
   const filteredItems = catalog.filter(item => {
     if (selectedCategory !== 'Tous' && item.category !== selectedCategory) return false;

@@ -243,6 +243,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     presentStaff: 0,
     absentStaff: 0,
     lateStaff: 0,
+    attendanceDate: null as string | null,
     recentPayments: [] as any[]
   });
 
@@ -392,28 +393,27 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       setSchoolInfo(prev => ({ ...prev, activeYearName: activeYear.label }));
 
-      // Étape 2 : Lancement PARALLÈLE des requêtes de données massives
-      let studentsQuery = supabase.from('students').select('*').eq('school_id', user.school_id);
-      let paymentsQuery = supabase.from('payments').select('*').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
-      let staffQuery = supabase.from('staff').select('*').eq('school_id', user.school_id);
-      let expensesQuery = supabase.from('expenses').select('*').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      // Étape 2 : Lancement PARALLÈLE des requêtes de données massives (colonnes ciblées pour vitesse maximale)
+      let studentsQuery = supabase.from('students').select('id, reference_number, first_name, last_name, gender, status, class_id, campus_id, discount_amount, discount_label, created_at').eq('school_id', user.school_id);
+      let paymentsQuery = supabase.from('payments').select('id, amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, fee_type, nature, ad_hoc_campaign_id, created_at, student_id, academic_year_id, campus_id').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      let staffQuery = supabase.from('staff').select('id, first_name, last_name, status, role, campus_id, amount, pay_type, contract_type, weekly_hours').eq('school_id', user.school_id);
+      let expensesQuery = supabase.from('expenses').select('id, amount, amount_htg_equivalent, currency, academic_year_id, campus_id').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
       let classesQuery = supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', user.school_id);
       let assignmentsQuery = supabase.from('staff_assignments').select('staff_id, duration_hours, hourly_rate').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
 
-      let suppliesQuery = supabase.from('school_supplies').select('*').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      let suppliesQuery = supabase.from('school_supplies').select('id, transaction_id, student_id, total_amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, academic_year_id, campus_id, created_at').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
       let enrollmentsQuery = supabase.from('enrollments').select('student_id, academic_year_id, class_id').eq('school_id', user.school_id);
-      let catalogQuery = supabase.from('supply_catalog').select('*').eq('school_id', user.school_id);
+      let catalogQuery = supabase.from('supply_catalog').select('id, name, stock_quantity, low_stock_threshold, sell_price, cost_price').eq('school_id', user.school_id);
       
-      const activeCampusId = user.campus_id || currentCampusId;
+      const isMultiCampus = Boolean(campuses && campuses.length > 1);
+      const activeCampusId = isMultiCampus ? (user.campus_id || currentCampusId) : null;
       if (activeCampusId && isValidUuid(activeCampusId)) {
         studentsQuery = studentsQuery.eq('campus_id', activeCampusId);
         paymentsQuery = paymentsQuery.eq('campus_id', activeCampusId);
-        staffQuery = staffQuery.eq('campus_id', activeCampusId);
-        expensesQuery = expensesQuery.eq('campus_id', activeCampusId);
+        staffQuery = staffQuery.or(`campus_id.eq.${activeCampusId},campus_id.is.null`);
+        expensesQuery = expensesQuery.or(`campus_id.eq.${activeCampusId},campus_id.is.null`);
         classesQuery = classesQuery.eq('campus_id', activeCampusId);
         suppliesQuery = suppliesQuery.eq('campus_id', activeCampusId);
-        // Note: enrollments table doesn't have campus_id, but fee plans don't either.
-        // We will just filter enrollments by checking if the student belongs to the campus later, or assume it's fine since activeStudents is filtered.
       }
 
       let [studentsRes, plansRes, paymentsRes, suppliesRes, staffRes, expensesRes, classesRes, enrollmentsRes, rateRes, assignmentsRes, catalogRes] = await Promise.all([
@@ -449,11 +449,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
 
       let fetchedPlans = plansRes.data || [];
-      if (plansRes.error) {
+      if (plansRes.error || fetchedPlans.length === 0) {
         console.warn("Moteur de secours pour les plans de frais du tableau de bord:", plansRes.error);
         const fallbackPlans = await supabase.from('fee_plans').select('*').eq('school_id', user.school_id);
-        if (fallbackPlans.data) {
-          fetchedPlans = fallbackPlans.data.filter(p => !p.academic_year_id || p.academic_year_id === activeYear.id);
+        if (fallbackPlans.data && fallbackPlans.data.length > 0) {
+          const activePlans = fallbackPlans.data.filter(p => !p.academic_year_id || p.academic_year_id === activeYear.id);
+          fetchedPlans = activePlans.length > 0 ? activePlans : fallbackPlans.data;
         }
       }
 
@@ -490,7 +491,9 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       activeYearEnrollments.forEach(e => studentActiveClassMap.set(e.student_id, e.class_id));
       
       const activeStudentIds = new Set(activeYearEnrollments.map(e => e.student_id));
-      const activeStudents = studentsRes.data?.filter(s => activeStudentIds.has(s.id)) || [];
+      const activeStudents = (activeStudentIds.size > 0 
+        ? studentsRes.data?.filter(s => activeStudentIds.has(s.id))
+        : studentsRes.data?.filter(s => s.status === 'Actif' || s.status === 'ACTIVE' || !s.status)) || [];
 
       let totalExpected = 0;
       let totalExpectedHTG = 0;
@@ -1324,11 +1327,32 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       // Director/Accountant/Secretary specific data
       if (user.role === UserRole.DIRECTOR || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.SUPER_ADMIN || user.is_super_admin || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY) {
         const today = new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0];
-        const { data: attendance } = await supabase
+        let effectiveDate = today;
+        let { data: attendance } = await supabase
           .from('staff_attendances')
-          .select('status, staff_id')
+          .select('status, staff_id, date')
           .eq('date', today)
           .eq('school_id', user.school_id);
+
+        if (!attendance || attendance.length === 0) {
+          const { data: latestRecord } = await supabase
+            .from('staff_attendances')
+            .select('date')
+            .eq('school_id', user.school_id)
+            .order('date', { ascending: false })
+            .limit(1);
+          if (latestRecord && latestRecord.length > 0 && latestRecord[0]?.date) {
+            effectiveDate = latestRecord[0].date;
+            const { data: latestAttendance } = await supabase
+              .from('staff_attendances')
+              .select('status, staff_id, date')
+              .eq('date', effectiveDate)
+              .eq('school_id', user.school_id);
+            if (latestAttendance && latestAttendance.length > 0) {
+              attendance = latestAttendance;
+            }
+          }
+        }
 
         // Use already filtered validPayments and students for in-memory join
         // Group supplies by transaction for recent payments to avoid multiple listings for one cart checkout
@@ -1367,6 +1391,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           presentStaff: campusAttendance?.filter(a => a.status === 'Présent').length || 0,
           absentStaff: campusAttendance?.filter(a => a.status === 'Absent').length || 0,
           lateStaff: campusAttendance?.filter(a => a.status === 'Retard').length || 0,
+          attendanceDate: effectiveDate,
           recentPayments: recentPayments
         });
       }
@@ -2260,7 +2285,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
                     </div>
                     <span className="text-[9px] font-black uppercase tracking-wider text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-2 py-0.5 rounded-full shrink-0">
-                      Aujourd'hui
+                      {directorStats.attendanceDate === new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0] ? "Aujourd'hui" : `Pointage (${directorStats.attendanceDate ? new Date(directorStats.attendanceDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }) : 'Récent'})`}
                     </span>
                   </div>
 

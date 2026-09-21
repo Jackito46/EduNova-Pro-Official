@@ -1,6 +1,8 @@
 
 import { initConsoleSanitizer } from './utils/consoleSanitizer';
 
+declare const __DEPLOY_HASH__: string;
+
 // Initialisation précoce de l'interception et du nettoyage des logs de la console
 initConsoleSanitizer();
 
@@ -44,6 +46,9 @@ if ('serviceWorker' in navigator) {
       if (!isRefreshing) {
         isRefreshing = true;
         try {
+          if (typeof __DEPLOY_HASH__ !== 'undefined') {
+            localStorage.setItem('edunova_active_sw_hash', __DEPLOY_HASH__);
+          }
           const lastReload = sessionStorage.getItem('edunova_sw_last_reload');
           const now = Date.now();
           if (!lastReload || now - parseInt(lastReload, 10) > 60000) {
@@ -68,6 +73,11 @@ if ('serviceWorker' in navigator) {
           console.log("⚡ [EduNova SW] Prêt pour le fonctionnement hors-ligne.");
         },
         onRegistered(registration) {
+          try {
+            if (typeof __DEPLOY_HASH__ !== 'undefined') {
+              localStorage.setItem('edunova_active_sw_hash', __DEPLOY_HASH__);
+            }
+          } catch (e) {}
           if (registration) {
             registration.update().catch(() => {});
 

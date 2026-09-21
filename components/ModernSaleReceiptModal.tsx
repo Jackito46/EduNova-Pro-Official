@@ -121,8 +121,6 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
   const [activeTab, setActiveTab] = useState<'thermal' | 'card' | 'invoice'>('thermal');
   const [copied, setCopied] = useState(false);
 
-  if (!isOpen) return null;
-
   const dateObj = useMemo(() => {
     return created_at instanceof Date ? created_at : new Date(created_at);
   }, [created_at]);
@@ -210,6 +208,8 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
   const handlePrint = () => {
     window.print();
   };
+
+  if (!isOpen) return null;
 
   return (
     <>
