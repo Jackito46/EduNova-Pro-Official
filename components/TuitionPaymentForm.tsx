@@ -128,6 +128,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [isLocked, setIsLocked] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showReceipt, setShowReceipt] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
   const [apiError, setApiError] = useState<string | null>(null);
 
@@ -1354,6 +1355,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setIsLocked(false);
     setIsSubmitting(false);
     setShowReceipt(false);
+    setShowWhatsAppModal(false);
     setTransactionRef('');
     setGlobalDebt(0);
     setCurrency('HTG');
@@ -1805,30 +1807,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end flex-wrap">
             <button
               type="button"
-              onClick={() => {
-                const targetPhone = parentPhoneCustom || selectedStudent?.parent_phone || selectedStudent?.phone || '';
-                const cleaned = cleanPhoneForWhatsApp(targetPhone);
-                const msg = buildPaymentWhatsAppText({
-                  schoolName: schoolDetails?.name || school?.name || 'Établissement',
-                  studentName: selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim(),
-                  studentClass: selectedStudent?.classe || selectedStudent?.class?.name,
-                  parentName: selectedStudent?.parent_name,
-                  amount: parseFloat(montantReel || '0'),
-                  currency: currency,
-                  feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
-                  transactionRef: transactionRef,
-                  remainingAmount: feeType === 'CREDIT_PORTEFEUILLE'
-                    ? undefined
-                    : typeof selectedStudent?.totalRemaining === 'number'
-                      ? selectedStudent.totalRemaining
-                      : undefined,
-                  paymentMethod: paymentMethod
-                });
-                const url = cleaned
-                  ? `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
-                  : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-                window.open(url, '_blank');
-              }}
+              onClick={() => setShowWhatsAppModal(true)}
               className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
               title="Partager le reçu sur WhatsApp (100% Gratuit)"
             >
@@ -1853,6 +1832,32 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             </button>
           </div>
         </div>
+
+        {/* MODAL DE CONFIRMATION ET VÉRIFICATION DU NUMÉRO WHATSAPP */}
+        {showWhatsAppModal && (
+          <PaymentWhatsAppShare
+            isOpen={showWhatsAppModal}
+            onClose={() => setShowWhatsAppModal(false)}
+            schoolName={schoolDetails?.name || school?.name || 'Établissement'}
+            studentName={selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim()}
+            studentClass={selectedStudent?.classe || selectedStudent?.class?.name}
+            parentName={selectedStudent?.parent_name}
+            defaultPhone={parentPhoneCustom || selectedStudent?.parent_phone || selectedStudent?.phone || ''}
+            amount={parseFloat(montantReel || '0')}
+            currency={currency}
+            feeTypeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || feeType}
+            transactionRef={transactionRef}
+            remainingAmount={
+              feeType === 'CREDIT_PORTEFEUILLE'
+                ? undefined
+                : typeof selectedStudent?.totalRemaining === 'number'
+                  ? selectedStudent.totalRemaining
+                  : undefined
+            }
+            paymentMethod={paymentMethod}
+            isInline={false}
+          />
+        )}
 
         {/* CARD RÉCAPITULATIVE TRANSACTION MONCASH (ID UNIQUE, DATE INITIATIVE, STATUT VALIDATION SERVEUR) */}
         {(moncashTransactionData || paymentMethod === 'MonCash') && (
@@ -1884,30 +1889,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             />
           </div>
         )}
-
-        {/* CONFIRMATION WHATSAPP PARENT (100% GRATUIT, SANS FRAIS SMS) */}
-        <div className="w-full max-w-xl mx-auto print:hidden">
-          <PaymentWhatsAppShare
-            schoolName={schoolDetails?.name || school?.name || 'Établissement'}
-            studentName={selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim()}
-            studentClass={selectedStudent?.classe || selectedStudent?.class?.name}
-            parentName={selectedStudent?.parent_name}
-            defaultPhone={parentPhoneCustom || selectedStudent?.parent_phone || selectedStudent?.phone || ''}
-            amount={parseFloat(montantReel || '0')}
-            currency={currency}
-            feeTypeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || feeType}
-            transactionRef={transactionRef}
-            remainingAmount={
-              feeType === 'CREDIT_PORTEFEUILLE'
-                ? undefined
-                : typeof selectedStudent?.totalRemaining === 'number'
-                  ? selectedStudent.totalRemaining
-                  : undefined
-            }
-            paymentMethod={paymentMethod}
-            isInline={true}
-          />
-        </div>
 
         {/* REÇU DE CAISSE TICKET 80MM (OPTIMISÉ IMPRIMANTE THERMIQUE EPSON) */}
         <div id="thermal-receipt" className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl rounded-xl border border-gray-200 text-black font-sans leading-tight flex flex-col print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm]">

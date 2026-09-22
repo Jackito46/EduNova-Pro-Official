@@ -7,12 +7,12 @@ import {
   Copy, 
   Check, 
   Edit3, 
-  Share2, 
   ExternalLink,
   Phone,
   User,
   ShieldCheck,
-  RotateCcw
+  RotateCcw,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -29,6 +29,8 @@ export interface PaymentWhatsAppShareProps {
   remainingAmount?: number;
   paymentMethod?: string;
   isInline?: boolean;
+  isOpen?: boolean;
+  onClose?: () => void;
 }
 
 /**
@@ -105,10 +107,11 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
   transactionRef,
   remainingAmount,
   paymentMethod,
-  isInline = true
+  isInline = false,
+  isOpen = true,
+  onClose
 }) => {
   const [phoneNumber, setPhoneNumber] = useState<string>(defaultPhone);
-  const [isEditingPhone, setIsEditingPhone] = useState<boolean>(!defaultPhone);
   const [isCustomizingText, setIsCustomizingText] = useState<boolean>(false);
   const [customText, setCustomText] = useState<string>('');
   const [copied, setCopied] = useState<boolean>(false);
@@ -133,6 +136,8 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
   const activeMessage = isCustomizingText && customText ? customText : defaultMessage;
   const cleanedPhone = useMemo(() => cleanPhoneForWhatsApp(phoneNumber), [phoneNumber]);
 
+  if (!isOpen) return null;
+
   const handleShareWhatsApp = () => {
     const waUrl = cleanedPhone
       ? `https://wa.me/${cleanedPhone}?text=${encodeURIComponent(activeMessage)}`
@@ -140,7 +145,12 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
 
     window.open(waUrl, '_blank');
     setHasShared(true);
-    toast.success("WhatsApp ouvert avec le reçu pré-rempli !");
+    toast.success("WhatsApp ouvert avec le reçu officiel pré-rempli !");
+    if (onClose) {
+      setTimeout(() => {
+        onClose();
+      }, 1200);
+    }
   };
 
   const handleCopyMessage = async () => {
@@ -160,14 +170,13 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
     toast.info("Message réinitialisé au format standard");
   };
 
-  return (
-    <div className="bg-white rounded-2xl sm:rounded-3xl border border-emerald-200/90 shadow-lg overflow-hidden transition-all my-4">
+  const content = (
+    <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden transition-all w-full max-w-lg">
       {/* Header avec identité WhatsApp et Badge Gratuit */}
       <div className="bg-gradient-to-r from-emerald-700 via-teal-700 to-emerald-800 text-white p-4 sm:p-5 relative overflow-hidden">
-        {/* Éléments graphiques décoratifs subtils */}
         <div className="absolute top-0 right-0 transform translate-x-6 -translate-y-6 w-32 h-32 bg-white/10 rounded-full blur-xl pointer-events-none"></div>
 
-        <div className="relative z-10 flex items-center justify-between gap-3">
+        <div className="relative z-10 flex items-start justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-white text-emerald-700 flex items-center justify-center font-black shadow-md shrink-0">
               <MessageSquare size={22} className="stroke-[2.5]" />
@@ -175,71 +184,78 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
             <div>
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-base sm:text-lg font-black tracking-tight text-white">
-                  Partager le Reçu sur WhatsApp
+                  Partager le Reçu WhatsApp
                 </h3>
-                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-400 text-emerald-950 shadow-xs flex items-center gap-1">
-                  <ShieldCheck size={12} />
-                  100% Gratuit (Sans Frais SMS)
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400 text-emerald-950 shadow-xs flex items-center gap-1">
+                  <ShieldCheck size={11} />
+                  100% Gratuit
                 </span>
               </div>
               <p className="text-emerald-100 text-xs mt-0.5">
-                Transmettez instantanément l'accusé de paiement officiel et certifié au parent sur son mobile.
+                Vérifiez le numéro destinataire avant transmission directe au parent.
               </p>
             </div>
           </div>
+
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-white/80 hover:text-white hover:bg-white/15 rounded-xl transition-all cursor-pointer shrink-0"
+              title="Fermer"
+            >
+              <X size={18} />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="p-4 sm:p-5 space-y-4">
-        {/* Ligne Destinataire & Numéro Téléphone */}
-        <div className="bg-slate-50 border border-slate-200 rounded-xl sm:rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
-              <User size={18} />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5 text-xs text-slate-500 font-bold uppercase tracking-wider">
-                <span>Destinataire</span>
-                {parentName ? <span className="text-slate-700">({parentName})</span> : null}
-              </div>
-              
-              {isEditingPhone ? (
-                <div className="flex items-center gap-2 mt-1">
-                  <input
-                    type="tel"
-                    placeholder="Ex: 48324487 ou +509 48324487"
-                    value={phoneNumber}
-                    onChange={(e) => setPhoneNumber(e.target.value)}
-                    className="px-3 py-1.5 bg-white border border-emerald-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-emerald-500 w-48 sm:w-56"
-                    autoFocus
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingPhone(false)}
-                    className="px-2.5 py-1.5 bg-emerald-600 text-white rounded-lg text-xs font-bold hover:bg-emerald-700 transition-colors"
-                  >
-                    OK
-                  </button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="font-mono font-black text-slate-900 text-sm">
-                    {phoneNumber ? phoneNumber : <span className="text-amber-600 italic">Aucun numéro enregistré</span>}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setIsEditingPhone(true)}
-                    className="p-1 text-slate-400 hover:text-emerald-600 rounded-md transition-colors"
-                    title="Modifier le numéro WhatsApp"
-                  >
-                    <Edit3 size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+        {/* Vérification et Saisie du Numéro Destinataire */}
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 uppercase tracking-wider">
+              <Phone size={14} className="text-emerald-600" />
+              <span>Numéro WhatsApp du parent</span>
+            </label>
+            {parentName && (
+              <span className="text-[11px] font-semibold text-slate-500 truncate max-w-[200px]" title={parentName}>
+                👤 {parentName}
+              </span>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-center">
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1">
+              <input
+                type="tel"
+                placeholder="Ex: 3887-3523 ou +509 3887 3523"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                className="w-full pl-3.5 pr-3 py-2.5 bg-white border-2 border-emerald-300 focus:border-emerald-500 rounded-xl text-sm font-bold text-slate-900 font-mono focus:outline-none focus:ring-3 focus:ring-emerald-100 transition-all"
+                autoFocus
+              />
+            </div>
+            {cleanedPhone && (
+              <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2.5 py-2.5 rounded-xl whitespace-nowrap hidden sm:inline-block">
+                +{cleanedPhone}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center justify-between text-[11px] text-slate-500">
+            <span>Élève : <strong className="text-slate-800">{studentName}</strong> {studentClass ? `(${studentClass})` : ''}</span>
+            <span>Montant : <strong className="text-emerald-700 font-mono">{amount.toLocaleString()} {currency}</strong></span>
+          </div>
+        </div>
+
+        {/* Barre d'outils Message : Personnaliser / Copier */}
+        <div className="flex items-center justify-between text-xs pt-1">
+          <span className="font-bold text-slate-700 flex items-center gap-1.5">
+            <Smartphone size={13} className="text-slate-500" />
+            {isCustomizingText ? 'Modifier le texte :' : 'Aperçu du reçu formaté :'}
+          </span>
+          <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => {
@@ -248,57 +264,47 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
                 }
                 setIsCustomizingText(!isCustomizingText);
               }}
-              className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
             >
-              <Edit3 size={13} />
-              <span>{isCustomizingText ? 'Aperçu Standard' : 'Personnaliser'}</span>
+              <Edit3 size={12} />
+              <span>{isCustomizingText ? 'Format standard' : 'Personnaliser'}</span>
             </button>
             <button
               type="button"
               onClick={handleCopyMessage}
-              className="px-2.5 py-1.5 bg-white border border-slate-200 hover:border-slate-300 text-slate-600 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer"
             >
-              {copied ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+              {copied ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
               <span>{copied ? 'Copié !' : 'Copier'}</span>
             </button>
           </div>
         </div>
 
-        {/* Zone d'édition personnalisée si activée */}
+        {/* Zone d'édition ou Aperçu du Message WhatsApp */}
         {isCustomizingText ? (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs font-bold text-slate-600">
-              <span>Modifier le message avant envoi :</span>
-              <button
-                type="button"
-                onClick={handleResetText}
-                className="text-rose-600 hover:underline flex items-center gap-1"
-              >
-                <RotateCcw size={12} />
-                Réinitialiser
-              </button>
-            </div>
+          <div className="space-y-1.5">
             <textarea
               rows={6}
               value={customText}
               onChange={(e) => setCustomText(e.target.value)}
-              className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
+              className="w-full p-3 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all leading-relaxed"
             />
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleResetText}
+                className="text-[11px] font-bold text-rose-600 hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <RotateCcw size={11} />
+                Réinitialiser au reçu original
+              </button>
+            </div>
           </div>
         ) : (
-          /* Aperçu du Message style Bulle WhatsApp */
-          <div className="bg-[#e5ddd5] dark:bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-200 relative">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-slate-600 mb-2 flex items-center justify-between">
-              <span className="flex items-center gap-1.5">
-                <Smartphone size={13} />
-                Aperçu du message reçu par le parent
-              </span>
-              <span className="bg-emerald-600 text-white px-2 py-0.5 rounded-full text-[9px]">WhatsApp Direct</span>
-            </div>
-
-            <div className="bg-white text-slate-900 rounded-2xl p-3.5 shadow-sm max-w-lg font-sans text-xs sm:text-[12.5px] leading-relaxed relative whitespace-pre-line border border-slate-100">
+          <div className="bg-[#e5ddd5] dark:bg-slate-900 p-3 sm:p-3.5 rounded-2xl border border-slate-200 max-h-44 overflow-y-auto custom-scrollbar">
+            <div className="bg-white text-slate-900 rounded-xl p-3 shadow-xs font-sans text-xs leading-relaxed whitespace-pre-line border border-slate-100">
               {activeMessage}
-              <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-2 font-mono">
+              <div className="flex items-center justify-end gap-1 text-[10px] text-slate-400 mt-1 font-mono">
                 <span>{new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                 <span className="text-emerald-600 font-bold">✓✓</span>
               </div>
@@ -306,26 +312,47 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
           </div>
         )}
 
-        {/* Bouton d'action principal 1-clic */}
-        <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+        {/* Boutons d'actions */}
+        <div className="pt-2 flex items-center gap-2.5">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs transition-colors cursor-pointer"
+            >
+              Fermer
+            </button>
+          )}
+
           <button
             type="button"
             onClick={handleShareWhatsApp}
-            className="w-full sm:flex-1 py-3.5 px-5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl sm:rounded-2xl font-black text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2.5 active:scale-98 cursor-pointer"
+            className="flex-1 py-3 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs sm:text-sm shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 active:scale-98 cursor-pointer"
           >
-            <MessageSquare size={18} className="stroke-[2.5]" />
-            <span>Partager le reçu sur WhatsApp</span>
-            <ExternalLink size={15} className="opacity-80" />
+            <MessageSquare size={16} className="stroke-[2.5]" />
+            <span>Envoyer sur WhatsApp</span>
+            <ExternalLink size={14} className="opacity-80" />
           </button>
-
-          {hasShared && (
-            <div className="flex items-center gap-2 text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3.5 py-2.5 rounded-xl">
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-              <span>Message transmis avec succès vers WhatsApp !</span>
-            </div>
-          )}
         </div>
+
+        {hasShared && (
+          <div className="flex items-center gap-2 text-xs font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-3.5 py-2 rounded-xl animate-in fade-in">
+            <CheckCircle2 size={15} className="text-emerald-600 shrink-0" />
+            <span>WhatsApp ouvert ! Le parent recevra ce reçu certifié.</span>
+          </div>
+        )}
       </div>
+    </div>
+  );
+
+  if (isInline) {
+    return content;
+  }
+
+  // Modal mode avec backdrop
+  return (
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200 print:hidden">
+      {content}
     </div>
   );
 };
