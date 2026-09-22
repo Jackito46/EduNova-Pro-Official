@@ -428,3 +428,45 @@ export interface AcademicYear {
   created_at: string;
   updated_at: string;
 }
+
+export type PendingActionType = 
+  | 'DELETE_USER'
+  | 'UPDATE_PAYROLL'
+  | 'DELETE_PAYROLL_SLIP'
+  | 'DELETE_PAYROLL_PERIOD'
+  | 'APPROVE_ADVANCE'
+  | 'PROCESS_PAYROLL_PAYMENT'
+  | 'UPDATE_SALARY'
+  | 'RESET_USER_PASSWORD'
+  | 'CHANGE_USER_ROLE'
+  | 'UPDATE_MONCASH';
+
+export type PendingActionStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+
+export interface PendingAction {
+  id: string;
+  school_id: string;
+  campus_id?: string | null;
+  action_type: PendingActionType;
+  action_title: string;
+  description?: string | null;
+  target_entity_type: string;
+  target_entity_id?: string | null;
+  payload: Record<string, any>;
+  status: PendingActionStatus;
+  requester_id: string;
+  requester_name?: string | null;
+  requester_email?: string | null;
+  requester_role?: string | null;
+  is_autonomous_requester?: boolean;
+  reviewed_by?: string | null;
+  reviewer_name?: string | null;
+  reviewed_at?: string | null;
+  review_notes?: string | null;
+  rejection_reason?: string | null;
+  execution_status?: 'IDLE' | 'SUCCESS' | 'FAILED';
+  execution_error?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

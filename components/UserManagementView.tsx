@@ -15,8 +15,10 @@ import { UserProfile, UserRole, StaffMember } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
 import { userSchema } from '../utils/validation';
 import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
+import { isAutonomousAccount, isAutonomousAdmin, AUTONOMOUS_RESTRICTION_MESSAGE } from '../utils/autonomousAdminGuard';
 import { SkeletonTable, FluidLoadingState, SubmittingButtonContent } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
+import { DoubleRegardSubmitModal } from './DoubleRegardSubmitModal';
 
 const secondarySupabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -331,6 +333,23 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     linkStaffId: ''
   });
 
+  const [doubleRegardModal, setDoubleRegardModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    actionType: any;
+    description: string;
+    targetEntityType: string;
+    targetEntityId?: string | null;
+    payload: Record<string, any>;
+  }>({
+    isOpen: false,
+    title: '',
+    actionType: 'DELETE_USER',
+    description: '',
+    targetEntityType: 'user',
+    payload: {}
+  });
+
   const openReopenModal = (user: UserProfile) => {
     setReopenModal({
       isOpen: true,
@@ -493,6 +512,10 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
     // Check for max 2 admins per school
     if (formData.role === UserRole.SCHOOL_ADMIN) {
+      if (isAutonomousAccount(currentUser)) {
+        setErrorMsg("Opération restreinte : Seul un Administrateur titulaire certifié RH ou Super Admin peut créer un compte Administrateur.");
+        return;
+      }
       const adminCount = users.filter(u => u.role === UserRole.SCHOOL_ADMIN && u.is_active !== false).length;
       if (adminCount >= 2) {
         setErrorMsg("La limite de 2 administrateurs par école est atteinte. Veuillez choisir un autre rôle ou désactiver un administrateur existant.");
@@ -658,6 +681,27 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
   const handleResetPassword = async () => {
     const { userId, fullName, newPassword } = resetModal;
     
+    const targetUser = users.find(u => u.id === userId);
+    if (targetUser && (targetUser.role === UserRole.SCHOOL_ADMIN || targetUser.role === UserRole.DIRECTOR) && isAutonomousAccount(currentUser)) {
+      setDoubleRegardModal({
+        isOpen: true,
+        title: `Réinitialisation de mot de passe : ${fullName}`,
+        actionType: 'RESET_USER_PASSWORD',
+        description: `Demande de réinitialisation de mot de passe pour l'administrateur ${fullName} (${targetUser.email}).\nEn tant qu'opérateur en mode autonome, cette action requiert la validation formelle d'un Administrateur titulaire certifié RH.`,
+        targetEntityType: 'user',
+        targetEntityId: userId,
+        payload: {
+          userId,
+          newPassword,
+          fullName,
+          email: targetUser.email,
+          forceChange: resetModal.forceChange
+        }
+      });
+      setResetModal({ ...resetModal, isOpen: false, newPassword: '', forceChange: true });
+      return;
+    }
+
     if (!newPassword) return;
     if (newPassword.length < 6) {
       showAlert('Erreur', 'Le mot de passe doit contenir au moins 6 caractères.');
@@ -807,16 +851,23 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       }
 
       // 1. Update profiles table with MultiTenant isolation
+      const profileUpdates: any = {
+        is_active: true,
+        expires_at: newExpiresAt,
+        access_duration_label: newDurationLabel,
+        is_autonomous: newIsAutonomous,
+        failed_login_attempts: 0,
+        failed_attempts: 0
+      };
+
+      if (reopenModal.actionType === 'LINK_RH' && reopenModal.linkStaffId) {
+        profileUpdates.staff_id = reopenModal.linkStaffId;
+        profileUpdates.rh_verified = true;
+      }
+
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({
-          is_active: true,
-          expires_at: newExpiresAt,
-          access_duration_label: newDurationLabel,
-          is_autonomous: newIsAutonomous,
-          failed_login_attempts: 0,
-          failed_attempts: 0
-        })
+        .update(profileUpdates)
         .eq('id', targetUser.id)
         .eq('school_id', currentUser.school_id);
 
@@ -895,6 +946,16 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       return;
     }
 
+    if ((newRole === UserRole.SCHOOL_ADMIN || newRole === UserRole.DIRECTOR) && isAutonomousAccount(currentUser)) {
+      showAlert("Opération restreinte", "Seul un Administrateur titulaire certifié RH ou Super Admin peut promouvoir un compte au rang d'Administrateur.");
+      return;
+    }
+
+    if ((targetUser.role === UserRole.SCHOOL_ADMIN || targetUser.role === UserRole.DIRECTOR) && isAutonomousAccount(currentUser)) {
+      showAlert("Opération restreinte", "Seul un Administrateur titulaire certifié RH ou Super Admin peut modifier le rôle d'un Administrateur.");
+      return;
+    }
+
     if (newRole === UserRole.SCHOOL_ADMIN && targetUser.role !== UserRole.SCHOOL_ADMIN) {
       const activeAdminCount = users.filter(u => u.role === UserRole.SCHOOL_ADMIN && u.is_active !== false).length;
       if (activeAdminCount >= 2) {
@@ -957,6 +1018,12 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     if (targetUser.role === UserRole.SUPER_ADMIN || targetUser.is_super_admin || targetUser.id === currentUser.id) return false;
     
     if (currentUser.campus_id && targetUser.campus_id !== currentUser.campus_id) {
+       return false;
+    }
+
+    // Sécurisation Pilier A : Un compte autonome sous tutelle ne peut pas gérer ni modifier d'autres Administrateurs
+    const isTargetAdmin = targetUser.role === UserRole.SCHOOL_ADMIN || targetUser.role === UserRole.DIRECTOR;
+    if (isTargetAdmin && isAutonomousAccount(currentUser)) {
        return false;
     }
 
@@ -1041,6 +1108,24 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     const targetUser = users.find(u => u.id === userId);
     if (targetUser && !canManageUser(targetUser)) {
       showAlert("Erreur", "Vous n'avez pas les droits nécessaires.");
+      return;
+    }
+
+    if (isAutonomousAccount(currentUser)) {
+      setDoubleRegardModal({
+        isOpen: true,
+        title: `Suppression du compte : ${userName}`,
+        actionType: 'DELETE_USER',
+        description: `Demande de suppression définitive du compte utilisateur de "${userName}" (${targetUser?.email || ''}, Rôle: ${targetUser?.role || ''}).\nEn tant qu'administrateur en mode autonome (sans dossier RH), le principe du Double Regard s'applique : l'action est enregistrée dans les opérations en attente pour validation par un Titulaire certifié RH.`,
+        targetEntityType: 'user',
+        targetEntityId: userId,
+        payload: {
+          userId,
+          userName,
+          email: targetUser?.email,
+          role: targetUser?.role
+        }
+      });
       return;
     }
 
@@ -1546,11 +1631,15 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                               <p className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-blue-600 transition-colors">
                                 {formatFullName(u.full_name || 'Sans Nom')}
                               </p>
-                              {u.is_autonomous && (
+                              {isAutonomousAdmin(u) ? (
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9px] font-black uppercase tracking-wider shrink-0" title="Admin Provisoire en Mode Autonome (Sous Tutelle RH)">
+                                  <ShieldAlert size={10} className="text-amber-700" /> Sous Tutelle RH
+                                </span>
+                              ) : u.is_autonomous ? (
                                 <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[9px] font-bold shrink-0">
                                   <Zap size={9} /> Mode Autonome
                                 </span>
-                              )}
+                              ) : null}
                             </div>
                             <div className="flex items-center gap-2 flex-wrap mt-0.5">
                               <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
@@ -1649,6 +1738,19 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
                           {canManageUser(u) ? (
                             <>
+                              {(u.is_autonomous || !u.staff_id) && (currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN || !isAutonomousAccount(currentUser)) && (
+                                <button 
+                                  onClick={() => {
+                                    openReopenModal(u);
+                                    setReopenModal(prev => ({ ...prev, actionType: 'LINK_RH' }));
+                                  }}
+                                  className="p-2 text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-xl transition-all hover:scale-105 active:scale-95 cursor-pointer"
+                                  title="Régulariser : Lier au Registre RH officiel (Pilier D)"
+                                >
+                                  <UserCheck size={15} />
+                                </button>
+                              )}
+
                               <button 
                                 onClick={() => setEditRoleModal({
                                   isOpen: true,
@@ -2447,6 +2549,24 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                           </button>
                         </div>
                       )}
+
+                      {(selectedUserModal.is_autonomous || !selectedUserModal.staff_id) && (currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN || !isAutonomousAccount(currentUser)) && (
+                        <div className="pt-2 border-t border-slate-200">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = selectedUserModal;
+                              setSelectedUserModal(null);
+                              openReopenModal(target);
+                              setReopenModal(prev => ({ ...prev, actionType: 'LINK_RH' }));
+                            }}
+                            className="w-full py-2.5 px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98"
+                          >
+                            <UserCheck size={15} />
+                            <span>Régulariser : Lier au Registre RH officiel (Pilier D)</span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
@@ -3133,6 +3253,23 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
           );
         })()}
       </AnimatePresence>
+
+      {/* Modal Double Regard pour opérations critiques */}
+      <DoubleRegardSubmitModal
+        isOpen={doubleRegardModal.isOpen}
+        onClose={() => setDoubleRegardModal(prev => ({ ...prev, isOpen: false }))}
+        user={currentUser}
+        title={doubleRegardModal.title}
+        actionType={doubleRegardModal.actionType}
+        description={doubleRegardModal.description}
+        targetEntityType={doubleRegardModal.targetEntityType}
+        targetEntityId={doubleRegardModal.targetEntityId}
+        payload={doubleRegardModal.payload}
+        campusId={currentUser.campus_id}
+        onSuccess={() => {
+          fetchUsersAndStaff();
+        }}
+      />
     </div>
   );
 };

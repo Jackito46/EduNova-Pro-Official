@@ -73,6 +73,7 @@ import { UserProfile, UserRole, SchoolType } from '../types';
 import Modal from './Modal';
 import { toast } from 'sonner';
 import { AuditLogger } from '../utils/auditLogger';
+import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 import Logo from './Logo';
 import { useSchool } from '../contexts/SchoolContext';
 import SessionManager from './SessionManager';
@@ -806,6 +807,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   };
 
   const handleUpdateSchool = async () => {
+    if (activeTab === 'payment_methods' && isAutonomousAccount(user)) {
+      toast.error("Action verrouillée : La modification des coordonnées bancaires et passerelles de paiement exige un compte Administrateur certifié RH.");
+      return;
+    }
+
     setSaving(true);
     try {
       // Prepare the final payload.
@@ -1396,6 +1402,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   };
 
   const handleUpdateMoncash = async () => {
+    if (isAutonomousAccount(user)) {
+      toast.error("Action verrouillée : La modification des passerelles de paiement exige un compte Administrateur certifié RH.");
+      return;
+    }
+
     setSaving(true);
     try {
       const payload = {

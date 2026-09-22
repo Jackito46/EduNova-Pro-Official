@@ -15,6 +15,9 @@ import {
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments 
 } from '../utils/documentRequirements';
+import { DoubleRegardValidationView } from './DoubleRegardValidationView';
+import { PendingActionsService } from '../services/pendingActionsService';
+import { ShieldAlert } from 'lucide-react';
 
 interface ValidationListProps {
   user: UserProfile;
@@ -22,6 +25,8 @@ interface ValidationListProps {
 
 const ValidationList: React.FC<ValidationListProps> = ({ user }) => {
   const { campuses, currentCampusId, school, terminology, activeAcademicYear } = useSchool();
+  const [activeMainTab, setActiveMainTab] = useState<'STUDENTS' | 'DOUBLE_REGARD'>('STUDENTS');
+  const [pendingActionsCount, setPendingActionsCount] = useState<number>(0);
   const [students, setStudents] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,8 +72,19 @@ const ValidationList: React.FC<ValidationListProps> = ({ user }) => {
   useEffect(() => {
     if (user?.school_id) {
       fetchPendingStudents();
+      loadPendingActionsCount();
     }
-  }, [user?.school_id]);
+  }, [user?.school_id, user?.campus_id, currentCampusId]);
+
+  const loadPendingActionsCount = async () => {
+    if (!user?.school_id) return;
+    try {
+      const count = await PendingActionsService.getPendingCount(user.school_id, user.campus_id || currentCampusId);
+      setPendingActionsCount(count);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const fetchPendingStudents = async () => {
     if (!user?.school_id) {
@@ -414,13 +430,71 @@ const ValidationList: React.FC<ValidationListProps> = ({ user }) => {
             <div className="flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10">
               <div className="text-right">
                 <p className="text-[11px] font-bold text-indigo-300 uppercase tracking-wider">File d'attente</p>
-                <p className="text-2xl font-black text-white leading-none mt-1">{filteredStudents.length} <span className="text-sm font-medium text-indigo-200">dossiers</span></p>
+                <p className="text-2xl font-black text-white leading-none mt-1">
+                  {activeMainTab === 'STUDENTS' ? filteredStudents.length : pendingActionsCount}{' '}
+                  <span className="text-sm font-medium text-indigo-200">
+                    {activeMainTab === 'STUDENTS' ? 'dossiers' : 'actions'}
+                  </span>
+                </p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* Sélecteur de Module de Validation : Admissions vs Double Regard */}
+      <div className="flex border-b border-slate-200 bg-white rounded-2xl p-1.5 shadow-sm gap-2">
+        <button
+          onClick={() => setActiveMainTab('STUDENTS')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 ${
+            activeMainTab === 'STUDENTS'
+              ? 'bg-indigo-900 text-white shadow-md shadow-indigo-900/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <FileCheck2 size={18} />
+          <span>Dossiers d'Inscriptions Élèves</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
+            activeMainTab === 'STUDENTS' ? 'bg-indigo-800 text-indigo-100' : 'bg-slate-100 text-slate-700'
+          }`}>
+            {filteredStudents.length}
+          </span>
+        </button>
+
+        <button
+          onClick={() => setActiveMainTab('DOUBLE_REGARD')}
+          className={`flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-black transition-all flex items-center justify-center gap-2.5 ${
+            activeMainTab === 'DOUBLE_REGARD'
+              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/20'
+              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+          }`}
+        >
+          <ShieldAlert size={18} />
+          <span>Double Regard • Opérations Critiques (4-Yeux)</span>
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold flex items-center gap-1.5 ${
+            activeMainTab === 'DOUBLE_REGARD' 
+              ? 'bg-amber-700 text-amber-100' 
+              : pendingActionsCount > 0 
+                ? 'bg-amber-100 text-amber-800 border border-amber-300' 
+                : 'bg-slate-100 text-slate-700'
+          }`}>
+            {pendingActionsCount > 0 && <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>}
+            {pendingActionsCount}
+          </span>
+        </button>
+      </div>
+
+      {activeMainTab === 'DOUBLE_REGARD' ? (
+        <DoubleRegardValidationView
+          user={user}
+          schoolId={user.school_id!}
+          selectedCampus={selectedCampus}
+          isCampusLocked={isCampusLocked}
+          terminology={terminology}
+          onCountChange={setPendingActionsCount}
+        />
+      ) : (
+        <>
       {/* KPIs & Filtres */}
       <div className="flex flex-col lg:flex-row gap-4 items-start lg:items-center justify-between bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex flex-wrap items-center gap-3">
@@ -891,6 +965,8 @@ const ValidationList: React.FC<ValidationListProps> = ({ user }) => {
             </form>
           </div>
         </div>
+      )}
+      </>
       )}
 
     </div>

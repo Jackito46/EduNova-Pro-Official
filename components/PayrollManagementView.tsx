@@ -9,6 +9,8 @@ import { Terminology } from '../lib/terminology';
 import { PayrollIntegrityAudit } from './PayrollIntegrityAudit';
 import { PayrollAuditModal } from './PayrollAuditModal';
 import { evaluatePayrollSensitivity } from '../utils/payrollSensitivity';
+import { isAutonomousAccount, AUTONOMOUS_RESTRICTION_MESSAGE } from '../utils/autonomousAdminGuard';
+import { DoubleRegardSubmitModal } from './DoubleRegardSubmitModal';
 import { 
   Wallet, Calendar, CheckCircle, Clock, AlertCircle, 
   FileText, User, Plus, Search, DollarSign, Save, X,
@@ -602,6 +604,23 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     advances: SalaryAdvance[];
   } | null>(null);
 
+  const [doubleRegardModal, setDoubleRegardModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    actionType: any;
+    description: string;
+    targetEntityType: string;
+    targetEntityId?: string | null;
+    payload: Record<string, any>;
+  }>({
+    isOpen: false,
+    title: '',
+    actionType: 'UPDATE_PAYROLL',
+    description: '',
+    targetEntityType: 'payroll_slip',
+    payload: {}
+  });
+
   const canValidate = ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'DIRECTOR', 'ACCOUNTANT'].includes(user.role);
 
   // Options harmonisées pour les sélecteurs de style 'pillule'
@@ -993,6 +1012,26 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handleDeletePeriod = async () => {
     if (!periodToDelete) return;
+    
+    if (isAutonomousAccount(user)) {
+      setDoubleRegardModal({
+        isOpen: true,
+        title: `Suppression de la période de paie : ${getPeriodName(periodToDelete)}`,
+        actionType: 'DELETE_PAYROLL_PERIOD',
+        description: `Demande de suppression définitive de la période de paie "${getPeriodName(periodToDelete)}" et des fiches associées.\nEn tant qu'opérateur en mode autonome, cette action sensible est soumise au Double Regard pour validation par un Administrateur certifié RH.`,
+        targetEntityType: 'payroll_period',
+        targetEntityId: periodToDelete.id,
+        payload: {
+          periodId: periodToDelete.id,
+          month: periodToDelete.month,
+          year: periodToDelete.year,
+          periodName: getPeriodName(periodToDelete)
+        }
+      });
+      setPeriodToDelete(null);
+      return;
+    }
+
     const periodId = periodToDelete.id;
     
     setLoading(true);
@@ -1091,6 +1130,27 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handleDeleteSlip = async () => {
     if (!slipToDelete) return;
 
+    if (isAutonomousAccount(user)) {
+      const staffName = slipToDelete.staff ? `${slipToDelete.staff.first_name} ${slipToDelete.staff.last_name}` : 'Salarié inconnu';
+      setDoubleRegardModal({
+        isOpen: true,
+        title: `Suppression de fiche de paie : ${staffName}`,
+        actionType: 'DELETE_PAYROLL_SLIP',
+        description: `Demande de suppression définitive de la fiche de paie de ${staffName} (Net: ${slipToDelete.net_salary} HTG).\nEn mode autonome, cette action sensible est soumise au Double Regard pour validation par un Administrateur certifié RH.`,
+        targetEntityType: 'payroll_slip',
+        targetEntityId: slipToDelete.id,
+        payload: {
+          slipId: slipToDelete.id,
+          staffId: slipToDelete.staff_id,
+          staffName,
+          periodId: slipToDelete.period_id,
+          netSalary: slipToDelete.net_salary
+        }
+      });
+      setSlipToDelete(null);
+      return;
+    }
+
     // RBAC : Vérifier si l'administrateur d'annexe a les droits sur cette fiche
     if (isAnnexeAdmin && user.campus_id) {
       const slipCampus = slipToDelete.campus_id || slipToDelete.staff?.campus_id;
@@ -1168,12 +1228,36 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handleSaveSlip = async (staffId: string, base: number, bonus: number, deduction: number) => {
     if (!selectedPeriodId) return;
-    
+
     const net = base + bonus - deduction;
     const existingSlip = slips.find(s => s.period_id === selectedPeriodId && s.staff_id === staffId);
     const staffMember = staff.find(s => s.id === staffId);
     const targetCampusId = isAnnexeAdmin ? user.campus_id : (staffMember?.campus_id || user.campus_id || effectiveCampusId || null);
+    const staffName = staffMember ? `${staffMember.first_name} ${staffMember.last_name}` : 'Salarié inconnu';
 
+    if (isAutonomousAccount(user)) {
+      setDoubleRegardModal({
+        isOpen: true,
+        title: `Modification fiche de paie : ${staffName}`,
+        actionType: 'UPDATE_PAYROLL',
+        description: `Demande de modification/création de la fiche de paie pour "${staffName}".\n• Salaire de base : ${base} HTG\n• Primes/Bonus : ${bonus} HTG\n• Déductions : ${deduction} HTG\n• Salaire Net calculé : ${net} HTG\nEn tant qu'administrateur en mode autonome, cette modification salariale doit être validée par un Administrateur certifié RH (Double Regard).`,
+        targetEntityType: 'payroll_slip',
+        targetEntityId: existingSlip?.id || null,
+        payload: {
+          periodId: selectedPeriodId,
+          staffId,
+          base,
+          bonus,
+          deduction,
+          net,
+          campusId: targetCampusId,
+          existingSlipId: existingSlip?.id || null,
+          staffName
+        }
+      });
+      return;
+    }
+    
     // RBAC : Contrôle d'accès sur l'annexe
     if (isAnnexeAdmin && user.campus_id) {
       const slipCampus = existingSlip?.campus_id || staffMember?.campus_id;
@@ -1329,6 +1413,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handlePrepareAll = async () => {
     if (!selectedPeriodId) return;
+
+    if (isAutonomousAccount(user)) {
+      showToast("Opération verrouillée : La préparation et génération globale des fiches de paie requièrent un compte certifié RH.", 'error');
+      return;
+    }
     
     setLoading(true);
     try {
@@ -1401,6 +1490,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   const handlePrepareCampus = async (targetCampusId: string | null, targetCampusName: string) => {
     if (!selectedPeriodId) return;
+
+    if (isAutonomousAccount(user)) {
+      showToast("Opération verrouillée : La préparation des fiches de paie par annexe requiert un compte certifié RH.", 'error');
+      return;
+    }
 
     // RBAC : Un administrateur d'annexe ne peut pas préparer la paie d'une autre annexe
     if (isAnnexeAdmin && user.campus_id && targetCampusId && targetCampusId !== user.campus_id) {
@@ -1514,6 +1608,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   };
 
   const processSingleSlipPayment = async (slip: PayrollSlip, method: string, notes: string) => {
+    if (isAutonomousAccount(user)) {
+      showToast("Opération verrouillée : Le déboursement et règlement de salaires requièrent un compte Administrateur certifié RH.", 'error');
+      throw new Error("Opération non autorisée pour un compte autonome sous tutelle.");
+    }
+
     // We update the slip
     const { data: updatedSlip, error: slipError } = await supabase
       .from('payroll_slips')
@@ -1730,6 +1829,28 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   };
 
   const handleApproveAdvance = async (advanceId: string) => {
+    const targetAdvance = advances.find(a => a.id === advanceId);
+    const staffName = targetAdvance?.staff ? `${targetAdvance.staff.first_name} ${targetAdvance.staff.last_name}` : 'Salarié inconnu';
+
+    if (isAutonomousAccount(user)) {
+      setDoubleRegardModal({
+        isOpen: true,
+        title: `Approbation d'avance : ${staffName} (${targetAdvance?.amount || 0} HTG)`,
+        actionType: 'APPROVE_ADVANCE',
+        description: `Demande de validation d'une avance sur salaire de ${targetAdvance?.amount || 0} HTG pour ${staffName}.\n• Motif déclaré : "${targetAdvance?.reason || 'Non précisé'}"\nEn tant qu'opérateur en mode autonome, cette libération de fonds est soumise au Double Regard d'un Administrateur certifié RH.`,
+        targetEntityType: 'salary_advance',
+        targetEntityId: advanceId,
+        payload: {
+          advanceId,
+          staffId: targetAdvance?.staff_id,
+          amount: targetAdvance?.amount,
+          reason: targetAdvance?.reason,
+          staffName
+        }
+      });
+      return;
+    }
+
     try {
       const targetAdvance = advances.find(a => a.id === advanceId);
       if (isAnnexeAdmin && user.campus_id) {
@@ -1762,6 +1883,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   };
 
   const handleRejectAdvance = async (advanceId: string) => {
+    if (isAutonomousAccount(user)) {
+      showToast("Opération verrouillée : Le rejet ou arbitrage d'avances requiert un compte Administrateur certifié RH.", 'error');
+      return;
+    }
+
     try {
       const targetAdvance = advances.find(a => a.id === advanceId);
       if (isAnnexeAdmin && user.campus_id) {
@@ -1792,6 +1918,11 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
   const handleProcessAdvancePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAdvance) return;
+
+    if (isAutonomousAccount(user)) {
+      showToast("Opération verrouillée : Le déboursement d'avances sur salaire requiert un compte Administrateur certifié RH.", 'error');
+      return;
+    }
 
     if (isAnnexeAdmin && user.campus_id) {
       const advCampus = selectedAdvance.campus_id || selectedAdvance.staff?.campus_id;
@@ -4307,6 +4438,19 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
 
   return (
     <div className="space-y-4 sm:space-y-5 relative">
+      {/* Banner pour compte autonome sous tutelle */}
+      {isAutonomousAccount(user) && (
+        <div className="bg-amber-50 border border-amber-300 p-3 sm:p-3.5 rounded-2xl flex items-start gap-3 text-amber-950 shadow-2xs">
+          <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <span className="font-black uppercase tracking-wider block text-amber-900 text-[11px]">Mode Consultation Seule — Compte Sous Tutelle RH</span>
+            <p className="mt-0.5 text-amber-800 leading-relaxed font-medium">
+              Conformément aux 4 piliers de protection et de gouvernance financière, la modification, la validation et le déboursement des salaires et avances sont réservés aux administrateurs titulaires certifiés RH.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Toast Notification */}
       {toast && (
         <div className={`fixed bottom-4 right-4 z-[100] flex items-center gap-2 px-3.5 py-2.5 rounded-xl shadow-lg text-white text-xs sm:text-sm font-medium animate-in slide-in-from-bottom-5 ${toast.type === 'success' ? 'bg-emerald-600' : 'bg-red-600'}`}>
@@ -5472,6 +5616,24 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
           allPeriods={periods}
         />
       )}
+
+      {/* Modal Double Regard pour opérations critiques (Paie) */}
+      <DoubleRegardSubmitModal
+        isOpen={doubleRegardModal.isOpen}
+        onClose={() => setDoubleRegardModal(prev => ({ ...prev, isOpen: false }))}
+        user={user}
+        title={doubleRegardModal.title}
+        actionType={doubleRegardModal.actionType}
+        description={doubleRegardModal.description}
+        targetEntityType={doubleRegardModal.targetEntityType}
+        targetEntityId={doubleRegardModal.targetEntityId}
+        payload={doubleRegardModal.payload}
+        campusId={isAnnexeAdmin ? user.campus_id : (effectiveCampusId || user.campus_id)}
+        onSuccess={() => {
+          showToast("Opération soumise avec succès au Double Regard.", 'success');
+          fetchData();
+        }}
+      />
     </div>
   );
 };

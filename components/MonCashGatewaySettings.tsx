@@ -32,6 +32,7 @@ import {
 import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
+import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 
 export interface MonCashGatewaySettingsProps {
   moncashConfig: {
@@ -348,8 +349,15 @@ export const MonCashGatewaySettings: React.FC<MonCashGatewaySettingsProps> = ({
             {/* Bouton Enregistrer */}
             <button
               type="button"
-              onClick={onSave}
-              disabled={saving || !canManageAllCampuses}
+              onClick={() => {
+                if (isAutonomousAccount(user)) {
+                  toast.error("Action verrouillée : La modification des clés bancaires MonCash requiert un compte Administrateur certifié RH.");
+                  return;
+                }
+                onSave();
+              }}
+              disabled={saving || !canManageAllCampuses || isAutonomousAccount(user)}
+              title={isAutonomousAccount(user) ? "Action verrouillée : Compte sous tutelle RH (Pilier Sécurité Trésorerie)" : undefined}
               className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
@@ -360,6 +368,19 @@ export const MonCashGatewaySettings: React.FC<MonCashGatewaySettingsProps> = ({
 
         {/* Corps du Formulaire Dense & Compact */}
         <div className="p-3.5 sm:p-4 md:p-5 space-y-3.5">
+          {/* Banner pour compte autonome sous tutelle */}
+          {isAutonomousAccount(user) && (
+            <div className="p-3 rounded-xl border border-amber-300 bg-amber-50 text-amber-950 flex items-start gap-2.5 text-xs shadow-2xs">
+              <AlertCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <span className="font-bold block text-amber-900">Mode Consultation — Configuration Trésorerie Sécurisée</span>
+                <p className="mt-0.5 text-amber-800">
+                  La modification des identifiants API (Client ID, Secret, Clé marchande) est réservée aux Administrateurs titulaires certifiés RH pour garantir l'imputabilité financière.
+                </p>
+              </div>
+            </div>
+          )}
+
           {/* Feedback Visuel : Résultat du Test de Connexion API MonCash */}
           {connectionResult && (
             <div 

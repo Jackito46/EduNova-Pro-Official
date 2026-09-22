@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { ShieldAlert, AlertTriangle, FileText, Lock, CheckCircle2, Zap, UserCheck, X, Shield, Info, ArrowRight } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { useNavigate } from 'react-router-dom';
+import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 
 interface AutonomousAdminWarningBannerProps {
   user: UserProfile;
@@ -12,19 +13,8 @@ export const AutonomousAdminWarningBanner: React.FC<AutonomousAdminWarningBanner
   const [showModal, setShowModal] = useState(false);
   const navigate = useNavigate();
 
-  // Ne s'applique pas aux Super Admins ni aux élèves / parents
-  if (
-    user.is_super_admin || 
-    user.role === UserRole.SUPER_ADMIN || 
-    (user.role as any) === 'SUPER_ADMIN' ||
-    user.role === UserRole.STUDENT ||
-    user.role === UserRole.PARENT
-  ) {
-    return null;
-  }
-
-  // Actif si le profil est explicitement marqué is_autonomous ou n'a pas de staff_id lié
-  const isAutonomous = Boolean(user.is_autonomous || (!user.staff_id && user.role === UserRole.SCHOOL_ADMIN));
+  // Ne s'applique pas si non autonome ou masqué
+  const isAutonomous = isAutonomousAccount(user);
 
   if (!isAutonomous || isDismissed) {
     return null;

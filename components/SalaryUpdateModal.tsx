@@ -5,6 +5,7 @@ import { StaffMember, UserProfile } from '../types';
 import { supabase } from '../supabase';
 import { toast } from 'sonner';
 import { AuditLogger } from '../utils/auditLogger';
+import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 import { formatStudentName } from '../utils/formatters';
 import { useSchool } from '../contexts/SchoolContext';
 import { DatePickerPill } from './DatePickerPill';
@@ -45,6 +46,11 @@ const SalaryUpdateModal: React.FC<SalaryUpdateModalProps> = ({ staff, user, isOp
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (isAutonomousAccount(user)) {
+      toast.error("Action verrouillée : La modification des salaires contractuels requiert un compte Administrateur certifié RH.");
+      return;
+    }
+
     if (currentCampusId && staff.campus_id && staff.campus_id !== currentCampusId) {
       toast.error("Action interdite : Cet employé appartient à un autre campus.");
       return;

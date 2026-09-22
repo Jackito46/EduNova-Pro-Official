@@ -1127,8 +1127,13 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <div className="font-bold text-slate-900 truncate leading-snug">
                               {log.profiles?.full_name || 'Utilisateur Système'}
                             </div>
-                            <div className="text-[10px] text-slate-500 font-medium truncate">
-                              {log.profiles?.role || 'Utilisateur'}
+                            <div className="text-[10px] text-slate-500 font-medium truncate flex items-center gap-1.5 flex-wrap">
+                              <span>{log.profiles?.role || 'Utilisateur'}</span>
+                              {(log.details?.is_autonomous_operator || log.details?.rh_compliance_notice) && (
+                                <span className="inline-flex items-center gap-0.5 px-1 py-0.2 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[8px] font-black uppercase tracking-tight" title="Action effectuée par un compte sous tutelle RH">
+                                  ⚡ Sous Tutelle RH
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1168,6 +1173,11 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       {/* 6. Description & détails opérationnels */}
                       <td className="py-2 px-3 align-top">
                         <div className="text-slate-800 font-medium leading-relaxed break-words line-clamp-2 sm:line-clamp-3">
+                          {log.details?.rh_compliance_notice && (
+                            <span className="inline-block mr-1.5 px-1.5 py-0.5 bg-amber-100 text-amber-900 border border-amber-300 rounded text-[9px] font-black tracking-tight align-middle">
+                              {log.details.rh_compliance_notice}
+                            </span>
+                          )}
                           {description}
                         </div>
                       </td>
@@ -1430,6 +1440,21 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </span>
                 </div>
               </div>
+
+              {/* Alerte Traçabilité et Audit Renforcé (Pilier C) */}
+              {(selectedLogForModal.details?.is_autonomous_operator || selectedLogForModal.details?.rh_compliance_notice) && (
+                <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-amber-950 flex items-start gap-2.5 text-xs shadow-2xs">
+                  <ShieldAlert size={16} className="text-amber-700 shrink-0 mt-0.5" />
+                  <div>
+                    <span className="font-black text-amber-900 uppercase tracking-wider block text-[10px]">
+                      Pilier C : Traçabilité et Audit Renforcé (Sans Dossier RH)
+                    </span>
+                    <p className="mt-0.5 text-amber-800 font-medium leading-relaxed">
+                      Cette action a été exécutée par un compte en Mode Autonome. Conformément à la politique d'imputabilité juridique, cette entrée est indexée avec la mention légale <strong>[COMPTE AUTONOME - SANS DOSSIER RH]</strong>.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Description explicite */}
               <div className="space-y-1">

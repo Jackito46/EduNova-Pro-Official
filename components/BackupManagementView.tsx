@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { BackupClientService, BackupMetadata, BackupSettings, RestoreResult } from '../services/backupClientService';
 import { supabase } from '../supabase';
 import { UserProfile } from '../types';
+import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 
 interface BackupManagementViewProps {
   user: UserProfile;
@@ -197,6 +198,14 @@ export const BackupManagementView: React.FC<BackupManagementViewProps> = ({ user
   // Handle backup deletion with instant in-place list update
   const handleDeleteBackup = async () => {
     if (!selectedBackup) return;
+
+    if (isAutonomousAccount(user)) {
+      toast.error("Action verrouillée : La suppression de sauvegardes système exige un compte Administrateur titulaire certifié RH.");
+      setIsDeleteModalOpen(false);
+      setSelectedBackup(null);
+      return;
+    }
+
     const targetId = selectedBackup.id;
     const targetName = selectedBackup.name;
 
