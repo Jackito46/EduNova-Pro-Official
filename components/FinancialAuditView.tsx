@@ -7,7 +7,7 @@ import {
   ChevronLeft, ChevronRight, Eye, X, Copy, Check,
   FileSpreadsheet, ExternalLink, CreditCard,
   Wallet, DollarSign, Tag, CheckCircle2,
-  Building2, ArrowRight, Layers, FileCode
+  Building2, ArrowRight, Layers, FileCode, Sparkles, AlertTriangle
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { UserProfile } from '../types';
@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { useSchool } from '../contexts/SchoolContext';
 import { SelectPill, SelectOption } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
+import Modal from './Modal';
 
 interface AuditLog {
   id: string;
@@ -332,6 +333,233 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [detailModalTab, setDetailModalTab] = useState<'METIER' | 'JSON'>('METIER');
   const [copiedDetail, setCopiedDetail] = useState(false);
 
+  // --- TEST ET VALIDATION DU FILTRE SQL ---
+  const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
+  const [simStartDate, setSimStartDate] = useState<string>(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 2);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [simEndDate, setSimEndDate] = useState<string>(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  });
+  const [simTargetTable, setSimTargetTable] = useState<'payments' | 'audit_logs'>('payments');
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResult, setSimResult] = useState<{
+    executedAt: string;
+    tableTested: 'payments' | 'audit_logs';
+    startDate: string;
+    endDate: string;
+    startLocalFormatted: string;
+    endLocalFormatted: string;
+    startUTC: string;
+    endUTC: string;
+    timezoneOffsetMinutes: number;
+    timezoneName: string;
+    totalFetched: number;
+    adjacentDayBeforeCount: number;
+    adjacentDayAfterCount: number;
+    validCount: number;
+    complianceRate: number;
+    isFullyCompliant: boolean;
+    recordsSample: Array<{
+      id: string;
+      createdAtUTC: string;
+      localFormatted: string;
+      localDateStr: string;
+      status: 'VALID' | 'LEAK_BEFORE' | 'LEAK_AFTER';
+      referenceOrDetails: string;
+      amountOrAction?: string;
+    }>;
+    sqlQueryPreview: string;
+    adjacentCheckNotes: string;
+  } | null>(null);
+
+  const executeDateFilterSimulation = async (
+    customStart?: string, 
+    customEnd?: string, 
+    customTable?: 'payments' | 'audit_logs'
+  ) => {
+    const startRange = customStart || simStartDate;
+    const endRange = customEnd || simEndDate;
+    const targetTable = customTable || simTargetTable;
+
+    if (!startRange || !endRange) {
+      toast.error("Veuillez renseigner les dates de début et de fin pour la simulation.");
+      return;
+    }
+
+    setSimLoading(true);
+    try {
+      // 1. Calcul précis des bornes locales complètes (00:00:00.000 à 23:59:59.999)
+      const [sY, sM, sD] = startRange.split('-').map(Number);
+      const [eY, eM, eD] = endRange.split('-').map(Number);
+
+      const startLocal = new Date(sY, sM - 1, sD, 0, 0, 0, 0);
+      const endLocal = new Date(eY, eM - 1, eD, 23, 59, 59, 999);
+
+      const startUTC = startLocal.toISOString();
+      const endUTC = endLocal.toISOString();
+
+      // Détection fuseau horaire
+      const offsetMinutes = -new Date().getTimezoneOffset();
+      const offsetHours = offsetMinutes / 60;
+      const timezoneFormatted = `UTC${offsetHours >= 0 ? '+' : ''}${offsetHours}:00 (${Intl.DateTimeFormat().resolvedOptions().timeZone || 'Local'})`;
+
+      // 2. Requête Supabase simulant le filtre SQL direct
+      let query = supabase
+        .from(targetTable)
+        .select('*')
+        .eq('school_id', user.school_id)
+        .gte('created_at', startUTC)
+        .lte('created_at', endUTC)
+        .order('created_at', { ascending: false })
+        .limit(200);
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      const rows = data || [];
+      let adjacentDayBeforeCount = 0;
+      let adjacentDayAfterCount = 0;
+      let validCount = 0;
+
+      const recordsSample: Array<{
+        id: string;
+        createdAtUTC: string;
+        localFormatted: string;
+        localDateStr: string;
+        status: 'VALID' | 'LEAK_BEFORE' | 'LEAK_AFTER';
+        referenceOrDetails: string;
+        amountOrAction?: string;
+      }> = [];
+
+      rows.forEach((row: any) => {
+        const d = new Date(row.created_at);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const localDateStr = `${y}-${m}-${day}`;
+        const localFormatted = d.toLocaleString('fr-FR');
+
+        let status: 'VALID' | 'LEAK_BEFORE' | 'LEAK_AFTER' = 'VALID';
+        if (localDateStr < startRange) {
+          status = 'LEAK_BEFORE';
+          adjacentDayBeforeCount++;
+        } else if (localDateStr > endRange) {
+          status = 'LEAK_AFTER';
+          adjacentDayAfterCount++;
+        } else {
+          validCount++;
+        }
+
+        let refOrDetails = '';
+        let amountOrAction = '';
+        if (targetTable === 'payments') {
+          refOrDetails = row.receipt_number || row.reference_number || (row.id ? String(row.id).substring(0, 8) : '-');
+          amountOrAction = `${Number(row.amount || 0).toLocaleString()} ${row.currency || 'HTG'}`;
+        } else {
+          refOrDetails = row.entity_type ? `${row.entity_type} #${row.entity_id ? String(row.entity_id).substring(0, 8) : ''}` : (row.id ? String(row.id).substring(0, 8) : '-');
+          amountOrAction = row.action || 'ACTION';
+        }
+
+        recordsSample.push({
+          id: row.id,
+          createdAtUTC: row.created_at,
+          localFormatted,
+          localDateStr,
+          status,
+          referenceOrDetails: refOrDetails,
+          amountOrAction
+        });
+      });
+
+      const totalFetched = rows.length;
+      const complianceRate = totalFetched > 0 
+        ? Math.round((validCount / totalFetched) * 1000) / 10 
+        : 100;
+      const isFullyCompliant = adjacentDayBeforeCount === 0 && adjacentDayAfterCount === 0;
+
+      const sqlPreview = `SELECT id, created_at, ... \nFROM ${targetTable} \nWHERE school_id = '${user.school_id}' \n  AND created_at >= '${startUTC}' \n  AND created_at <= '${endUTC}' \nORDER BY created_at DESC \nLIMIT 200;`;
+
+      setSimResult({
+        executedAt: new Date().toLocaleTimeString('fr-FR'),
+        tableTested: targetTable,
+        startDate: startRange,
+        endDate: endRange,
+        startLocalFormatted: startLocal.toLocaleString('fr-FR'),
+        endLocalFormatted: endLocal.toLocaleString('fr-FR'),
+        startUTC,
+        endUTC,
+        timezoneOffsetMinutes: offsetMinutes,
+        timezoneName: timezoneFormatted,
+        totalFetched,
+        adjacentDayBeforeCount,
+        adjacentDayAfterCount,
+        validCount,
+        complianceRate,
+        isFullyCompliant,
+        recordsSample,
+        sqlQueryPreview: sqlPreview,
+        adjacentCheckNotes: isFullyCompliant 
+          ? `Validation réussie : 0 enregistrement du jour précédent (< ${startRange}) et 0 enregistrement du jour suivant (> ${endRange}) inclus.`
+          : `Attention : ${adjacentDayBeforeCount + adjacentDayAfterCount} enregistrement(s) détecté(s) hors de l'intervalle sélectionné.`
+      });
+
+      if (isFullyCompliant) {
+        toast.success(`Simulation réussie : 100% conforme (${totalFetched} écritures analysées).`);
+      } else {
+        toast.error(`Alerte de filtrage : ${adjacentDayBeforeCount + adjacentDayAfterCount} anomalie(s) détectée(s).`);
+      }
+    } catch (err: any) {
+      console.error("Erreur de simulation SQL:", err);
+      toast.error("Erreur simulation SQL: " + (err.message || err.toString()));
+    } finally {
+      setSimLoading(false);
+    }
+  };
+
+  const handleOpenSimulator = () => {
+    setIsSimulatorOpen(true);
+    if (!simResult) {
+      executeDateFilterSimulation();
+    }
+  };
+
+  const applySimPreset = (type: 'today' | '3days' | '7days' | 'this_month') => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const d = now.getDate();
+    const todayStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+
+    let newStart = todayStr;
+    let newEnd = todayStr;
+
+    if (type === '3days') {
+      const past = new Date(y, m, d - 2);
+      newStart = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+    } else if (type === '7days') {
+      const past = new Date(y, m, d - 6);
+      newStart = `${past.getFullYear()}-${String(past.getMonth() + 1).padStart(2, '0')}-${String(past.getDate()).padStart(2, '0')}`;
+    } else if (type === 'this_month') {
+      newStart = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+      const lastD = new Date(y, m + 1, 0).getDate();
+      newEnd = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastD).padStart(2, '0')}`;
+    }
+
+    setSimStartDate(newStart);
+    setSimEndDate(newEnd);
+    executeDateFilterSimulation(newStart, newEnd, simTargetTable);
+  };
+
   const fetchLogs = async () => {
     setLoading(true);
     try {
@@ -381,14 +609,15 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       }
 
-      // Date range filtering
-      if (startDate) {
-        const logDate = new Date(log.created_at).toISOString().split('T')[0];
-        if (logDate < startDate) return false;
-      }
-      if (endDate) {
-        const logDate = new Date(log.created_at).toISOString().split('T')[0];
-        if (logDate > endDate) return false;
+      // Date range filtering (Local Timezone Aware)
+      if (startDate || endDate) {
+        const d = new Date(log.created_at);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        const logDate = `${y}-${m}-${day}`;
+        if (startDate && logDate < startDate) return false;
+        if (endDate && logDate > endDate) return false;
       }
 
       // Text search
@@ -857,6 +1086,15 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
           </button>
           <button 
+            onClick={handleOpenSimulator}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 rounded-lg transition-all border border-indigo-200/90 shadow-2xs font-bold text-xs tracking-wider uppercase active:scale-95 cursor-pointer"
+            title="Tester et valider le moteur de filtrage SQL sur une plage de dates"
+          >
+            <Sparkles size={14} className="text-indigo-600 shrink-0" />
+            <span className="hidden sm:inline">Test Filtre SQL</span>
+            <span className="sm:hidden">Test SQL</span>
+          </button>
+          <button 
             onClick={exportToCSV}
             className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg transition-all shadow-xs font-bold text-xs tracking-wider uppercase active:scale-95 cursor-pointer"
           >
@@ -1284,6 +1522,344 @@ const FinancialAuditView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         );
       })()}
+
+      {/* MODAL UTILITAIRE DE TEST DU MOTEUR DE FILTRAGE SQL */}
+      <Modal
+        isOpen={isSimulatorOpen}
+        onClose={() => setIsSimulatorOpen(false)}
+        title={
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                Simulateur & Validation du Filtrage SQL
+              </h3>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Vérification d'intégrité de l'intervalle et exclusion rigoureuse des jours adjacents
+              </p>
+            </div>
+          </div>
+        }
+        type="info"
+        hideIcon={true}
+        hideDefaultActions={true}
+        containerClassName="max-w-4xl"
+      >
+        <div className="p-4 sm:p-5 space-y-4 max-h-[75vh] overflow-y-auto">
+          {/* BARRE DE CONTRÔLE DE LA SIMULATION */}
+          <div className="bg-slate-50 p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              {/* Table Cible */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1 truncate">
+                  <Layers size={12} className="text-indigo-600 shrink-0" />
+                  <span>Table Analysée</span>
+                </label>
+                <SelectPill
+                  options={[
+                    { value: 'payments', label: 'Paiements (Recettes)', badge: 'Finance' },
+                    { value: 'audit_logs', label: "Journal d'Audit", badge: 'Événements' }
+                  ]}
+                  value={simTargetTable}
+                  onChange={(val) => {
+                    const t = val as 'payments' | 'audit_logs';
+                    setSimTargetTable(t);
+                    executeDateFilterSimulation(simStartDate, simEndDate, t);
+                  }}
+                  variant="field"
+                  size="sm"
+                  colorScheme="indigo"
+                  portal={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Date Début */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1 truncate">
+                  <Calendar size={12} className="text-blue-600 shrink-0" />
+                  <span>Date Début Simulation</span>
+                </label>
+                <DatePickerPill
+                  selectedDate={simStartDate}
+                  onSelectDate={(newDate) => {
+                    setSimStartDate(newDate);
+                    if (simEndDate && newDate > simEndDate) setSimEndDate(newDate);
+                  }}
+                  variant="field"
+                  size="sm"
+                  colorScheme="blue"
+                  showShortcuts={false}
+                  showQuickArrows={true}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Date Fin */}
+              <div className="space-y-1.5 min-w-0">
+                <label className="text-[10px] font-black uppercase tracking-wider text-slate-500 flex items-center gap-1 truncate">
+                  <Calendar size={12} className="text-blue-600 shrink-0" />
+                  <span>Date Fin Simulation</span>
+                </label>
+                <DatePickerPill
+                  selectedDate={simEndDate}
+                  onSelectDate={(newDate) => {
+                    setSimEndDate(newDate);
+                    if (simStartDate && newDate < simStartDate) setSimStartDate(newDate);
+                  }}
+                  variant="field"
+                  size="sm"
+                  colorScheme="blue"
+                  showShortcuts={false}
+                  showQuickArrows={true}
+                  className="w-full"
+                />
+              </div>
+            </div>
+
+            {/* Raccourcis Rapides + Bouton d'Exécution */}
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/70">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mr-1">Raccourcis :</span>
+                <button
+                  type="button"
+                  onClick={() => applySimPreset('today')}
+                  className="px-2 py-1 rounded-md text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                >
+                  Aujourd'hui
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySimPreset('3days')}
+                  className="px-2 py-1 rounded-md text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                >
+                  3 Derniers Jours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySimPreset('7days')}
+                  className="px-2 py-1 rounded-md text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                >
+                  7 Derniers Jours
+                </button>
+                <button
+                  type="button"
+                  onClick={() => applySimPreset('this_month')}
+                  className="px-2 py-1 rounded-md text-[11px] font-bold bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs transition-all cursor-pointer"
+                >
+                  Ce Mois-ci
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => executeDateFilterSimulation()}
+                disabled={simLoading}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold shadow-xs active:scale-95 transition-all cursor-pointer"
+              >
+                <RefreshCw size={13} className={simLoading ? 'animate-spin' : ''} />
+                <span>{simLoading ? 'Exécution en cours...' : 'Exécuter le Test SQL'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* RÉSULTATS DE LA SIMULATION */}
+          {simLoading && (
+            <div className="py-12 text-center space-y-2">
+              <RefreshCw size={26} className="animate-spin mx-auto text-indigo-600" />
+              <p className="text-xs font-bold text-slate-700">Calcul des bornes locales et exécution de la requête SQL...</p>
+              <p className="text-[11px] text-slate-400">Vérification de l'absence de fuites sur les jours adjacents</p>
+            </div>
+          )}
+
+          {!simLoading && simResult && (
+            <div className="space-y-3.5 animate-in fade-in duration-200">
+              {/* BANNIÈRE DE VERDICT DE CONFORMITÉ */}
+              <div className={`p-4 rounded-2xl border flex items-start gap-3 shadow-xs ${
+                simResult.isFullyCompliant 
+                  ? 'bg-emerald-50/80 border-emerald-200/90 text-emerald-950' 
+                  : 'bg-rose-50 border-rose-200 text-rose-950'
+              }`}>
+                {simResult.isFullyCompliant ? (
+                  <div className="p-2 bg-emerald-600 text-white rounded-xl shrink-0 shadow-xs mt-0.5">
+                    <CheckCircle2 size={20} />
+                  </div>
+                ) : (
+                  <div className="p-2 bg-rose-600 text-white rounded-xl shrink-0 shadow-xs mt-0.5">
+                    <AlertTriangle size={20} />
+                  </div>
+                )}
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h4 className="text-sm font-black tracking-tight">
+                      {simResult.isFullyCompliant 
+                        ? 'Moteur de Filtrage SQL 100% Conforme — Zéro Fuite Détectée' 
+                        : 'Alerte : Fuite Temporelle Détectée sur les Jours Adjacents'}
+                    </h4>
+                    <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                      simResult.isFullyCompliant 
+                        ? 'bg-emerald-200/70 text-emerald-800' 
+                        : 'bg-rose-200 text-rose-800'
+                    }`}>
+                      {simResult.isFullyCompliant ? 'Intégrité Vérifiée' : 'Non Conforme'}
+                    </span>
+                  </div>
+                  <p className="text-xs leading-relaxed opacity-90">
+                    {simResult.adjacentCheckNotes}
+                  </p>
+                  <p className="text-[11px] opacity-75 font-mono">
+                    Plage testée : {simResult.startDate} au {simResult.endDate} • Heure locale : {simResult.timezoneName}
+                  </p>
+                </div>
+              </div>
+
+              {/* 4 CARTES KPI DIAGNOSTIC */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Lignes Récupérées</span>
+                  <span className="text-lg font-black text-slate-900 mt-0.5 block">{simResult.totalFetched}</span>
+                  <span className="text-[10px] text-slate-500 font-medium block">Écritures dans la table</span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fuites Jour J-1</span>
+                  <span className={`text-lg font-black mt-0.5 block ${simResult.adjacentDayBeforeCount === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {simResult.adjacentDayBeforeCount}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium block">
+                    {simResult.adjacentDayBeforeCount === 0 ? 'Exclusion parfaite' : 'Lignes avant date début'}
+                  </span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Fuites Jour J+1</span>
+                  <span className={`text-lg font-black mt-0.5 block ${simResult.adjacentDayAfterCount === 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+                    {simResult.adjacentDayAfterCount}
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium block">
+                    {simResult.adjacentDayAfterCount === 0 ? 'Exclusion parfaite' : 'Lignes après date fin'}
+                  </span>
+                </div>
+                <div className="p-3 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Taux de Précision</span>
+                  <span className={`text-lg font-black mt-0.5 block ${simResult.complianceRate === 100 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                    {simResult.complianceRate}%
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-medium block">Intégrité stricte</span>
+                </div>
+              </div>
+
+              {/* DÉTAIL TECHNIQUE DES BORNES SQL & TIMEZONE */}
+              <div className="bg-slate-900 text-slate-100 p-3.5 rounded-2xl border border-slate-800 space-y-2 font-mono text-xs shadow-xs">
+                <div className="flex items-center justify-between text-[11px] text-slate-400 font-sans pb-1.5 border-b border-slate-800">
+                  <span className="font-bold uppercase tracking-wider flex items-center gap-1 text-indigo-400">
+                    <FileCode size={13} />
+                    Paramètres de la Requête SQL Exécutée
+                  </span>
+                  <span>Exécuté à {simResult.executedAt}</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[11px]">
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60 space-y-1">
+                    <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-sans font-bold">Bornes Locales Calculées</span>
+                    <p className="text-emerald-400 truncate">Début : {simResult.startLocalFormatted} (00:00:00.000)</p>
+                    <p className="text-emerald-400 truncate">Fin &nbsp; : {simResult.endLocalFormatted} (23:59:59.999)</p>
+                  </div>
+                  <div className="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60 space-y-1">
+                    <span className="text-slate-400 block text-[10px] uppercase tracking-wider font-sans font-bold">Bornes Envoyées à Supabase (UTC)</span>
+                    <p className="text-indigo-300 truncate">.gte('created_at', '{simResult.startUTC}')</p>
+                    <p className="text-indigo-300 truncate">.lte('created_at', '{simResult.endUTC}')</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* TABLE ÉCHANTILLON DES LIGNES ANALYSÉES */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h5 className="text-xs font-black text-slate-900 uppercase tracking-wider flex items-center gap-1.5">
+                    <Layers size={13} className="text-slate-500" />
+                    Échantillon des Enregistrements ({simResult.recordsSample.length} lignes)
+                  </h5>
+                  <span className="text-[11px] text-slate-500 font-medium">
+                    Inspection individuelle des dates de stockage vs dates locales
+                  </span>
+                </div>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden bg-white shadow-2xs">
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="w-full text-left text-xs">
+                      <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200 sticky top-0">
+                        <tr>
+                          <th className="py-2 px-3">Réf / ID</th>
+                          <th className="py-2 px-3">Horodatage BDD (UTC)</th>
+                          <th className="py-2 px-3">Date Locale Recalculée</th>
+                          <th className="py-2 px-3">Jour Calendrier</th>
+                          <th className="py-2 px-3">Objet / Montant</th>
+                          <th className="py-2 px-3 text-right">Statut</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {simResult.recordsSample.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-6 text-center text-slate-400 font-medium text-xs">
+                              Aucune écriture enregistrée dans cet intervalle (0 fuite sur les jours adjacents).
+                            </td>
+                          </tr>
+                        ) : (
+                          simResult.recordsSample.slice(0, 50).map((row) => (
+                            <tr key={row.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2 px-3 font-mono font-bold text-slate-800 text-[11px]">
+                                {row.referenceOrDetails}
+                              </td>
+                              <td className="py-2 px-3 font-mono text-[10px] text-slate-500">
+                                {row.createdAtUTC}
+                              </td>
+                              <td className="py-2 px-3 font-bold text-slate-900 text-[11px]">
+                                {row.localFormatted}
+                              </td>
+                              <td className="py-2 px-3 font-mono text-[11px] text-slate-600">
+                                {row.localDateStr}
+                              </td>
+                              <td className="py-2 px-3 font-medium text-slate-700 text-[11px]">
+                                {row.amountOrAction}
+                              </td>
+                              <td className="py-2 px-3 text-right">
+                                {row.status === 'VALID' ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                    <Check size={10} /> Conforme
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                    <AlertTriangle size={10} /> Fuite
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* PIED DE MODAL */}
+        <div className="px-5 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between rounded-b-2xl">
+          <div className="text-[11px] text-slate-500 font-medium flex items-center gap-1.5">
+            <ShieldCheck size={14} className="text-emerald-600 shrink-0" />
+            <span>Contrôle technique direct sur la base PostgreSQL Supabase</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsSimulatorOpen(false)}
+            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer active:scale-95"
+          >
+            Fermer
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 };

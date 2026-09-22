@@ -716,18 +716,19 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 pct = 50;
               }
 
-              // Détection d'une couverture intégrale : libellé explicite, 100%, ou montant couvrant l'assiette totale
+              // Détection d'une couverture intégrale : libellé explicite, 100%, ou montant couvrant scolarité + frais annexes
               const isCompleteScholarship = isExplicitComplete || 
                 pct === 100 || 
-                (studentGross > 0 && Math.abs(studentDiscount - studentGross) <= (15 * (currentExchangeRate || 1))) ||
-                (studentGrossHTG > 0 && studentGrossUSD_raw === 0 && studentDiscount >= studentGrossHTG);
+                (studentGross > 0 && Math.abs(studentDiscount - (tuitionHTG + tuitionUSD + miscAmount)) <= (15 * (currentExchangeRate || 1))) ||
+                (studentGrossHTG > 0 && studentGrossUSD_raw === 0 && studentDiscount >= (tuitionHTG + miscHTG));
 
-              // Si bourse complète : prise en charge intégrale de la scolarité et de l'ensemble des frais obligatoires
-              const eligibleHTG = isCompleteScholarship ? studentGrossHTG : tuitionHTG;
-              const eligibleUSD_raw = isCompleteScholarship ? studentGrossUSD_raw : tuitionUSD_raw;
+              // Règle d'or Économat : L'inscription/réinscription est obligatoire pour valider l'admission
+              // La bourse s'applique sur la scolarité et les frais annexes, jamais sur l'inscription
+              const eligibleHTG = isCompleteScholarship ? (tuitionHTG + miscHTG) : tuitionHTG;
+              const eligibleUSD_raw = isCompleteScholarship ? (tuitionUSD_raw + miscUSD_raw) : tuitionUSD_raw;
 
               if (isCompleteScholarship) {
-                // Prise en charge intégrale : annulation totale dans les devises respectives (0 HTG et 0 USD dû)
+                // Prise en charge intégrale de la scolarité et des frais annexes dans leurs devises respectives
                 sReductHTG = eligibleHTG;
                 sReductUSD = eligibleUSD_raw;
               } else if (pct !== null && pct > 0) {
@@ -735,19 +736,32 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 sReductHTG = eligibleHTG * ratio;
                 sReductUSD = eligibleUSD_raw * ratio;
               } else {
-                // Allocation forfaitaire en Gourdes : on impute d'abord sur la part HTG éligible
+                // Allocation forfaitaire en Gourdes : imputée sur l'assiette éligible (hors inscription)
                 sReductHTG = Math.min(eligibleHTG, studentDiscount);
                 const overflowHTG = Math.max(0, studentDiscount - sReductHTG);
-                // Le reliquat de réduction en HTG s'impute sur la part USD au taux de change
+                // Le reliquat de réduction en HTG s'impute sur la part USD éligible au taux de change
                 if (overflowHTG > 0 && currentExchangeRate > 0 && eligibleUSD_raw > 0) {
                   sReductUSD = Math.min(eligibleUSD_raw, overflowHTG / currentExchangeRate);
                 }
               }
 
               // Sécurité de cohérence avec l'allocation enregistrée en base pour les cas 100% HTG
-              if (studentGrossUSD_raw === 0 && studentDiscount > 0 && sReductHTG < studentDiscount && studentDiscount <= studentGrossHTG) {
+              if (studentGrossUSD_raw === 0 && studentDiscount > 0 && sReductHTG < studentDiscount && studentDiscount <= eligibleHTG) {
                 sReductHTG = studentDiscount;
               }
+
+              // Paiements effectués par cet élève
+              const studentPaymentsList = payments?.filter(p => 
+                p.student_id === s.id && 
+                !p.payment_method?.includes('EN ATTENTE') && 
+                !p.payment_method?.includes('REJETÉ') &&
+                p.status !== 'ANNULE'
+              ) || [];
+              const studentPaidHTG = studentPaymentsList.filter((p: any) => !p.currency || p.currency === 'HTG').reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+              const studentPaidUSD = studentPaymentsList.filter((p: any) => p.currency === 'USD').reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+              const studentPaidTotalEqHTG = studentPaymentsList.reduce((acc: number, p: any) => acc + Number(p.amount_htg_equivalent || p.amount || 0), 0);
+              const inscriptionRequiredEqHTG = inscriptionHTG + (inscriptionUSD_raw * currentExchangeRate);
+              const isInscriptionPaid = inscriptionRequiredEqHTG === 0 || studentPaidTotalEqHTG >= inscriptionRequiredEqHTG;
 
               reevaluatedList.push({
                 studentId: s.id,
@@ -759,6 +773,9 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 className: studentClassName,
                 discountLabel: s.discount_label || 'Bourse / Réduction',
                 discountAmountHTG: studentDiscount,
+                inscriptionHTG,
+                inscriptionUSD: inscriptionUSD_raw,
+                isReturning,
                 tuitionHTG,
                 tuitionUSD: tuitionUSD_raw,
                 miscHTG,
@@ -769,7 +786,10 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 reductionUSD: sReductUSD,
                 netHTG: Math.max(0, studentGrossHTG - sReductHTG),
                 netUSD: Math.max(0, studentGrossUSD_raw - sReductUSD),
-                isCompleteScholarship: isCompleteScholarship || (sReductHTG >= studentGrossHTG && sReductUSD >= studentGrossUSD_raw)
+                paidHTG: studentPaidHTG,
+                paidUSD: studentPaidUSD,
+                isInscriptionPaid,
+                isCompleteScholarship: isCompleteScholarship || (sReductHTG >= (tuitionHTG + miscHTG) && sReductUSD >= (tuitionUSD_raw + miscUSD_raw))
               });
             }
 

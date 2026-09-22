@@ -23,7 +23,8 @@ import {
   Lock,
   Eye,
   EyeOff,
-  ShieldCheck
+  ShieldCheck,
+  MessageSquare
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
@@ -33,6 +34,7 @@ import { UserProfile, UserRole } from '../types';
 import { AuditLogger } from '../utils/auditLogger';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
+import { cleanPhoneForWhatsApp, buildPaymentWhatsAppText } from './PaymentWhatsAppShare';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { getLocalTodayString } from '../utils/dateUtils';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -46,7 +48,7 @@ import { useLocation } from 'react-router-dom';
 const STATUSES = ['Tous', 'Validé', 'En attente', 'Annulé'];
 
 const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
-  const { terminology, currentCampusId, activeAcademicYear } = useSchool();
+  const { terminology, currentCampusId, activeAcademicYear, school } = useSchool();
   const location = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
   const [methodFilter, setMethodFilter] = useState('Tous');
@@ -83,9 +85,11 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       const dayOfWeek = now.getDay();
       const diff = d - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
       const firstDay = new Date(y, m, diff);
+      const lastDay = new Date(y, m, diff + 6);
       const startStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`;
+      const endStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
       setStartDate(startStr);
-      setEndDate(todayStr);
+      setEndDate(endStr);
       setDateFilter('Cette semaine');
     } else if (preset === 'this_month') {
       const startStr = `${y}-${String(m + 1).padStart(2, '0')}-01`;
@@ -153,6 +157,26 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [validatorPassword, setValidatorPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
+  const handleShareReceiptWhatsApp = (p: any) => {
+    const cleaned = cleanPhoneForWhatsApp(p.studentPhone || '');
+    const msg = buildPaymentWhatsAppText({
+      schoolName: school?.name || 'Établissement Scolaire',
+      studentName: p.studentName,
+      studentClass: p.className,
+      parentName: p.parentName,
+      amount: Number(p.amount) || 0,
+      currency: p.currency || 'HTG',
+      feeTypeLabel: p.nature,
+      transactionRef: p.ref,
+      paymentMethod: p.method
+    });
+    const waUrl = cleaned
+      ? `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
+      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+    window.open(waUrl, '_blank');
+    toast.success("WhatsApp ouvert avec le reçu officiel pré-rempli !");
+  };
+
   const openCancelModal = (transaction: { id: string; ref: string; source: string; originalMethod?: string; amount?: number; currency?: string; studentId?: string; dateObj?: Date; }) => {
     const isCapable = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.is_super_admin;
     setValidatorEmail(isCapable ? user.email : '');
@@ -203,7 +227,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       let studentsQuery = supabase
         .from('students')
-        .select('id, first_name, last_name, class_id')
+        .select('id, first_name, last_name, class_id, phone, parent_phone, parent_name')
         .eq('school_id', user.school_id);
         
       if (currentCampusId) {
@@ -252,7 +276,9 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
         studentsMap.set(s.id, {
           name: formatStudentName(s.last_name, s.first_name).fullName || 'Inconnu',
           className: classesMap.get(s.class_id) || 'N/A',
-          classId: s.class_id
+          classId: s.class_id,
+          parentPhone: s.parent_phone || s.phone || '',
+          parentName: s.parent_name || ''
         });
       });
       
@@ -311,6 +337,8 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           amount_htg_equivalent: tempAmountHtg,
           currency: p.currency,
           method: baseMethod,
+          studentPhone: studentInfo.parentPhone || '',
+          parentName: studentInfo.parentName || '',
           dateObj: new Date(p.created_at),
           date: new Date(p.created_at).toLocaleDateString('fr-FR'),
           status: status,
@@ -344,7 +372,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           status = 'En attente';
         }
         
-        const studentInfo = studentsMap.get(s.student_id) || { name: 'Inconnu', className: 'N/A' };
+        const studentInfo = studentsMap.get(s.student_id) || { name: 'Inconnu', className: 'N/A', parentPhone: '', parentName: '' };
         
         let tempAmountHtg = s.amount_htg_equivalent;
         if (!tempAmountHtg || isNaN(tempAmountHtg)) {
@@ -366,6 +394,8 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           amount_htg_equivalent: tempAmountHtg,
           currency: s.currency || 'HTG',
           method: baseMethod,
+          studentPhone: studentInfo.parentPhone || '',
+          parentName: studentInfo.parentName || '',
           dateObj: new Date(s.created_at),
           date: new Date(s.created_at).toLocaleDateString('fr-FR'),
           status: status,
@@ -623,8 +653,11 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           const diff = today.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
           const firstDay = new Date(today);
           firstDay.setDate(diff);
+          const lastDay = new Date(firstDay);
+          lastDay.setDate(lastDay.getDate() + 6);
           const firstDayStr = `${firstDay.getFullYear()}-${String(firstDay.getMonth() + 1).padStart(2, '0')}-${String(firstDay.getDate()).padStart(2, '0')}`;
-          matchesDate = paymentDateStr >= firstDayStr && paymentDateStr <= todayStr;
+          const lastDayStr = `${lastDay.getFullYear()}-${String(lastDay.getMonth() + 1).padStart(2, '0')}-${String(lastDay.getDate()).padStart(2, '0')}`;
+          matchesDate = paymentDateStr >= firstDayStr && paymentDateStr <= lastDayStr;
         } else if (dateFilter === 'Ce mois') {
           const today = new Date();
           const y = today.getFullYear();
@@ -1092,33 +1125,46 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                     )}
                   </div>
 
-                  {/* Actions mobile */}
-                  <div className="flex items-center justify-end gap-2 pt-1">
-                    {p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
-                      <div className="flex items-center gap-2 w-full">
-                        <button 
-                          onClick={() => setConfirmingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
-                          className="flex-1 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
-                        >
-                          <Check size={14} /> Valider
-                        </button>
-                        <button 
-                          onClick={() => setRejectingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
-                          className="px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-bold transition-all border border-rose-200 cursor-pointer"
-                          title="Rejeter"
-                        >
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ) : p.status === 'Validé' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) ? (
-                      <button 
-                        onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
-                        className="w-full py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer"
-                      >
-                        <AlertTriangle size={13} /> Annuler le versement
-                      </button>
-                    ) : null}
-                  </div>
+                    {/* Actions mobile */}
+                    <div className="flex items-center justify-end gap-2 pt-1">
+                      {p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <button 
+                            onClick={() => setConfirmingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
+                            className="flex-1 py-2 bg-emerald-600 text-white hover:bg-emerald-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                          >
+                            <Check size={14} /> Valider
+                          </button>
+                          <button 
+                            onClick={() => setRejectingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
+                            className="px-3 py-2 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-bold transition-all border border-rose-200 cursor-pointer"
+                            title="Rejeter"
+                          >
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ) : p.status === 'Validé' ? (
+                        <div className="flex items-center gap-2 w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleShareReceiptWhatsApp(p)}
+                            className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
+                            title="Partager le reçu sur WhatsApp (100% Gratuit)"
+                          >
+                            <MessageSquare size={13} /> Reçu WhatsApp
+                          </button>
+                          {(user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) && (
+                            <button 
+                              onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
+                              className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-rose-200 cursor-pointer"
+                              title="Annuler le versement"
+                            >
+                              <AlertTriangle size={13} /> Annuler
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+                    </div>
                 </div>
               ))}
             </div>
@@ -1205,14 +1251,26 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <X size={16} />
                           </button>
                         </div>
-                      ) : p.status === 'Validé' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) ? (
-                        <button 
-                          onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
-                          className="px-3 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 border border-rose-200 hover:border-rose-600 cursor-pointer"
-                          title="Annuler la transaction (Superviseur sur place)"
-                        >
-                          <AlertTriangle size={14} /> Annuler
-                        </button>
+                      ) : p.status === 'Validé' ? (
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button 
+                            type="button"
+                            onClick={() => handleShareReceiptWhatsApp(p)}
+                            className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 border border-emerald-200 hover:border-emerald-600 cursor-pointer"
+                            title="Partager le reçu sur WhatsApp (100% Gratuit)"
+                          >
+                            <MessageSquare size={13} /> WhatsApp
+                          </button>
+                          {(user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) && (
+                            <button 
+                              onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
+                              className="px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 border border-rose-200 hover:border-rose-600 cursor-pointer"
+                              title="Annuler la transaction (Superviseur sur place)"
+                            >
+                              <AlertTriangle size={14} /> Annuler
+                            </button>
+                          )}
+                        </div>
                       ) : (
                         <div className="flex items-center justify-center">
                           <span className="p-2 text-gray-300">

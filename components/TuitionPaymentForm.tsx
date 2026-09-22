@@ -51,7 +51,11 @@ import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
 import { MonCashSummaryModal } from './MonCashSummaryModal';
 import { MonCashTransactionCard, MonCashTransactionInfo } from './MonCashTransactionCard';
-import { PaymentSmsConfirmation } from './PaymentSmsConfirmationModal';
+import { 
+  PaymentWhatsAppShare, 
+  buildPaymentWhatsAppText, 
+  cleanPhoneForWhatsApp 
+} from './PaymentWhatsAppShare';
 import { tuitionPaymentSchema } from '../utils/validation';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -147,8 +151,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   // État récapitulatif officiel MonCash (ID unique, date exacte d'initiative, statut de validation côté serveur)
   const [moncashTransactionData, setMoncashTransactionData] = useState<MonCashTransactionInfo | null>(null);
   
-  // États pour la proposition de confirmation SMS aux parents (Renforcement de confiance)
-  const [autoSendSmsParent, setAutoSendSmsParent] = useState<boolean>(true);
+  // État pour le numéro de téléphone personnalisé du parent pour le partage WhatsApp
   const [parentPhoneCustom, setParentPhoneCustom] = useState<string>('');
 
   const [activeYear, setActiveYear] = useState<any>(null);
@@ -1799,11 +1802,43 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end">
+          <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                const targetPhone = parentPhoneCustom || selectedStudent?.parent_phone || selectedStudent?.phone || '';
+                const cleaned = cleanPhoneForWhatsApp(targetPhone);
+                const msg = buildPaymentWhatsAppText({
+                  schoolName: schoolDetails?.name || school?.name || 'Établissement',
+                  studentName: selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim(),
+                  studentClass: selectedStudent?.classe || selectedStudent?.class?.name,
+                  parentName: selectedStudent?.parent_name,
+                  amount: parseFloat(montantReel || '0'),
+                  currency: currency,
+                  feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
+                  transactionRef: transactionRef,
+                  remainingAmount: feeType === 'CREDIT_PORTEFEUILLE'
+                    ? undefined
+                    : typeof selectedStudent?.totalRemaining === 'number'
+                      ? selectedStudent.totalRemaining
+                      : undefined,
+                  paymentMethod: paymentMethod
+                });
+                const url = cleaned
+                  ? `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
+                  : `https://wa.me/?text=${encodeURIComponent(msg)}`;
+                window.open(url, '_blank');
+              }}
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              title="Partager le reçu sur WhatsApp (100% Gratuit)"
+            >
+              <MessageSquare size={15} />
+              Partager WhatsApp
+            </button>
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
             >
               <Printer size={15} />
               Imprimer Reçu
@@ -1811,7 +1846,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={resetAllFields}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95"
+              className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
             >
               <PlusCircle size={15} />
               Nouvel Encaissement
@@ -1850,12 +1885,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         )}
 
-        {/* PROPOSITION D'ENVOI SMS DE CONFIRMATION PARENT (RENFORCEMENT DE CONFIANCE) */}
+        {/* CONFIRMATION WHATSAPP PARENT (100% GRATUIT, SANS FRAIS SMS) */}
         <div className="w-full max-w-xl mx-auto print:hidden">
-          <PaymentSmsConfirmation
-            schoolId={user.school_id}
+          <PaymentWhatsAppShare
             schoolName={schoolDetails?.name || school?.name || 'Établissement'}
-            studentId={selectedStudent?.id || ''}
             studentName={selectedStudent?.fullName || `${selectedStudent?.first_name || ''} ${selectedStudent?.last_name || ''}`.trim()}
             studentClass={selectedStudent?.classe || selectedStudent?.class?.name}
             parentName={selectedStudent?.parent_name}
@@ -1872,7 +1905,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   : undefined
             }
             paymentMethod={paymentMethod}
-            autoSendEnabled={autoSendSmsParent}
             isInline={true}
           />
         </div>

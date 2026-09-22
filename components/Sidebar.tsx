@@ -222,12 +222,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const schoolNameLen = (schoolInfo.name || '').length;
   const sidebarSchoolNameClasses = React.useMemo(() => {
     if (schoolNameLen > 55) {
-      return "text-[11px] leading-[1.25] line-clamp-3";
+      return "text-[11px] leading-[1.25]";
     }
-    if (schoolNameLen > 30) {
-      return "text-[12px] leading-[1.3] line-clamp-2";
+    if (schoolNameLen > 35) {
+      return "text-[11.5px] leading-[1.3]";
     }
-    return "text-[13px] leading-snug line-clamp-2";
+    if (schoolNameLen > 20) {
+      return "text-[12.5px] leading-snug";
+    }
+    return "text-[13.5px] leading-snug";
   }, [schoolNameLen]);
 
   const handleToggleMenu = React.useCallback((menuId: string) => {
@@ -288,7 +291,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
       </button>
 
       <aside 
-        className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} fixed lg:static inset-y-0 left-0 z-50 ${isNarrow ? 'w-[280px] lg:w-20' : 'w-[280px] sm:w-[285px] lg:w-[260px] xl:w-[270px] 2xl:w-[285px]'} bg-slate-100 text-slate-800 transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200 shadow-xl lg:shadow-sm print:hidden group`}
+        className={`${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} fixed lg:static inset-y-0 left-0 z-50 ${isNarrow ? 'w-[280px] lg:w-20' : 'w-[280px] sm:w-[285px] lg:w-[275px] xl:w-[285px] 2xl:w-[295px]'} bg-slate-100 text-slate-800 transition-all duration-300 ease-in-out flex flex-col border-r border-slate-200 shadow-xl lg:shadow-sm print:hidden group`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
@@ -314,9 +317,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
 
             {/* School Name & Campus / Connecté Status Badges */}
             {!isNarrow && (
-              <div className="overflow-hidden flex-1 min-w-0 flex flex-col justify-center">
+              <div className="flex-1 min-w-0 flex flex-col justify-center">
                 <h1 
-                  className={`${sidebarSchoolNameClasses} font-black tracking-tight text-slate-900 break-words hover:text-blue-600 transition-colors cursor-default select-text`} 
+                  className={`${sidebarSchoolNameClasses} font-black tracking-tight text-slate-900 break-normal [overflow-wrap:anywhere] hover:text-blue-600 transition-colors cursor-default select-text`} 
                   title={schoolInfo.name}
                 >
                   {schoolInfo.name}

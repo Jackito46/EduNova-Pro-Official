@@ -41,6 +41,9 @@ export interface ReevaluatedStudentItem {
   className: string;
   discountLabel: string;
   discountAmountHTG: number;
+  inscriptionHTG?: number;
+  inscriptionUSD?: number;
+  isReturning?: boolean;
   tuitionHTG: number;
   tuitionUSD: number;
   miscHTG: number;
@@ -51,6 +54,9 @@ export interface ReevaluatedStudentItem {
   reductionUSD: number;
   netHTG: number;
   netUSD: number;
+  paidHTG?: number;
+  paidUSD?: number;
+  isInscriptionPaid?: boolean;
   isCompleteScholarship?: boolean;
 }
 
@@ -86,11 +92,11 @@ export const getDiscountBadgeInfo = (st: ReevaluatedStudentItem) => {
     lower.includes('complète') || 
     lower.includes('complete') || 
     lower.includes('sociale') || 
-    lower.includes('frais divers') ||
-    lower.includes('totale') ||
+    lower.includes('frais divers') || 
+    lower.includes('totale') || 
     lower.includes('intégrale') ||
-    (st.reductionHTG && st.grossHTG && st.reductionHTG >= st.grossHTG) ||
-    (st.discountAmountHTG && st.grossHTG && st.discountAmountHTG >= st.grossHTG) ||
+    (st.reductionHTG && st.tuitionHTG && st.reductionHTG >= st.tuitionHTG) ||
+    (st.discountAmountHTG && st.tuitionHTG && st.discountAmountHTG >= st.tuitionHTG) ||
     (lower.includes('excellence') && !lower.includes('pure'))
   );
 
@@ -113,9 +119,9 @@ export const getDiscountBadgeInfo = (st: ReevaluatedStudentItem) => {
     categoryKey = 'excellence';
     badgeStyle = 'bg-amber-50 text-amber-900 border-amber-300 ring-1 ring-amber-400/20';
     icon = Award;
-    categoryTitle = isComplete ? "Bourse d'Excellence Complète (100%)" : "Bourse d'Excellence";
+    categoryTitle = isComplete ? "Bourse d'Excellence (100% Scolarité)" : "Bourse d'Excellence";
     scopeLabel = isComplete 
-      ? 'Prise en charge intégrale (100% Scolarité + Frais + Inscription)' 
+      ? "Exonération 100% Scolarité & Frais (Inscription exigible à l'admission)" 
       : 'Exonération Totale de Scolarité (100% Scolarité Pure)';
   } else if (lower.includes('social')) {
     categoryKey = 'social';
@@ -123,7 +129,7 @@ export const getDiscountBadgeInfo = (st: ReevaluatedStudentItem) => {
     icon = HeartHandshake;
     categoryTitle = 'Cas Social / Partenariat';
     scopeLabel = isComplete 
-      ? 'Prise en charge sociale étendue' 
+      ? "Prise en charge sociale étendue (Inscription exigible)" 
       : (pct ? `Exonération Scolarité (${pct}%)` : 'Allègement Social');
   } else if (lower.includes('fratrie') || lower.includes('sibling')) {
     categoryKey = 'sibling';
@@ -267,6 +273,8 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
       acc.miscUSD += curr.miscUSD || 0;
       acc.tuitionHTG += curr.tuitionHTG || 0;
       acc.tuitionUSD += curr.tuitionUSD || 0;
+      acc.inscriptionHTG += curr.inscriptionHTG || 0;
+      acc.inscriptionUSD += curr.inscriptionUSD || 0;
       acc.reductionHTG += curr.reductionHTG || 0;
       acc.reductionUSD += curr.reductionUSD || 0;
       acc.netHTG += curr.netHTG || 0;
@@ -279,6 +287,8 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
       miscUSD: 0,
       tuitionHTG: 0,
       tuitionUSD: 0,
+      inscriptionHTG: 0,
+      inscriptionUSD: 0,
       reductionHTG: 0,
       reductionUSD: 0,
       netHTG: 0,
@@ -306,6 +316,9 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
         'Motif Officiel': st.discountLabel,
         'Catégorie': badgeInfo.categoryTitle,
         'Portée Précise': badgeInfo.scopeLabel,
+        'Inscription HTG': st.inscriptionHTG || 0,
+        'Inscription USD': st.inscriptionUSD || 0,
+        'Statut Inscription': st.isInscriptionPaid ? 'Acquittée' : 'Exigible',
         'Scolarité USD': st.tuitionUSD || 0,
         'Scolarité HTG': st.tuitionHTG || 0,
         'Frais Annexes USD': st.miscUSD || 0,
@@ -343,40 +356,40 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-md animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <div 
         role="dialog" 
         aria-modal="true" 
         aria-labelledby="reevaluation-title" 
-        className="bg-white rounded-3xl max-w-6xl w-full max-h-[94vh] shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden text-slate-900"
+        className="bg-white rounded-2xl sm:rounded-3xl max-w-6xl w-full max-h-[96vh] shadow-2xl border border-slate-200/80 flex flex-col overflow-hidden text-slate-900"
       >
         
         {/* =========================================================================
-            1. MODAL HEADER WITH SOPHISTICATED GRADIENT & BADGES
+            1. MODAL HEADER WITH COMPACT GRADIENT & BADGES
            ========================================================================= */}
-        <div className="relative p-5 sm:p-6 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white rounded-t-3xl border-b border-indigo-900/40 shrink-0">
-          <div className="flex items-start sm:items-center justify-between gap-4">
-            <div className="flex items-center gap-3.5 sm:gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-400/30 shadow-inner backdrop-blur-md shrink-0">
-                <Calculator size={24} className="text-indigo-400" />
+        <div className="relative px-3.5 py-3 sm:px-5 sm:py-3.5 bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white rounded-t-2xl sm:rounded-t-3xl border-b border-indigo-900/40 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-400/30 shadow-inner backdrop-blur-md shrink-0">
+                <Calculator size={18} className="text-indigo-400" />
               </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-indigo-500/25 border border-indigo-400/30 text-indigo-300">
-                    <ShieldCheck size={12} />
+              <div className="min-w-0 space-y-0.5">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-indigo-500/25 border border-indigo-400/30 text-indigo-300">
+                    <ShieldCheck size={11} />
                     Audit Économat & Recouvrement
                   </span>
-                  <span className="text-[10px] font-bold text-slate-400 bg-white/5 px-2 py-0.5 rounded-full border border-white/10">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-slate-300 bg-white/10 px-2 py-0.5 rounded-md border border-white/10">
                     Taux : 1 USD = {exchangeRate} HTG
                   </span>
-                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                  <span className="text-[9px] sm:text-[10px] font-bold text-emerald-300 bg-emerald-500/20 px-2 py-0.5 rounded-md border border-emerald-500/30">
                     {discountedStudents} dossiers réévalués
                   </span>
                 </div>
-                <h2 id="reevaluation-title" className="text-lg sm:text-xl font-black tracking-tight text-white">
+                <h2 id="reevaluation-title" className="text-sm sm:text-base md:text-lg font-black tracking-tight text-white truncate">
                   Réévaluation & Ventilation de l'Objectif Financier
                 </h2>
-                <p className="text-xs text-slate-300 font-medium max-w-2xl">
+                <p className="text-[10px] sm:text-[11px] text-slate-300 font-medium line-clamp-1">
                   Bilan analytique après déduction rigoureuse des bourses d'excellence, remises fratries, cas sociaux et avantages collaborateurs.
                 </p>
               </div>
@@ -384,11 +397,11 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
 
             <button 
               onClick={onClose}
-              className="p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-xl transition-all cursor-pointer active:scale-95 shrink-0"
+              className="p-1.5 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-all cursor-pointer active:scale-95 shrink-0"
               title="Fermer le panneau"
               aria-label="Fermer"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
         </div>
@@ -396,102 +409,99 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
         {/* =========================================================================
             2. MODAL SCROLLABLE BODY
            ========================================================================= */}
-        <div className="p-4 sm:p-6 space-y-6 overflow-y-auto flex-1 bg-slate-50/50">
+        <div className="p-3 sm:p-4 space-y-3 sm:space-y-3.5 overflow-y-auto flex-1 bg-slate-50/60">
           
           {/* TOP 3 EXECUTIVE KPI TILES */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 sm:gap-3">
             
             {/* Card 1: Objectif Brut Initial */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-white border border-slate-200/90 shadow-xs hover:border-slate-300 transition-all space-y-3">
+            <div className="p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                  <Receipt size={14} className="text-slate-400" />
+                <span className="text-[10px] sm:text-[11px] font-black uppercase text-slate-600 tracking-wider flex items-center gap-1.5">
+                  <Receipt size={13} className="text-slate-400" />
                   1. Objectif Brut Initial
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md border border-slate-200">
+                <span className="text-[9px] font-bold px-2 py-0.5 bg-slate-100 text-slate-600 rounded-md border border-slate-200">
                   Théorique
                 </span>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-xl sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
-                    {totalGrossExpectedUSD.toLocaleString()}
+              <div>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <p className="text-lg sm:text-xl font-black text-slate-900 font-mono tracking-tight">
+                    {totalGrossExpectedUSD.toLocaleString('fr-FR')} <span className="text-[11px] font-sans font-bold text-slate-500">USD</span>
                   </p>
-                  <span className="text-xs font-black text-slate-500 font-sans">USD</span>
                   <span className="text-slate-300 font-light">•</span>
-                  <p className="text-base sm:text-lg font-bold text-slate-700 font-mono">
-                    {totalGrossExpectedHTG.toLocaleString()} <span className="text-xs font-medium font-sans text-slate-500">HTG</span>
+                  <p className="text-base sm:text-lg font-bold text-slate-700 font-mono tracking-tight">
+                    {totalGrossExpectedHTG.toLocaleString('fr-FR')} <span className="text-[10px] font-medium font-sans text-slate-500">HTG</span>
                   </p>
                 </div>
-                <p className="text-xs font-bold text-slate-500">
-                  ≈ {Math.round(totalGrossEqHTG).toLocaleString()} HTG équivalent
+                <p className="text-[11px] font-bold text-slate-500 mt-0.5">
+                  ≈ {Math.round(totalGrossEqHTG).toLocaleString('fr-FR')} HTG équivalent
                 </p>
               </div>
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+              <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-500">
                 <span>Barème plein officiel</span>
                 <span className="font-bold text-slate-700">100% Assiette</span>
               </div>
             </div>
 
             {/* Card 2: Bourses & Déductions Accordées */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-white border border-amber-200/90 shadow-xs hover:border-amber-300 transition-all space-y-3">
+            <div className="p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-amber-50/40 border border-amber-200/90 shadow-2xs hover:border-amber-300 transition-all space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase text-amber-800 tracking-wider flex items-center gap-1.5">
-                  <Sparkles size={14} className="text-amber-600" />
+                <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-800 tracking-wider flex items-center gap-1.5">
+                  <Sparkles size={13} className="text-amber-600" />
                   2. Bourses & Allègements
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-amber-100/80 text-amber-900 rounded-md border border-amber-300/60">
+                <span className="text-[9px] font-bold px-2 py-0.5 bg-amber-100/90 text-amber-900 rounded-md border border-amber-300/60">
                   -{reductionPercentage}% de l'objectif
                 </span>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-xl sm:text-2xl font-black text-amber-700 font-mono tracking-tight">
-                    -{totalReductionsUSD.toLocaleString()}
+              <div>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <p className="text-lg sm:text-xl font-black text-amber-700 font-mono tracking-tight">
+                    -{totalReductionsUSD.toLocaleString('fr-FR')} <span className="text-[11px] font-sans font-bold text-amber-800">USD</span>
                   </p>
-                  <span className="text-xs font-black text-amber-700 font-sans">USD</span>
                   <span className="text-amber-300 font-light">•</span>
-                  <p className="text-base sm:text-lg font-bold text-amber-700 font-mono">
-                    -{totalReductionsHTG.toLocaleString()} <span className="text-xs font-medium font-sans text-amber-700">HTG</span>
+                  <p className="text-base sm:text-lg font-bold text-amber-700 font-mono tracking-tight">
+                    -{totalReductionsHTG.toLocaleString('fr-FR')} <span className="text-[10px] font-medium font-sans text-amber-800">HTG</span>
                   </p>
                 </div>
-                <p className="text-xs font-bold text-amber-700">
-                  ≈ -{Math.round(totalReductionsEqHTG).toLocaleString()} HTG exonéré
+                <p className="text-[11px] font-bold text-amber-700 mt-0.5">
+                  ≈ -{Math.round(totalReductionsEqHTG).toLocaleString('fr-FR')} HTG exonéré
                 </p>
               </div>
-              <div className="pt-2 border-t border-amber-100 flex items-center justify-between text-[11px] text-amber-800">
+              <div className="pt-1.5 border-t border-amber-200/60 flex items-center justify-between text-[10px] text-amber-800">
                 <span>{discountedStudents} dossiers réévalués</span>
                 <span className="font-bold text-amber-900">{availableClasses.length} classes concernées</span>
               </div>
             </div>
 
             {/* Card 3: Objectif Réel Corrigé (Net Recouvrable) */}
-            <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-white border border-emerald-200/90 shadow-xs hover:border-emerald-300 transition-all space-y-3">
+            <div className="p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-emerald-50/40 border border-emerald-200/90 shadow-2xs hover:border-emerald-300 transition-all space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
-                  <CheckCircle2 size={14} className="text-emerald-600" />
+                <span className="text-[10px] sm:text-[11px] font-black uppercase text-emerald-800 tracking-wider flex items-center gap-1.5">
+                  <CheckCircle2 size={13} className="text-emerald-600" />
                   3. Objectif Réel Corrigé
                 </span>
-                <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-300/60">
+                <span className="text-[9px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-md border border-emerald-300/60">
                   Net Recouvrable
                 </span>
               </div>
-              <div className="space-y-1">
-                <div className="flex items-baseline gap-2">
-                  <p className="text-xl sm:text-2xl font-black text-emerald-700 font-mono tracking-tight">
-                    {totalExpectedUSD.toLocaleString()}
+              <div>
+                <div className="flex items-baseline gap-1.5 flex-wrap">
+                  <p className="text-lg sm:text-xl font-black text-emerald-700 font-mono tracking-tight">
+                    {totalExpectedUSD.toLocaleString('fr-FR')} <span className="text-[11px] font-sans font-bold text-emerald-800">USD</span>
                   </p>
-                  <span className="text-xs font-black text-emerald-700 font-sans">USD</span>
                   <span className="text-emerald-300 font-light">•</span>
-                  <p className="text-base sm:text-lg font-bold text-emerald-700 font-mono">
-                    {totalExpectedHTG.toLocaleString()} <span className="text-xs font-medium font-sans text-emerald-700">HTG</span>
+                  <p className="text-base sm:text-lg font-bold text-emerald-700 font-mono tracking-tight">
+                    {totalExpectedHTG.toLocaleString('fr-FR')} <span className="text-[10px] font-medium font-sans text-emerald-800">HTG</span>
                   </p>
                 </div>
-                <p className="text-xs font-bold text-emerald-700">
-                  ≈ {Math.round(totalNetEqHTG).toLocaleString()} HTG cible d'encaissement
+                <p className="text-[11px] font-bold text-emerald-700 mt-0.5">
+                  ≈ {Math.round(totalNetEqHTG).toLocaleString('fr-FR')} HTG cible d'encaissement
                 </p>
               </div>
-              <div className="pt-2 border-t border-emerald-100 flex items-center justify-between text-[11px] text-emerald-800">
+              <div className="pt-1.5 border-t border-emerald-200/60 flex items-center justify-between text-[10px] text-emerald-800">
                 <span>Engagement Économat</span>
                 <span className="font-bold text-emerald-900">{(100 - parseFloat(reductionPercentage)).toFixed(1)}% Recouvrabilité</span>
               </div>
@@ -502,13 +512,13 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
           {/* =========================================================================
               3. SMART INTERACTIVE FILTER SUITE & CLASS PILL BAR
              ========================================================================= */}
-          <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+          <div className="bg-white p-3 sm:p-3.5 rounded-xl sm:rounded-2xl border border-slate-200/80 shadow-2xs space-y-2.5">
             
             {/* Category / Motif Filter Tabs & Search Row */}
-            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+            <div className="flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-2.5">
               
               {/* Category Pills */}
-              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 lg:pb-0 scrollbar-none">
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 xl:pb-0 scrollbar-none shrink-0">
                 {[
                   { key: 'ALL', label: 'Tous les motifs', icon: Filter },
                   { key: 'excellence', label: "Excellence (100%)", icon: Award },
@@ -523,13 +533,13 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                     <button
                       key={tab.key}
                       onClick={() => setSelectedCategory(tab.key as MotifCategoryKey)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 ${
+                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap ${
                         isActive
-                          ? 'bg-indigo-600 text-white shadow-xs'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200/60'
+                          ? 'bg-indigo-600 text-white shadow-2xs'
+                          : 'bg-slate-100/90 hover:bg-slate-200 text-slate-700 border border-slate-200/60'
                       }`}
                     >
-                      <IconComp size={13} />
+                      <IconComp size={12} className="shrink-0" />
                       <span>{tab.label}</span>
                     </button>
                   );
@@ -537,27 +547,27 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
               </div>
 
               {/* Search & Sort Controls */}
-              <div className="flex items-center gap-2">
-                <div className="relative flex-1 sm:w-64">
-                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="relative flex-1 sm:w-56">
+                  <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type="text"
                     placeholder="Rechercher élève, classe..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-8 pr-3 py-1.5 text-xs font-bold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
+                    className="w-full pl-8 pr-7 py-1.5 text-xs font-semibold bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder:text-slate-400"
                   />
                   {searchTerm && (
                     <button
                       onClick={() => setSearchTerm('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                     >
                       <X size={12} />
                     </button>
                   )}
                 </div>
 
-                <div className="w-auto min-w-[190px]">
+                <div className="w-auto min-w-[170px] shrink-0">
                   <SelectPill
                     value={sortBy}
                     onChange={(val) => setSortBy(val as SortOption)}
@@ -581,27 +591,27 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
 
             {/* Class Pill Horizontal Bar */}
             <div className="pt-2 border-t border-slate-100">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
-                  <Sliders size={13} className="text-indigo-600" />
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] sm:text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                  <Sliders size={12} className="text-indigo-600" />
                   Ventilation par {terminology.class} ({availableClasses.length})
                 </span>
-                <span className="text-[11px] text-slate-500 font-medium">
+                <span className="text-[10px] text-slate-500 font-bold">
                   {filteredStudents.length} {filteredStudents.length > 1 ? terminology.students.toLowerCase() : terminology.student.toLowerCase()} affiché{filteredStudents.length > 1 ? 's' : ''}
                 </span>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2 max-h-28 overflow-y-auto pr-1">
+              <div className="flex flex-wrap items-center gap-1.5 max-h-24 overflow-y-auto pr-1">
                 <button
                   onClick={() => setSelectedClass('ALL')}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer ${
                     selectedClass === 'ALL'
-                      ? 'bg-slate-900 text-white border-slate-900 shadow-xs'
+                      ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                       : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                   }`}
                 >
                   <span className="font-black">Toutes les classes</span>
-                  <span className="ml-1.5 opacity-80">({reevaluatedStudents.length})</span>
+                  <span className="ml-1 opacity-80 font-mono">({reevaluatedStudents.length})</span>
                 </button>
 
                 {classBreakdown.map(item => {
@@ -610,18 +620,18 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                     <button
                       key={item.className}
                       onClick={() => setSelectedClass(isSelected ? 'ALL' : item.className)}
-                      className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center gap-1.5 ${
+                      className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all border cursor-pointer flex items-center gap-1.5 ${
                         isSelected
-                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                          ? 'bg-indigo-600 text-white border-indigo-600 shadow-2xs'
                           : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-200'
                       }`}
                     >
                       <span>{item.className}</span>
-                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] ${isSelected ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${isSelected ? 'bg-indigo-700 text-white' : 'bg-slate-100 text-slate-600'}`}>
                         {item.count}
                       </span>
-                      <span className={`font-mono text-[11px] ${isSelected ? 'text-indigo-100' : 'text-amber-700'}`}>
-                        -{Math.round(item.totalEqHTG).toLocaleString()} HTG
+                      <span className={`font-mono text-[10px] ${isSelected ? 'text-indigo-100' : 'text-amber-700'}`}>
+                        -{Math.round(item.totalEqHTG).toLocaleString('fr-FR')} HTG
                       </span>
                     </button>
                   );
@@ -634,54 +644,54 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
           {/* =========================================================================
               4. DETAILED AUDIT TABLE & VENTILATION
              ========================================================================= */}
-          <div className="space-y-3">
+          <div className="space-y-2">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 flex items-center gap-1.5">
-                  <Layers size={14} className="text-indigo-600" />
+                  <Layers size={13} className="text-indigo-600" />
                   Ventilation Analytique des Dossiers Réévalués
                 </h3>
                 {selectedClass !== 'ALL' && (
-                  <span className="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full border border-indigo-200">
+                  <span className="text-[9px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full border border-indigo-200">
                     Classe : {selectedClass}
                   </span>
                 )}
               </div>
 
               {/* Quick Table Actions */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <button
                   onClick={handleExportExcel}
-                  className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-xl border border-emerald-200 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-xs rounded-lg border border-emerald-200 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                   title="Télécharger l'audit complet sous format Excel"
                 >
-                  <FileSpreadsheet size={14} className="text-emerald-700" />
+                  <FileSpreadsheet size={13} className="text-emerald-700" />
                   <span>Exporter Excel</span>
                 </button>
 
                 <button
                   onClick={handlePrintSummary}
-                  className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                  className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-lg border border-slate-200 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
                   title="Imprimer le bordereau d'audit"
                 >
-                  <Printer size={14} className="text-slate-600" />
+                  <Printer size={13} className="text-slate-600" />
                   <span>Imprimer</span>
                 </button>
               </div>
             </div>
 
             {/* Table Container */}
-            <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-xs bg-white">
-              <div className="overflow-x-auto max-h-[420px] scrollbar-thin">
+            <div className="border border-slate-200/80 rounded-xl sm:rounded-2xl overflow-hidden shadow-2xs bg-white">
+              <div className="overflow-x-auto max-h-[380px] scrollbar-thin">
                 <table className="w-full text-left border-collapse min-w-[780px]">
                   <thead className="sticky top-0 z-10">
                     <tr className="bg-slate-900 text-slate-100 text-[10px] font-black uppercase tracking-wider border-b border-slate-800">
-                      <th className="p-3.5 text-slate-100 font-black">Élève & Identification</th>
-                      <th className="p-3.5 text-slate-100 font-black">Motif & Statut d'Allègement</th>
-                      <th className="p-3.5 text-right text-slate-100 font-black">Scolarité Brute</th>
-                      <th className="p-3.5 text-right text-slate-100 font-black">Frais Annexes</th>
-                      <th className="p-3.5 text-right text-amber-300 font-black">Déduction Accordée</th>
-                      <th className="p-3.5 text-right text-emerald-400 font-black">Solde Net Exigible</th>
+                      <th className="p-2.5 sm:p-3 text-slate-100 font-black">Élève & Identification</th>
+                      <th className="p-2.5 sm:p-3 text-slate-100 font-black">Motif & Statut d'Allègement</th>
+                      <th className="p-2.5 sm:p-3 text-right text-slate-100 font-black">Scolarité Brute</th>
+                      <th className="p-2.5 sm:p-3 text-right text-slate-100 font-black">Frais Annexes</th>
+                      <th className="p-2.5 sm:p-3 text-right text-amber-300 font-black">Déduction Accordée</th>
+                      <th className="p-2.5 sm:p-3 text-right text-emerald-400 font-black">Solde Net Exigible</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 text-xs">
@@ -702,22 +712,32 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                             className="hover:bg-indigo-50/40 transition-colors cursor-pointer group"
                           >
                             {/* Élève & Classe */}
-                            <td className="p-3.5">
+                            <td className="p-2.5 sm:p-3">
                               <div className="flex items-center gap-2.5">
-                                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-slate-800 to-indigo-700 text-white font-black text-xs flex items-center justify-center shadow-2xs shrink-0">
+                                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-gradient-to-tr from-slate-800 to-indigo-700 text-white font-black text-xs flex items-center justify-center shadow-2xs shrink-0">
                                   {studentNameObj.firstName.charAt(0)}{studentNameObj.lastName.charAt(0)}
                                 </div>
                                 <div className="min-w-0">
                                   <p className="font-bold text-slate-900 text-xs group-hover:text-indigo-700 transition-colors truncate">
                                     {studentNameObj.fullName}
                                   </p>
-                                  <div className="flex items-center gap-1.5 mt-0.5">
-                                    <span className="inline-block px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 font-bold border border-slate-200 text-[10px]">
+                                  <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                    <span className="inline-block px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-700 font-bold border border-slate-200 text-[9px]">
                                       {st.className}
                                     </span>
                                     {st.matricule && (
-                                      <span className="text-[10px] font-mono text-slate-500">
+                                      <span className="text-[9px] font-mono text-slate-500">
                                         #{st.matricule}
+                                      </span>
+                                    )}
+                                    {((st.inscriptionHTG || 0) > 0 || (st.inscriptionUSD || 0) > 0) && (
+                                      <span className={`inline-flex items-center gap-0.5 text-[8.5px] px-1.5 py-0.2 rounded font-semibold border ${
+                                        st.isInscriptionPaid 
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
+                                          : 'bg-amber-50 text-amber-800 border-amber-200'
+                                      }`}>
+                                        {st.isInscriptionPaid && <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />}
+                                        Inscr. : {st.inscriptionHTG ? `${st.inscriptionHTG.toLocaleString('fr-FR')} HTG` : ''} {st.inscriptionUSD ? `${st.inscriptionUSD.toLocaleString('fr-FR')} USD` : ''} ({st.isInscriptionPaid ? 'Acquittée' : 'Exigible'})
                                       </span>
                                     )}
                                   </div>
@@ -725,10 +745,10 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                               </div>
                             </td>
 
-                            {/* Motif & Statut d'Allègement - TRUTHFUL, ACCURATE & BEAUTIFUL */}
-                            <td className="p-3.5">
-                              <div className="space-y-1">
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border shadow-2xs"
+                            {/* Motif & Statut d'Allègement */}
+                            <td className="p-2.5 sm:p-3">
+                              <div className="space-y-0.5">
+                                <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[10px] sm:text-[11px] font-bold border shadow-2xs"
                                      style={{
                                        backgroundColor: badgeInfo.categoryKey === 'excellence' ? '#fef3c7' :
                                                         badgeInfo.categoryKey === 'social' ? '#f3e8ff' :
@@ -744,38 +764,43 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                                               badgeInfo.categoryKey === 'staff' ? '#14532d' : '#312e81'
                                      }}
                                 >
-                                  <IconComp size={13} className="shrink-0" />
+                                  <IconComp size={12} className="shrink-0" />
                                   <span className="truncate max-w-[180px]">{st.discountLabel}</span>
                                 </div>
-                                <p className="text-[10px] font-bold text-slate-500 flex items-center gap-1">
-                                  <span>{badgeInfo.scopeLabel}</span>
+                                <p className="text-[9.5px] font-bold text-slate-500 flex items-center gap-1">
+                                  <span className="line-clamp-1">{badgeInfo.scopeLabel}</span>
                                 </p>
                               </div>
                             </td>
 
-                            {/* Scolarité Brute - Affichage en clair */}
-                            <td className="p-3.5 text-right font-mono font-medium text-slate-700">
+                            {/* Scolarité Brute */}
+                            <td className="p-2.5 sm:p-3 text-right font-mono font-medium text-slate-700">
                               {st.tuitionUSD > 0 && (
-                                <p className="font-bold text-indigo-700">{st.tuitionUSD.toLocaleString()} USD</p>
+                                <p className="font-bold text-indigo-700">{st.tuitionUSD.toLocaleString('fr-FR')} USD</p>
                               )}
                               {st.tuitionHTG > 0 && (
-                                <p className={st.tuitionUSD > 0 ? 'text-[11px] text-slate-500 font-semibold' : 'font-bold'}>
-                                  {st.tuitionHTG.toLocaleString()} HTG
+                                <p className={st.tuitionUSD > 0 ? 'text-[10px] text-slate-500 font-semibold' : 'font-bold'}>
+                                  {st.tuitionHTG.toLocaleString('fr-FR')} HTG
                                 </p>
                               )}
-                              {st.tuitionUSD === 0 && st.tuitionHTG === 0 && (
+                              {((st.inscriptionHTG || 0) > 0 || (st.inscriptionUSD || 0) > 0) && (
+                                <p className="text-[9px] text-slate-500 font-medium mt-0.5">
+                                  + Inscr. : {st.inscriptionHTG ? `${st.inscriptionHTG.toLocaleString('fr-FR')} HTG` : ''} {st.inscriptionUSD ? `${st.inscriptionUSD.toLocaleString('fr-FR')} USD` : ''}
+                                </p>
+                              )}
+                              {st.tuitionUSD === 0 && st.tuitionHTG === 0 && (st.inscriptionHTG || 0) === 0 && (
                                 <span className="text-slate-400 italic text-[11px]">—</span>
                               )}
                             </td>
 
-                            {/* Frais Annexes / Divers - Affichage en clair */}
-                            <td className="p-3.5 text-right font-mono font-medium text-slate-700">
+                            {/* Frais Annexes / Divers */}
+                            <td className="p-2.5 sm:p-3 text-right font-mono font-medium text-slate-700">
                               {st.miscUSD > 0 && (
-                                <p className="font-bold text-indigo-700">{st.miscUSD.toLocaleString()} USD</p>
+                                <p className="font-bold text-indigo-700">{st.miscUSD.toLocaleString('fr-FR')} USD</p>
                               )}
                               {st.miscHTG > 0 && (
-                                <p className={st.miscUSD > 0 ? 'text-[11px] text-slate-500 font-semibold' : 'font-bold'}>
-                                  {st.miscHTG.toLocaleString()} HTG
+                                <p className={st.miscUSD > 0 ? 'text-[10px] text-slate-500 font-semibold' : 'font-bold'}>
+                                  {st.miscHTG.toLocaleString('fr-FR')} HTG
                                 </p>
                               )}
                               {st.miscUSD === 0 && st.miscHTG === 0 && (
@@ -783,58 +808,77 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                               )}
                             </td>
 
-                            {/* Déduction Accordée - Affichage en clair */}
-                            <td className="p-3.5 text-right font-mono font-bold text-amber-700">
+                            {/* Déduction Accordée */}
+                            <td className="p-2.5 sm:p-3 text-right font-mono font-bold text-amber-700">
                               {st.reductionUSD > 0 && (
-                                <p className="font-bold text-amber-700">-{st.reductionUSD.toLocaleString()} USD</p>
+                                <p className="font-bold text-amber-700">-{st.reductionUSD.toLocaleString('fr-FR')} USD</p>
                               )}
                               {st.reductionHTG > 0 && (
-                                <p className="font-bold text-amber-700">-{st.reductionHTG.toLocaleString()} HTG</p>
+                                <p className="font-bold text-amber-700">-{st.reductionHTG.toLocaleString('fr-FR')} HTG</p>
                               )}
                               {st.reductionUSD === 0 && st.reductionHTG === 0 && (
                                 <span className="text-slate-400">0 HTG</span>
                               )}
                               {st.reductionUSD > 0 && (
-                                <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-200">
-                                  -{Math.round(reductionEq).toLocaleString()} HTG eq.
+                                <span className="inline-block mt-0.5 text-[8.5px] font-sans px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-200">
+                                  -{Math.round(reductionEq).toLocaleString('fr-FR')} HTG eq.
                                 </span>
                               )}
                             </td>
 
-                            {/* Solde Net Exigible - Indicateurs et Badges adaptatifs */}
-                            <td className="p-3.5 text-right font-mono font-black text-emerald-700 bg-emerald-50/30">
-                              {netEq === 0 ? (
+                            {/* Solde Net Exigible */}
+                            <td className="p-2.5 sm:p-3 text-right font-mono font-black text-emerald-700 bg-emerald-50/30">
+                              {st.isInscriptionPaid && (st.netHTG === (st.inscriptionHTG || 0)) && (st.netUSD === (st.inscriptionUSD || 0)) ? (
                                 <>
-                                  {/* Montant en clair selon la composition des frais de l'élève */}
+                                  <p className="text-emerald-900 font-black font-mono">0 HTG {st.grossUSD > 0 ? '• 0 USD' : ''}</p>
+                                  <span className="inline-block mt-0.5 text-[8.5px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
+                                    Bourse Active (Inscription Réglée)
+                                  </span>
+                                </>
+                              ) : netEq === 0 ? (
+                                <>
                                   {st.grossUSD > 0 && st.grossHTG === 0 ? (
                                     <p className="text-emerald-800 font-bold font-mono">0 USD</p>
                                   ) : st.grossUSD > 0 && st.grossHTG > 0 ? (
-                                    <p className="text-emerald-800 font-bold font-mono text-[11px]">0 HTG • 0 USD</p>
+                                    <p className="text-emerald-800 font-bold font-mono text-[10px]">0 HTG • 0 USD</p>
                                   ) : (
                                     <p className="text-emerald-900 font-black font-mono">0 HTG</p>
                                   )}
 
                                   {/* Badge de synthèse adaptatif */}
-                                  <span className="inline-block mt-0.5 text-[9px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
-                                    {st.grossUSD > 0 && st.grossHTG === 0 
+                                  <span className="inline-block mt-0.5 text-[8.5px] font-sans px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-900 font-black border border-emerald-300 uppercase tracking-tight shadow-2xs">
+                                    {st.isInscriptionPaid 
+                                      ? 'Bourse Complète (Inscription Réglée)' 
+                                      : st.grossUSD > 0 && st.grossHTG === 0 
                                       ? 'Bourse Complète (0 USD Dû)' 
                                       : st.grossUSD > 0 
                                       ? 'Bourse Complète (0 Dû / Soldé)' 
                                       : 'Bourse Complète (0 HTG Dû)'}
                                   </span>
                                 </>
-                              ) : (
+                              ) : st.isCompleteScholarship && !st.isInscriptionPaid && ((st.inscriptionHTG || 0) > 0 || (st.inscriptionUSD || 0) > 0) && (st.netHTG === (st.inscriptionHTG || 0)) ? (
                                 <>
-                                  {/* Montants nets exigibles non nuls affichés en clair */}
                                   {st.netUSD > 0 && (
-                                    <p className="text-emerald-800 font-bold font-mono">{st.netUSD.toLocaleString()} USD</p>
+                                    <p className="text-amber-800 font-bold font-mono">{st.netUSD.toLocaleString('fr-FR')} USD</p>
                                   )}
                                   {st.netHTG > 0 && (
-                                    <p className="text-emerald-900 font-black font-mono">{st.netHTG.toLocaleString()} HTG</p>
+                                    <p className="text-amber-900 font-black font-mono">{st.netHTG.toLocaleString('fr-FR')} HTG</p>
+                                  )}
+                                  <span className="inline-block mt-0.5 text-[8.5px] font-sans px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 font-black border border-amber-300 uppercase tracking-tight shadow-2xs">
+                                    Inscription Exigible (Bourse Active)
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  {st.netUSD > 0 && (
+                                    <p className="text-emerald-800 font-bold font-mono">{st.netUSD.toLocaleString('fr-FR')} USD</p>
+                                  )}
+                                  {st.netHTG > 0 && (
+                                    <p className="text-emerald-900 font-black font-mono">{st.netHTG.toLocaleString('fr-FR')} HTG</p>
                                   )}
                                   {st.netUSD > 0 && (
-                                    <span className="inline-block mt-0.5 text-[9px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">
-                                      {Math.round(netEq).toLocaleString()} HTG net
+                                    <span className="inline-block mt-0.5 text-[8.5px] font-sans px-1.5 py-0.2 rounded bg-emerald-100/70 text-emerald-900 font-bold border border-emerald-200">
+                                      {Math.round(netEq).toLocaleString('fr-FR')} HTG net
                                     </span>
                                   )}
                                 </>
@@ -845,35 +889,30 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                           {/* Expandable Breakdown Drawer */}
                           {isExpanded && (
                             <tr className="bg-slate-900 text-white animate-fade-in">
-                              <td colSpan={6} className="p-4 border-t border-slate-800">
-                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+                              <td colSpan={6} className="p-3 border-t border-slate-800">
+                                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 text-xs">
                                   <div className="space-y-1">
-                                    <p className="text-[11px] font-black uppercase text-indigo-400 tracking-wider">
+                                    <p className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">
                                       Formule de Calcul pour {studentNameObj.fullName} ({st.className})
                                     </p>
-                                    <div className="flex items-center gap-2 flex-wrap text-slate-300 font-mono text-xs pt-1">
-                                      <span className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-slate-200">
-                                        Assiette Brute : {st.grossUSD > 0 ? `${st.grossUSD.toLocaleString()} USD ${st.grossHTG > 0 ? '+ ' : ''}` : ''}{st.grossHTG > 0 ? `${st.grossHTG.toLocaleString()} HTG` : ''} {st.grossUSD > 0 && `(${Math.round(grossEq).toLocaleString()} HTG eq.)`}
+                                    <div className="flex items-center gap-1.5 flex-wrap text-slate-300 font-mono text-[11px] pt-0.5">
+                                      <span className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-slate-200">
+                                        Assiette : {st.tuitionHTG > 0 ? `${st.tuitionHTG.toLocaleString('fr-FR')} HTG (Scolarité) ` : ''}{(st.inscriptionHTG || 0) > 0 ? `+ ${(st.inscriptionHTG || 0).toLocaleString('fr-FR')} HTG (Inscription) ` : ''}{st.miscUSD > 0 ? `+ ${st.miscUSD.toLocaleString('fr-FR')} USD (Annexes) ` : ''}
                                       </span>
                                       <span className="text-amber-400 font-bold">-</span>
-                                      <span className="px-2 py-1 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
-                                        Allègement ({badgeInfo.scopeLabel}) : -{st.reductionUSD > 0 ? `${st.reductionUSD.toLocaleString()} USD ${st.reductionHTG > 0 ? '+ ' : ''}` : ''}{st.reductionHTG > 0 ? `${st.reductionHTG.toLocaleString()} HTG` : ''} {st.reductionUSD > 0 && `(-${Math.round(reductionEq).toLocaleString()} HTG eq.)`}
+                                      <span className="px-2 py-0.5 rounded bg-amber-500/20 border border-amber-400/40 text-amber-300 font-bold">
+                                        Bourse ({badgeInfo.categoryTitle}) : -{st.reductionUSD > 0 ? `${st.reductionUSD.toLocaleString('fr-FR')} USD ` : ''}{st.reductionHTG > 0 ? `${st.reductionHTG.toLocaleString('fr-FR')} HTG ` : ''}
                                       </span>
                                       <span className="text-emerald-400 font-bold">=</span>
-                                      <span className="px-2 py-1 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-black">
-                                        Net Exigible : {netEq === 0 ? (
-                                          st.grossUSD > 0 && st.grossHTG === 0 ? '0 USD (Bourse Complète)' :
-                                          st.grossUSD > 0 ? '0 Dû (Soldé)' : '0 HTG (Bourse Complète)'
-                                        ) : (
-                                          `${st.netUSD > 0 ? `${st.netUSD.toLocaleString()} USD ` : ''}${st.netHTG > 0 ? `${st.netHTG.toLocaleString()} HTG ` : ''}${st.netUSD > 0 ? `(${Math.round(netEq).toLocaleString()} HTG eq.)` : ''}`
-                                        )}
+                                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-black">
+                                        Net Exigible : {st.isInscriptionPaid && (st.netHTG === (st.inscriptionHTG || 0)) ? '0 HTG (Inscription réglée à la caisse)' : netEq === 0 ? '0 Dû' : `${st.netUSD > 0 ? `${st.netUSD.toLocaleString('fr-FR')} USD ` : ''}${st.netHTG > 0 ? `${st.netHTG.toLocaleString('fr-FR')} HTG ` : ''}${st.isCompleteScholarship ? "(Frais d'inscription obligatoires à l'admission)" : ''}`}
                                       </span>
                                     </div>
                                   </div>
                                   <div className="text-right shrink-0">
-                                    <p className="text-[10px] text-slate-400 uppercase tracking-wider">Statut Comptable</p>
-                                    <p className="text-xs font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
-                                      <CheckCircle2 size={13} />
+                                    <p className="text-[9px] text-slate-400 uppercase tracking-wider">Statut Comptable</p>
+                                    <p className="text-[11px] font-bold text-emerald-400 flex items-center gap-1 mt-0.5">
+                                      <CheckCircle2 size={12} />
                                       Validé & Appliqué au Suivi
                                     </p>
                                   </div>
@@ -887,10 +926,10 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
 
                     {filteredStudents.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="p-10 text-center text-slate-500 space-y-2">
-                          <Info size={28} className="mx-auto text-slate-400" />
-                          <p className="font-bold text-sm text-slate-700">Aucun dossier trouvé pour ces filtres</p>
-                          <p className="text-xs text-slate-400">Essayez de modifier votre recherche ou de réinitialiser le filtre de classe.</p>
+                        <td colSpan={6} className="p-8 text-center text-slate-500 space-y-2">
+                          <Info size={24} className="mx-auto text-slate-400" />
+                          <p className="font-bold text-xs text-slate-700">Aucun dossier trouvé pour ces filtres</p>
+                          <p className="text-[11px] text-slate-400">Essayez de modifier votre recherche ou de réinitialiser le filtre de classe.</p>
                         </td>
                       </tr>
                     )}
@@ -900,27 +939,27 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                   {filteredStudents.length > 0 && (
                     <tfoot>
                       <tr className="bg-slate-100 font-bold text-slate-900 border-t-2 border-slate-300 text-xs">
-                        <td colSpan={2} className="p-3.5 text-slate-800 font-black uppercase text-[11px]">
+                        <td colSpan={2} className="p-2.5 sm:p-3 text-slate-800 font-black uppercase text-[10px]">
                           Sous-total Filtré ({filteredStudents.length} élèves)
                         </td>
-                        <td className="p-3.5 text-right font-mono font-bold">
-                          {filteredTotals.tuitionUSD > 0 && <p className="text-indigo-700">{filteredTotals.tuitionUSD.toLocaleString()} USD</p>}
-                          {filteredTotals.tuitionHTG > 0 && <p>{filteredTotals.tuitionHTG.toLocaleString()} HTG</p>}
+                        <td className="p-2.5 sm:p-3 text-right font-mono font-bold">
+                          {filteredTotals.tuitionUSD > 0 && <p className="text-indigo-700">{filteredTotals.tuitionUSD.toLocaleString('fr-FR')} USD</p>}
+                          {filteredTotals.tuitionHTG > 0 && <p>{filteredTotals.tuitionHTG.toLocaleString('fr-FR')} HTG</p>}
                           {filteredTotals.tuitionUSD === 0 && filteredTotals.tuitionHTG === 0 && <p>0 HTG</p>}
                         </td>
-                        <td className="p-3.5 text-right font-mono font-bold">
-                          {filteredTotals.miscUSD > 0 && <p className="text-indigo-700">{filteredTotals.miscUSD.toLocaleString()} USD</p>}
-                          {filteredTotals.miscHTG > 0 && <p>{filteredTotals.miscHTG.toLocaleString()} HTG</p>}
+                        <td className="p-2.5 sm:p-3 text-right font-mono font-bold">
+                          {filteredTotals.miscUSD > 0 && <p className="text-indigo-700">{filteredTotals.miscUSD.toLocaleString('fr-FR')} USD</p>}
+                          {filteredTotals.miscHTG > 0 && <p>{filteredTotals.miscHTG.toLocaleString('fr-FR')} HTG</p>}
                           {filteredTotals.miscUSD === 0 && filteredTotals.miscHTG === 0 && <span className="text-slate-400 italic text-[11px]">—</span>}
                         </td>
-                        <td className="p-3.5 text-right font-mono font-black text-amber-700">
-                          {filteredTotals.reductionUSD > 0 && <p>-{filteredTotals.reductionUSD.toLocaleString()} USD</p>}
-                          {filteredTotals.reductionHTG > 0 && <p>-{filteredTotals.reductionHTG.toLocaleString()} HTG</p>}
+                        <td className="p-2.5 sm:p-3 text-right font-mono font-black text-amber-700">
+                          {filteredTotals.reductionUSD > 0 && <p>-{filteredTotals.reductionUSD.toLocaleString('fr-FR')} USD</p>}
+                          {filteredTotals.reductionHTG > 0 && <p>-{filteredTotals.reductionHTG.toLocaleString('fr-FR')} HTG</p>}
                           {filteredTotals.reductionUSD === 0 && filteredTotals.reductionHTG === 0 && <p>0 HTG</p>}
                         </td>
-                        <td className="p-3.5 text-right font-mono font-black text-emerald-800 bg-emerald-100/50">
-                          {filteredTotals.netUSD > 0 && <p>{filteredTotals.netUSD.toLocaleString()} USD</p>}
-                          {filteredTotals.netHTG > 0 && <p>{filteredTotals.netHTG.toLocaleString()} HTG</p>}
+                        <td className="p-2.5 sm:p-3 text-right font-mono font-black text-emerald-800 bg-emerald-100/50">
+                          {filteredTotals.netUSD > 0 && <p>{filteredTotals.netUSD.toLocaleString('fr-FR')} USD</p>}
+                          {filteredTotals.netHTG > 0 && <p>{filteredTotals.netHTG.toLocaleString('fr-FR')} HTG</p>}
                           {filteredTotals.netUSD === 0 && filteredTotals.netHTG === 0 && <p>0 HTG</p>}
                         </td>
                       </tr>
@@ -936,19 +975,19 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
         {/* =========================================================================
             5. MODAL ACTION FOOTER WITH VIEW TOGGLE & ACTIONS
            ========================================================================= */}
-        <div className="p-4 sm:p-5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 rounded-b-3xl shrink-0">
+        <div className="p-3 sm:p-3.5 bg-white border-t border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 rounded-b-2xl sm:rounded-b-3xl shrink-0">
           
           {/* Mode Toggle Button */}
           <button
             type="button"
             onClick={onToggleTargetReevaluated}
-            className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-2 ${
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer flex items-center justify-center gap-2 ${
               isTargetReevaluated
                 ? 'bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border-indigo-200 shadow-2xs'
                 : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border-slate-300'
             }`}
           >
-            <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${isTargetReevaluated ? 'bg-indigo-600 animate-pulse' : 'bg-slate-400'}`} />
+            <div className={`w-2 h-2 rounded-full shrink-0 ${isTargetReevaluated ? 'bg-indigo-600 animate-pulse' : 'bg-slate-400'}`} />
             <span className="text-center sm:text-left">
               Mode Tableau de Bord : <strong>{isTargetReevaluated ? 'Objectif Corrigé (Actif)' : 'Objectif Brut Initial'}</strong>
             </span>
@@ -959,9 +998,9 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
             <button
               type="button"
               onClick={handleExportExcel}
-              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap min-h-[42px]"
+              className="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl border border-slate-200 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap min-h-[38px]"
             >
-              <Download size={14} className="text-slate-600 shrink-0" />
+              <Download size={13} className="text-slate-600 shrink-0" />
               <span>Exporter XLSX</span>
             </button>
 
@@ -971,9 +1010,9 @@ export const ReevaluationModal: React.FC<ReevaluationModalProps> = ({
                 onConfirmReevaluation();
                 onClose();
               }}
-              className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 whitespace-nowrap min-h-[42px]"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs hover:shadow-indigo-500/25 transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 whitespace-nowrap min-h-[38px]"
             >
-              <Check size={16} className="shrink-0" />
+              <Check size={15} className="shrink-0" />
               <span>Valider & Enregistrer</span>
             </button>
           </div>

@@ -2777,14 +2777,14 @@ const handleDeleteSchool = async () => {
                   {/* --- View 1: Modern Table View (Desktop & Tablet with Horizontal Smooth Scroll) --- */}
                   <div className={`${schoolViewMode === 'grid' ? 'hidden' : 'block'} bg-white rounded-2xl sm:rounded-3xl shadow-xs border border-slate-200 overflow-hidden`}>
                     <div className="overflow-x-auto custom-scrollbar">
-                      <table className="w-full text-left min-w-full">
+                      <table className="w-full text-left table-auto lg:table-fixed">
                         <thead>
                           <tr className="bg-slate-50/80 border-b border-slate-200 text-[10px] sm:text-[11px] font-black text-slate-400 uppercase tracking-wider">
-                            <th className="px-3 sm:px-4 py-3 sm:py-3.5">Établissement</th>
-                            <th className="px-3 sm:px-4 py-3 sm:py-3.5">Abonnement & Licence</th>
-                            <th className="px-2.5 sm:px-3 py-3 sm:py-3.5 text-center">Population</th>
-                            <th className="px-2.5 sm:px-3 py-3 sm:py-3.5 text-center">Statut</th>
-                            <th className="px-3 sm:px-4 py-3 sm:py-3.5 text-right">Actions</th>
+                            <th className="w-auto lg:w-[36%] px-2.5 sm:px-3 lg:px-3.5 py-3">Établissement</th>
+                            <th className="w-auto lg:w-[22%] px-2 sm:px-2.5 lg:px-3 py-3">Abonnement & Licence</th>
+                            <th className="w-auto lg:w-[15%] px-1.5 sm:px-2 lg:px-2.5 py-3 text-center">Population</th>
+                            <th className="w-auto lg:w-[12%] px-1.5 sm:px-2 lg:px-2.5 py-3 text-center">Statut</th>
+                            <th className="w-auto lg:w-[15%] px-2 sm:px-3 py-3 text-right">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
@@ -2805,19 +2805,19 @@ const handleDeleteSchool = async () => {
                                 className="hover:bg-slate-50/90 transition-all group"
                               >
                                 {/* Column 1: School Identity */}
-                                <td className="px-3 sm:px-4 py-3 sm:py-3.5">
-                                  <div className="flex items-center gap-2.5 sm:gap-3">
-                                    <div className="w-9 h-9 sm:w-10 sm:h-10 bg-indigo-50/80 text-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center relative border border-indigo-100 shrink-0 group-hover:scale-105 transition-transform">
-                                      <Building2 size={18} />
+                                <td className="px-2.5 sm:px-3 lg:px-3.5 py-2.5 sm:py-3">
+                                  <div className="flex items-center gap-2 sm:gap-2.5">
+                                    <div className="w-8 h-8 sm:w-9 sm:h-9 bg-indigo-50/80 text-indigo-600 rounded-xl sm:rounded-2xl flex items-center justify-center relative border border-indigo-100 shrink-0 group-hover:scale-105 transition-transform">
+                                      <Building2 size={16} />
                                       {school.is_protected && (
-                                        <div className="absolute -top-1 -right-1 w-4 h-4 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center shadow-xs" title="École Protégée Système">
+                                        <div className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-amber-500 rounded-full border-2 border-white flex items-center justify-center shadow-xs" title="École Protégée Système">
                                           <ShieldAlert size={8} className="text-white" />
                                         </div>
                                       )}
                                     </div>
-                                    <div className="min-w-0">
+                                    <div className="min-w-0 flex-1">
                                       <div className="flex items-center gap-1.5 flex-wrap">
-                                        <p className="font-extrabold text-slate-900 text-xs sm:text-sm tracking-tight leading-snug truncate max-w-[140px] sm:max-w-[180px] lg:max-w-[210px] xl:max-w-[260px]" title={school.name}>{school.name}</p>
+                                        <p className="font-extrabold text-slate-900 text-xs sm:text-[13px] tracking-tight leading-snug break-words" title={school.name}>{school.name}</p>
                                         {isCurrentWorkingSchool && (
                                           <span className="px-1.5 py-0.2 bg-emerald-100 text-emerald-800 text-[9px] font-black uppercase rounded-full tracking-wider shrink-0">
                                             Actuelle
@@ -2848,9 +2848,9 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 2: Subscription & Expiration */}
-                                <td className="px-3 sm:px-4 py-3 sm:py-3.5">
+                                <td className="px-2 sm:px-2.5 lg:px-3 py-2.5 sm:py-3">
                                   <div className="flex flex-col gap-1 items-start">
-                                    <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${
+                                    <span className={`inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded-lg text-[9px] sm:text-[10px] font-black uppercase tracking-wider border whitespace-nowrap ${
                                       school.subscription_plan === 'unlimited' ? 'bg-amber-50 text-amber-800 border-amber-200/80 shadow-xs' :
                                       school.subscription_plan === 'yearly' ? 'bg-indigo-50 text-indigo-700 border-indigo-200/80' :
                                       school.subscription_plan === 'monthly' ? 'bg-blue-50 text-blue-700 border-blue-200/80' :
@@ -2872,13 +2872,13 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 3: Population Metrics */}
-                                <td className="px-2.5 sm:px-3 py-3 sm:py-3.5">
-                                  <div className="flex items-center justify-center gap-1.5">
-                                    <div className="flex flex-col items-center px-1.5 sm:px-2 py-0.5 rounded-lg bg-blue-50/70 border border-blue-100 min-w-[42px] sm:min-w-[48px]" title="Gestionnaires & Enseignants">
+                                <td className="px-1.5 sm:px-2 lg:px-2.5 py-2.5 sm:py-3">
+                                  <div className="flex items-center justify-center gap-1">
+                                    <div className="flex flex-col items-center px-1.5 py-0.5 rounded-lg bg-blue-50/70 border border-blue-100 min-w-[36px] sm:min-w-[40px]" title="Gestionnaires & Enseignants">
                                       <span className="text-blue-800 text-xs font-black leading-tight">{school.staff_count || 0}</span>
                                       <span className="text-[7.5px] sm:text-[8px] font-bold text-blue-600 uppercase tracking-widest">Staff</span>
                                     </div>
-                                    <div className="flex flex-col items-center px-1.5 sm:px-2 py-0.5 rounded-lg bg-slate-50 border border-slate-200/70 min-w-[42px] sm:min-w-[48px]" title="Élèves inscrits">
+                                    <div className="flex flex-col items-center px-1.5 py-0.5 rounded-lg bg-slate-50 border border-slate-200/70 min-w-[36px] sm:min-w-[40px]" title="Élèves inscrits">
                                       <span className="text-slate-800 text-xs font-black leading-tight">{school.student_count || 0}</span>
                                       <span className="text-[7.5px] sm:text-[8px] font-bold text-slate-500 uppercase tracking-widest">Élèves</span>
                                     </div>
@@ -2886,8 +2886,8 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 4: Status */}
-                                <td className="px-2.5 sm:px-3 py-3 sm:py-3.5 text-center">
-                                  <span className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider border ${
+                                <td className="px-1.5 sm:px-2 lg:px-2.5 py-2.5 sm:py-3 text-center">
+                                  <span className={`inline-flex items-center gap-1 px-1.5 sm:px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider border ${
                                     school.status === 'ACTIVE' 
                                       ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                                       : 'bg-rose-50 text-rose-700 border-rose-200'
@@ -2898,13 +2898,13 @@ const handleDeleteSchool = async () => {
                                 </td>
 
                                 {/* Column 5: Smart Action Suite */}
-                                <td className="px-3 sm:px-4 py-3 sm:py-3.5 text-right">
-                                  <div className="flex items-center justify-end gap-1 sm:gap-1.5 relative">
+                                <td className="px-2 sm:px-3 py-2.5 sm:py-3 text-right">
+                                  <div className="flex items-center justify-end gap-1 relative">
                                     {/* Primary Work Button */}
                                     <button 
                                       onClick={() => setSwitchSchoolModal({ isOpen: true, school })}
                                       title={isCurrentWorkingSchool ? "Vous êtes dans cette école" : "Basculer et travailler dans cette école"}
-                                      className={`px-2.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                                      className={`px-2 sm:px-2.5 py-1 sm:py-1.5 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-bold flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                                         isCurrentWorkingSchool 
                                           ? 'bg-emerald-600 text-white shadow-xs' 
                                           : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-600 hover:text-white border border-indigo-100'
@@ -2918,9 +2918,9 @@ const handleDeleteSchool = async () => {
                                     <button 
                                       onClick={() => openAdminList(school)}
                                       title="Comptes Administrateurs & Accès"
-                                      className="p-1.5 sm:p-2 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all border border-transparent hover:border-blue-100 cursor-pointer"
+                                      className="p-1 sm:p-1.5 text-slate-500 hover:text-blue-600 hover:bg-blue-50 rounded-lg sm:rounded-xl transition-all border border-transparent hover:border-blue-100 cursor-pointer"
                                     >
-                                      <Users size={15} />
+                                      <Users size={14} />
                                     </button>
 
                                     {/* Quick Edit (Large Screens) */}
@@ -3027,7 +3027,7 @@ const handleDeleteSchool = async () => {
                                   )}
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <h3 className="font-black text-slate-900 text-sm md:text-base leading-snug truncate whitespace-nowrap" title={school.name}>
+                                  <h3 className="font-black text-slate-900 text-sm md:text-base leading-snug break-words" title={school.name}>
                                     {school.name}
                                   </h3>
                                   <div className="flex items-center gap-1.5 mt-1 flex-wrap">
@@ -7842,7 +7842,7 @@ const handleDeleteSchool = async () => {
                     <div className="px-5 py-4 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0">
                       <div className="min-w-0 flex-1 pr-3">
                         <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block">Opérations Avancées</span>
-                        <h4 className="text-sm font-black text-slate-900 truncate" title={school.name}>{school.name}</h4>
+                        <h4 className="text-sm font-black text-slate-900 break-words leading-tight" title={school.name}>{school.name}</h4>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[10px] font-mono text-slate-500 bg-white px-1.5 py-0.5 rounded border border-slate-200">
                             ID: {school.id.split('-')[0]}
@@ -8033,7 +8033,7 @@ const handleDeleteSchool = async () => {
                 <div className="px-3.5 py-2.5 bg-slate-50/80 border-b border-slate-100 flex items-center justify-between shrink-0">
                   <div className="min-w-0 flex-1 pr-2">
                     <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">Opérations Avancées</p>
-                    <p className="text-xs font-bold text-slate-900 truncate" title={school.name}>{school.name}</p>
+                    <p className="text-xs font-bold text-slate-900 break-words leading-tight" title={school.name}>{school.name}</p>
                   </div>
                   <button 
                     onClick={() => setActiveSchoolMenu(null)}

@@ -135,10 +135,16 @@ const isPaymentInDateRange = (p: any, startStr: string, endStr: string) => {
   const rawDate = p.created_at || p.payment_date || p.date || p.created_date;
   if (!rawDate) return true;
   let pDate = '';
-  if (typeof rawDate === 'string') {
-    pDate = rawDate.substring(0, 10);
-  } else if (rawDate instanceof Date) {
-    pDate = rawDate.toISOString().substring(0, 10);
+  try {
+    const d = rawDate instanceof Date ? rawDate : new Date(rawDate);
+    if (!isNaN(d.getTime())) {
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      pDate = `${y}-${m}-${day}`;
+    }
+  } catch {
+    pDate = typeof rawDate === 'string' ? rawDate.substring(0, 10) : '';
   }
   if (!pDate) return true;
   if (startStr && pDate < startStr) return false;
