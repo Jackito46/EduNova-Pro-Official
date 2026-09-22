@@ -24,7 +24,14 @@ import {
   Eye,
   EyeOff,
   ShieldCheck,
-  MessageSquare
+  Receipt,
+  Users,
+  Tag,
+  Banknote,
+  Smartphone,
+  Landmark,
+  Layers,
+  Trash2
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
@@ -34,14 +41,12 @@ import { UserProfile, UserRole } from '../types';
 import { AuditLogger } from '../utils/auditLogger';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
-import { cleanPhoneForWhatsApp, buildPaymentWhatsAppText } from './PaymentWhatsAppShare';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { getLocalTodayString } from '../utils/dateUtils';
 import { SelectPill, SelectOption } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
-import { Layers } from 'lucide-react';
 
 import { useLocation } from 'react-router-dom';
 
@@ -156,26 +161,6 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [validatorEmail, setValidatorEmail] = useState('');
   const [validatorPassword, setValidatorPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-
-  const handleShareReceiptWhatsApp = (p: any) => {
-    const cleaned = cleanPhoneForWhatsApp(p.studentPhone || '');
-    const msg = buildPaymentWhatsAppText({
-      schoolName: school?.name || 'Établissement Scolaire',
-      studentName: p.studentName,
-      studentClass: p.className,
-      parentName: p.parentName,
-      amount: Number(p.amount) || 0,
-      currency: p.currency || 'HTG',
-      feeTypeLabel: p.nature,
-      transactionRef: p.ref,
-      paymentMethod: p.method
-    });
-    const waUrl = cleaned
-      ? `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank');
-    toast.success("WhatsApp ouvert avec le reçu officiel pré-rempli !");
-  };
 
   const openCancelModal = (transaction: { id: string; ref: string; source: string; originalMethod?: string; amount?: number; currency?: string; studentId?: string; dateObj?: Date; }) => {
     const isCapable = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.is_super_admin;
@@ -341,6 +326,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           parentName: studentInfo.parentName || '',
           dateObj: new Date(p.created_at),
           date: new Date(p.created_at).toLocaleDateString('fr-FR'),
+          time: new Date(p.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           status: status,
           cancelReason: p.cancel_reason,
           originalMethod: p.payment_method
@@ -398,6 +384,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           parentName: studentInfo.parentName || '',
           dateObj: new Date(s.created_at),
           date: new Date(s.created_at).toLocaleDateString('fr-FR'),
+          time: new Date(s.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           status: status,
           cancelReason: s.cancel_reason,
           originalMethod: s.payment_method
@@ -697,6 +684,48 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
     currentPage * itemsPerPage
   );
 
+  const pageSubtotals = useMemo(() => {
+    let localHTG = 0;
+    let foreignUSD = 0;
+    let totalEquivHTG = 0;
+
+    paginatedPayments.forEach(p => {
+      if (p.status === 'Validé') {
+        const val = Number(p.amount || 0);
+        const equiv = Number(p.amount_htg_equivalent || p.amount || 0);
+        if (p.currency === 'USD') {
+          foreignUSD += val;
+        } else {
+          localHTG += val;
+        }
+        totalEquivHTG += equiv;
+      }
+    });
+
+    return { localHTG, foreignUSD, totalEquivHTG };
+  }, [paginatedPayments]);
+
+  const filteredTotals = useMemo(() => {
+    let localHTG = 0;
+    let foreignUSD = 0;
+    let totalEquivHTG = 0;
+
+    filteredPayments.forEach(p => {
+      if (p.status === 'Validé') {
+        const val = Number(p.amount || 0);
+        const equiv = Number(p.amount_htg_equivalent || p.amount || 0);
+        if (p.currency === 'USD') {
+          foreignUSD += val;
+        } else {
+          localHTG += val;
+        }
+        totalEquivHTG += equiv;
+      }
+    });
+
+    return { localHTG, foreignUSD, totalEquivHTG };
+  }, [filteredPayments]);
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'Validé': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
@@ -712,6 +741,50 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       case 'MonCash': return <CreditCard size={14} />;
       default: return <DollarSign size={14} />;
     }
+  };
+
+  const getMethodBadge = (method: string) => {
+    const m = (method || '').toUpperCase();
+    if (m.includes('CASH') || m.includes('ESPECES') || m.includes('COMPTANT')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-800 text-[11px] font-extrabold rounded-lg border border-emerald-100 whitespace-nowrap">
+          <Banknote size={13} className="text-emerald-600 shrink-0" /> Cash
+        </span>
+      );
+    }
+    if (m.includes('MONCASH') || m.includes('MOBILE') || m.includes('NATCASH')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-rose-50 text-rose-800 text-[11px] font-extrabold rounded-lg border border-rose-100 whitespace-nowrap">
+          <Smartphone size={13} className="text-rose-600 shrink-0" /> MonCash / Mobile
+        </span>
+      );
+    }
+    if (m.includes('VIREMENT') || m.includes('BANQUE') || m.includes('TRANSFERT')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-800 text-[11px] font-extrabold rounded-lg border border-blue-100 whitespace-nowrap">
+          <Landmark size={13} className="text-blue-600 shrink-0" /> Virement
+        </span>
+      );
+    }
+    if (m.includes('PORTEFEUILLE') || m.includes('WALLET')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-800 text-[11px] font-extrabold rounded-lg border border-purple-100 whitespace-nowrap">
+          <Wallet size={13} className="text-purple-600 shrink-0" /> Portefeuille
+        </span>
+      );
+    }
+    if (m.includes('CHEQUE') || m.includes('CHÈQUE')) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-purple-50 text-purple-800 text-[11px] font-extrabold rounded-lg border border-purple-100 whitespace-nowrap">
+          <CreditCard size={13} className="text-purple-600 shrink-0" /> Chèque
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 text-[11px] font-extrabold rounded-lg border border-slate-200 whitespace-nowrap">
+        <DollarSign size={13} className="text-slate-500 shrink-0" /> {method || 'Standard'}
+      </span>
+    );
   };
 
   return (
@@ -1144,15 +1217,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </button>
                         </div>
                       ) : p.status === 'Validé' ? (
-                        <div className="flex items-center gap-2 w-full">
-                          <button
-                            type="button"
-                            onClick={() => handleShareReceiptWhatsApp(p)}
-                            className="flex-1 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-emerald-200 cursor-pointer"
-                            title="Partager le reçu sur WhatsApp (100% Gratuit)"
-                          >
-                            <MessageSquare size={13} /> Reçu WhatsApp
-                          </button>
+                        <div className="flex items-center justify-end gap-2 w-full">
                           {(user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) && (
                             <button 
                               onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
@@ -1169,119 +1234,273 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
               ))}
             </div>
 
-            {/* VUE TABLEAU DESKTOP & IMPRESSION */}
-            <div className="hidden lg:block overflow-x-auto print:block print:overflow-visible custom-scrollbar">
-              <table className="w-full text-left min-w-[1000px]">
+            {/* VUE TABLEAU DESKTOP & IMPRESSION (ALIGNE AVEC BILAN FINANCIER) */}
+            <div className="hidden lg:block overflow-x-auto print:block print:overflow-visible scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
+              <table className="w-full text-left border-collapse min-w-[1050px]">
                 <thead>
-                  <tr className="bg-slate-900 text-white text-xs font-bold uppercase tracking-wider border-b border-slate-800">
-                    <th className="px-6 py-4">ID & Date</th>
-                    <th className="px-6 py-4">{terminology.student} & {terminology.option}</th>
-                    <th className="px-6 py-4">Libellé</th>
-                    <th className="px-6 py-4">Méthode</th>
-                    <th className="px-6 py-4 text-right">Montant</th>
-                    <th className="px-6 py-4 text-center">Statut</th>
-                    <th className="px-6 py-4 text-center">Actions</th>
+                  <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-indigo-100 text-[11px] font-black uppercase tracking-wider border-b border-indigo-900/60 shadow-xs select-none">
+                    <th className="px-3.5 py-3.5 text-center min-w-[50px] w-12">
+                      <span className="text-indigo-200">N°</span>
+                    </th>
+                    <th className="px-4 py-3.5 min-w-[140px]">
+                      <span className="text-indigo-200 flex items-center gap-1.5">
+                        <Calendar size={13} className="text-indigo-400" /> Date & Heure
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 min-w-[130px]">
+                      <span className="text-indigo-200 flex items-center gap-1.5">
+                        <Receipt size={13} className="text-indigo-400" /> Réf. Reçu
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 min-w-[210px]">
+                      <span className="text-indigo-200 flex items-center gap-1.5">
+                        <Users size={13} className="text-indigo-400" /> {terminology.student}
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 min-w-[120px]">
+                      <span className="text-indigo-200 flex items-center gap-1.5">
+                        <Layers size={13} className="text-indigo-400" /> {terminology.option}
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 min-w-[150px]">
+                      <span className="text-indigo-200 flex items-center gap-1.5">
+                        <Tag size={13} className="text-indigo-400" /> Type de Frais
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 min-w-[140px]">
+                      <span className="text-indigo-200 flex items-center gap-1.5">
+                        <CreditCard size={13} className="text-indigo-400" /> Mode
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 text-right min-w-[140px]">
+                      <span className="text-indigo-200 flex items-center justify-end gap-1.5">
+                        <DollarSign size={13} className="text-indigo-400" /> Montant
+                      </span>
+                    </th>
+                    <th className="px-4 py-3.5 text-center min-w-[110px]">
+                      <span className="text-indigo-200">Statut</span>
+                    </th>
+                    <th className="px-4 py-3.5 text-center min-w-[100px]">
+                      <span className="text-indigo-200">Action</span>
+                    </th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {paginatedPayments.map((p) => (
-                  <tr key={`${p.source}-${p.id}`} className="group hover:bg-blue-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-medium text-gray-900">{p.ref}</p>
-                      <div className="flex items-center gap-1.5 text-xs text-gray-500 mt-1">
-                        <Calendar size={14} />
-                        {p.date}
+                <tbody className="divide-y divide-slate-100 text-xs bg-white">
+                  {paginatedPayments.map((p, index) => (
+                  <tr key={`${p.source}-${p.id}`} className="hover:bg-indigo-50/40 transition-colors group">
+                    {/* Index */}
+                    <td className="px-3.5 py-3.5 text-center text-xs font-bold text-slate-400 font-mono">
+                      {(currentPage - 1) * itemsPerPage + index + 1}
+                    </td>
+
+                    {/* Date & Heure */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-700 font-bold">
+                        <Calendar size={12} className="text-indigo-600 shrink-0" />
+                        <span>{p.date}</span>
+                        <span className="text-[10.5px] text-slate-400 font-medium font-mono">
+                          {p.time || (p.dateObj ? p.dateObj.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }) : '')}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4">
-                      <p className="font-medium text-gray-900 text-sm">{p.studentName}</p>
-                      <span 
-                        title={p.className}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-0.5 mt-1 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 text-slate-800 rounded-lg text-[11px] font-bold max-w-[160px] truncate shadow-2xs transition-colors"
-                      >
+
+                    {/* Réf. Reçu / Transaction */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <div className="space-y-0.5">
+                        <span className="font-mono text-xs font-black px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-800 tracking-tight inline-block shadow-2xs">
+                          {p.ref}
+                        </span>
+                        <span className="text-[9.5px] text-slate-400 font-bold block uppercase tracking-wider">
+                          {p.source === 'school_supplies' ? 'Fournitures' : 'Scolarité'}
+                        </span>
+                      </div>
+                    </td>
+
+                    {/* Élève & contact parent */}
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-indigo-100/80 text-indigo-800 font-black text-[11px] flex items-center justify-center shrink-0 border border-indigo-200/50">
+                          {p.studentName ? p.studentName.split(' ').map((n: string) => n[0]).filter(Boolean).slice(0, 2).join('').toUpperCase() : 'EL'}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="whitespace-nowrap font-black text-slate-900 text-xs tracking-tight">
+                            {p.studentName}
+                          </p>
+                          {(p.studentPhone || p.parentName) && (
+                            <p className="text-[10px] text-slate-500 font-medium truncate max-w-[200px]" title={`${p.parentName ? p.parentName + ' - ' : ''}${p.studentPhone || ''}`}>
+                              {p.parentName ? `${p.parentName} ` : ''}{p.studentPhone ? `(${p.studentPhone})` : ''}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+
+                    {/* Classe / Option */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 rounded-lg text-[11px] font-extrabold border border-slate-200/50">
                         <Layers size={11} className="text-indigo-600 shrink-0" />
-                        <span className="truncate">{p.className}</span>
+                        <span className="truncate max-w-[140px]" title={p.className}>{p.className || 'Non assigné'}</span>
                       </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-700">{p.nature}</span>
+
+                    {/* Nature / Type de Frais */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      <span className="inline-flex items-center px-2.5 py-1 bg-indigo-50 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg border border-indigo-100">
+                        <Tag size={10} className="mr-1 text-indigo-500 shrink-0" />
+                        {p.nature}
+                      </span>
                     </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-sm text-gray-700">
-                        <span className="p-1.5 bg-gray-100 rounded-md text-gray-500">{getMethodIcon(p.method)}</span>
-                        {p.method}
-                      </div>
+
+                    {/* Mode de Paiement */}
+                    <td className="px-4 py-3.5 whitespace-nowrap">
+                      {getMethodBadge(p.method)}
                     </td>
-                    <td className="px-6 py-4 text-right">
-                      <p className="text-base font-bold text-gray-900 font-mono">
-                        {Number(p.amount).toLocaleString()} <span className="text-xs text-gray-500 font-sans">{p.currency === 'USD' ? 'USD' : 'HTG'}</span>
-                      </p>
-                      {p.currency === 'USD' && (
-                        <p className="text-[10px] text-gray-400 font-medium">({Number(p.amount_htg_equivalent || p.amount).toLocaleString()} HTG eq.)</p>
+
+                    {/* Montant */}
+                    <td className="px-4 py-3.5 whitespace-nowrap text-right">
+                      {p.currency === 'USD' ? (
+                        <div className="space-y-0.5">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-teal-100/80 text-teal-900 text-[10px] font-black border border-teal-300/70">
+                              USD
+                            </span>
+                            <span className="text-xs font-black text-teal-900 font-mono">
+                              {Number(p.amount).toLocaleString('fr-FR')} USD
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-500 font-bold block font-mono">
+                            Eq: {Number(p.amount_htg_equivalent || p.amount).toLocaleString('fr-FR')} HTG
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span className="px-1.5 py-0.5 rounded bg-emerald-100/80 text-emerald-900 text-[10px] font-black border border-emerald-300/70">
+                            HTG
+                          </span>
+                          <span className="text-xs font-black text-emerald-900 font-mono">
+                            {Number(p.amount).toLocaleString('fr-FR')} HTG
+                          </span>
+                        </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
-                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border ${getStatusStyle(p.status)}`}>
-                        {p.status === 'Validé' && <CheckCircle2 size={14} />}
-                        {p.status === 'En attente' && <Clock size={14} />}
-                        {p.status === 'Annulé' && <XCircle size={10} />}
+
+                    {/* Statut */}
+                    <td className="px-4 py-3.5 whitespace-nowrap text-center">
+                      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${getStatusStyle(p.status)}`}>
+                        {p.status === 'Validé' && <CheckCircle2 size={13} />}
+                        {p.status === 'En attente' && <Clock size={13} />}
+                        {p.status === 'Annulé' && <XCircle size={13} />}
                         {p.status}
                       </div>
                       {p.status === 'Annulé' && p.cancelReason && (
-                        <p className="text-[10px] text-rose-500 mt-1 italic max-w-[120px] mx-auto truncate" title={p.cancelReason}>
+                        <p className="text-[10px] text-rose-500 mt-1 italic max-w-[130px] mx-auto truncate" title={p.cancelReason}>
                           {p.cancelReason}
                         </p>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+
+                    {/* Actions */}
+                    <td className="px-4 py-3.5 whitespace-nowrap text-center">
                       {p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1.5">
                           <button 
                             onClick={() => setConfirmingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
-                            className="px-3 py-1.5 bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 border border-emerald-200 hover:border-emerald-600 cursor-pointer"
-                            title="Valider"
+                            className="px-2.5 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 border border-emerald-200 cursor-pointer shadow-2xs"
+                            title="Valider la transaction"
                           >
-                            <Check size={14} /> Valider
+                            <Check size={13} /> Valider
                           </button>
                           <button 
                             onClick={() => setRejectingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
-                            className="p-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-md transition-colors border border-rose-200 hover:border-rose-600 cursor-pointer"
-                            title="Rejeter"
+                            className="p-1 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-lg transition-all border border-rose-200 cursor-pointer shadow-2xs"
+                            title="Rejeter la transaction"
                           >
-                            <X size={16} />
+                            <X size={14} />
                           </button>
                         </div>
                       ) : p.status === 'Validé' ? (
-                        <div className="flex items-center justify-center gap-1.5">
-                          <button 
-                            type="button"
-                            onClick={() => handleShareReceiptWhatsApp(p)}
-                            className="px-2.5 py-1.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 border border-emerald-200 hover:border-emerald-600 cursor-pointer"
-                            title="Partager le reçu sur WhatsApp (100% Gratuit)"
-                          >
-                            <MessageSquare size={13} /> WhatsApp
-                          </button>
-                          {(user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) && (
+                        <div className="flex items-center justify-center">
+                          {(user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.role === UserRole.SECRETARY || user.is_super_admin) ? (
                             <button 
                               onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
-                              className="px-2.5 py-1.5 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-md text-xs font-medium transition-colors flex items-center gap-1.5 border border-rose-200 hover:border-rose-600 cursor-pointer"
-                              title="Annuler la transaction (Superviseur sur place)"
+                              className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] rounded-lg border border-rose-200/60 transition-all inline-flex items-center gap-1 cursor-pointer"
+                              title="Annuler cette transaction (Superviseur sur place)"
                             >
-                              <AlertTriangle size={14} /> Annuler
+                              <AlertTriangle size={12} />
+                              <span>Annuler</span>
                             </button>
+                          ) : (
+                            <span className="text-slate-300 font-bold text-xs">-</span>
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center justify-center">
-                          <span className="p-2 text-gray-300">
-                            <MoreVertical size={18} />
-                          </span>
-                        </div>
+                        <span className="text-slate-300 font-bold text-xs">-</span>
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
+
+              {/* PIED DE TABLEAU COMPTABLE (ALIGNE AVEC BILAN FINANCIER) */}
+              <tfoot className="border-t-2 border-slate-200">
+                {/* Ligne 1 : Sous-total de la page affichée */}
+                <tr className="bg-slate-100/90 text-slate-700 font-extrabold text-xs">
+                  <td colSpan={7} className="px-4 py-3 text-right">
+                    <span className="text-[11px] uppercase tracking-wider text-slate-500 font-black">
+                      Sous-total Page {currentPage} ({paginatedPayments.length} transaction{paginatedPayments.length > 1 ? 's' : ''}) :
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right whitespace-nowrap font-mono font-black text-xs">
+                    {pageSubtotals.foreignUSD > 0 && pageSubtotals.localHTG === 0 ? (
+                      <>
+                        <span className="text-teal-800 text-xs font-black">{pageSubtotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
+                        <span className="block text-[10.5px] text-slate-500 font-bold">
+                          Eq: {pageSubtotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                        </span>
+                      </>
+                    ) : pageSubtotals.foreignUSD > 0 ? (
+                      <>
+                        <span className="text-emerald-800 text-xs font-black">{pageSubtotals.totalEquivHTG.toLocaleString('fr-FR')} HTG (Eq)</span>
+                        <span className="block text-[10.5px] text-teal-800 font-bold">
+                          {pageSubtotals.localHTG.toLocaleString('fr-FR')} HTG + {pageSubtotals.foreignUSD.toLocaleString('fr-FR')} USD
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-emerald-800 text-xs font-black">{pageSubtotals.localHTG.toLocaleString('fr-FR')} HTG</span>
+                    )}
+                  </td>
+                  <td colSpan={2} className="px-4 py-3"></td>
+                </tr>
+
+                {/* Ligne 2 : Total de la sélection filtrée */}
+                <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-white font-extrabold text-xs border-t border-indigo-900/60">
+                  <td colSpan={7} className="px-4 py-3.5 text-right">
+                    <span className="text-[11px] uppercase tracking-wider text-indigo-300 font-black">
+                      Total Filtré ({filteredPayments.length} transaction{filteredPayments.length > 1 ? 's' : ''}) :
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-right whitespace-nowrap font-mono font-black text-xs text-white">
+                    {filteredTotals.foreignUSD > 0 && filteredTotals.localHTG === 0 ? (
+                      <>
+                        <span className="text-teal-300 text-sm font-black">{filteredTotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
+                        <span className="block text-[11px] text-emerald-300 font-extrabold">
+                          Total Équivalent : {filteredTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                        </span>
+                      </>
+                    ) : filteredTotals.foreignUSD > 0 ? (
+                      <>
+                        <span className="text-emerald-300 text-sm font-black">{filteredTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG</span>
+                        <span className="block text-[11px] text-teal-200 font-bold">
+                          Dont : {filteredTotals.localHTG.toLocaleString('fr-FR')} HTG + {filteredTotals.foreignUSD.toLocaleString('fr-FR')} USD
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-emerald-300 text-sm font-black">{filteredTotals.localHTG.toLocaleString('fr-FR')} HTG</span>
+                    )}
+                  </td>
+                  <td colSpan={2} className="px-4 py-3.5"></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
         </>

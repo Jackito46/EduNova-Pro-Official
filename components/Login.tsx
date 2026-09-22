@@ -335,8 +335,24 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           try { window.localStorage.removeItem('edunova_current_campus_id'); } catch (err) {}
         }
 
+        // Expiration check for autonomous / temporary accounts
+        const isExpired = finalProfile.expires_at ? new Date(finalProfile.expires_at).getTime() <= Date.now() : false;
+        if (isExpired && finalProfile.role !== 'SUPER_ADMIN' && !finalProfile.is_super_admin) {
+          try {
+            await supabase.from('profiles').update({ is_active: false }).eq('id', finalProfile.id);
+          } catch (e) {}
+          try { await supabase.auth.signOut(); } catch (e) {}
+          const expiryDateFormatted = new Date(finalProfile.expires_at!).toLocaleDateString('fr-FR', {
+            day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
+          });
+          throw new Error(`La durée de validité de votre accès a expiré le ${expiryDateFormatted}. Votre compte est suspendu. Seul un Administrateur peut prolonger ou réactiver votre accès.`);
+        }
+
         if (finalProfile.is_active === false && finalProfile.role !== 'SUPER_ADMIN' && !finalProfile.is_super_admin) {
           try { await supabase.auth.signOut(); } catch (e) {}
+          if (finalProfile.expires_at && new Date(finalProfile.expires_at).getTime() <= Date.now()) {
+            throw new Error("La durée de validité de votre compte a expiré. Votre accès est suspendu. Veuillez contacter un Administrateur pour prolonger ou réactiver votre compte.");
+          }
           throw new Error("Accès révoqué par l'administration.");
         }
 

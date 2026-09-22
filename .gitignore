@@ -29,3 +29,6 @@ dist-ssr
 data/backups/*.json
 !data/backups/.gitkeep
 
+bun.lock
+
+

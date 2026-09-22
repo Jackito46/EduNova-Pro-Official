@@ -107,6 +107,9 @@ export interface UserProfile {
   is_active?: boolean;
   force_password_change?: boolean;
   current_session_id?: string | null;
+  expires_at?: string | null;
+  is_autonomous?: boolean;
+  access_duration_label?: string | null;
 }
 
 export interface StaffMember {

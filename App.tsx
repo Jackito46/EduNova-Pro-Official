@@ -479,6 +479,18 @@ const App: React.FC = () => {
         const profile = data as UserProfile;
         if (isRecovery) {
           profile.force_password_change = true;
+        } else if (profile.expires_at && new Date(profile.expires_at).getTime() <= Date.now() && profile.role !== 'SUPER_ADMIN' && !profile.is_super_admin) {
+          console.warn("Compte expiré. Déconnexion automatique.");
+          try {
+            await supabase.from('profiles').update({ is_active: false }).eq('id', profile.id);
+          } catch (e) {}
+          try { await supabase.auth.signOut(); } catch (e) {}
+          try { window.localStorage.removeItem('edunova_user_profile'); } catch (err) {}
+          setUser(null);
+          try { 
+            window.sessionStorage.setItem('edunova_login_error', "La durée de validité de votre compte a expiré. Votre accès a été suspendu automatiquement. Veuillez contacter un Administrateur pour le réactiver."); 
+          } catch (e) {}
+          return;
         } else if (profile.is_active === false && profile.role !== 'SUPER_ADMIN' && !profile.is_super_admin) {
           console.warn("Compte désactivé. Déconnexion forcée.");
           try { await supabase.auth.signOut(); } catch (e) {}
