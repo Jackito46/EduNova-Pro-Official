@@ -84,6 +84,7 @@ import AppFooter from './components/AppFooter';
 
 import { NotificationBanner } from './components/NotificationBanner';
 import { AiQuotaAlertBanner } from './components/AiQuotaAlertBanner';
+import { AutonomousAdminWarningBanner } from './components/AutonomousAdminWarningBanner';
 import { PayrollSensitiveNotificationListener } from './components/PayrollSensitiveNotificationListener';
 import { GlobalShortcuts } from './components/GlobalShortcuts';
 import { ModernDashboardSkeleton } from './components/SkeletonLoader';
@@ -232,6 +233,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
           {user.role === UserRole.STUDENT && <StudentHeader user={user} />}
           <ConnectivityBanner />
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
+          <AutonomousAdminWarningBanner user={user} />
           <PayrollSensitiveNotificationListener user={user} />
           <AiQuotaAlertBanner user={user} />
           <AddressBarInstallHint />

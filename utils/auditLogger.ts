@@ -27,7 +27,9 @@ export type AuditAction =
   | 'UPDATE_USER'
   | 'UPDATE_ROLE'
   | 'UNBLOCK_USER'
+  | 'REACTIVATE_AND_EXTEND'
   | 'LOGIN_FAILED'
+  | 'LINK_RH_RECORD'
   | 'PAYROLL_UPDATE'
   | 'PAYROLL_CREATE'
   | 'PAYROLL_DELETE'
@@ -81,13 +83,29 @@ export const AuditLogger = {
 
       const hasValidEntityId = payload.entity_id && isUuid(payload.entity_id);
 
+      // Traçabilité et imputation juridique : identifier si l'opérateur est un compte en mode autonome (sans dossier RH)
+      let isAutonomousAccount = false;
+      try {
+        const cachedUserStr = window.localStorage.getItem('edunova_user_profile');
+        if (cachedUserStr) {
+          const cached = JSON.parse(cachedUserStr);
+          if (cached && (cached.is_autonomous || (!cached.staff_id && cached.role !== 'SUPER_ADMIN' && !cached.is_super_admin))) {
+            isAutonomousAccount = true;
+          }
+        }
+      } catch (e) {}
+
       // Add browser context to details
       const enrichedDetails = {
         ...payload.details,
         userAgent: navigator.userAgent,
         timestamp: new Date().toISOString(),
         url: window.location.pathname,
-        ...(payload.entity_id && !hasValidEntityId ? { entity_string_id: payload.entity_id } : {})
+        ...(payload.entity_id && !hasValidEntityId ? { entity_string_id: payload.entity_id } : {}),
+        ...(isAutonomousAccount ? {
+          rh_compliance_notice: '[COMPTE AUTONOME - SANS DOSSIER RH]',
+          is_autonomous_operator: true
+        } : {})
       };
 
       const insertData: any = {

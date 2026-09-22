@@ -87,5 +87,8 @@ export const userSchema = z.object({
   full_name: z.string().min(2, "Le nom complet doit contenir au moins 2 caractères"),
   role: z.string(),
   campus_id: z.string().optional().nullable(),
-  linked_staff_id: z.string().optional().nullable()
+  linked_staff_id: z.string().optional().nullable(),
+  is_autonomous: z.boolean().optional(),
+  expires_at: z.string().optional().nullable(),
+  access_duration_label: z.string().optional().nullable()
 });

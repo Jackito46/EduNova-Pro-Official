@@ -608,13 +608,24 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const filteredPayments = useMemo(() => {
     return payments.filter(p => {
-      const s = searchTerm.toLowerCase();
+      const s = searchTerm.toLowerCase().trim();
+      const cleanCode = s.replace(/^(rcp|rec|fou)[\s-_]*/i, '').trim().toLowerCase();
+      const isReceiptTarget = cleanCode.length >= 3 && (s.startsWith('rcp') || s.startsWith('fou') || /^[0-9a-fA-F]+$/.test(cleanCode));
+
       const matchesSearch = 
         !s ||
         p.studentName?.toLowerCase().includes(s) || 
         p.ref?.toLowerCase().includes(s) || 
+        p.ref?.toLowerCase().includes(cleanCode) || 
+        p.id?.toLowerCase().includes(cleanCode) || 
+        p.id?.toLowerCase().includes(s) || 
         p.className?.toLowerCase().includes(s);
         
+      if (!matchesSearch) return false;
+
+      // Si recherche ciblée sur un numéro de reçu spécifique, bypasser les filtres de date et classe
+      if (isReceiptTarget) return true;
+
       const matchesMethod = methodFilter === 'Tous' || p.method === methodFilter;
       const matchesStatus = statusFilter === 'Tous' || p.status === statusFilter;
       

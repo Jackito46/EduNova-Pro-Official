@@ -3,7 +3,8 @@ import {
   Users, UserPlus, Shield, Mail, Trash2, 
   ShieldCheck, Crown, UserCog, Loader2, RefreshCcw, AlertCircle, Power, PowerOff, X, Lock,
   Unlock, Eye, EyeOff, User, CheckCircle2, ShieldAlert, Search, Filter, Building2, MapPin,
-  Sparkles, KeyRound, Check, Info, Wallet, BookOpen, ClipboardList, FileText, Send, AlertTriangle
+  Sparkles, KeyRound, Check, Info, Wallet, BookOpen, ClipboardList, FileText, Send, AlertTriangle,
+  Clock, Zap, Calendar, History, UserCheck, Timer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { supabase, supabaseUrl, supabaseAnonKey, isValidUuid } from '../supabase';
@@ -140,6 +141,87 @@ const getRolePermissionsSummary = (role: string, terminology: any) => {
   }
 };
 
+// Expiration calculation helper for autonomous and temporary accounts
+export const calculateExpiryDate = (
+  preset: number | 'END_YEAR' | 'CUSTOM',
+  customDate?: string
+): { iso: string; label: string } => {
+  if (preset === 'CUSTOM' && customDate) {
+    const d = new Date(customDate);
+    d.setHours(23, 59, 59, 999);
+    return {
+      iso: d.toISOString(),
+      label: `Date butoir (${d.toLocaleDateString('fr-FR')})`
+    };
+  }
+  if (preset === 'END_YEAR') {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const targetYear = now.getMonth() >= 6 ? currentYear + 1 : currentYear;
+    const endOfYear = new Date(targetYear, 5, 30, 23, 59, 59, 999); // 30 Juin
+    return {
+      iso: endOfYear.toISOString(),
+      label: `Fin d'Année Scolaire (30 Juin ${targetYear})`
+    };
+  }
+  const d = new Date();
+  const numDays = typeof preset === 'number' ? preset : 30;
+  d.setDate(d.getDate() + numDays);
+  d.setHours(23, 59, 59, 999);
+  let label = `${numDays} jours`;
+  if (numDays === 7) label = '7 jours (Mission d\'urgence)';
+  else if (numDays === 15) label = '15 jours (Remplacement court)';
+  else if (numDays === 30) label = '1 mois (30 jours)';
+  else if (numDays === 90) label = '3 mois (Trimestre)';
+  return {
+    iso: d.toISOString(),
+    label: `${label} (Jusqu'au ${d.toLocaleDateString('fr-FR')})`
+  };
+};
+
+export const getUserExpiryInfo = (u: UserProfile) => {
+  if (!u.expires_at) {
+    return {
+      isExpired: false,
+      isExpiringSoon: false,
+      text: 'Permanent',
+      daysLeft: null,
+      formattedExpiry: ''
+    };
+  }
+  const now = Date.now();
+  const expiry = new Date(u.expires_at).getTime();
+  const diffMs = expiry - now;
+  const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
+  const formattedExpiry = new Date(u.expires_at).toLocaleDateString('fr-FR');
+
+  if (diffMs <= 0) {
+    return {
+      isExpired: true,
+      isExpiringSoon: false,
+      text: `Expiré le ${formattedExpiry}`,
+      daysLeft,
+      formattedExpiry
+    };
+  }
+  if (daysLeft <= 7) {
+    return {
+      isExpired: false,
+      isExpiringSoon: true,
+      text: `Expire dans ${daysLeft}j (${formattedExpiry})`,
+      daysLeft,
+      formattedExpiry
+    };
+  }
+  return {
+    isExpired: false,
+    isExpiringSoon: false,
+    text: `Échéance : ${formattedExpiry}`,
+    daysLeft,
+    formattedExpiry
+  };
+};
+
 const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUser }) => {
   const { terminology, campuses, currentCampusId } = useSchool();
   const [users, setUsers] = useState<UserProfile[]>([]);
@@ -227,8 +309,48 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     confirmPassword: '',
     staff_id: '',
     campus_id: '',
-    forcePasswordChange: true
+    forcePasswordChange: true,
+    accessDurationType: 'PERMANENT' as 'PERMANENT' | 'TEMPORARY',
+    durationPreset: 30 as number | 'END_YEAR' | 'CUSTOM',
+    customExpiryDate: ''
   });
+
+  const [reopenModal, setReopenModal] = useState<{
+    isOpen: boolean;
+    user: UserProfile | null;
+    actionType: 'PROLONG' | 'PERMANENT' | 'LINK_RH';
+    durationPreset: number | 'END_YEAR' | 'CUSTOM';
+    customExpiryDate: string;
+    linkStaffId: string;
+  }>({
+    isOpen: false,
+    user: null,
+    actionType: 'PROLONG',
+    durationPreset: 30,
+    customExpiryDate: '',
+    linkStaffId: ''
+  });
+
+  const openReopenModal = (user: UserProfile) => {
+    setReopenModal({
+      isOpen: true,
+      user,
+      actionType: user.expires_at ? 'PROLONG' : 'PROLONG',
+      durationPreset: 30,
+      customExpiryDate: '',
+      linkStaffId: ''
+    });
+  };
+
+  const canReactivate = (targetUser: UserProfile) => {
+    if (!canManageUser(targetUser)) return false;
+    return (
+      currentUser.is_super_admin ||
+      currentUser.role === UserRole.SUPER_ADMIN ||
+      currentUser.role === UserRole.SCHOOL_ADMIN ||
+      currentUser.role === UserRole.DIRECTOR
+    );
+  };
 
   const fetchUsersAndStaff = useCallback(async () => {
     setLoading(true);
@@ -272,6 +394,27 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
             u.role === 'SCHOOL_ADMIN' || 
             u.role === 'DIRECTOR'
           );
+        }
+
+        // Proactively suspend any accounts past their expiration date (MultiTenant safe)
+        const expiredUsersToSuspend = usersData.filter(u => 
+          u.expires_at && 
+          new Date(u.expires_at).getTime() <= Date.now() && 
+          u.is_active !== false &&
+          u.role !== 'SUPER_ADMIN' &&
+          !u.is_super_admin
+        );
+        if (expiredUsersToSuspend.length > 0) {
+          const expiredIds = expiredUsersToSuspend.map(u => u.id);
+          supabase
+            .from('profiles')
+            .update({ is_active: false })
+            .in('id', expiredIds)
+            .eq('school_id', currentUser.school_id)
+            .then(() => {
+              console.log(`Auto-suspended ${expiredIds.length} expired accounts`);
+            });
+          usersData = usersData.map(u => expiredIds.includes(u.id) ? { ...u, is_active: false } : u);
         }
         
         const sortedData = usersData.sort((a, b) => 
@@ -321,13 +464,26 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
     const normalizedEmail = normalizeIdentifier(formData.email);
 
+    const isAutonomous = !formData.staff_id;
+    let calculatedExpiresAt: string | null = null;
+    let calculatedDurationLabel: string | null = null;
+
+    if (formData.accessDurationType === 'TEMPORARY') {
+      const exp = calculateExpiryDate(formData.durationPreset, formData.customExpiryDate);
+      calculatedExpiresAt = exp.iso;
+      calculatedDurationLabel = exp.label;
+    }
+
     const validationResult = userSchema.safeParse({
       email: formData.email,
       password: formData.password,
       full_name: formData.full_name,
       role: formData.role,
       campus_id: formData.campus_id,
-      linked_staff_id: formData.staff_id
+      linked_staff_id: formData.staff_id,
+      is_autonomous: isAutonomous,
+      expires_at: calculatedExpiresAt,
+      access_duration_label: calculatedDurationLabel
     });
     
     if (!validationResult.success) {
@@ -374,7 +530,10 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
           .from('profiles')
           .update({ 
             force_password_change: formData.forcePasswordChange,
-            campus_id: finalCampusId
+            campus_id: finalCampusId,
+            is_autonomous: isAutonomous,
+            expires_at: calculatedExpiresAt,
+            access_duration_label: calculatedDurationLabel
           })
           .eq('id', newUserId)
           .eq('school_id', currentUser.school_id);
@@ -393,12 +552,33 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
           action: 'CREATE',
           entity_type: 'user',
           entity_id: newUserId,
-          details: { email: normalizedEmail, role: formData.role, full_name: formData.full_name, staff_id: formData.staff_id, campus_id: finalCampusId }
+          details: { 
+            email: normalizedEmail, 
+            role: formData.role, 
+            full_name: formData.full_name, 
+            staff_id: formData.staff_id, 
+            campus_id: finalCampusId,
+            is_autonomous: isAutonomous,
+            expires_at: calculatedExpiresAt,
+            access_duration_label: calculatedDurationLabel
+          }
         });
         
         fetchUsersAndStaff();
         setShowAddModal(false);
-        setFormData({ email: '', full_name: '', role: UserRole.TEACHER, password: '', confirmPassword: '', staff_id: '', campus_id: '', forcePasswordChange: true });
+        setFormData({ 
+          email: '', 
+          full_name: '', 
+          role: UserRole.TEACHER, 
+          password: '', 
+          confirmPassword: '', 
+          staff_id: '', 
+          campus_id: '', 
+          forcePasswordChange: true,
+          accessDurationType: 'PERMANENT',
+          durationPreset: 30,
+          customExpiryDate: ''
+        });
         showAlert("Succès", `Le compte de ${formData.full_name} a été créé avec succès.`);
       } else {
         setErrorMsg("Erreur lors de la création de l'utilisateur.");
@@ -571,6 +751,140 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     }
   };
 
+  const handleReactivateAndExtend = async () => {
+    if (!reopenModal.user) return;
+    if (!navigator.onLine) {
+      showAlert("Erreur", "Action impossible hors-ligne.");
+      return;
+    }
+
+    const targetUser = reopenModal.user;
+    if (!canReactivate(targetUser)) {
+      showAlert("Erreur", "Vous n'avez pas les droits nécessaires pour réactiver ou prolonger ce compte.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      let newExpiresAt: string | null = null;
+      let newDurationLabel: string | null = null;
+      let newIsAutonomous = targetUser.is_autonomous ?? !((targetUser as any).linked_staff_id || (targetUser as any).staff_id);
+
+      if (reopenModal.actionType === 'PROLONG') {
+        const exp = calculateExpiryDate(reopenModal.durationPreset, reopenModal.customExpiryDate);
+        newExpiresAt = exp.iso;
+        newDurationLabel = exp.label;
+      } else if (reopenModal.actionType === 'PERMANENT') {
+        newExpiresAt = null;
+        newDurationLabel = 'Permanent (Indéterminé)';
+      } else if (reopenModal.actionType === 'LINK_RH') {
+        if (!reopenModal.linkStaffId) {
+          showAlert("Erreur", "Veuillez sélectionner un collaborateur RH à associer.");
+          setIsSubmitting(false);
+          return;
+        }
+        newIsAutonomous = false;
+        newExpiresAt = null;
+        newDurationLabel = 'Permanent (Titulaire RH)';
+        
+        // Link staff table with user email
+        const { error: staffLinkErr } = await supabase
+          .from('staff')
+          .update({ email: targetUser.email })
+          .eq('id', reopenModal.linkStaffId)
+          .eq('school_id', currentUser.school_id);
+        if (staffLinkErr) console.warn("Erreur liaison staff:", staffLinkErr);
+      }
+
+      // Check admin limit if reactivating a SCHOOL_ADMIN
+      if (targetUser.role === UserRole.SCHOOL_ADMIN) {
+        const activeAdminCount = users.filter(u => u.role === UserRole.SCHOOL_ADMIN && u.is_active !== false && u.id !== targetUser.id).length;
+        if (activeAdminCount >= 2) {
+          showAlert("Opération refusée", "La limite de 2 administrateurs actifs par école est déjà atteinte.");
+          setIsSubmitting(false);
+          return;
+        }
+      }
+
+      // 1. Update profiles table with MultiTenant isolation
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({
+          is_active: true,
+          expires_at: newExpiresAt,
+          access_duration_label: newDurationLabel,
+          is_autonomous: newIsAutonomous,
+          failed_login_attempts: 0,
+          failed_attempts: 0
+        })
+        .eq('id', targetUser.id)
+        .eq('school_id', currentUser.school_id);
+
+      if (updateError) throw updateError;
+
+      // 2. Also ensure admin_toggle_user_status RPC synchronization if available
+      try {
+        await supabase.rpc('admin_toggle_user_status', {
+          p_user_id: targetUser.id,
+          p_new_status: true
+        });
+      } catch (rpcErr) {
+        console.warn("RPC admin_toggle_user_status optional sync:", rpcErr);
+      }
+
+      // 3. Audit log
+      await AuditLogger.log({
+        school_id: currentUser.school_id,
+        user_id: currentUser.id,
+        action: 'REACTIVATE_AND_EXTEND',
+        entity_type: 'user',
+        entity_id: targetUser.id,
+        details: {
+          user_name: targetUser.full_name || targetUser.email,
+          previous_expires_at: targetUser.expires_at,
+          new_expires_at: newExpiresAt,
+          new_duration_label: newDurationLabel,
+          action_type: reopenModal.actionType,
+          linked_staff_id: reopenModal.linkStaffId || null,
+          restored_by: currentUser.full_name || currentUser.email,
+          campus_id: targetUser.campus_id || null
+        }
+      });
+
+      showAlert(
+        "Accès Rétabli", 
+        `Le compte de ${targetUser.full_name || targetUser.email} a été réactivé avec succès ! ${newDurationLabel ? `Durée : ${newDurationLabel}` : ''}`,
+        'success'
+      );
+
+      setReopenModal({
+        isOpen: false,
+        user: null,
+        actionType: 'PROLONG',
+        durationPreset: 30,
+        customExpiryDate: '',
+        linkStaffId: ''
+      });
+
+      if (selectedUserModal?.id === targetUser.id) {
+        setSelectedUserModal(prev => prev ? { 
+          ...prev, 
+          is_active: true, 
+          expires_at: newExpiresAt, 
+          access_duration_label: newDurationLabel,
+          is_autonomous: newIsAutonomous
+        } : null);
+      }
+
+      fetchUsersAndStaff();
+    } catch (err: any) {
+      console.error("Erreur réactivation / prolongation:", err);
+      showAlert("Erreur", "Impossible de réactiver le compte : " + (err.message || "Erreur inconnue"), 'danger');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleUpdateUserRoleAndCampus = async () => {
     if (!editRoleModal.user) return;
     const targetUser = editRoleModal.user;
@@ -661,6 +975,13 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     const targetUser = users.find(u => u.id === userId);
     if (targetUser && !canManageUser(targetUser)) {
       showAlert("Erreur", "Vous n'avez pas les droits nécessaires.");
+      return;
+    }
+
+    // If trying to reactivate or if the account has expired, open the dedicated Admin Reactivation & Duration modal
+    const isExpired = targetUser?.expires_at ? new Date(targetUser.expires_at).getTime() <= Date.now() : false;
+    if ((!currentStatus || isExpired) && targetUser) {
+      openReopenModal(targetUser);
       return;
     }
 
@@ -860,8 +1181,18 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
       }
 
       if (statusFilter !== 'ALL') {
-        if (statusFilter === 'ACTIVE' && u.is_active === false) return false;
-        if (statusFilter === 'INACTIVE' && u.is_active !== false) return false;
+        const isUserExpired = u.expires_at ? new Date(u.expires_at).getTime() <= Date.now() : false;
+        if (statusFilter === 'ACTIVE') {
+          if (u.is_active === false || isUserExpired) return false;
+        } else if (statusFilter === 'INACTIVE') {
+          if (u.is_active !== false) return false;
+        } else if (statusFilter === 'EXPIRED') {
+          if (!isUserExpired) return false;
+        } else if (statusFilter === 'AUTONOMOUS') {
+          if (!u.is_autonomous) return false;
+        } else if (statusFilter === 'TEMPORARY') {
+          if (!u.expires_at) return false;
+        }
       }
 
       return true;
@@ -881,12 +1212,18 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     });
 
     const total = accessibleUsers.length;
-    const active = accessibleUsers.filter(u => u.is_active !== false).length;
+    const active = accessibleUsers.filter(u => {
+      const isExpired = u.expires_at ? new Date(u.expires_at).getTime() <= Date.now() : false;
+      return u.is_active !== false && !isExpired;
+    }).length;
     const inactive = total - active;
     const siegeCount = accessibleUsers.filter(u => !u.campus_id).length;
     const annexesCount = accessibleUsers.filter(u => Boolean(u.campus_id)).length;
     const adminCount = users.filter(u => u.role === UserRole.SCHOOL_ADMIN && u.is_active !== false).length;
-    return { total, active, inactive, siegeCount, annexesCount, adminCount };
+    const expiredCount = accessibleUsers.filter(u => u.expires_at && new Date(u.expires_at).getTime() <= Date.now()).length;
+    const autonomousCount = accessibleUsers.filter(u => u.is_autonomous).length;
+    const temporaryCount = accessibleUsers.filter(u => Boolean(u.expires_at)).length;
+    return { total, active, inactive, siegeCount, annexesCount, adminCount, expiredCount, autonomousCount, temporaryCount };
   }, [users, currentUser]);
 
   // Password Strength Calculation
@@ -936,6 +1273,9 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     return [
       { value: 'ALL', label: 'Tous les Statuts' },
       { value: 'ACTIVE', label: 'Comptes Actifs', badge: 'En service', icon: CheckCircle2 },
+      { value: 'AUTONOMOUS', label: 'Mode Autonome direct', badge: 'Autonome', icon: Zap },
+      { value: 'TEMPORARY', label: 'Comptes Temporaires', badge: 'À durée', icon: Clock },
+      { value: 'EXPIRED', label: 'Accès Expirés', badge: 'Échu', icon: AlertTriangle },
       { value: 'INACTIVE', label: 'Inactifs / Suspendus', badge: 'Verrouillé', icon: PowerOff }
     ];
   }, []);
@@ -1192,6 +1532,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                   const isSuperAdmin = currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN;
                   const isInactive = u.is_active === false;
                   const roleStyle = getRoleBadgeStyle(u.role);
+                  const expiryInfo = getUserExpiryInfo(u);
 
                   return (
                     <tr key={u.id} className="group hover:bg-slate-50/70 transition-colors">
@@ -1201,13 +1542,33 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                             {u.full_name?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-blue-600 transition-colors">
-                              {formatFullName(u.full_name || 'Sans Nom')}
-                            </p>
-                            <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1 mt-0.5">
-                              <Mail size={11} className="text-slate-400 shrink-0" />
-                              {displayIdentifier(u.email)}
-                            </p>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <p className="font-bold text-slate-900 text-xs sm:text-sm truncate group-hover:text-blue-600 transition-colors">
+                                {formatFullName(u.full_name || 'Sans Nom')}
+                              </p>
+                              {u.is_autonomous && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-700 border border-amber-200 rounded text-[9px] font-bold shrink-0">
+                                  <Zap size={9} /> Mode Autonome
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                              <p className="text-[11px] text-slate-500 font-medium truncate flex items-center gap-1">
+                                <Mail size={11} className="text-slate-400 shrink-0" />
+                                {displayIdentifier(u.email)}
+                              </p>
+                              {u.expires_at && (
+                                <span className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-bold border ${
+                                  expiryInfo.isExpired 
+                                    ? 'bg-rose-50 text-rose-700 border-rose-200' 
+                                    : expiryInfo.isExpiringSoon 
+                                    ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                                    : 'bg-blue-50 text-blue-700 border-blue-200'
+                                }`}>
+                                  <Clock size={9} /> {expiryInfo.text}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1236,14 +1597,19 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                       )}
 
                       <td className="px-3 sm:px-4 py-2.5 sm:py-3 cursor-pointer" onClick={() => setSelectedUserModal(u)}>
-                        {!isInactive ? (
+                        {expiryInfo.isExpired ? (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 uppercase tracking-wider border border-rose-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                            Expiré
+                          </span>
+                        ) : !isInactive ? (
                           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase tracking-wider border border-emerald-200">
                             <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 animate-pulse" />
                             Actif
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-rose-100 text-rose-800 uppercase tracking-wider border border-rose-200">
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-600" />
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-slate-100 text-slate-700 uppercase tracking-wider border border-slate-200">
+                            <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
                             Inactif
                           </span>
                         )}
@@ -1259,7 +1625,18 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                             <Eye size={14} />
                           </button>
 
-                          {isSuperAdmin && isInactive && (
+                          {canReactivate(u) && (isInactive || expiryInfo.isExpired) && (
+                            <button
+                              onClick={() => openReopenModal(u)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all flex items-center gap-1 active:scale-95 cursor-pointer shrink-0"
+                              title="Réactiver / Prolonger l'accès (Admin)"
+                            >
+                              <Clock size={13} />
+                              <span className="hidden sm:inline">Réactiver / Prolonger</span>
+                            </button>
+                          )}
+
+                          {isSuperAdmin && isInactive && !canReactivate(u) && (
                             <button
                               onClick={() => handleRestoreAccess(u)}
                               className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-lg shadow-2xs transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
@@ -1391,53 +1768,101 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                     </div>
                   )}
 
-                  {/* 1. Mode de Création & Liaison RH (SelectPill) */}
-                  <div className="space-y-1">
+                  {/* 1. Mode de Création : Autonome direct vs Fiche RH */}
+                  <div className="space-y-2 p-2.5 sm:p-3 bg-slate-50 border border-slate-200 rounded-xl">
                     <div className="flex items-center justify-between">
                       <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1">
                         <User size={12} className="text-blue-600" />
-                        Liaison Registre RH
-                        <InfoTooltip content="Sélectionnez un membre de l'équipe pour lier automatiquement ses informations, ou restez en création autonome." />
+                        Mode de Création
+                        <InfoTooltip content="Le Mode Autonome permet de créer rapidement un accès sans fiche RH préalable. Vous pouvez définir une durée de validité pour éviter les comptes fantômes." />
                       </label>
-                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider ${
-                        formData.staff_id ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                      <span className={`text-[9px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        formData.staff_id ? 'bg-indigo-50 text-indigo-700 border border-indigo-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
                       }`}>
-                        {formData.staff_id ? 'Lié au registre RH' : 'Mode Autonome'}
+                        {formData.staff_id ? '📋 Titulaire RH' : '⚡ Mode Autonome'}
                       </span>
                     </div>
 
-                    <SelectPill
-                      options={staffSelectOptions}
-                      value={formData.staff_id}
-                      onChange={(selectedVal) => {
-                        const staff = staffList.find(s => s.id === selectedVal);
-                        let matchedRole = formData.role;
-                        if (staff && staff.role) {
-                          const r = staff.role.toLowerCase();
-                          if (r.includes('directeur') || r.includes('direction') || r.includes('proviseur') || r.includes('dg')) matchedRole = UserRole.DIRECTOR;
-                          else if (r.includes('comptable') || r.includes('économe') || r.includes('économat') || r.includes('caisse') || r.includes('finance')) matchedRole = UserRole.ACCOUNTANT;
-                          else if (r.includes('secrétaire') || r.includes('registraire') || r.includes('admission')) matchedRole = UserRole.SECRETARY;
-                          else if (r.includes('professeur') || r.includes('enseignant') || r.includes('formateur') || r.includes('maître')) matchedRole = UserRole.TEACHER;
-                          else if (r.includes('surveillant') || r.includes('doyen') || r.includes('préfet') || r.includes('discipline')) matchedRole = UserRole.SUPERVISOR;
-                          else if (r.includes('biblio')) matchedRole = UserRole.LIBRARIAN;
-                          else if (r.includes('admin')) matchedRole = UserRole.SCHOOL_ADMIN;
-                        }
-                        setFormData({
-                          ...formData, 
-                          staff_id: selectedVal,
-                          full_name: staff ? formatStudentName(staff.last_name, staff.first_name).fullName : (selectedVal ? '' : formData.full_name),
-                          email: staff?.email || (selectedVal ? '' : formData.email),
-                          role: matchedRole
-                        });
-                      }}
-                      placeholder="Choisir un collaborateur RH ou mode direct..."
-                      variant="field"
-                      size="sm"
-                      colorScheme="indigo"
-                      searchable={true}
-                      icon={User}
-                      className="w-full"
-                    />
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            staff_id: '',
+                            full_name: prev.staff_id ? '' : prev.full_name
+                          }));
+                        }}
+                        className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                          !formData.staff_id
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Zap size={13} />
+                        <span>Mode Autonome direct</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const firstStaff = getAvailableStaff()[0];
+                          if (firstStaff) {
+                            setFormData(prev => ({
+                              ...prev,
+                              staff_id: firstStaff.id,
+                              full_name: formatStudentName(firstStaff.last_name, firstStaff.first_name).fullName,
+                              email: firstStaff.email || prev.email
+                            }));
+                          }
+                        }}
+                        className={`py-2 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer border ${
+                          formData.staff_id
+                            ? 'bg-blue-600 text-white border-blue-700 shadow-xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <User size={13} />
+                        <span>Lier à une fiche RH</span>
+                      </button>
+                    </div>
+
+                    {formData.staff_id && (
+                      <div className="pt-1">
+                        <SelectPill
+                          options={staffSelectOptions.filter(o => o.value !== '')}
+                          value={formData.staff_id}
+                          onChange={(selectedVal) => {
+                            const staff = staffList.find(s => s.id === selectedVal);
+                            let matchedRole = formData.role;
+                            if (staff && staff.role) {
+                              const r = staff.role.toLowerCase();
+                              if (r.includes('directeur') || r.includes('direction') || r.includes('proviseur') || r.includes('dg')) matchedRole = UserRole.DIRECTOR;
+                              else if (r.includes('comptable') || r.includes('économe') || r.includes('économat') || r.includes('caisse') || r.includes('finance')) matchedRole = UserRole.ACCOUNTANT;
+                              else if (r.includes('secrétaire') || r.includes('registraire') || r.includes('admission')) matchedRole = UserRole.SECRETARY;
+                              else if (r.includes('professeur') || r.includes('enseignant') || r.includes('formateur') || r.includes('maître')) matchedRole = UserRole.TEACHER;
+                              else if (r.includes('surveillant') || r.includes('doyen') || r.includes('préfet') || r.includes('discipline')) matchedRole = UserRole.SUPERVISOR;
+                              else if (r.includes('biblio')) matchedRole = UserRole.LIBRARIAN;
+                              else if (r.includes('admin')) matchedRole = UserRole.SCHOOL_ADMIN;
+                            }
+                            setFormData({
+                              ...formData, 
+                              staff_id: selectedVal,
+                              full_name: staff ? formatStudentName(staff.last_name, staff.first_name).fullName : '',
+                              email: staff?.email || formData.email,
+                              role: matchedRole
+                            });
+                          }}
+                          placeholder="Sélectionner le collaborateur RH..."
+                          variant="field"
+                          size="sm"
+                          colorScheme="indigo"
+                          searchable={true}
+                          icon={User}
+                          className="w-full"
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* 2. Nom complet & Rôle */}
@@ -1482,7 +1907,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                     <div className="space-y-1 p-2.5 bg-purple-50/50 border border-purple-100 rounded-xl">
                       <label htmlFor="campus_id" className="text-[11px] font-bold text-purple-900 uppercase tracking-wider flex items-center gap-1">
                         <Building2 size={12} className="text-purple-600" />
-                        Périmètre Annexe
+                        Périmètre Annexe / Multi-Site
                       </label>
                       <SelectPill
                         options={campusSelectOptions}
@@ -1496,6 +1921,101 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                       />
                     </div>
                   )}
+
+                  {/* 4. Durée de Validité & Cycle de Vie du Compte */}
+                  <div className="space-y-2 p-2.5 sm:p-3 bg-slate-50/90 border border-slate-200 rounded-xl">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wider flex items-center gap-1">
+                        <Clock size={12} className="text-amber-600" />
+                        Durée de Validité de l'Accès
+                        <InfoTooltip content="À l'échéance, le compte est automatiquement verrouillé pour éviter les comptes fantômes. Seul un Administrateur pourra le réactiver ou le prolonger." />
+                      </label>
+                      <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${
+                        formData.accessDurationType === 'TEMPORARY'
+                          ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {formData.accessDurationType === 'TEMPORARY' ? '⏳ Durée Déterminée' : '♾️ Permanent'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, accessDurationType: 'PERMANENT' })}
+                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border ${
+                          formData.accessDurationType === 'PERMANENT'
+                            ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <span>♾️ Permanent / Indéterminé</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, accessDurationType: 'TEMPORARY' })}
+                        className={`py-1.5 px-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border ${
+                          formData.accessDurationType === 'TEMPORARY'
+                            ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Timer size={13} />
+                        <span>⏳ Durée Déterminée</span>
+                      </button>
+                    </div>
+
+                    {formData.accessDurationType === 'TEMPORARY' && (
+                      <div className="pt-2 space-y-2 border-t border-slate-200/80 mt-1">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                          {[
+                            { value: 7, label: '⚡ 7 jours (Urgence)' },
+                            { value: 15, label: '📅 15 jours (Court)' },
+                            { value: 30, label: '🗓️ 1 mois (30j)' },
+                            { value: 90, label: '🏛️ 3 mois (Trimestre)' },
+                            { value: 'END_YEAR', label: '🎓 Fin d\'année (30 Juin)' },
+                            { value: 'CUSTOM', label: '📆 Date au choix' }
+                          ].map(opt => (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onClick={() => setFormData({ ...formData, durationPreset: opt.value as any })}
+                              className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
+                                formData.durationPreset === opt.value
+                                  ? 'bg-amber-100 text-amber-900 border-amber-400 font-bold shadow-2xs'
+                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                              }`}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+
+                        {formData.durationPreset === 'CUSTOM' && (
+                          <div className="pt-1">
+                            <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
+                              Choisir la date d'expiration exacte :
+                            </label>
+                            <input
+                              type="date"
+                              min={new Date().toISOString().split('T')[0]}
+                              value={formData.customExpiryDate}
+                              onChange={(e) => setFormData({ ...formData, customExpiryDate: e.target.value })}
+                              className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-200"
+                            />
+                          </div>
+                        )}
+
+                        <div className="p-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-[11px] font-medium flex items-start gap-1.5">
+                          <Clock size={13} className="mt-0.5 text-amber-700 shrink-0" />
+                          <span>
+                            Ce compte sera actif jusqu'au : <strong>{calculateExpiryDate(formData.durationPreset, formData.customExpiryDate).label}</strong>. À cette date, la connexion sera verrouillée automatiquement.
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
 
                   {/* 4. Identifiant ou Email */}
                   <div className="space-y-1">
@@ -1864,10 +2384,50 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                         </div>
 
                         <div>
-                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Lien Personnel RH</span>
+                          <span className="text-slate-400 font-bold block text-[10px] uppercase">Mode de Création</span>
                           <span className="font-bold text-slate-700 mt-0.5 block">
-                            {(selectedUserModal as any).linked_staff_id || (selectedUserModal as any).staff_id ? 'Lié au registre RH' : 'Compte autonome'}
+                            {selectedUserModal.is_autonomous ? (
+                              <span className="inline-flex items-center gap-1 text-amber-700 font-bold">
+                                <Zap size={12} className="text-amber-600" /> Mode Autonome direct
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-indigo-700 font-bold">
+                                <User size={12} className="text-indigo-600" /> Lié au registre RH
+                              </span>
+                            )}
                           </span>
+                        </div>
+
+                        <div className="col-span-2 p-3 bg-white border border-slate-200 rounded-xl">
+                          <div className="flex items-center justify-between">
+                            <span className="text-slate-500 font-bold text-[10px] uppercase tracking-wider flex items-center gap-1">
+                              <Clock size={12} className="text-blue-600" />
+                              Validité & Cycle de Vie
+                            </span>
+                            {selectedUserModal.expires_at ? (
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                                getUserExpiryInfo(selectedUserModal).isExpired
+                                  ? 'bg-rose-100 text-rose-800'
+                                  : getUserExpiryInfo(selectedUserModal).isExpiringSoon
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-blue-100 text-blue-800'
+                              }`}>
+                                {getUserExpiryInfo(selectedUserModal).text}
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded">
+                                ♾️ Accès Permanent
+                              </span>
+                            )}
+                          </div>
+                          {selectedUserModal.expires_at && (
+                            <p className="text-xs font-semibold text-slate-700 mt-1">
+                              Échéance : <strong>{new Date(selectedUserModal.expires_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</strong>
+                              {selectedUserModal.access_duration_label && (
+                                <span className="text-slate-500 ml-1">({selectedUserModal.access_duration_label})</span>
+                              )}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -1968,6 +2528,29 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                       <KeyRound size={14} />
                       <span>Réinitialiser</span>
                     </button>
+
+                    {canReactivate(selectedUserModal) && (
+                      <button
+                        onClick={() => {
+                          const target = selectedUserModal;
+                          setSelectedUserModal(null);
+                          openReopenModal(target);
+                        }}
+                        className={`px-3.5 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs active:scale-95 ${
+                          selectedUserModal.is_active === false || getUserExpiryInfo(selectedUserModal).isExpired
+                            ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                            : 'bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200'
+                        }`}
+                        title="Réactiver le compte ou ajuster sa durée de validité"
+                      >
+                        <Clock size={14} />
+                        <span>
+                          {selectedUserModal.is_active === false || getUserExpiryInfo(selectedUserModal).isExpired
+                            ? 'Réactiver / Prolonger'
+                            : 'Gérer la Durée'}
+                        </span>
+                      </button>
+                    )}
 
                     <button
                       onClick={() => {
@@ -2084,6 +2667,262 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                 >
                   {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <ShieldCheck size={14} />}
                   <span>Enregistrer l'habilitation</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Reactivate & Extend Access Modal (Admin Only) */}
+      <AnimatePresence>
+        {reopenModal.isOpen && reopenModal.user && (
+          <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96, y: 12 }}
+              transition={{ duration: 0.2 }}
+              className="bg-white w-full max-w-lg rounded-2xl shadow-xl flex flex-col max-h-[92vh] overflow-hidden border border-slate-200"
+            >
+              {/* Header */}
+              <div className="p-3.5 sm:p-4 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-600 border border-emerald-500 text-white rounded-xl flex items-center justify-center shrink-0 shadow-xs">
+                    <Clock size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-white tracking-tight">Réactiver / Prolonger l'Accès</h3>
+                    <p className="text-[11px] text-slate-300 font-medium truncate max-w-[260px] sm:max-w-xs">
+                      {formatFullName(reopenModal.user.full_name || reopenModal.user.email)} • {getRoleDisplayName(reopenModal.user.role)}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setReopenModal({ ...reopenModal, isOpen: false, user: null })} 
+                  className="w-8 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-4 sm:p-5 space-y-3.5 overflow-y-auto custom-scrollbar">
+                {/* Status card */}
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500 font-bold uppercase text-[10px]">Statut Actuel :</span>
+                    <span className={`px-2 py-0.5 rounded font-bold text-[10px] uppercase ${
+                      reopenModal.user.is_active === false
+                        ? 'bg-rose-100 text-rose-800'
+                        : getUserExpiryInfo(reopenModal.user).isExpired
+                        ? 'bg-rose-100 text-rose-800'
+                        : 'bg-emerald-100 text-emerald-800'
+                    }`}>
+                      {reopenModal.user.is_active === false ? 'Compte Suspendu' : getUserExpiryInfo(reopenModal.user).isExpired ? 'Accès Expiré' : 'Compte Actif'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 text-[11px]">
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Mode de création :</span>
+                      <span className="font-semibold text-slate-700">
+                        {reopenModal.user.is_autonomous ? '⚡ Mode Autonome' : '📋 Lié au registre RH'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px] uppercase font-bold">Périmètre / Annexe :</span>
+                      <span className="font-semibold text-slate-700">
+                        {reopenModal.user.campus_id ? (campuses?.find(c => c.id === reopenModal.user?.campus_id)?.name || 'Annexe') : 'Siège Social'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {reopenModal.user.expires_at && (
+                    <div className="pt-1.5 border-t border-slate-200/80 text-[11px] text-slate-600">
+                      <span>Dernière échéance enregistrée : </span>
+                      <strong>{new Date(reopenModal.user.expires_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* Admin authorization reminder */}
+                <div className="p-2.5 bg-indigo-50/70 border border-indigo-100 rounded-xl flex items-center gap-2 text-indigo-900 text-xs font-semibold">
+                  <ShieldCheck size={16} className="text-indigo-600 shrink-0" />
+                  <span>Opération d'Administration : la décision de réactivation et de durée est enregistrée sous votre responsabilité d'administrateur.</span>
+                </div>
+
+                {/* Action Choices */}
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+                    Mode de Réactivation & Durée souhaitée :
+                  </label>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setReopenModal({ ...reopenModal, actionType: 'PROLONG' })}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                        reopenModal.actionType === 'PROLONG'
+                          ? 'bg-amber-500 text-white border-amber-600 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Timer size={14} />
+                        <span>Durée Déterminée</span>
+                      </div>
+                      <span className={`text-[10px] font-medium ${reopenModal.actionType === 'PROLONG' ? 'text-amber-100' : 'text-slate-500'}`}>
+                        Définir une nouvelle échéance
+                      </span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setReopenModal({ ...reopenModal, actionType: 'PERMANENT' })}
+                      className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer ${
+                        reopenModal.actionType === 'PERMANENT'
+                          ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <CheckCircle2 size={14} />
+                        <span>Accès Permanent</span>
+                      </div>
+                      <span className={`text-[10px] font-medium ${reopenModal.actionType === 'PERMANENT' ? 'text-slate-300' : 'text-slate-500'}`}>
+                        Sans date limite
+                      </span>
+                    </button>
+
+                    {reopenModal.user.is_autonomous && (
+                      <button
+                        type="button"
+                        onClick={() => setReopenModal({ ...reopenModal, actionType: 'LINK_RH' })}
+                        className={`p-2.5 rounded-xl border text-xs font-bold transition-all text-left flex flex-col gap-1 cursor-pointer col-span-2 sm:col-span-1 ${
+                          reopenModal.actionType === 'LINK_RH'
+                            ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs'
+                            : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <User size={14} />
+                          <span>Lier au Registre RH</span>
+                        </div>
+                        <span className={`text-[10px] font-medium ${reopenModal.actionType === 'LINK_RH' ? 'text-indigo-200' : 'text-slate-500'}`}>
+                          Convertir en titulaire
+                        </span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Sub-form based on ActionType */}
+                {reopenModal.actionType === 'PROLONG' && (
+                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl space-y-2.5">
+                    <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
+                      Sélectionnez la période de prolongation :
+                    </label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                      {[
+                        { value: 7, label: '⚡ 7 jours (Urgence)' },
+                        { value: 15, label: '📅 15 jours (Court)' },
+                        { value: 30, label: '🗓️ 1 mois (30 jours)' },
+                        { value: 90, label: '🏛️ 3 mois (Trimestre)' },
+                        { value: 'END_YEAR', label: '🎓 Fin d\'année (30 Juin)' },
+                        { value: 'CUSTOM', label: '📆 Date au choix' }
+                      ].map(opt => (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setReopenModal({ ...reopenModal, durationPreset: opt.value as any })}
+                          className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
+                            reopenModal.durationPreset === opt.value
+                              ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-2xs'
+                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                          }`}
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+
+                    {reopenModal.durationPreset === 'CUSTOM' && (
+                      <div className="pt-1">
+                        <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
+                          Date d'expiration exacte :
+                        </label>
+                        <input
+                          type="date"
+                          min={new Date().toISOString().split('T')[0]}
+                          value={reopenModal.customExpiryDate}
+                          onChange={(e) => setReopenModal({ ...reopenModal, customExpiryDate: e.target.value })}
+                          className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-200"
+                        />
+                      </div>
+                    )}
+
+                    <div className="p-2 bg-white/90 border border-amber-200 text-amber-950 rounded-lg text-xs font-medium flex items-start gap-2 mt-1">
+                      <Clock size={14} className="mt-0.5 text-amber-600 shrink-0" />
+                      <span>
+                        Nouvelle échéance : <strong>{calculateExpiryDate(reopenModal.durationPreset, reopenModal.customExpiryDate).label}</strong>.
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {reopenModal.actionType === 'PERMANENT' && (
+                  <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1.5 text-xs text-slate-700">
+                    <p className="font-semibold text-slate-900 flex items-center gap-1.5">
+                      <CheckCircle2 size={15} className="text-emerald-600" />
+                      Accès Permanent et Indéterminé
+                    </p>
+                    <p className="text-[11px] text-slate-600 leading-relaxed">
+                      Ce compte sera réactivé sans date limite. Il n'expirera plus automatiquement et restera actif jusqu'à ce qu'un administrateur décide manuellement de le suspendre.
+                    </p>
+                  </div>
+                )}
+
+                {reopenModal.actionType === 'LINK_RH' && (
+                  <div className="p-3 bg-indigo-50/70 border border-indigo-200 rounded-xl space-y-2">
+                    <label className="text-[11px] font-bold text-indigo-950 uppercase tracking-wider block">
+                      Choisir le collaborateur RH correspondant :
+                    </label>
+                    <SelectPill
+                      options={staffSelectOptions.filter(o => o.value !== '')}
+                      value={reopenModal.linkStaffId}
+                      onChange={(val) => setReopenModal({ ...reopenModal, linkStaffId: val })}
+                      placeholder="Sélectionner la fiche RH..."
+                      variant="field"
+                      size="sm"
+                      colorScheme="indigo"
+                      searchable={true}
+                      icon={User}
+                      className="w-full"
+                    />
+                    <p className="text-[11px] text-indigo-800 leading-relaxed">
+                      L'adresse email de ce compte sera synchronisée avec la fiche RH sélectionnée, et le compte basculera en mode Titulaire Permanent.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Footer */}
+              <div className="p-3.5 sm:p-4 bg-slate-50 border-t border-slate-200 flex items-center justify-end gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setReopenModal({ ...reopenModal, isOpen: false, user: null })}
+                  className="px-3.5 py-2 text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-200 rounded-xl transition-all cursor-pointer"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  disabled={isSubmitting || (reopenModal.actionType === 'LINK_RH' && !reopenModal.linkStaffId)}
+                  onClick={handleReactivateAndExtend}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-98"
+                >
+                  {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <Power size={14} />}
+                  <span>Confirmer la Réactivation</span>
                 </button>
               </div>
             </motion.div>

@@ -109,6 +109,8 @@ export interface UserProfile {
   current_session_id?: string | null;
   expires_at?: string | null;
   is_autonomous?: boolean;
+  staff_id?: string | null;
+  rh_verified?: boolean;
   access_duration_label?: string | null;
 }
 

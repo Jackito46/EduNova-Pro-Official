@@ -27,8 +27,13 @@ import {
   Banknote,
   Smartphone,
   Landmark,
-  Wallet
+  Wallet,
+  Copy,
+  Check,
+  Globe,
+  Zap
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { UserProfile } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
@@ -60,6 +65,10 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [loading, setLoading] = useState(true);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [rcpAutoMode, setRcpAutoMode] = useState<boolean>(false);
+  const [rcpSuffix, setRcpSuffix] = useState<string>('');
+  const [deepSearch, setDeepSearch] = useState<boolean>(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
   const [dateFilter, setDateFilter] = useState("Aujourd'hui");
@@ -145,7 +154,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           if (classesData.length > 0) setGenClass(classesData[0].id);
         }
 
-        let studentsQuery = supabase.from('students').select('id, first_name, last_name, class_id').eq('school_id', effectiveSchoolId);
+        let studentsQuery = supabase.from('students').select('id, first_name, last_name, class_id, code, phone, parent_phone').eq('school_id', effectiveSchoolId);
         if (currentCampusId) studentsQuery = studentsQuery.eq('campus_id', currentCampusId);
         const { data: studentsData } = await studentsQuery;
         if (studentsData) setStudents(studentsData);
@@ -153,7 +162,38 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         let paymentsQuery = supabase.from('payments').select('*, campaign:ad_hoc_campaigns(id, name)').eq('school_id', effectiveSchoolId).order('created_at', { ascending: false });
         if (currentCampusId) paymentsQuery = paymentsQuery.eq('campus_id', currentCampusId);
         const { data: paymentsData } = await paymentsQuery;
-        if (paymentsData) setPayments(paymentsData);
+
+        // Récupération et harmonisation des reçus de fournitures scolaires
+        let suppliesQuery = supabase.from('school_supplies').select('*').eq('school_id', effectiveSchoolId).order('created_at', { ascending: false });
+        if (currentCampusId) suppliesQuery = suppliesQuery.eq('campus_id', currentCampusId);
+        const { data: suppliesData } = await suppliesQuery;
+
+        const groupedHistorySupplies = new Map<string, any>();
+        (suppliesData || []).forEach((s: any) => {
+          const txId = s.transaction_id || s.id;
+          if (groupedHistorySupplies.has(txId)) {
+            const existing = groupedHistorySupplies.get(txId);
+            existing.total_amount = Number(existing.total_amount || 0) + Number(s.total_amount || 0);
+            existing.amount_htg_equivalent = Number(existing.amount_htg_equivalent || 0) + Number(s.amount_htg_equivalent || s.total_amount || 0);
+          } else {
+            groupedHistorySupplies.set(txId, { ...s });
+          }
+        });
+
+        const suppliesPayments = Array.from(groupedHistorySupplies.values()).map((s: any) => ({
+          ...s,
+          id: s.transaction_id || s.id,
+          source: 'school_supplies',
+          amount: s.amount_htg_equivalent || s.total_amount,
+          original_amount: s.total_amount,
+          currency: s.currency || 'HTG',
+          payment_method: s.payment_method?.replace(' (EN ATTENTE)', '')?.replace(' (REJETÉ)', '') || 'Cash',
+          nature: 'Fournitures',
+          receipt_number: s.receipt_number || `FOU-${(s.transaction_id || s.id).substring(0, 8).toUpperCase()}`,
+        }));
+
+        const allPayments = [...(paymentsData || []), ...suppliesPayments];
+        setPayments(allPayments);
 
       } catch (e) {
         console.error("Erreur chargement contexte", e);
@@ -238,13 +278,22 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     const createdDate = p.created_at ? new Date(p.created_at) : new Date();
 
+    const idPrefix = (p.id || '').substring(0, 8).toUpperCase();
+    const formattedRef = p.receipt_number
+      ? (p.receipt_number.toUpperCase().startsWith('RCP-') || p.receipt_number.toUpperCase().startsWith('FOU-') 
+          ? p.receipt_number.toUpperCase() 
+          : `RCP-${p.receipt_number.toUpperCase()}`)
+      : (p.source === 'school_supplies' ? `FOU-${idPrefix}` : `RCP-${idPrefix}`);
+
     return {
       ...p,
-      studentName: studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : 'Inconnu',
-      classe: studentClassName || 'N/A',
+      ref: formattedRef,
+      receipt_code: idPrefix,
+      studentName: studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : (p.studentName || 'Inconnu'),
+      classe: studentClassName || p.className || 'N/A',
       date: createdDate.toLocaleDateString('fr-FR'),
       time: createdDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
-      nature: p.campaign?.name 
+      nature: p.nature || (p.campaign?.name 
         ? `Campagne: ${p.campaign.name}` 
         : p.ad_hoc_campaign_id 
         ? 'Frais de Campagne' 
@@ -252,7 +301,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         ? 'Scolarité' 
         : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
           ? 'Inscription' 
-          : (p.nature || p.type || p.fee_type || 'Frais Divers')),
+          : (p.nature || p.type || p.fee_type || 'Frais Divers'))),
       amount: equivHTG,
       original_amount: originalAmount,
       currency: p.currency || 'HTG',
@@ -262,23 +311,80 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
   };
 
+  // Terme de recherche effectif (selon mode Auto-RCP ou texte libre)
+  const activeSearchQuery = useMemo(() => {
+    if (rcpAutoMode) {
+      return rcpSuffix.trim() ? `RCP-${rcpSuffix.trim().toUpperCase()}` : '';
+    }
+    return searchTerm.trim();
+  }, [rcpAutoMode, rcpSuffix, searchTerm]);
+
+  // Détection si la requête cible spécifiquement un reçu ou si recherche approfondie
+  const cleanSearchCode = useMemo(() => {
+    return activeSearchQuery.replace(/^(rcp|rec|fou)[\s-_]*/i, '').trim().toLowerCase();
+  }, [activeSearchQuery]);
+
+  const isReceiptLookup = useMemo(() => {
+    if (!activeSearchQuery) return false;
+    const lower = activeSearchQuery.toLowerCase();
+    return rcpAutoMode || lower.startsWith('rcp') || lower.startsWith('fou') || (cleanSearchCode.length >= 3 && /^[0-9a-fA-F]+$/.test(cleanSearchCode));
+  }, [activeSearchQuery, rcpAutoMode, cleanSearchCode]);
+
+  const isDeepSearchEffective = useMemo(() => {
+    return deepSearch || (isReceiptLookup && cleanSearchCode.length >= 3);
+  }, [deepSearch, isReceiptLookup, cleanSearchCode]);
+
   // Filtrage archives globales
   const filteredPayments = useMemo(() => {
+    const rawQuery = activeSearchQuery;
+    const cleanCode = cleanSearchCode;
+    const fullTerm = rawQuery.toLowerCase();
+
     return payments.filter(p => {
       const student = students.find(s => s.id === p.student_id);
-      const studentName = student ? formatStudentName(student.last_name, student.first_name).fullName : 'Inconnu';
+      const studentName = student ? formatStudentName(student.last_name, student.first_name).fullName : (p.studentName || 'Inconnu');
+      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : (p.classe || 'N/A');
 
-      const matchesYear = !selectedYear || p.academic_year_id === selectedYear;
-      const matchesClass = selectedClass === 'all' || student?.class_id === selectedClass;
-      const matchesSearch = searchTerm.trim().length > 0 
-        ? (studentName.toLowerCase().includes(searchTerm.toLowerCase()) || p.id.toLowerCase().includes(searchTerm.toLowerCase()))
-        : true;
-        
+      // Clés de correspondance pour reçus
+      const idPrefix = (p.id || '').substring(0, 8).toLowerCase();
+      const fullId = (p.id || '').toLowerCase();
+      const pRef = (p.ref || `rcp-${idPrefix}`).toLowerCase();
+      const pReceiptNum = (p.receipt_number || '').toLowerCase();
+      const pReference = (p.reference_number || '').toLowerCase();
+      const pTxId = (p.transaction_id || '').toLowerCase();
+      const studentFullName = studentName.toLowerCase();
+
+      const matchesSearch = !rawQuery ? true : (
+        pRef.includes(fullTerm) ||
+        pRef.includes(cleanCode) ||
+        idPrefix.includes(cleanCode) ||
+        fullId.includes(cleanCode) ||
+        fullId.includes(fullTerm) ||
+        pReceiptNum.includes(fullTerm) ||
+        pReceiptNum.includes(cleanCode) ||
+        pReference.includes(fullTerm) ||
+        pReference.includes(cleanCode) ||
+        pTxId.includes(cleanCode) ||
+        studentFullName.includes(fullTerm) ||
+        (student?.code || '').toLowerCase().includes(fullTerm) ||
+        (student?.phone || '').includes(rawQuery) ||
+        (student?.parent_phone || '').includes(rawQuery) ||
+        studentClass.toLowerCase().includes(fullTerm)
+      );
+
+      if (!matchesSearch) return false;
+
+      // Si recherche approfondie active ou recherche par numéro de reçu précis, on ignore les restrictions de date et de session
+      if (isDeepSearchEffective) return true;
+
+      // Filtres standard
+      const matchesYear = !selectedYear || selectedYear === 'all' || !p.academic_year_id || p.academic_year_id === selectedYear;
+      const matchesClass = selectedClass === 'all' || student?.class_id === selectedClass || p.class_id === selectedClass;
+
       let matchesDate = true;
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
-      const paymentDate = new Date(p.created_at);
       const paymentDateMidnight = new Date(p.created_at);
       paymentDateMidnight.setHours(0, 0, 0, 0);
 
@@ -302,13 +408,13 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       }
 
-      return matchesYear && matchesClass && matchesSearch && matchesDate;
+      return matchesYear && matchesClass && matchesDate;
     }).map(p => {
       const student = students.find(s => s.id === p.student_id);
-      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : 'N/A';
+      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : (p.classe || 'N/A');
       return normalizeReceiptPayment(p, student, studentClass);
     });
-  }, [payments, selectedYear, selectedClass, searchTerm, dateFilter, customDate, students, classes]);
+  }, [payments, selectedYear, selectedClass, activeSearchQuery, cleanSearchCode, isDeepSearchEffective, dateFilter, customDate, students, classes]);
 
   // Totaux comptables rigoureux sur les paiements filtrés
   const receiptsFilteredTotals = useMemo(() => {
@@ -585,32 +691,151 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
               </div>
 
-              {/* 4. Recherche Rapide */}
+              {/* 4. Recherche Rapide avec Mode Auto RCP- & Recherche Approfondie */}
               <div className="space-y-1.5 min-w-0">
-                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
-                  <Search size={13} className="text-indigo-600 shrink-0" />
-                  <span>Recherche Rapide</span>
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
-                  <input 
-                    type="text" 
-                    placeholder={`${terminology.student}, ID ou Reçu...`}
-                    className="w-full pl-10 pr-8 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all min-h-[38px]"
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                  {searchTerm && (
+                <div className="flex items-center justify-between gap-1 flex-wrap">
+                  <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider ml-1 flex items-center gap-1.5 whitespace-nowrap">
+                    <Search size={13} className="text-indigo-600 shrink-0" />
+                    <span>Recherche Rapide</span>
+                  </label>
+                  <div className="flex items-center gap-1">
+                    {/* Bascule Mode Auto-RCP */}
                     <button
-                      onClick={() => setSearchTerm('')}
-                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md hover:bg-slate-200/50 cursor-pointer"
+                      type="button"
+                      onClick={() => {
+                        const next = !rcpAutoMode;
+                        setRcpAutoMode(next);
+                        if (next) {
+                          const clean = searchTerm.replace(/^(rcp|rec|fou)[\s-_]*/i, '').replace(/[^a-zA-Z0-9]/g, '').trim().toUpperCase();
+                          setRcpSuffix(clean);
+                        } else {
+                          if (rcpSuffix) setSearchTerm(rcpSuffix);
+                        }
+                      }}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 transition-all cursor-pointer border ${
+                        rcpAutoMode 
+                          ? 'bg-indigo-600 text-white border-indigo-700 shadow-2xs' 
+                          : 'bg-indigo-50 text-indigo-700 border-indigo-200/80 hover:bg-indigo-100'
+                      }`}
+                      title="Saisie assistée automatique avec préfixe RCP-"
                     >
-                      <X size={13} />
+                      <Receipt size={10} />
+                      <span>{rcpAutoMode ? 'Mode Auto RCP- ✓' : 'Auto RCP-'}</span>
+                    </button>
+
+                    {/* Bascule Recherche Approfondie */}
+                    <button
+                      type="button"
+                      onClick={() => setDeepSearch(!deepSearch)}
+                      className={`px-2 py-0.5 rounded-md text-[10px] font-black tracking-tight flex items-center gap-1 transition-all cursor-pointer border ${
+                        deepSearch 
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs' 
+                          : 'bg-slate-100 text-slate-600 border-slate-200 hover:bg-slate-200/70'
+                      }`}
+                      title="Recherche sur tout le système (ignore les filtres de date et session)"
+                    >
+                      <Globe size={10} />
+                      <span>Approfondie</span>
+                    </button>
+                  </div>
+                </div>
+
+                {rcpAutoMode ? (
+                  <div className="relative flex items-center">
+                    <div className="absolute left-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 bg-indigo-600 text-white font-mono font-black text-xs px-2.5 py-1 rounded-lg shadow-2xs select-none">
+                      <Receipt size={12} />
+                      <span>RCP-</span>
+                    </div>
+                    <input 
+                      type="text" 
+                      placeholder="EC1F67F2..."
+                      className="w-full pl-22 pr-8 py-2 bg-indigo-50/40 border-2 border-indigo-500 rounded-xl text-xs font-mono font-black text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all min-h-[38px] tracking-wider uppercase"
+                      value={rcpSuffix}
+                      autoFocus
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const cleaned = raw.replace(/^(rcp|rec|fou)[\s-_]*/i, '').replace(/[^a-zA-Z0-9]/g, '').toUpperCase().slice(0, 12);
+                        setRcpSuffix(cleaned);
+                      }}
+                    />
+                    {rcpSuffix && (
+                      <button
+                        type="button"
+                        onClick={() => setRcpSuffix('')}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded-md hover:bg-slate-200/50 cursor-pointer"
+                        title="Effacer"
+                      >
+                        <X size={13} />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={15} />
+                    <input 
+                      type="text" 
+                      placeholder={`${terminology.student}, classe ou N° Reçu (ex: RCP-EC1F67F2)...`}
+                      className="w-full pl-10 pr-20 py-2 bg-slate-50 border border-slate-200/80 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all min-h-[38px]"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {searchTerm ? (
+                        <button
+                          type="button"
+                          onClick={() => setSearchTerm('')}
+                          className="text-slate-400 hover:text-slate-600 p-1 rounded-md hover:bg-slate-200/50 cursor-pointer"
+                        >
+                          <X size={13} />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setRcpAutoMode(true)}
+                          className="px-1.5 py-0.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-mono font-bold text-[10px] rounded border border-indigo-200 transition-colors cursor-pointer"
+                          title="Basculer vers la saisie automatique avec préfixe RCP-"
+                        >
+                          + RCP-
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* BANNIÈRE CONTEXTUELLE DE RECHERCHE APPROFONDIE */}
+            {isDeepSearchEffective && (
+              <div className="mt-3.5 px-4 py-2.5 bg-gradient-to-r from-indigo-50 via-blue-50 to-indigo-50 border border-indigo-200/80 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-indigo-950 animate-in fade-in shadow-2xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="p-1.5 rounded-lg bg-indigo-600 text-white shrink-0 shadow-2xs">
+                    <Globe size={13} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="font-black text-xs text-indigo-900 leading-tight">
+                      Recherche Approfondie Active {isReceiptLookup ? `• N° Reçu ciblé : ${activeSearchQuery}` : '• Système Global'}
+                    </p>
+                    <p className="text-[10.5px] text-indigo-700 font-medium truncate">
+                      Recherche étendue sur l'historique complet (toutes les dates et sessions déverrouillées).
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+                  <span className="font-mono font-black text-xs px-2.5 py-0.5 bg-white text-indigo-800 rounded-lg border border-indigo-200 shadow-2xs">
+                    {filteredPayments.length} reçu{filteredPayments.length > 1 ? 's' : ''} trouvé{filteredPayments.length > 1 ? 's' : ''}
+                  </span>
+                  {deepSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setDeepSearch(false)}
+                      className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
+                    >
+                      Désactiver
                     </button>
                   )}
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* TABLEAU REGISTRE GLOBAL */}
@@ -708,9 +933,26 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </div>
                       </td>
                       <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
-                        <span className="inline-block bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md font-mono text-[11px] font-semibold border border-slate-200/70 whitespace-nowrap">
-                          RCP-{p.id?.substring(0, 8)}
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-block bg-slate-100 text-slate-800 px-2 py-0.5 rounded-md font-mono text-[11px] font-black border border-slate-200/80 shadow-2xs whitespace-nowrap">
+                            {p.ref || `RCP-${p.id?.substring(0, 8).toUpperCase()}`}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const textToCopy = p.ref || `RCP-${p.id?.substring(0, 8).toUpperCase()}`;
+                              navigator.clipboard?.writeText(textToCopy);
+                              setCopiedId(p.id);
+                              toast.success(`N° Reçu ${textToCopy} copié !`);
+                              setTimeout(() => setCopiedId(null), 2000);
+                            }}
+                            className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors cursor-pointer"
+                            title="Copier le N° de reçu"
+                          >
+                            {copiedId === p.id ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          </button>
+                        </div>
                       </td>
                       <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
                         <span className="inline-block text-[10px] font-bold text-slate-700 uppercase tracking-tight bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/70 whitespace-nowrap">
@@ -772,8 +1014,33 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   
                   {!loading && filteredPayments.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center text-slate-500 font-bold text-xs italic">
-                        Aucun reçu trouvé pour ces critères.
+                      <td colSpan={8} className="py-14 text-center">
+                        <div className="max-w-md mx-auto space-y-3 px-4">
+                          <div className="w-12 h-12 mx-auto rounded-full bg-slate-100 flex items-center justify-center text-slate-400">
+                            <Receipt size={24} />
+                          </div>
+                          <div>
+                            <p className="font-bold text-slate-800 text-sm">Aucun reçu trouvé pour ces critères</p>
+                            <p className="text-xs text-slate-500 mt-0.5">
+                              {activeSearchQuery 
+                                ? `Aucune transaction ne correspond à "${activeSearchQuery}" dans les dates ou classes sélectionnées.` 
+                                : 'Aucune transaction enregistrée pour les filtres actuels.'}
+                            </p>
+                          </div>
+                          {!isDeepSearchEffective && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setDeepSearch(true);
+                                setDateFilter('Toutes les dates');
+                              }}
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs cursor-pointer"
+                            >
+                              <Globe size={14} />
+                              <span>Lancer la Recherche Approfondie (Toutes les dates & sessions)</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )}
