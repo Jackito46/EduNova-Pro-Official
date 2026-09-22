@@ -22,7 +22,6 @@ import Modal from './Modal';
 import { SelectPill, SelectOption } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
-import { cleanPhoneForWhatsApp, buildPaymentWhatsAppText } from './PaymentWhatsAppShare';
 
 interface ReportsViewProps {
   user: UserProfile;
@@ -468,30 +467,6 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
       setLoading(false);
     }
   }, [startDate, endDate, user.school_id, effectiveCampusId, terminology]);
-
-  const handleShareReceiptWhatsApp = (p: any) => {
-    const studentFullName = p.students
-      ? `${p.students.first_name || ''} ${p.students.last_name || ''}`.trim()
-      : 'Élève';
-    const targetPhone = p.students?.parent_phone || p.students?.phone || '';
-    const cleaned = cleanPhoneForWhatsApp(targetPhone);
-    const msg = buildPaymentWhatsAppText({
-      schoolName: school?.name || 'Établissement Scolaire',
-      studentName: studentFullName,
-      studentClass: p.students?.className,
-      parentName: p.students?.parent_name,
-      amount: p.original_amount || p.amount,
-      currency: p.currency || 'HTG',
-      feeTypeLabel: p.type || 'Frais de scolarité',
-      transactionRef: p.id ? String(p.id).substring(0, 8).toUpperCase() : 'REC',
-      paymentMethod: p.method
-    });
-    const waUrl = cleaned
-      ? `https://wa.me/${cleaned}?text=${encodeURIComponent(msg)}`
-      : `https://wa.me/?text=${encodeURIComponent(msg)}`;
-    window.open(waUrl, '_blank');
-    toast.success("WhatsApp ouvert avec le reçu officiel pré-rempli !");
-  };
 
   const canCancelTransaction = user?.is_super_admin || ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'ACCOUNTANT', 'DIRECTOR', 'COMPTABLE', 'DIRECTEUR', 'SECRETARY', 'SECRETAIRE'].includes(user?.role || '');
 
@@ -1805,18 +1780,9 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                             </span>
                           )}
 
-                          {/* Actions rapides mobile (WhatsApp 100% gratuit & Annulation si superviseur) */}
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <button
-                              type="button"
-                              onClick={() => handleShareReceiptWhatsApp(p)}
-                              className="px-2 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[10.5px] rounded-lg border border-emerald-200 transition-all inline-flex items-center gap-1 cursor-pointer"
-                              title="Partager le reçu sur WhatsApp (100% Gratuit)"
-                            >
-                              <MessageSquare size={11} className="text-emerald-600" />
-                              <span>WhatsApp</span>
-                            </button>
-                            {canCancelTransaction && (
+                          {/* Actions rapides mobile (Annulation si superviseur) */}
+                          {canCancelTransaction && (
+                            <div className="flex items-center gap-1.5 shrink-0">
                               <button
                                 type="button"
                                 onClick={() => openCancelModal(p)}
@@ -1826,8 +1792,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                                 <Trash2 size={11} />
                                 <span>Annuler</span>
                               </button>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
 
                         {/* Badges : Type de frais, Mode de règlement, Annexe */}
@@ -2050,17 +2016,8 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
 
                             {/* Action */}
                             <td className="px-4 py-3.5 whitespace-nowrap text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => handleShareReceiptWhatsApp(p)}
-                                  className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-[11px] rounded-lg border border-emerald-200 transition-all inline-flex items-center gap-1 cursor-pointer"
-                                  title="Partager le reçu sur WhatsApp (100% Gratuit)"
-                                >
-                                  <MessageSquare size={12} className="text-emerald-600" />
-                                  <span>WhatsApp</span>
-                                </button>
-                                {canCancelTransaction && (
+                              {canCancelTransaction ? (
+                                <div className="flex items-center justify-center">
                                   <button
                                     type="button"
                                     onClick={() => openCancelModal(p)}
@@ -2070,8 +2027,10 @@ const ReportsView: React.FC<ReportsViewProps> = ({ user }) => {
                                     <Trash2 size={12} />
                                     <span>Annuler</span>
                                   </button>
-                                )}
-                              </div>
+                                </div>
+                              ) : (
+                                <span className="text-slate-300 font-bold text-xs">-</span>
+                              )}
                             </td>
                           </tr>
                         );

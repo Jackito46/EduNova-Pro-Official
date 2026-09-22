@@ -111,10 +111,14 @@ const DEFAULT_SETTINGS: BackupSettings = {
   last_auto_backup_status: 'SUCCESS'
 };
 
-// Helper to safely check if an HTTP response is valid JSON
+// Helper to safely check if an HTTP response is valid JSON with built-in timeout guard
 async function safeFetchJson(url: string, options?: RequestInit): Promise<any | null> {
   try {
-    const res = await fetch(url, options);
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const signal = options?.signal || controller.signal;
+    const res = await fetch(url, { ...options, signal });
+    clearTimeout(timeoutId);
     const contentType = res.headers.get('content-type') || '';
     if (res.ok && contentType.includes('application/json')) {
       return await res.json();

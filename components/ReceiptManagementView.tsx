@@ -23,7 +23,11 @@ import {
   Receipt,
   SearchCheck,
   Clock,
-  Sparkles
+  Sparkles,
+  Banknote,
+  Smartphone,
+  Landmark,
+  Wallet
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { formatStudentName } from '../utils/formatters';
@@ -160,6 +164,104 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     fetchContext();
   }, [user, effectiveSchoolId, currentCampusId]);
 
+  const getMethodBadge = (method?: string) => {
+    const m = (method || 'Cash').toUpperCase();
+    if (m.includes('MONCASH')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 whitespace-nowrap">
+          <Smartphone size={10} />
+          MonCash
+        </span>
+      );
+    }
+    if (m.includes('BANQUE') || m.includes('VIREMENT') || m.includes('TRANSFERT')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
+          <Landmark size={10} />
+          Virement
+        </span>
+      );
+    }
+    if (m.includes('CHÈQUE') || m.includes('CHEQUE')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-purple-50 text-purple-700 border border-purple-200 whitespace-nowrap">
+          <FileText size={10} />
+          Chèque
+        </span>
+      );
+    }
+    if (m.includes('PORTEFEUILLE') || m.includes('WALLET')) {
+      return (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
+          <Wallet size={10} />
+          Portefeuille
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
+        <Banknote size={10} />
+        Cash
+      </span>
+    );
+  };
+
+  const normalizeReceiptPayment = (p: any, studentObj?: any, studentClassName?: string) => {
+    const isUSD = p.currency === 'USD';
+    const rawAmount = Number(p.amount || 0);
+    const rawOriginal = Number(p.original_amount || p.amount || 0);
+    const rawEquiv = Number(p.amount_htg_equivalent || 0);
+
+    let originalAmount = rawOriginal;
+    let equivHTG = rawEquiv;
+    let appliedRate = p.exchange_rate_applied ? Number(p.exchange_rate_applied) : null;
+
+    if (isUSD) {
+      if (rawEquiv > 0) {
+        equivHTG = rawEquiv;
+        originalAmount = rawOriginal > 0 ? rawOriginal : (rawAmount > 0 && rawAmount !== rawEquiv ? rawAmount : (appliedRate ? Math.round(rawEquiv / appliedRate) : rawAmount));
+      } else if (rawAmount > 0 && appliedRate) {
+        equivHTG = Math.round(rawAmount * appliedRate);
+        originalAmount = rawAmount;
+      } else if (rawAmount > 0) {
+        appliedRate = 145;
+        equivHTG = Math.round(rawAmount * appliedRate);
+        originalAmount = rawAmount;
+      }
+      if (!appliedRate && originalAmount > 0 && equivHTG > 0) {
+        appliedRate = Math.round(equivHTG / originalAmount);
+      }
+    } else {
+      equivHTG = rawAmount > 0 ? rawAmount : rawOriginal;
+      originalAmount = equivHTG;
+    }
+
+    const createdDate = p.created_at ? new Date(p.created_at) : new Date();
+
+    return {
+      ...p,
+      studentName: studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : 'Inconnu',
+      classe: studentClassName || 'N/A',
+      date: createdDate.toLocaleDateString('fr-FR'),
+      time: createdDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      nature: p.campaign?.name 
+        ? `Campagne: ${p.campaign.name}` 
+        : p.ad_hoc_campaign_id 
+        ? 'Frais de Campagne' 
+        : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
+        ? 'Scolarité' 
+        : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
+          ? 'Inscription' 
+          : (p.nature || p.type || p.fee_type || 'Frais Divers')),
+      amount: equivHTG,
+      original_amount: originalAmount,
+      currency: p.currency || 'HTG',
+      is_foreign_currency: isUSD,
+      exchange_rate_applied: appliedRate,
+      payment_method: p.payment_method || 'Cash'
+    };
+  };
+
   // Filtrage archives globales
   const filteredPayments = useMemo(() => {
     return payments.filter(p => {
@@ -203,26 +305,35 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       return matchesYear && matchesClass && matchesSearch && matchesDate;
     }).map(p => {
       const student = students.find(s => s.id === p.student_id);
-      return {
-        ...p,
-        studentName: student ? formatStudentName(student.last_name, student.first_name).fullName : 'Inconnu',
-        classe: student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : 'N/A',
-        date: new Date(p.created_at).toLocaleDateString('fr-FR'),
-        nature: p.campaign?.name 
-          ? `Campagne: ${p.campaign.name}` 
-          : p.ad_hoc_campaign_id 
-          ? 'Frais de Campagne' 
-          : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
-          ? 'Scolarité' 
-          : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
-            ? 'Inscription' 
-            : (p.nature || p.type || p.fee_type || 'Frais Divers')),
-        amount: p.amount_htg_equivalent || p.amount,
-        original_amount: p.amount,
-        currency: p.currency || 'HTG'
-      };
+      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : 'N/A';
+      return normalizeReceiptPayment(p, student, studentClass);
     });
   }, [payments, selectedYear, selectedClass, searchTerm, dateFilter, customDate, students, classes]);
+
+  // Totaux comptables rigoureux sur les paiements filtrés
+  const receiptsFilteredTotals = useMemo(() => {
+    let foreignUSD = 0;
+    let localHTG = 0;
+    let totalEquivHTG = 0;
+
+    filteredPayments.forEach(p => {
+      if (
+        p.status === 'ANNULE' || 
+        p.payment_method?.includes('EN ATTENTE') || 
+        p.payment_method?.includes('REJETÉ') ||
+        p.moncash_status === 'PENDING'
+      ) return;
+
+      totalEquivHTG += Number(p.amount || 0);
+      if (p.currency === 'USD' || p.is_foreign_currency) {
+        foreignUSD += Number(p.original_amount || 0);
+      } else {
+        localHTG += Number(p.original_amount || p.amount || 0);
+      }
+    });
+
+    return { foreignUSD, localHTG, totalEquivHTG };
+  }, [filteredPayments]);
 
   // Réinitialiser la page courante à 1 dès qu'un critère de filtre ou recherche change
   useEffect(() => {
@@ -246,6 +357,31 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredPayments.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredPayments, currentPage, itemsPerPage]);
+
+  // Sous-total de la page affichée
+  const receiptsPageSubtotals = useMemo(() => {
+    let foreignUSD = 0;
+    let localHTG = 0;
+    let totalEquivHTG = 0;
+
+    paginatedPayments.forEach(p => {
+      if (
+        p.status === 'ANNULE' || 
+        p.payment_method?.includes('EN ATTENTE') || 
+        p.payment_method?.includes('REJETÉ') ||
+        p.moncash_status === 'PENDING'
+      ) return;
+
+      totalEquivHTG += Number(p.amount || 0);
+      if (p.currency === 'USD' || p.is_foreign_currency) {
+        foreignUSD += Number(p.original_amount || 0);
+      } else {
+        localHTG += Number(p.original_amount || p.amount || 0);
+      }
+    });
+
+    return { foreignUSD, localHTG, totalEquivHTG };
+  }, [paginatedPayments]);
 
   // Étudiants disponibles pour la classe sélectionnée dans le générateur
   const availableStudentsForGen = useMemo(() => {
@@ -271,25 +407,32 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   // Historique des paiements de l'élève sélectionné dans le générateur
   const studentPaymentsHistory = useMemo(() => {
     if (!selectedGenStudent) return [];
-    return payments.filter(p => p.student_id === selectedGenStudent.id && p.academic_year_id === genYear).map(p => ({
-      ...p,
-      studentName: selectedGenStudent.name,
-      classe: classes.find(c => c.id === selectedGenStudent.class_id)?.name || 'N/A',
-      date: new Date(p.created_at).toLocaleDateString('fr-FR'),
-      nature: p.campaign?.name 
-        ? `Campagne: ${p.campaign.name}` 
-        : p.ad_hoc_campaign_id 
-        ? 'Frais de Campagne' 
-        : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
-        ? 'Scolarité' 
-        : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
-          ? 'Inscription' 
-          : (p.nature || p.type || p.fee_type || 'Frais Divers')),
-      amount: p.amount_htg_equivalent || p.amount,
-      original_amount: p.amount,
-      currency: p.currency || 'HTG'
-    }));
+    return payments
+      .filter(p => p.student_id === selectedGenStudent.id && p.academic_year_id === genYear)
+      .map(p => {
+        const studentClass = classes.find(c => c.id === selectedGenStudent.class_id)?.name || 'N/A';
+        return normalizeReceiptPayment(p, selectedGenStudent, studentClass);
+      });
   }, [payments, selectedGenStudent, genYear, classes]);
+
+  // Totaux des versements de l'élève sélectionné
+  const studentHistoryTotals = useMemo(() => {
+    let foreignUSD = 0;
+    let localHTG = 0;
+    let totalEquivHTG = 0;
+
+    studentPaymentsHistory.forEach(p => {
+      if (p.status === 'ANNULE' || p.payment_method?.includes('EN ATTENTE')) return;
+      totalEquivHTG += Number(p.amount || 0);
+      if (p.currency === 'USD' || p.is_foreign_currency) {
+        foreignUSD += Number(p.original_amount || 0);
+      } else {
+        localHTG += Number(p.original_amount || p.amount || 0);
+      }
+    });
+
+    return { foreignUSD, localHTG, totalEquivHTG };
+  }, [studentPaymentsHistory]);
 
   const handleOpenPreview = (payment: any) => {
     setPrintPreview(payment);
@@ -485,16 +628,31 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="flex items-center gap-3 sm:gap-4 print:hidden w-full md:w-auto justify-between md:justify-end">
                 <div className="bg-white/5 px-4 sm:px-5 py-2 rounded-xl border border-white/10 text-right">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Collecte Totale</p>
-                  <p className="text-base sm:text-xl font-bold text-emerald-400 whitespace-nowrap">
-                    {filteredPayments
-                      .filter(p => 
-                        p.status !== 'ANNULE' && 
-                        !p.payment_method?.includes('EN ATTENTE') && 
-                        !p.payment_method?.includes('REJETÉ') &&
-                        p.moncash_status !== 'PENDING'
-                      )
-                      .reduce((acc, c) => acc + c.amount, 0).toLocaleString()} <span className="text-xs font-medium">HTG</span>
-                  </p>
+                  <div className="font-mono text-right">
+                    {receiptsFilteredTotals.foreignUSD > 0 && receiptsFilteredTotals.localHTG === 0 ? (
+                      <>
+                        <p className="text-base sm:text-xl font-black text-teal-300 whitespace-nowrap leading-tight">
+                          {receiptsFilteredTotals.foreignUSD.toLocaleString('fr-FR')} <span className="text-xs font-bold">USD</span>
+                        </p>
+                        <p className="text-[10px] text-emerald-300 font-extrabold whitespace-nowrap mt-0.5">
+                          Total Équivalent : {receiptsFilteredTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                        </p>
+                      </>
+                    ) : receiptsFilteredTotals.foreignUSD > 0 ? (
+                      <>
+                        <p className="text-base sm:text-xl font-black text-emerald-300 whitespace-nowrap leading-tight">
+                          {receiptsFilteredTotals.totalEquivHTG.toLocaleString('fr-FR')} <span className="text-xs font-bold">HTG (Eq)</span>
+                        </p>
+                        <p className="text-[10px] text-teal-200 font-bold whitespace-nowrap mt-0.5">
+                          Dont : {receiptsFilteredTotals.localHTG.toLocaleString('fr-FR')} HTG + {receiptsFilteredTotals.foreignUSD.toLocaleString('fr-FR')} USD
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-base sm:text-xl font-black text-emerald-400 whitespace-nowrap leading-tight">
+                        {receiptsFilteredTotals.localHTG.toLocaleString('fr-FR')} <span className="text-xs font-bold">HTG</span>
+                      </p>
+                    )}
+                  </div>
                 </div>
                 <button 
                   onClick={() => window.print()}
@@ -509,11 +667,12 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <table className="w-full text-left border-collapse min-w-[760px] xl:min-w-0">
                 <thead>
                   <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[115px]">Date</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[130px]">Date & Heure</th>
                     <th className="px-3.5 sm:px-4 py-3.5 min-w-[170px]">{terminology.student} & {terminology.class}</th>
                     <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Référence</th>
                     <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Nature</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[130px]">Montant</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[110px]">Mode</th>
+                    <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[140px]">Montant</th>
                     <th className="px-3.5 sm:px-4 py-3.5 text-center whitespace-nowrap w-[95px]">Statut</th>
                     <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[115px] print:hidden">Action</th>
                   </tr>
@@ -521,7 +680,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <tbody className="divide-y divide-slate-100 text-xs">
                   {loading ? (
                     <tr>
-                      <td colSpan={7} className="py-8">
+                      <td colSpan={8} className="py-8">
                         <FluidLoadingState message="Chargement des reçus..." subtext="Synchronisation en cours" />
                         <SkeletonTable rows={5} />
                       </td>
@@ -530,8 +689,11 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
                       <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
                         <div className="flex items-center gap-2">
-                          <Calendar size={13} className="text-slate-400 shrink-0 hidden sm:block" />
-                          <span className="font-bold text-slate-900 text-xs whitespace-nowrap">{p.date}</span>
+                          <Calendar size={13} className="text-blue-600 shrink-0 hidden sm:block" />
+                          <div>
+                            <span className="font-bold text-slate-900 text-xs block whitespace-nowrap">{p.date}</span>
+                            <span className="text-[10px] text-slate-400 font-mono font-bold block whitespace-nowrap">{p.time}</span>
+                          </div>
                         </div>
                       </td>
                       <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 align-middle">
@@ -555,13 +717,34 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           {p.nature}
                         </span>
                       </td>
+                      <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 whitespace-nowrap align-middle">
+                        {getMethodBadge(p.payment_method)}
+                      </td>
                       <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 text-right whitespace-nowrap align-middle">
-                        <div className="flex flex-col items-end whitespace-nowrap">
-                          <span className="text-xs font-black text-slate-900 whitespace-nowrap">{p.amount.toLocaleString()} G</span>
-                          {p.currency !== 'HTG' && (
-                            <span className="text-[10px] text-slate-400 font-medium italic whitespace-nowrap">({p.original_amount.toLocaleString()} {p.currency})</span>
-                          )}
-                        </div>
+                        {p.currency === 'USD' || p.is_foreign_currency ? (
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded bg-teal-100/80 text-teal-900 text-[10px] font-black border border-teal-300/70">
+                                USD
+                              </span>
+                              <span className="text-xs font-black text-teal-900 font-mono">
+                                {p.original_amount?.toLocaleString('fr-FR')} USD
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-slate-500 font-bold block font-mono">
+                              Eq: {p.amount?.toLocaleString('fr-FR')} HTG {p.exchange_rate_applied ? `(@${p.exchange_rate_applied})` : ''}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center justify-end gap-1.5">
+                            <span className="px-1.5 py-0.5 rounded bg-emerald-100/80 text-emerald-900 text-[10px] font-black border border-emerald-300/70">
+                              HTG
+                            </span>
+                            <span className="text-xs font-black text-emerald-900 font-mono">
+                              {p.amount?.toLocaleString('fr-FR')} HTG
+                            </span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-3.5 sm:px-4 py-3 sm:py-3.5 text-center whitespace-nowrap align-middle">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-tight whitespace-nowrap border ${
@@ -589,12 +772,75 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   
                   {!loading && filteredPayments.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="py-16 text-center text-slate-500 font-bold text-xs italic">
+                      <td colSpan={8} className="py-16 text-center text-slate-500 font-bold text-xs italic">
                         Aucun reçu trouvé pour ces critères.
                       </td>
                     </tr>
                   )}
                 </tbody>
+
+                {/* PIED DE TABLEAU COMPTABLE RIGOUREUX */}
+                {!loading && filteredPayments.length > 0 && (
+                  <tfoot>
+                    {/* Ligne 1 : Sous-total de la page affichée */}
+                    <tr className="bg-slate-100/90 border-t-2 border-slate-200 text-slate-700 font-extrabold text-xs">
+                      <td colSpan={5} className="px-4 py-3 text-right">
+                        <span className="text-[11px] uppercase tracking-wider text-slate-500 font-black">
+                          Sous-total Page {currentPage} ({paginatedPayments.length} reçu{paginatedPayments.length > 1 ? 's' : ''}) :
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap font-mono font-black text-xs">
+                        {receiptsPageSubtotals.foreignUSD > 0 && receiptsPageSubtotals.localHTG === 0 ? (
+                          <>
+                            <span className="text-teal-800 text-xs font-black">{receiptsPageSubtotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
+                            <span className="block text-[10px] text-slate-500 font-bold">
+                              Eq: {receiptsPageSubtotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                            </span>
+                          </>
+                        ) : receiptsPageSubtotals.foreignUSD > 0 ? (
+                          <>
+                            <span className="text-emerald-800 text-xs font-black">{receiptsPageSubtotals.totalEquivHTG.toLocaleString('fr-FR')} HTG (Eq)</span>
+                            <span className="block text-[10px] text-teal-800 font-bold">
+                              {receiptsPageSubtotals.localHTG.toLocaleString('fr-FR')} HTG + {receiptsPageSubtotals.foreignUSD.toLocaleString('fr-FR')} USD
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-emerald-800 text-xs font-black">{receiptsPageSubtotals.localHTG.toLocaleString('fr-FR')} HTG</span>
+                        )}
+                      </td>
+                      <td colSpan={2} className="px-4 py-3"></td>
+                    </tr>
+
+                    {/* Ligne 2 : Total de la sélection / période filtrée */}
+                    <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-white font-extrabold text-xs border-t border-indigo-900/60">
+                      <td colSpan={5} className="px-4 py-3.5 text-right">
+                        <span className="text-[11px] uppercase tracking-wider text-indigo-300 font-black">
+                          Total Sélection ({filteredPayments.length} reçu{filteredPayments.length > 1 ? 's' : ''}) :
+                        </span>
+                      </td>
+                      <td className="px-4 py-3.5 text-right whitespace-nowrap font-mono font-black text-xs text-white">
+                        {receiptsFilteredTotals.foreignUSD > 0 && receiptsFilteredTotals.localHTG === 0 ? (
+                          <>
+                            <span className="text-teal-300 text-sm font-black">{receiptsFilteredTotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
+                            <span className="block text-[11px] text-emerald-300 font-extrabold">
+                              Total Équivalent : {receiptsFilteredTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                            </span>
+                          </>
+                        ) : receiptsFilteredTotals.foreignUSD > 0 ? (
+                          <>
+                            <span className="text-emerald-300 text-sm font-black">{receiptsFilteredTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG</span>
+                            <span className="block text-[11px] text-teal-200 font-bold">
+                              Dont : {receiptsFilteredTotals.localHTG.toLocaleString('fr-FR')} HTG + {receiptsFilteredTotals.foreignUSD.toLocaleString('fr-FR')} USD
+                            </span>
+                          </>
+                        ) : (
+                          <span className="text-emerald-300 text-sm font-black">{receiptsFilteredTotals.localHTG.toLocaleString('fr-FR')} HTG</span>
+                        )}
+                      </td>
+                      <td colSpan={2} className="px-4 py-3.5"></td>
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
 
@@ -817,13 +1063,31 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
                 </div>
-                <div className="bg-white/5 px-8 py-5 rounded-2xl border border-white/10 text-center md:text-right">
+                <div className="bg-white/5 px-6 sm:px-8 py-4 sm:py-5 rounded-2xl border border-white/10 text-center md:text-right font-mono">
                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-1">Total Encaissé</p>
-                  <p className="text-3xl font-bold text-emerald-400 tracking-tight">
-                    {studentPaymentsHistory
-                      .filter(p => p.status !== 'ANNULE' && !p.payment_method?.includes('EN ATTENTE'))
-                      .reduce((acc, c) => acc + c.amount, 0).toLocaleString()} <span className="text-sm font-medium">HTG</span>
-                  </p>
+                  {studentHistoryTotals.foreignUSD > 0 && studentHistoryTotals.localHTG === 0 ? (
+                    <>
+                      <p className="text-2xl sm:text-3xl font-black text-teal-300 tracking-tight whitespace-nowrap">
+                        {studentHistoryTotals.foreignUSD.toLocaleString('fr-FR')} <span className="text-sm font-bold">USD</span>
+                      </p>
+                      <p className="text-xs text-emerald-300 font-extrabold whitespace-nowrap mt-1">
+                        Total Équivalent : {studentHistoryTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                      </p>
+                    </>
+                  ) : studentHistoryTotals.foreignUSD > 0 ? (
+                    <>
+                      <p className="text-2xl sm:text-3xl font-black text-emerald-300 tracking-tight whitespace-nowrap">
+                        {studentHistoryTotals.totalEquivHTG.toLocaleString('fr-FR')} <span className="text-sm font-bold">HTG (Eq)</span>
+                      </p>
+                      <p className="text-xs text-teal-200 font-bold whitespace-nowrap mt-1">
+                        Dont : {studentHistoryTotals.localHTG.toLocaleString('fr-FR')} HTG + {studentHistoryTotals.foreignUSD.toLocaleString('fr-FR')} USD
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-2xl sm:text-3xl font-black text-emerald-400 tracking-tight whitespace-nowrap">
+                      {studentHistoryTotals.localHTG.toLocaleString('fr-FR')} <span className="text-sm font-bold">HTG</span>
+                    </p>
+                  )}
                 </div>
               </div>
 
@@ -843,14 +1107,15 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {studentPaymentsHistory.length > 0 ? (
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[620px] sm:min-w-0">
+                    <table className="w-full text-left border-collapse min-w-[680px] sm:min-w-0">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                          <th className="px-4 py-3.5 whitespace-nowrap">Date</th>
-                          <th className="px-4 py-3.5 whitespace-nowrap">Référence</th>
-                          <th className="px-4 py-3.5 whitespace-nowrap">Nature</th>
-                          <th className="px-4 py-3.5 text-right whitespace-nowrap">Montant</th>
-                          <th className="px-4 py-3.5 text-right whitespace-nowrap">Action</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap w-[130px]">Date & Heure</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap w-[125px]">Référence</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap w-[130px]">Nature</th>
+                          <th className="px-4 py-3.5 whitespace-nowrap w-[110px]">Mode</th>
+                          <th className="px-4 py-3.5 text-right whitespace-nowrap w-[150px]">Montant</th>
+                          <th className="px-4 py-3.5 text-right whitespace-nowrap w-[130px]">Action</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 text-xs">
@@ -858,10 +1123,10 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <tr key={p.id} className="group hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-3.5 whitespace-nowrap align-middle">
                               <div className="flex items-center gap-2">
-                                <Calendar size={13} className="text-slate-400 shrink-0 hidden sm:block" />
+                                <Calendar size={13} className="text-blue-600 shrink-0 hidden sm:block" />
                                 <div>
                                   <p className="font-bold text-slate-900 text-xs whitespace-nowrap">{p.date}</p>
-                                  <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-tight whitespace-nowrap">Enregistré</p>
+                                  <p className="text-[10px] text-slate-400 font-mono font-bold whitespace-nowrap">{p.time}</p>
                                 </div>
                               </div>
                             </td>
@@ -878,13 +1143,34 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 </span>
                               </div>
                             </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap align-middle">
+                              {getMethodBadge(p.payment_method)}
+                            </td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle">
-                              <div className="flex flex-col items-end whitespace-nowrap">
-                                <p className="text-xs font-black text-slate-900 whitespace-nowrap">{p.amount.toLocaleString()} G</p>
-                                {p.currency !== 'HTG' && (
-                                  <p className="text-[10px] text-slate-400 font-medium italic whitespace-nowrap">({p.original_amount.toLocaleString()} {p.currency})</p>
-                                )}
-                              </div>
+                              {p.currency === 'USD' || p.is_foreign_currency ? (
+                                <div className="space-y-0.5">
+                                  <div className="flex items-center justify-end gap-1.5">
+                                    <span className="px-1.5 py-0.5 rounded bg-teal-100/80 text-teal-900 text-[10px] font-black border border-teal-300/70">
+                                      USD
+                                    </span>
+                                    <span className="text-xs font-black text-teal-900 font-mono">
+                                      {p.original_amount?.toLocaleString('fr-FR')} USD
+                                    </span>
+                                  </div>
+                                  <span className="text-[10px] text-slate-500 font-bold block font-mono">
+                                    Eq: {p.amount?.toLocaleString('fr-FR')} HTG {p.exchange_rate_applied ? `(@${p.exchange_rate_applied})` : ''}
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-100/80 text-emerald-900 text-[10px] font-black border border-emerald-300/70">
+                                    HTG
+                                  </span>
+                                  <span className="text-xs font-black text-emerald-900 font-mono">
+                                    {p.amount?.toLocaleString('fr-FR')} HTG
+                                  </span>
+                                </div>
+                              )}
                             </td>
                             <td className="px-4 py-3.5 text-right whitespace-nowrap align-middle">
                               <button 
@@ -898,6 +1184,35 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </tr>
                         ))}
                       </tbody>
+                      <tfoot>
+                        <tr className="bg-slate-900 text-white font-extrabold text-xs border-t-2 border-slate-800">
+                          <td colSpan={4} className="px-4 py-3.5 text-right">
+                            <span className="text-[11px] uppercase tracking-wider text-slate-400 font-black">
+                              Total Reçu pour {selectedGenStudent.name} :
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5 text-right whitespace-nowrap font-mono font-black text-xs text-white">
+                            {studentHistoryTotals.foreignUSD > 0 && studentHistoryTotals.localHTG === 0 ? (
+                              <>
+                                <span className="text-teal-300 text-xs font-black">{studentHistoryTotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
+                                <span className="block text-[10px] text-emerald-300 font-extrabold">
+                                  Total Équivalent : {studentHistoryTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG
+                                </span>
+                              </>
+                            ) : studentHistoryTotals.foreignUSD > 0 ? (
+                              <>
+                                <span className="text-emerald-300 text-xs font-black">{studentHistoryTotals.totalEquivHTG.toLocaleString('fr-FR')} HTG</span>
+                                <span className="block text-[10px] text-teal-200 font-bold">
+                                  Dont : {studentHistoryTotals.localHTG.toLocaleString('fr-FR')} HTG + {studentHistoryTotals.foreignUSD.toLocaleString('fr-FR')} USD
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-emerald-300 text-xs font-black">{studentHistoryTotals.localHTG.toLocaleString('fr-FR')} HTG</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3.5"></td>
+                        </tr>
+                      </tfoot>
                     </table>
                   </div>
                 ) : (
