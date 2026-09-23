@@ -25,7 +25,13 @@ export function isAutonomousAccount(user?: UserProfile | null): boolean {
     return false;
   }
   
-  return Boolean(user.is_autonomous || !user.staff_id);
+  // Si le statut is_autonomous est explicitement défini (true/false)
+  if (typeof user.is_autonomous === 'boolean') {
+    return user.is_autonomous;
+  }
+
+  // Fallback de sécurité : un compte sans lien RH (staff_id) est considéré autonome
+  return !user.staff_id;
 }
 
 /**

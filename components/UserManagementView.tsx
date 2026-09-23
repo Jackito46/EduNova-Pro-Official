@@ -143,19 +143,53 @@ const getRolePermissionsSummary = (role: string, terminology: any) => {
   }
 };
 
+export type DurationPresetType = number | '1H' | '2H' | '4H' | '8H' | '12H' | '24H' | 'END_YEAR' | 'CUSTOM' | string;
+
 // Expiration calculation helper for autonomous and temporary accounts
 export const calculateExpiryDate = (
-  preset: number | 'END_YEAR' | 'CUSTOM',
+  preset: DurationPresetType,
   customDate?: string
 ): { iso: string; label: string } => {
   if (preset === 'CUSTOM' && customDate) {
     const d = new Date(customDate);
-    d.setHours(23, 59, 59, 999);
+    const hasTime = customDate.includes('T');
+    if (!hasTime) {
+      d.setHours(23, 59, 59, 999);
+    }
+    const formattedDate = d.toLocaleDateString('fr-FR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
+    const formattedTime = d.toLocaleTimeString('fr-FR', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+    const label = hasTime 
+      ? `Date butoir (${formattedDate} à ${formattedTime})`
+      : `Date butoir (${formattedDate})`;
     return {
       iso: d.toISOString(),
-      label: `Date butoir (${d.toLocaleDateString('fr-FR')})`
+      label
     };
   }
+
+  // Hourly presets (e.g. 1H, 2H, 4H, 8H, 12H, 24H)
+  if (typeof preset === 'string' && preset.endsWith('H')) {
+    const hours = parseInt(preset.replace('H', ''), 10);
+    if (!isNaN(hours) && hours > 0) {
+      const d = new Date();
+      d.setTime(d.getTime() + hours * 60 * 60 * 1000);
+      const timeStr = d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+      const isToday = d.toDateString() === new Date().toDateString();
+      const dateStr = isToday ? "aujourd'hui" : `le ${d.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}`;
+      return {
+        iso: d.toISOString(),
+        label: `${hours} heure${hours > 1 ? 's' : ''} (Jusqu'à ${timeStr} ${dateStr})`
+      };
+    }
+  }
+
   if (preset === 'END_YEAR') {
     const now = new Date();
     const currentYear = now.getFullYear();
@@ -166,12 +200,14 @@ export const calculateExpiryDate = (
       label: `Fin d'Année Scolaire (30 Juin ${targetYear})`
     };
   }
+
   const d = new Date();
   const numDays = typeof preset === 'number' ? preset : 30;
   d.setDate(d.getDate() + numDays);
   d.setHours(23, 59, 59, 999);
   let label = `${numDays} jours`;
-  if (numDays === 7) label = '7 jours (Mission d\'urgence)';
+  if (numDays === 1) label = '24 heures (1 jour)';
+  else if (numDays === 7) label = '7 jours (Mission d\'urgence)';
   else if (numDays === 15) label = '15 jours (Remplacement court)';
   else if (numDays === 30) label = '1 mois (30 jours)';
   else if (numDays === 90) label = '3 mois (Trimestre)';
@@ -195,30 +231,66 @@ export const getUserExpiryInfo = (u: UserProfile) => {
   const expiry = new Date(u.expires_at).getTime();
   const diffMs = expiry - now;
   const daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24));
-  const formattedExpiry = new Date(u.expires_at).toLocaleDateString('fr-FR');
+  
+  const expiryDate = new Date(u.expires_at);
+  const isToday = expiryDate.toDateString() === new Date().toDateString();
+  const formattedTime = expiryDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const formattedDate = expiryDate.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const formattedExpiry = `${formattedDate} à ${formattedTime}`;
 
   if (diffMs <= 0) {
     return {
       isExpired: true,
       isExpiringSoon: false,
-      text: `Expiré le ${formattedExpiry}`,
-      daysLeft,
+      text: `Expiré (${isToday ? `aujourd'hui à ${formattedTime}` : formattedDate})`,
+      daysLeft: 0,
       formattedExpiry
     };
   }
+
+  // Moins de 60 minutes
+  if (diffMs < 60 * 60 * 1000) {
+    const minsLeft = Math.max(1, Math.round(diffMs / (60 * 1000)));
+    return {
+      isExpired: false,
+      isExpiringSoon: true,
+      text: `Expire dans ${minsLeft} min (${formattedTime})`,
+      daysLeft: 0,
+      formattedExpiry
+    };
+  }
+
+  // Moins de 24 heures
+  if (diffMs < 24 * 60 * 60 * 1000) {
+    const hoursLeft = Math.floor(diffMs / (1000 * 60 * 60));
+    const minsLeft = Math.round((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    const durationText = hoursLeft > 0 
+      ? `${hoursLeft}h${minsLeft > 0 ? `${minsLeft}m` : ''}` 
+      : `${minsLeft} min`;
+    return {
+      isExpired: false,
+      isExpiringSoon: true,
+      text: `Expire dans ${durationText} (${formattedTime})`,
+      daysLeft: 0,
+      formattedExpiry
+    };
+  }
+
+  // Moins de 7 jours
   if (daysLeft <= 7) {
     return {
       isExpired: false,
       isExpiringSoon: true,
-      text: `Expire dans ${daysLeft}j (${formattedExpiry})`,
+      text: `Expire dans ${daysLeft}j (${formattedDate})`,
       daysLeft,
       formattedExpiry
     };
   }
+
   return {
     isExpired: false,
     isExpiringSoon: false,
-    text: `Échéance : ${formattedExpiry}`,
+    text: `Échéance : ${formattedDate}`,
     daysLeft,
     formattedExpiry
   };
@@ -313,7 +385,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     campus_id: '',
     forcePasswordChange: true,
     accessDurationType: 'PERMANENT' as 'PERMANENT' | 'TEMPORARY',
-    durationPreset: 30 as number | 'END_YEAR' | 'CUSTOM',
+    durationPreset: 30 as DurationPresetType,
     customExpiryDate: ''
   });
 
@@ -321,7 +393,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
     isOpen: boolean;
     user: UserProfile | null;
     actionType: 'PROLONG' | 'PERMANENT' | 'LINK_RH';
-    durationPreset: number | 'END_YEAR' | 'CUSTOM';
+    durationPreset: DurationPresetType;
     customExpiryDate: string;
     linkStaffId: string;
   }>({
@@ -436,6 +508,27 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
           usersData = usersData.map(u => expiredIds.includes(u.id) ? { ...u, is_active: false } : u);
         }
         
+        const rawStaffList = (staffResponse.data as StaffMember[]) || [];
+        const staffByEmail = new Map<string, string>();
+        rawStaffList.forEach(s => {
+          if (s.email) {
+            staffByEmail.set(s.email.toLowerCase().trim(), s.id);
+          }
+        });
+
+        // Reconcile and enrich profiles with HR registry staff_id
+        usersData = usersData.map(u => {
+          const emailKey = (u.email || '').toLowerCase().trim();
+          const matchedStaffId = u.staff_id || staffByEmail.get(emailKey) || null;
+          return {
+            ...u,
+            staff_id: matchedStaffId,
+            is_autonomous: typeof u.is_autonomous === 'boolean' 
+              ? u.is_autonomous 
+              : (matchedStaffId ? false : !matchedStaffId)
+          };
+        });
+
         const sortedData = usersData.sort((a, b) => 
           (a.full_name || '').localeCompare(b.full_name || '')
         );
@@ -1738,7 +1831,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
 
                           {canManageUser(u) ? (
                             <>
-                              {(u.is_autonomous || !u.staff_id) && (currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN || !isAutonomousAccount(currentUser)) && (
+                              {isAutonomousAccount(u) && (currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN || !isAutonomousAccount(currentUser)) && (
                                 <button 
                                   onClick={() => {
                                     openReopenModal(u);
@@ -2069,50 +2162,84 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                     </div>
 
                     {formData.accessDurationType === 'TEMPORARY' && (
-                      <div className="pt-2 space-y-2 border-t border-slate-200/80 mt-1">
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                          {[
-                            { value: 7, label: '⚡ 7 jours (Urgence)' },
-                            { value: 15, label: '📅 15 jours (Court)' },
-                            { value: 30, label: '🗓️ 1 mois (30j)' },
-                            { value: 90, label: '🏛️ 3 mois (Trimestre)' },
-                            { value: 'END_YEAR', label: '🎓 Fin d\'année (30 Juin)' },
-                            { value: 'CUSTOM', label: '📆 Date au choix' }
-                          ].map(opt => (
-                            <button
-                              key={opt.value}
-                              type="button"
-                              onClick={() => setFormData({ ...formData, durationPreset: opt.value as any })}
-                              className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
-                                formData.durationPreset === opt.value
-                                  ? 'bg-amber-100 text-amber-900 border-amber-400 font-bold shadow-2xs'
-                                  : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                              }`}
-                            >
-                              {opt.label}
-                            </button>
-                          ))}
+                      <div className="pt-2 space-y-2.5 border-t border-slate-200/80 mt-1">
+                        <div>
+                          <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block mb-1">
+                            ⚡ Durée Express (Heures) :
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                            {[
+                              { value: '1H', label: '⚡ 1 heure (Express)' },
+                              { value: '2H', label: '⏱️ 2 heures (Dépannage)' },
+                              { value: '4H', label: '⏳ 4 heures (Demi-jour)' },
+                              { value: '8H', label: '🏢 8 heures (Journée)' },
+                            ].map(opt => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, durationPreset: opt.value as any })}
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
+                                  formData.durationPreset === opt.value
+                                    ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-2xs'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
+
+                          <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block mb-1">
+                            📅 Durée Étendue (Jours & Mois) :
+                          </span>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                            {[
+                              { value: 1, label: '🌓 24 heures (1 jour)' },
+                              { value: 7, label: '⚡ 7 jours (Urgence)' },
+                              { value: 15, label: '📅 15 jours (Court)' },
+                              { value: 30, label: '🗓️ 1 mois (30j)' },
+                              { value: 90, label: '🏛️ 3 mois (Trimestre)' },
+                              { value: 'END_YEAR', label: '🎓 Fin d\'année (30 Juin)' },
+                              { value: 'CUSTOM', label: '📆 Date & Heure au choix' }
+                            ].map(opt => (
+                              <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setFormData({ ...formData, durationPreset: opt.value as any })}
+                                className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
+                                  formData.durationPreset === opt.value
+                                    ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-2xs'
+                                    : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                                }`}
+                              >
+                                {opt.label}
+                              </button>
+                            ))}
+                          </div>
                         </div>
 
                         {formData.durationPreset === 'CUSTOM' && (
                           <div className="pt-1">
                             <label className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block mb-1">
-                              Choisir la date d'expiration exacte :
+                              Choisir la date et l'heure d'expiration exacte :
                             </label>
                             <input
-                              type="date"
-                              min={new Date().toISOString().split('T')[0]}
+                              type="datetime-local"
+                              min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
                               value={formData.customExpiryDate}
                               onChange={(e) => setFormData({ ...formData, customExpiryDate: e.target.value })}
                               className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-200"
                             />
+                            <p className="text-[10px] text-slate-500 mt-0.5">
+                              Précisez le jour et l'heure de désactivation automatique à la minute près.
+                            </p>
                           </div>
                         )}
 
                         <div className="p-2 bg-amber-50 border border-amber-200 text-amber-900 rounded-lg text-[11px] font-medium flex items-start gap-1.5">
                           <Clock size={13} className="mt-0.5 text-amber-700 shrink-0" />
                           <span>
-                            Ce compte sera actif jusqu'au : <strong>{calculateExpiryDate(formData.durationPreset, formData.customExpiryDate).label}</strong>. À cette date, la connexion sera verrouillée automatiquement.
+                            Ce compte sera actif jusqu'au : <strong>{calculateExpiryDate(formData.durationPreset, formData.customExpiryDate).label}</strong>. À cette échéance, la connexion sera verrouillée automatiquement.
                           </span>
                         </div>
                       </div>
@@ -2550,7 +2677,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                         </div>
                       )}
 
-                      {(selectedUserModal.is_autonomous || !selectedUserModal.staff_id) && (currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN || !isAutonomousAccount(currentUser)) && (
+                      {isAutonomousAccount(selectedUserModal) && (currentUser.is_super_admin || currentUser.role === UserRole.SUPER_ADMIN || !isAutonomousAccount(currentUser)) && (
                         <div className="pt-2 border-t border-slate-200">
                           <button
                             type="button"
@@ -2942,42 +3069,76 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                     <label className="text-[11px] font-bold text-amber-900 uppercase tracking-wider block">
                       Sélectionnez la période de prolongation :
                     </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
-                      {[
-                        { value: 7, label: '⚡ 7 jours (Urgence)' },
-                        { value: 15, label: '📅 15 jours (Court)' },
-                        { value: 30, label: '🗓️ 1 mois (30 jours)' },
-                        { value: 90, label: '🏛️ 3 mois (Trimestre)' },
-                        { value: 'END_YEAR', label: '🎓 Fin d\'année (30 Juin)' },
-                        { value: 'CUSTOM', label: '📆 Date au choix' }
-                      ].map(opt => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => setReopenModal({ ...reopenModal, durationPreset: opt.value as any })}
-                          className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
-                            reopenModal.durationPreset === opt.value
-                              ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-2xs'
-                              : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                    <div>
+                      <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block mb-1">
+                        ⚡ Durée Express (Heures) :
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 mb-2">
+                        {[
+                          { value: '1H', label: '⚡ 1 heure (Express)' },
+                          { value: '2H', label: '⏱️ 2 heures (Dépannage)' },
+                          { value: '4H', label: '⏳ 4 heures (Demi-jour)' },
+                          { value: '8H', label: '🏢 8 heures (Journée)' },
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setReopenModal({ ...reopenModal, durationPreset: opt.value as any })}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
+                              reopenModal.durationPreset === opt.value
+                                ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <span className="text-[10px] font-bold text-amber-900 uppercase tracking-wider block mb-1">
+                        📅 Durée Étendue (Jours & Mois) :
+                      </span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+                        {[
+                          { value: 1, label: '🌓 24 heures (1 jour)' },
+                          { value: 7, label: '⚡ 7 jours (Urgence)' },
+                          { value: 15, label: '📅 15 jours (Court)' },
+                          { value: 30, label: '🗓️ 1 mois (30 jours)' },
+                          { value: 90, label: '🏛️ 3 mois (Trimestre)' },
+                          { value: 'END_YEAR', label: '🎓 Fin d\'année (30 Juin)' },
+                          { value: 'CUSTOM', label: '📆 Date & Heure au choix' }
+                        ].map(opt => (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setReopenModal({ ...reopenModal, durationPreset: opt.value as any })}
+                            className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all border text-left cursor-pointer ${
+                              reopenModal.durationPreset === opt.value
+                                ? 'bg-amber-500 text-white border-amber-600 font-bold shadow-2xs'
+                                : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100'
+                            }`}
+                          >
+                            {opt.label}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
                     {reopenModal.durationPreset === 'CUSTOM' && (
                       <div className="pt-1">
                         <label className="text-[10px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                          Date d'expiration exacte :
+                          Date et heure d'expiration exacte :
                         </label>
                         <input
-                          type="date"
-                          min={new Date().toISOString().split('T')[0]}
+                          type="datetime-local"
+                          min={new Date(Date.now() + 5 * 60 * 1000).toISOString().slice(0, 16)}
                           value={reopenModal.customExpiryDate}
                           onChange={(e) => setReopenModal({ ...reopenModal, customExpiryDate: e.target.value })}
                           className="w-full px-3 py-1.5 bg-white border border-amber-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:ring-2 focus:ring-amber-200"
                         />
+                        <p className="text-[10px] text-slate-500 mt-0.5">
+                          Précisez le jour et l'heure exacte de verrouillage.
+                        </p>
                       </div>
                     )}
 

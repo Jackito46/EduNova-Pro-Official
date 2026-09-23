@@ -1086,7 +1086,7 @@ const App: React.FC = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('current_session_id, role, is_super_admin, is_active, school_id')
+          .select('current_session_id, role, is_super_admin, is_active, school_id, expires_at')
           .eq('id', user.id)
           .single();
           
@@ -1096,6 +1096,17 @@ const App: React.FC = () => {
         }
 
         if (data) {
+          // Check expiration during active session
+          if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now() && data.role !== 'SUPER_ADMIN' && !data.is_super_admin) {
+            console.warn("Compte expiré pendant la session active. Déconnexion immédiate.");
+            try { await supabase.from('profiles').update({ is_active: false }).eq('id', user.id); } catch (e) {}
+            try { 
+              window.sessionStorage.setItem('edunova_login_error', "La durée de validité de votre accès a expiré. Votre session a été verrouillée automatiquement."); 
+            } catch(e){}
+            purgeSystemState();
+            return;
+          }
+
           if (data.is_active === false && data.role !== 'SUPER_ADMIN' && !data.is_super_admin) {
             console.warn("Compte désactivé détecté.");
             try { window.sessionStorage.setItem('edunova_login_error', "Votre compte a été désactivé par l'administration."); } catch(e){}
