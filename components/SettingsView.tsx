@@ -1981,18 +1981,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                </div>
 
                <div className="flex items-center gap-2 w-full sm:w-auto">
-                 {isSuperAdmin && (
-                   <Link
-                     to="/super-admin/system-health?tab=database"
-                     className="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                     title="Analyser le temps de chargement de l'identité et la latence Supabase dans Santé Système"
-                   >
-                     <Activity size={13} className="text-indigo-600 animate-pulse" />
-                     <span>Tester Latence BD</span>
-                   </Link>
-                 )}
-
-                 <button 
+                  <button 
                    onClick={handleUpdateSchool} 
                    disabled={saving || !canManageAllCampuses} 
                    className="flex-1 sm:flex-initial px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
