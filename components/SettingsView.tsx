@@ -78,6 +78,7 @@ import { AuditLogger } from '../utils/auditLogger';
 import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 import Logo from './Logo';
 import { useSchool } from '../contexts/SchoolContext';
+import { LogoStorageMigrationService } from '../services/logoStorageMigrationService';
 import SessionManager from './SessionManager';
 import { 
   DocumentDefinition, 
@@ -461,13 +462,24 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Compression en WebP ou PNG (WebP est plus léger)
-        const compressedBase64 = canvas.toDataURL('image/webp', 0.8);
-        
-        setSchoolData({ ...schoolData, logo_url: compressedBase64 });
-        // Mise en cache locale pour le mode OFFLINE
-        localStorage.setItem(`school_logo_${user.school_id}`, compressedBase64);
-        toast.success("Logo compressé et chargé localement. N'oubliez pas d'enregistrer.");
+        // Upload optimisé direct vers Supabase Storage (CDN public)
+        canvas.toBlob(async (blob) => {
+          if (blob && user.school_id) {
+            toast.loading("Téléversement du logo vers Supabase Storage (CDN)...", { id: 'logo-upload' });
+            const uploadRes = await LogoStorageMigrationService.uploadLogoBlob(user.school_id, blob, 'school');
+            if (uploadRes.success && uploadRes.publicUrl) {
+              setSchoolData({ ...schoolData, logo_url: uploadRes.publicUrl });
+              localStorage.setItem(`school_logo_${user.school_id}`, uploadRes.publicUrl);
+              toast.success("Logo hébergé sur Supabase Storage avec succès (0 Ko dans SQL) ! N'oubliez pas d'enregistrer.", { id: 'logo-upload' });
+              return;
+            }
+          }
+          // Fallback local WebP compressé
+          const compressedBase64 = canvas.toDataURL('image/webp', 0.8);
+          setSchoolData({ ...schoolData, logo_url: compressedBase64 });
+          localStorage.setItem(`school_logo_${user.school_id}`, compressedBase64);
+          toast.success("Logo compressé et préparé localement. N'oubliez pas d'enregistrer.", { id: 'logo-upload' });
+        }, 'image/webp', 0.85);
       };
       img.src = event.target?.result as string;
     };

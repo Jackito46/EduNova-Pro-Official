@@ -806,7 +806,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         isCertifiedManager || 
         isPresenceApproved || 
         existingSignatureStatus === 'VALIDATED'
-      ) ? 'VALIDATED' : (existingSignatureStatus || 'SIGNED');
+      ) ? 'VALIDATED' : (existingSignatureStatus === 'VALIDATED' ? 'VALIDATED' : 'SIGNED');
 
       const payload: any = {
         school_id: user.school_id,

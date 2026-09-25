@@ -22,9 +22,12 @@ import {
   Gauge,
   Lock,
   Layers,
-  Zap
+  Zap,
+  Loader2,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { LogoStorageMigrationService } from '../services/logoStorageMigrationService';
 import { 
   supabaseLatencyTracker, 
   SupabaseLatencyLog, 
@@ -64,6 +67,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
   const [report, setReport] = useState<DiagnosticSuiteReport | null>(null);
   const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
   const [diagnosticStep, setDiagnosticStep] = useState<string>('');
+  const [isMigratingLogos, setIsMigratingLogos] = useState(false);
   
   // Filters for real-time logs
   const [filterType, setFilterType] = useState<'all' | 'identity' | 'slow' | 'errors'>('all');
@@ -121,6 +125,27 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
     }
   }, [effectiveSchoolId]);
 
+  const handleMigrateLogos = async () => {
+    setIsMigratingLogos(true);
+    const toastId = toast.loading("Migration des logos vers Supabase Storage en cours (Multi-Tenant & Annexes)...");
+    try {
+      const res = await LogoStorageMigrationService.migrateAllLogosToStorage();
+      if (res.success) {
+        toast.success(
+          `Migration réussie ! ${res.migratedSchools} établissement(s) et ${res.migratedCampuses} annexe(s) optimisés. Économie PostgreSQL : ${Math.round(res.bytesSaved / 1024)} Ko.`,
+          { id: toastId, duration: 6000 }
+        );
+        await handleRunFullDiagnosis();
+      } else {
+        toast.error("La migration s'est achevée avec des avertissements. Vérifiez la console.", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la migration vers Supabase Storage", { id: toastId });
+    } finally {
+      setIsMigratingLogos(false);
+    }
+  };
+
   // Auto-run light initial benchmark if never run before
   useEffect(() => {
     if (!report && effectiveSchoolId) {
@@ -164,10 +189,14 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
     toast.info("Journal de latence réinitialisé");
   };
 
-  // Get color for latency badges
-  const getLatencyColor = (ms: number) => {
-    if (ms < 250) return 'text-emerald-700 bg-emerald-50 border-emerald-200/80';
-    if (ms < 650) return 'text-amber-700 bg-amber-50 border-amber-200/80';
+  // Get color for latency badges based on status and context
+  const getLatencyColor = (ms: number, status?: DiagnosticBenchmarkItem['status']) => {
+    if (status === 'OPTIMAL') return 'text-emerald-700 bg-emerald-50 border-emerald-200/80';
+    if (status === 'ACCEPTABLE') return 'text-blue-700 bg-blue-50 border-blue-200/80';
+    if (status === 'WARNING') return 'text-amber-700 bg-amber-50 border-amber-200/80';
+    if (status === 'CRITICAL' || status === 'ERROR') return 'text-rose-700 bg-rose-50 border-rose-200/80';
+    if (ms < 350) return 'text-emerald-700 bg-emerald-50 border-emerald-200/80';
+    if (ms < 850) return 'text-amber-700 bg-amber-50 border-amber-200/80';
     return 'text-rose-700 bg-rose-50 border-rose-200/80';
   };
 
@@ -465,16 +494,28 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                 Analyse de la Lenteur de l'Identité Établissement
               </h3>
             </div>
-            {onNavigateToSchoolProfile && (
+            <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={onNavigateToSchoolProfile}
-                className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer"
+                onClick={handleMigrateLogos}
+                disabled={isMigratingLogos}
+                className="text-[11px] font-bold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200/80 px-2 py-0.5 rounded flex items-center gap-1 cursor-pointer transition-colors disabled:opacity-50"
+                title="Migrer les logos Base64 vers Supabase Storage pour tous les établissements et leurs annexes"
               >
-                <span>Fiche École</span>
-                <ChevronRight size={13} />
+                {isMigratingLogos ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} className="text-amber-600" />}
+                <span>{isMigratingLogos ? 'Migration...' : 'Optimiser Logos (Storage)'}</span>
               </button>
-            )}
+              {onNavigateToSchoolProfile && (
+                <button
+                  type="button"
+                  onClick={onNavigateToSchoolProfile}
+                  className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-0.5 cursor-pointer"
+                >
+                  <span>Fiche École</span>
+                  <ChevronRight size={13} />
+                </button>
+              )}
+            </div>
           </div>
 
           <div className="p-3 sm:p-3.5 space-y-2">
@@ -501,10 +542,24 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                 <div className="space-y-1 flex-1 min-w-0">
                   <div className="font-black tracking-tight">{insight.title}</div>
                   <p className="text-[11px] leading-relaxed text-slate-700">{insight.description}</p>
-                  <div className="pt-0.5 text-[11px] font-semibold text-slate-900 flex items-start gap-1">
+                  <div className="pt-0.5 text-[11px] font-semibold text-slate-900 flex items-start gap-1 flex-wrap">
                     <span className="text-indigo-600 font-bold shrink-0">Action :</span>
                     <span>{insight.recommendation}</span>
                   </div>
+
+                  {insight.id === 'heavy_payload' && (
+                    <div className="pt-2">
+                      <button
+                        type="button"
+                        onClick={handleMigrateLogos}
+                        disabled={isMigratingLogos}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-lg text-xs font-bold shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        {isMigratingLogos ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+                        <span>{isMigratingLogos ? 'Migration en cours...' : '⚡ Migrer tous les logos Base64 vers Supabase Storage (Multi-Tenant & Annexes)'}</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
@@ -514,77 +569,153 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
 
       {/* 5. TABLEAU DES BENCHMARKS DÉTAILLÉS */}
       {report && report.items.length > 0 && (
-        <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
-          <div className="px-3.5 py-2 bg-slate-50/90 border-b border-slate-200/80 flex items-center justify-between">
-            <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-              <span>Sondes & Benchmarks de Latence</span>
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 bg-slate-200 text-slate-700 rounded">
-                {report.items.length} tests
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+          <div className="px-3.5 py-2.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+              <Activity size={16} className="text-indigo-600" />
+              <span>Sondes & Benchmarks de Latence Réseau & SQL</span>
+              <span className="text-[10px] font-mono font-black px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded-full border border-indigo-200">
+                {report.items.length} sondes actives
               </span>
             </h3>
-            <span className="text-[10px] font-mono text-slate-500 hidden sm:inline">
-              Moyenne : {Math.round(report.items.reduce((acc, i) => acc + (i.durationMs < 9999 ? i.durationMs : 0), 0) / report.items.length)} ms
-            </span>
+            <div className="flex items-center gap-3 text-[11px]">
+              <span className="text-slate-600 font-medium hidden sm:inline">
+                Latence moyenne globale :
+              </span>
+              <span className="font-mono font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200 shadow-2xs">
+                {(() => {
+                  const valid = report.items.filter(i => i.durationMs < 9999);
+                  return valid.length ? Math.round(valid.reduce((acc, i) => acc + i.durationMs, 0) / valid.length) : 0;
+                })()} ms
+              </span>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50/50 border-b border-slate-200/80 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                  <th className="py-2 px-3">Point d'accès</th>
-                  <th className="py-2 px-3">Catégorie</th>
-                  <th className="py-2 px-3">Temps de Réponse</th>
-                  <th className="py-2 px-3">Payload</th>
-                  <th className="py-2 px-3">Observations</th>
+                <tr className="bg-slate-100/90 border-b border-slate-200 text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
+                  <th className="py-2.5 px-3">Test & Point d'accès</th>
+                  <th className="py-2.5 px-3">Type & Infrastructure</th>
+                  <th className="py-2.5 px-3">Temps de Réponse</th>
+                  <th className="py-2.5 px-3">Poids Transféré</th>
+                  <th className="py-2.5 px-3">Diagnostic & Observations Détaillées</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 text-[11px]">
-                {report.items.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-1.5 px-2.5 sm:px-3 font-bold text-slate-900">
-                      <div className="leading-tight text-xs">{item.label}</div>
-                      <div className="text-[10px] font-normal text-slate-500 leading-tight mt-0.5 max-w-md">{item.description}</div>
-                    </td>
-                    <td className="py-2 px-3">
-                      <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono text-[9.5px] font-bold">
-                        {item.category}
-                      </span>
-                    </td>
-                    <td className="py-2 px-3">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`px-2 py-0.5 rounded font-mono font-black text-[11px] border ${getLatencyColor(item.durationMs)}`}>
-                          {item.durationMs} ms
+              <tbody className="divide-y divide-slate-100 text-xs">
+                {report.items.map((item) => {
+                  // Determine icon based on probe ID
+                  const ProbeIcon = 
+                    item.id === 'ping_health' ? Globe :
+                    item.id === 'cache_local' ? Zap :
+                    item.id === 'identity_select_all' ? Database :
+                    item.id === 'identity_select_light' ? Sparkles :
+                    item.id === 'campuses_select' ? Layers :
+                    item.id === 'academic_years_select' ? Clock : ShieldCheck;
+
+                  const pingItem = report.items.find(i => i.id === 'ping_health');
+                  const basePing = pingItem && pingItem.durationMs < 9999 ? pingItem.durationMs : 0;
+                  const sqlOverhead = item.category !== 'NETWORK' && item.category !== 'CACHE' && basePing > 0
+                    ? Math.max(1, item.durationMs - basePing)
+                    : null;
+
+                  return (
+                    <tr key={item.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2.5 px-3 font-bold text-slate-900 align-top">
+                        <div className="flex items-start gap-2">
+                          <div className="p-1 rounded-md bg-slate-100 text-slate-700 mt-0.5 shrink-0">
+                            <ProbeIcon size={14} className="stroke-[2.2]" />
+                          </div>
+                          <div>
+                            <div className="leading-tight text-xs font-black text-slate-900">{item.label}</div>
+                            <div className="text-[10.5px] font-medium text-slate-600 leading-snug mt-0.5 max-w-sm">
+                              {item.description}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-2.5 px-3 align-top">
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-black border uppercase tracking-wider ${
+                          item.category === 'NETWORK' 
+                            ? 'bg-sky-50 text-sky-800 border-sky-200' 
+                            : item.category === 'CACHE' 
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                            : item.category === 'IDENTITY' 
+                            ? 'bg-indigo-50 text-indigo-800 border-indigo-200' 
+                            : item.category === 'CAMPUSES' 
+                            ? 'bg-purple-50 text-purple-800 border-purple-200' 
+                            : item.category === 'ACADEMIC' 
+                            ? 'bg-blue-50 text-blue-800 border-blue-200' 
+                            : 'bg-teal-50 text-teal-800 border-teal-200'
+                        }`}>
+                          {item.category === 'NETWORK' ? 'Transit FAI / RTT' :
+                           item.category === 'CACHE' ? 'Cache Navigateur' :
+                           item.category === 'IDENTITY' ? 'PostgreSQL Schools' :
+                           item.category === 'CAMPUSES' ? 'Multi-Sites' :
+                           item.category === 'ACADEMIC' ? 'Sessions Scolaires' : 'Session JWT'}
                         </span>
-                        {getStatusBadge(item.status)}
-                      </div>
-                    </td>
-                    <td className="py-2 px-3 font-mono text-[10px] text-slate-600">
-                      {item.bytesReceived != null ? (
-                        item.bytesReceived > 1024 
-                          ? `${Math.round(item.bytesReceived / 1024)} Ko` 
-                          : `${item.bytesReceived} o`
-                      ) : (
-                        '—'
-                      )}
-                    </td>
-                    <td className="py-2 px-3 text-slate-600 text-[11px]">
-                      {item.error ? (
-                        <span className="text-rose-600 font-medium flex items-center gap-1">
-                          <XCircle size={12} /> {item.error}
-                        </span>
-                      ) : (
-                        <div className="space-y-0.5">
-                          <span>{item.details || 'Normal'}</span>
-                          {item.payloadAnalysis?.hasLargeBase64 && (
-                            <span className="text-[10px] font-bold text-amber-600 flex items-center gap-1">
-                              <AlertTriangle size={11} /> Image Base64 détectée
+                      </td>
+                      <td className="py-2.5 px-3 align-top">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className={`px-2 py-0.5 rounded font-mono font-black text-xs border ${getLatencyColor(item.durationMs, item.status)}`}>
+                              {item.durationMs} ms
                             </span>
+                            {getStatusBadge(item.status)}
+                          </div>
+                          {sqlOverhead != null && (
+                            <div className="text-[10px] text-slate-600 font-medium">
+                              Overhead SQL pur : <span className="font-bold text-slate-900">{sqlOverhead} ms</span>
+                            </div>
+                          )}
+                          {item.category === 'CACHE' && (
+                            <div className="text-[10px] text-emerald-700 font-bold">
+                              ⚡ Réponse instantanée sans réseau
+                            </div>
                           )}
                         </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-2.5 px-3 font-mono text-[11px] align-top">
+                        {item.bytesReceived != null ? (
+                          <div className="space-y-0.5">
+                            <div className="font-black text-slate-900">
+                              {item.bytesReceived > 1024 
+                                ? `${(item.bytesReceived / 1024).toFixed(1)} Ko` 
+                                : `${item.bytesReceived} octets`}
+                            </div>
+                            <div className="text-[9.5px] font-sans text-slate-500 font-medium">
+                              {item.id === 'identity_select_all' ? 'Logo CDN + JSON' :
+                               item.id === 'identity_select_light' ? 'Payload optimisé' :
+                               item.category === 'CACHE' ? 'LocalStorage' : 'En-têtes HTTP'}
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400 font-sans">—</span>
+                        )}
+                      </td>
+                      <td className="py-2.5 px-3 text-slate-800 text-xs align-top">
+                        {item.error ? (
+                          <span className="text-rose-700 font-bold flex items-center gap-1.5 bg-rose-50 px-2 py-1 rounded border border-rose-200">
+                            <XCircle size={14} className="shrink-0 text-rose-600" />
+                            <span>{item.error}</span>
+                          </span>
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="font-semibold text-slate-800 leading-snug">
+                              {item.details || 'Opération conforme'}
+                            </p>
+                            {item.payloadAnalysis?.hasLargeBase64 && (
+                              <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10.5px] font-black text-amber-900 bg-amber-50 border border-amber-300">
+                                <AlertTriangle size={12} className="text-amber-600 shrink-0" />
+                                <span>Logo Base64 encombrant dans PostgreSQL</span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -592,17 +723,18 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
       )}
 
       {/* 6. CONSOLE DE TRAÇABILITÉ DES REQUÊTES SUPABASE EN TEMPS RÉEL */}
-      <div className="bg-white rounded-xl border border-slate-200/80 shadow-2xs overflow-hidden">
-        <div className="p-2.5 sm:p-3 bg-slate-50/90 border-b border-slate-200/80 space-y-2.5">
+      <div className="bg-white rounded-xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="p-3 bg-slate-50 border-b border-slate-200 space-y-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
-              <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight flex items-center gap-1.5">
+              <h3 className="text-xs sm:text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Database size={16} className="text-indigo-600" />
                 <span>Journal des Requêtes Supabase en Direct</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-black bg-indigo-100 text-indigo-700">
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-indigo-100 text-indigo-800 border border-indigo-200">
                   {logs.length} capturées
                 </span>
               </h3>
-              <p className="text-[10.5px] text-slate-500">
+              <p className="text-[11px] text-slate-600 font-medium mt-0.5">
                 Interception globale de tous les appels PostgREST, Auth et Storage dans l'application
               </p>
             </div>
@@ -610,24 +742,24 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
             <button
               type="button"
               onClick={handleClearLogs}
-              className="self-end sm:self-center px-2 py-1 bg-white hover:bg-slate-100 text-slate-700 text-[11px] font-bold rounded-lg border border-slate-200 flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+              className="self-end sm:self-center px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 text-xs font-bold rounded-lg border border-slate-300 flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               title="Vider le journal local"
             >
-              <Trash2 size={11} className="text-slate-500" />
-              <span>Vider</span>
+              <Trash2 size={13} className="text-slate-500" />
+              <span>Vider le journal</span>
             </button>
           </div>
 
-          {/* Compact Filter Pills and Search */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="flex flex-wrap items-center gap-1">
+          {/* Filter Pills and High-Contrast Search Box */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+            <div className="flex flex-wrap items-center gap-1.5">
               <button
                 type="button"
                 onClick={() => setFilterType('all')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                className={`px-3 py-1 rounded-lg text-xs font-black transition-all cursor-pointer ${
                   filterType === 'all'
                     ? 'bg-slate-900 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
                 }`}
               >
                 Toutes ({metrics.totalRequests})
@@ -636,14 +768,16 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
               <button
                 type="button"
                 onClick={() => setFilterType('identity')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
                   filterType === 'identity'
                     ? 'bg-indigo-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
                 }`}
               >
                 <span>Identité</span>
-                <span className="px-1 py-0.2 rounded-full text-[9px] bg-indigo-100 text-indigo-800">
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterType === 'identity' ? 'bg-indigo-700 text-white' : 'bg-indigo-100 text-indigo-800'
+                }`}>
                   {metrics.identityQueryCount}
                 </span>
               </button>
@@ -651,14 +785,16 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
               <button
                 type="button"
                 onClick={() => setFilterType('slow')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
                   filterType === 'slow'
                     ? 'bg-amber-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
                 }`}
               >
                 <span>Lentes (&gt; 500ms)</span>
-                <span className="px-1 py-0.2 rounded-full text-[9px] bg-amber-100 text-amber-800">
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterType === 'slow' ? 'bg-amber-700 text-white' : 'bg-amber-100 text-amber-900'
+                }`}>
                   {metrics.slowRequestsCount}
                 </span>
               </button>
@@ -666,40 +802,115 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
               <button
                 type="button"
                 onClick={() => setFilterType('errors')}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 ${
                   filterType === 'errors'
                     ? 'bg-rose-600 text-white shadow-2xs'
-                    : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                    : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-300'
                 }`}
               >
                 <span>Erreurs</span>
-                <span className="px-1 py-0.2 rounded-full text-[9px] bg-rose-100 text-rose-800">
+                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                  filterType === 'errors' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-800'
+                }`}>
                   {metrics.errorCount}
                 </span>
               </button>
             </div>
 
-            <div className="relative flex-1 max-w-xs ml-auto">
-              <Search size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            {/* High-Contrast Search Input with Clear Button */}
+            <div className="relative flex-1 max-w-sm sm:ml-auto">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Filtrer URL / table..."
+                placeholder="Filtrer par URL, table, méthode..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-7 pr-2.5 py-1 text-[11px] bg-white rounded-lg border border-slate-200 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="w-full pl-9 pr-9 py-1.5 text-xs text-slate-900 font-bold bg-white rounded-lg border-2 border-slate-300 placeholder:text-slate-500 placeholder:font-normal focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-600 shadow-xs transition-all"
               />
+              {searchTerm && (
+                <button
+                  type="button"
+                  onClick={() => setSearchTerm('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-500 hover:text-slate-900 hover:bg-slate-100 rounded-full transition-colors cursor-pointer"
+                  title="Effacer la recherche"
+                >
+                  <X size={13} className="stroke-[2.5]" />
+                </button>
+              )}
             </div>
           </div>
         </div>
 
-        {/* Compact Log Rows */}
-        <div className="divide-y divide-slate-100 max-h-[360px] overflow-y-auto font-mono text-[11px]">
+        {/* Structured Column Header for the Live Request Journal */}
+        <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3 py-2 bg-slate-100/90 border-b border-slate-200 text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
+          <div className="col-span-2">Horodatage</div>
+          <div className="col-span-3">Méthode & Table</div>
+          <div className="col-span-4">Endpoint & Paramètres PostgREST</div>
+          <div className="col-span-1 text-center">Statut</div>
+          <div className="col-span-2 text-right">Durée / Poids</div>
+        </div>
+
+        {/* High-Contrast Log Rows & Clear Empty States */}
+        <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto text-xs">
           {filteredLogs.length === 0 ? (
-            <div className="p-6 text-center text-slate-500 space-y-1">
-              <Database size={22} className="mx-auto text-slate-300 stroke-[1.5]" />
-              <p className="text-xs font-medium">Aucun appel Supabase correspondant.</p>
-              <p className="text-[10px] text-slate-400">Cliquez sur « Diagnostiquer » pour générer les sondes.</p>
-            </div>
+            searchTerm || filterType !== 'all' ? (
+              <div className="p-8 text-center bg-slate-50/50 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-slate-200 text-slate-700 flex items-center justify-center mx-auto">
+                  <Search size={22} className="stroke-[2.5]" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                    Aucune requête Supabase ne correspond à votre filtre
+                  </h4>
+                  <p className="text-xs font-semibold text-slate-700 max-w-md mx-auto">
+                    {searchTerm ? (
+                      <span>Recherche active : <strong className="font-mono bg-amber-100 text-amber-900 px-1.5 py-0.5 rounded border border-amber-300">"{searchTerm}"</strong></span>
+                    ) : null}
+                    {filterType !== 'all' ? (
+                      <span> • Catégorie active : <strong className="text-indigo-700 uppercase">{filterType}</strong></span>
+                    ) : null}
+                  </p>
+                  <p className="text-[11px] text-slate-600 font-medium">
+                    {logs.length} requête(s) capturée(s) dans l'historique global de cette session.
+                  </p>
+                </div>
+                <div className="pt-1 flex items-center justify-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => { setSearchTerm(''); setFilterType('all'); }}
+                    className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer flex items-center gap-1.5"
+                  >
+                    <RefreshCw size={13} />
+                    <span>Réinitialiser les filtres</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="p-8 text-center bg-slate-50/50 space-y-3">
+                <div className="w-12 h-12 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center mx-auto">
+                  <Database size={22} className="stroke-[2.5]" />
+                </div>
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black text-slate-900 tracking-tight">
+                    Journal en attente d'appels Supabase
+                  </h4>
+                  <p className="text-xs font-semibold text-slate-700 max-w-md mx-auto">
+                    Toutes les requêtes Supabase (PostgREST, Authentification, Storage) exécutées dans l'application sont interceptées et chronométrées ici en direct.
+                  </p>
+                </div>
+                <div className="pt-1">
+                  <button
+                    type="button"
+                    onClick={handleRunFullDiagnosis}
+                    disabled={isRunningDiagnostic}
+                    className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-lg shadow-xs transition-colors cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-50"
+                  >
+                    <Sparkles size={13} className="text-indigo-400" />
+                    <span>{isRunningDiagnostic ? 'Diagnostic en cours...' : '⚡ Lancer les sondes pour générer des requêtes'}</span>
+                  </button>
+                </div>
+              </div>
+            )
           ) : (
             filteredLogs.map((log) => {
               const isExpanded = expandedLogId === log.id;
@@ -708,95 +919,98 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
               return (
                 <div 
                   key={log.id} 
-                  className={`hover:bg-slate-50/70 transition-colors ${
-                    log.isIdentityQuery ? 'bg-indigo-50/30' : ''
+                  className={`hover:bg-slate-50 transition-colors ${
+                    log.isIdentityQuery ? 'bg-indigo-50/40' : ''
                   }`}
                 >
                   <div 
                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                    className="p-2 sm:px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 cursor-pointer select-none"
+                    className="p-2 sm:px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 cursor-pointer select-none"
                   >
-                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
-                      <span className="text-slate-400 text-[9.5px] shrink-0 font-sans">
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <span className="text-slate-600 text-[10.5px] font-mono font-semibold shrink-0">
                         {dateStr}
                       </span>
 
-                      <span className={`px-1.5 py-0.2 rounded text-[9px] font-black shrink-0 ${
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 border ${
                         log.method === 'GET' 
-                          ? 'bg-blue-100 text-blue-800'
+                          ? 'bg-blue-50 text-blue-800 border-blue-200'
                           : log.method === 'POST'
-                          ? 'bg-emerald-100 text-emerald-800'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                           : log.method === 'PATCH' || log.method === 'PUT'
-                          ? 'bg-amber-100 text-amber-800'
+                          ? 'bg-amber-50 text-amber-900 border-amber-200'
                           : log.method === 'DELETE'
-                          ? 'bg-rose-100 text-rose-800'
-                          : 'bg-slate-100 text-slate-700'
+                          ? 'bg-rose-50 text-rose-800 border-rose-200'
+                          : 'bg-slate-100 text-slate-800 border-slate-200'
                       }`}>
                         {log.method}
                       </span>
 
-                      <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 text-[10px] font-bold shrink-0">
+                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-900 text-xs font-black shrink-0 border border-slate-200">
                         {log.table}
                       </span>
 
                       {log.isIdentityQuery && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-700 text-[9px] font-black shrink-0">
+                        <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 text-[9.5px] font-black shrink-0 border border-indigo-200">
                           Identité
                         </span>
                       )}
 
-                      <span className="text-slate-700 text-[10.5px] font-sans truncate max-w-[190px] sm:max-w-xs md:max-w-md lg:max-w-lg block" title={log.displayEndpoint}>
+                      <span className="text-slate-800 text-xs font-mono font-medium truncate max-w-[190px] sm:max-w-xs md:max-w-md lg:max-w-lg block" title={log.displayEndpoint}>
                         {log.displayEndpoint}
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
+                    <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center font-mono">
                       {log.bytesReceived != null && (
-                        <span className="text-[9.5px] text-slate-400 font-mono">
+                        <span className="text-[10.5px] text-slate-600 font-bold">
                           {log.bytesReceived > 1024 ? `${Math.round(log.bytesReceived / 1024)} Ko` : `${log.bytesReceived} o`}
                         </span>
                       )}
 
-                      <span className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold ${
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-black border ${
                         log.status >= 200 && log.status < 300
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
                           : log.status >= 500
-                          ? 'bg-rose-50 text-rose-700 border border-rose-200'
-                          : 'bg-amber-50 text-amber-700 border border-amber-200'
+                          ? 'bg-rose-50 text-rose-800 border-rose-300'
+                          : 'bg-amber-50 text-amber-900 border-amber-300'
                       }`}>
-                        {log.status}
+                        {log.status} {log.status === 200 ? 'OK' : ''}
                       </span>
 
-                      <span className={`px-2 py-0.2 rounded font-mono font-black text-[10.5px] border ${getLatencyColor(log.durationMs)}`}>
+                      <span className={`px-2 py-0.5 rounded font-black text-xs border ${getLatencyColor(log.durationMs)}`}>
                         {log.durationMs} ms
                       </span>
 
-                      <span className="text-slate-400">
-                        {isExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                      <span className="text-slate-500 hover:text-slate-900 p-0.5">
+                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </span>
                     </div>
                   </div>
 
                   {isExpanded && (
-                    <div className="px-3 py-2 bg-slate-900 text-slate-200 text-[10.5px] space-y-1.5 border-t border-slate-800 animate-in fade-in">
+                    <div className="px-3.5 py-2.5 bg-slate-900 text-slate-100 text-xs space-y-2 border-t border-slate-800 animate-in fade-in">
                       <div className="flex items-center justify-between">
-                        <span className="font-bold text-indigo-400">URL de la Requête :</span>
-                        <span className="text-slate-400 text-[9.5px]">Type : {log.queryType}</span>
+                        <span className="font-bold text-indigo-400">URL Complète de la Requête :</span>
+                        <span className="text-slate-400 text-[10px] font-mono">Type : {log.queryType}</span>
                       </div>
-                      <div className="p-1.5 bg-slate-950 rounded break-all text-slate-300 font-mono text-[10px] select-all">
+                      <div className="p-2 bg-slate-950 rounded break-all text-slate-200 font-mono text-[11px] select-all border border-slate-800 leading-relaxed">
                         {log.url}
                       </div>
 
                       {log.errorMessage && (
-                        <div className="p-1.5 bg-rose-950/50 border border-rose-800 text-rose-200 rounded">
-                          <strong>Erreur :</strong> {log.errorMessage}
+                        <div className="p-2 bg-rose-950/70 border border-rose-700 text-rose-100 rounded text-xs font-medium">
+                          <strong className="text-rose-300">Erreur :</strong> {log.errorMessage}
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-3 text-[9.5px] text-slate-400 pt-0.5">
-                        <span>Horodatage : {new Date(log.timestamp).toISOString()}</span>
-                        <span>Durée : {log.durationMs} ms</span>
-                        <span>Table : {log.table}</span>
+                      <div className="flex flex-wrap gap-4 text-[10.5px] text-slate-400 pt-1 font-mono">
+                        <span>Horodatage : <strong className="text-slate-200">{new Date(log.timestamp).toISOString()}</strong></span>
+                        <span>Durée : <strong className="text-slate-200">{log.durationMs} ms</strong></span>
+                        <span>Table : <strong className="text-slate-200">{log.table}</strong></span>
+                        {log.bytesReceived != null && (
+                          <span>Payload : <strong className="text-slate-200">{log.bytesReceived} octets</strong></span>
+                        )}
                       </div>
                     </div>
                   )}

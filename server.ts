@@ -3580,6 +3580,99 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // ENDPOINT MIGRATION AUTOMATIQUE DES LOGOS VERS SUPABASE STORAGE
+  // Multi-Tenant & Annexes (école par école + school_campuses)
+  // =========================================================================
+  app.post('/api/migrate-logos-to-storage', async (req, res) => {
+    try {
+      console.log('[Logo Migration Server] Démarrage de la migration globale des logos...');
+      if (!supabase) {
+        return res.status(500).json({ success: false, error: 'Client Supabase serveur non disponible' });
+      }
+
+      // 1. Assurer que le bucket database_backups est public et accessible
+      await supabase.rpc('exec_ddl', { ddl_query: "UPDATE storage.buckets SET public = true WHERE id = 'database_backups';" });
+      await supabase.rpc('exec_ddl', { ddl_query: "ALTER TABLE public.school_campuses ADD COLUMN IF NOT EXISTS logo_url TEXT;" });
+
+      const { data: schools } = await supabase.rpc('exec_sql', { sql_query: "SELECT id, name, logo_url FROM schools;" });
+      let migratedSchools = 0;
+      let totalBytesSaved = 0;
+
+      if (Array.isArray(schools)) {
+        for (const s of schools) {
+          if (s.logo_url && typeof s.logo_url === 'string' && s.logo_url.startsWith('data:image/')) {
+            const matches = s.logo_url.match(/^data:([A-Za-z-+\\/]+);base64,(.+)$/);
+            if (matches) {
+              const mime = matches[1];
+              const ext = mime.includes('webp') ? 'webp' : mime.includes('png') ? 'png' : mime.includes('jpeg') ? 'jpg' : 'png';
+              const buffer = Buffer.from(matches[2], 'base64');
+              const filePath = `school_logos/${s.id}.${ext}`;
+
+              const { error: uploadErr } = await supabase.storage.from('database_backups').upload(filePath, buffer, {
+                contentType: mime,
+                upsert: true
+              });
+
+              if (!uploadErr) {
+                const { data: pub } = supabase.storage.from('database_backups').getPublicUrl(filePath);
+                const publicUrl = pub.publicUrl;
+                const escapedUrl = publicUrl.replace(/'/g, "''");
+                await supabase.rpc('exec_ddl', { ddl_query: `UPDATE schools SET logo_url = '${escapedUrl}' WHERE id = '${s.id}';` });
+                migratedSchools++;
+                totalBytesSaved += (s.logo_url.length - publicUrl.length);
+              }
+            }
+          }
+        }
+      }
+
+      // Traitement des annexes
+      let migratedCampuses = 0;
+      try {
+        const { data: campuses } = await supabase.rpc('exec_sql', { sql_query: "SELECT id, school_id, name, logo_url FROM school_campuses;" });
+        if (Array.isArray(campuses)) {
+          for (const c of campuses) {
+            if (c.logo_url && typeof c.logo_url === 'string' && c.logo_url.startsWith('data:image/')) {
+              const matches = c.logo_url.match(/^data:([A-Za-z-+\\/]+);base64,(.+)$/);
+              if (matches) {
+                const mime = matches[1];
+                const ext = mime.includes('webp') ? 'webp' : mime.includes('png') ? 'png' : mime.includes('jpeg') ? 'jpg' : 'png';
+                const buffer = Buffer.from(matches[2], 'base64');
+                const filePath = `school_logos/campus_${c.id}.${ext}`;
+
+                const { error: uploadErr } = await supabase.storage.from('database_backups').upload(filePath, buffer, {
+                  contentType: mime,
+                  upsert: true
+                });
+
+                if (!uploadErr) {
+                  const { data: pub } = supabase.storage.from('database_backups').getPublicUrl(filePath);
+                  const publicUrl = pub.publicUrl;
+                  const escapedUrl = publicUrl.replace(/'/g, "''");
+                  await supabase.rpc('exec_ddl', { ddl_query: `UPDATE school_campuses SET logo_url = '${escapedUrl}' WHERE id = '${c.id}';` });
+                  migratedCampuses++;
+                  totalBytesSaved += (c.logo_url.length - publicUrl.length);
+                }
+              }
+            }
+          }
+        }
+      } catch (cErr) {}
+
+      return res.json({
+        success: true,
+        migratedSchools,
+        migratedCampuses,
+        totalBytesSaved,
+        message: `Migration réussie : ${migratedSchools} école(s) et ${migratedCampuses} annexe(s) migrées vers Supabase Storage.`
+      });
+    } catch (err: any) {
+      console.error('[Logo Migration Server Error]:', err);
+      res.status(500).json({ success: false, error: err.message || 'Erreur serveur migration logos' });
+    }
+  });
+
   // Explicit routes for favicon.ico, favicon.png, and logo.png to ensure they don't fall back to SPA index.html
   app.get('/favicon.ico', (req, res) => {
     const distFav = path.join(process.cwd(), 'dist', 'favicon.ico');
