@@ -298,7 +298,7 @@
 
         <div class="edunova-status-badge">
           <span class="edunova-pulse-dot"></span>
-          <span>Chargement en cours...</span>
+          <span id="edunova-splash-status-text">Initialisation sécurisée d'EduNova Pro...</span>
         </div>
 
         <div id="edunova-splash-actions" style="display: none; margin-top: 24px; flex-direction: column; align-items: center; gap: 10px; max-width: 320px; width: 100%; z-index: 10;">
@@ -307,7 +307,7 @@
             <span style="font-size: 15px;">→</span>
           </button>
           <button id="edunova-emergency-reload" type="button" style="width: 100%; padding: 9px 14px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;">
-            <span>Vider le cache &amp; Recharger</span>
+            <span>Actualiser l'application</span>
           </button>
           <div id="edunova-splash-hint" style="font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.4;">
             Initialisation du système EduNova Pro...
@@ -370,6 +370,7 @@
       logDiag('LIFECYCLE', 'Signal de fermeture du splashscreen reçu');
       var splash = document.getElementById('edunova-pwa-splash');
       if (splash) {
+        splash.style.pointerEvents = 'none';
         splash.style.transition = 'opacity 0.25s ease-out';
         splash.style.opacity = '0';
         setTimeout(function() {
@@ -377,7 +378,7 @@
             splash.parentNode.removeChild(splash);
             logDiag('LIFECYCLE', 'Splashscreen retiré du DOM');
           }
-        }, 250);
+        }, 260);
       }
     };
 
@@ -580,14 +581,7 @@
           elapsedMs: Math.round(performance.now() - startTime)
         };
         window.__edunovaDiagnostics.resourceFailures.push(failure);
-        logDiag('RESOURCE_ERR', 'Échec de chargement de ressource', failure);
-
-        // Ne pas déclencher immédiatement l'écran d'urgence si l'application est en cours de montage
-        setTimeout(function() {
-          if (!window.__edunovaAppReady) {
-            showEmergencyActions('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
-          }
-        }, 4000);
+        logDiag('RESOURCE_ERR', 'Avertissement ressource secondaire', failure);
       } else {
         var errInfo = {
           message: event.message,
@@ -597,13 +591,7 @@
           error: event.error ? (event.error.stack || event.error.message) : null
         };
         window.__edunovaDiagnostics.errors.push(errInfo);
-        logDiag('SCRIPT_ERR', 'Erreur script non capturée', errInfo);
-
-        setTimeout(function() {
-          if (!window.__edunovaAppReady) {
-            showEmergencyActions('Erreur : ' + (event.message || 'Script bloqué'));
-          }
-        }, 4000);
+        logDiag('SCRIPT_ERR', 'Erreur script interceptée', errInfo);
       }
     }, true);
 
@@ -616,15 +604,23 @@
       };
       window.__edunovaDiagnostics.errors.push(rejInfo);
       logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté', rejInfo);
+    });
 
-      // Si React est déjà prêt, ne pas perturber l'interface
-      if (!window.__edunovaAppReady) {
-        setTimeout(function() {
-          if (!window.__edunovaAppReady) {
-            showEmergencyActions('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
-          }
-        }, 4000);
-      }
+    // Évolution progressive et rassurante de l'état pendant le chargement
+    var statusTextEl = document.getElementById('edunova-splash-status-text');
+    var progressMilestones = [
+      { t: 0, text: "Initialisation sécurisée d'EduNova Pro..." },
+      { t: 3000, text: "Chargement des modules scolaires..." },
+      { t: 7000, text: "Synchronisation de l'espace de gestion..." },
+      { t: 12000, text: "Finalisation de la session sécurisée..." },
+      { t: 18000, text: "Optimisation de l'interface utilisateur..." }
+    ];
+    progressMilestones.forEach(function(m) {
+      setTimeout(function() {
+        if (!window.__edunovaAppReady && statusTextEl) {
+          statusTextEl.textContent = m.text;
+        }
+      }, m.t);
     });
 
     function showEmergencyActions(cause) {
@@ -632,70 +628,50 @@
       if (actions && !window.__edunovaAppReady) {
         actions.style.display = 'flex';
         var hint = document.getElementById('edunova-splash-hint');
-        if (hint && cause) {
-          hint.textContent = 'Incident détecté (' + cause + '). Cliquez ci-dessous pour débloquer.';
-          hint.style.color = '#f87171';
+        if (hint) {
+          hint.textContent = 'Le chargement prend quelques instants de plus que d\'habitude. Vous pouvez basculer immédiatement vers la connexion.';
+          hint.style.color = '#94a3b8';
         }
         var btnLogin = document.getElementById('edunova-emergency-login');
-        if (btnLogin) btnLogin.onclick = clearStorageAndGoLogin;
+        if (btnLogin) btnLogin.onclick = emergencyGoToLogin;
         var btnReload = document.getElementById('edunova-emergency-reload');
-        if (btnReload) btnReload.onclick = clearStorageAndGoLogin;
+        if (btnReload) btnReload.onclick = function() { window.location.reload(); };
       }
     }
 
-    // Gestionnaire de réinitialisation d'urgence
-    function clearStorageAndGoLogin() {
-      logDiag('ACTION', 'Déclenchement réinitialisation complète du cache & session');
+    // Accès fluide et direct vers la connexion sans boucle infinie
+    function emergencyGoToLogin() {
+      logDiag('ACTION', 'Accès direct à la page de connexion');
+      // Si React a déjà monté ou injecté le DOM, masquer immédiatement le splash
+      if (window.__edunovaAppReady || document.querySelector('#root > *')) {
+        window.__dismissEduNovaSplash();
+        return;
+      }
       try {
         localStorage.removeItem('edunova_user_profile');
-        localStorage.removeItem('edunova-auth-token');
-        localStorage.removeItem('supabase.auth.token');
         localStorage.setItem('edunova_logged_out', 'true');
         sessionStorage.clear();
       } catch(e) {}
 
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.getRegistrations().then(function(regs) {
-          for (var i = 0; i < regs.length; i++) {
-            regs[i].unregister();
-          }
-        });
-      }
-      if ('caches' in window) {
-        caches.keys().then(function(keys) {
-          for (var i = 0; i < keys.length; i++) {
-            caches.delete(keys[i]);
-          }
-        });
-      }
-
-      window.location.href = window.location.pathname + '#/';
+      window.__dismissEduNovaSplash();
+      window.location.hash = '#/';
+      // Failsafe au cas où React n'était pas encore en mémoire
       setTimeout(function() {
-        window.location.reload();
-      }, 100);
+        if (!window.__edunovaAppReady && !document.querySelector('#root > *')) {
+          window.location.reload();
+        }
+      }, 500);
     }
 
-    // Watchdog : inspection de l'état après 8000ms (adapté aux connexions à latence et 19 Mbps)
+    // Watchdog tolérant : n'intervient qu'après 25 secondes si le système est réellement immobilisé
     setTimeout(function() {
       if (!window.__edunovaAppReady) {
-        logDiag('WATCHDOG', 'Délai d’attente dépassé (8000ms). L’application React n’a pas encore signalé son montage.');
-        
-        // Audit des ressources réseau chargées
-        if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
-          var resources = performance.getEntriesByType('resource');
-          var slowOrPending = resources.filter(function(r) { return r.duration > 1500; });
-          logDiag('PERF_AUDIT', 'Ressources lentes (>1.5s) ou chargées', {
-            totalResources: resources.length,
-            slowCount: slowOrPending.length,
-            slowList: slowOrPending.map(function(r) { return { name: r.name.split('/').pop(), durationMs: Math.round(r.duration) }; })
-          });
-        }
-
-        showEmergencyActions('Délai d’attente dépassé');
+        logDiag('WATCHDOG', 'Délai prolongé constaté (25000ms). Mise à disposition de l\'action de secours.');
+        showEmergencyActions('Délai prolongé');
       } else {
-        logDiag('WATCHDOG', 'Vérification 8000ms : Application montée avec succès');
+        logDiag('WATCHDOG', 'Vérification terminée : Application montée avec succès');
       }
-    }, 8000);
+    }, 25000);
   })();
 </script>
 <script type="module" src="/index.tsx"></script>

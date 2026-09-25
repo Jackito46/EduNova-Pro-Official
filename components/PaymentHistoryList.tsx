@@ -33,7 +33,7 @@ import {
   Layers,
   Trash2
 } from 'lucide-react';
-import { supabase } from '../supabase';
+import { supabase, isValidUuid } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import Modal from './Modal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
@@ -181,11 +181,24 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
     try {
       let paymentsQuery = supabase
         .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name)')
+        .select(`
+          *,
+          campaign:ad_hoc_campaigns(id, name),
+          student:students(
+            id,
+            first_name,
+            last_name,
+            class_id,
+            phone,
+            parent_phone,
+            parent_name,
+            class:classes(id, name)
+          )
+        `)
         .eq('school_id', user.school_id);
         
-      if (currentCampusId) {
-        paymentsQuery = paymentsQuery.eq('campus_id', currentCampusId);
+      if (currentCampusId && currentCampusId !== 'GLOBAL' && isValidUuid(currentCampusId)) {
+        paymentsQuery = paymentsQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
       }
       
       const { data: paymentsData, error: paymentsError } = await paymentsQuery.order('created_at', { ascending: false });
@@ -197,11 +210,23 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       let suppliesQuery = supabase
         .from('school_supplies')
-        .select('*')
+        .select(`
+          *,
+          student:students(
+            id,
+            first_name,
+            last_name,
+            class_id,
+            phone,
+            parent_phone,
+            parent_name,
+            class:classes(id, name)
+          )
+        `)
         .eq('school_id', user.school_id);
         
-      if (currentCampusId) {
-        suppliesQuery = suppliesQuery.eq('campus_id', currentCampusId);
+      if (currentCampusId && currentCampusId !== 'GLOBAL' && isValidUuid(currentCampusId)) {
+        suppliesQuery = suppliesQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
       }
       
       const { data: suppliesData, error: suppliesError } = await suppliesQuery.order('created_at', { ascending: false });
@@ -212,27 +237,26 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       let studentsQuery = supabase
         .from('students')
-        .select('id, first_name, last_name, class_id, phone, parent_phone, parent_name')
-        .eq('school_id', user.school_id);
-        
-      if (currentCampusId) {
-        studentsQuery = studentsQuery.eq('campus_id', currentCampusId);
-      }
+        .select('id, first_name, last_name, class_id, phone, parent_phone, parent_name, class:classes(id, name)')
+        .eq('school_id', user.school_id)
+        .limit(5000);
       
       const { data: studentsData, error: studentsError } = await studentsQuery;
         
       if (studentsError) {
         console.error("Erreur Supabase students:", studentsError);
       }
+
+      const { data: enrollmentsData } = await supabase
+        .from('enrollments')
+        .select('student_id, class_id, academic_year_id, class:classes(id, name)')
+        .eq('school_id', user.school_id)
+        .limit(5000);
       
       let classesQuery = supabase
         .from('classes')
         .select('id, name')
         .eq('school_id', user.school_id);
-        
-      if (currentCampusId) {
-        classesQuery = classesQuery.eq('campus_id', currentCampusId);
-      }
       
       const { data: classesData, error: classesError } = await classesQuery;
         
@@ -255,16 +279,44 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       // Create maps for quick lookup
       const classesMap = new Map();
       (classesData || []).forEach(c => classesMap.set(c.id, c.name));
+
+      const enrollmentsByYearMap = new Map();
+      const latestEnrollmentMap = new Map();
+      (enrollmentsData || []).forEach((e: any) => {
+        const clsName = (Array.isArray(e.class) ? e.class[0]?.name : e.class?.name) || classesMap.get(e.class_id) || '';
+        if (clsName && e.student_id) {
+          if (e.academic_year_id) {
+            enrollmentsByYearMap.set(`${e.student_id}_${e.academic_year_id}`, clsName);
+          }
+          latestEnrollmentMap.set(e.student_id, clsName);
+        }
+      });
       
       const studentsMap = new Map();
-      (studentsData || []).forEach(s => {
+      (studentsData || []).forEach((s: any) => {
+        const className = (Array.isArray(s.class) ? s.class[0]?.name : s.class?.name) || classesMap.get(s.class_id) || latestEnrollmentMap.get(s.id) || 'N/A';
         studentsMap.set(s.id, {
           name: formatStudentName(s.last_name, s.first_name).fullName || 'Inconnu',
-          className: classesMap.get(s.class_id) || 'N/A',
+          className: className,
           classId: s.class_id,
           parentPhone: s.parent_phone || s.phone || '',
           parentName: s.parent_name || ''
         });
+      });
+
+      // Intégrer également les élèves embarqués via jointure PostgREST directe
+      [...(paymentsData || []), ...(suppliesData || [])].forEach((item: any) => {
+        if (item.student && item.student.id && !studentsMap.has(item.student.id)) {
+          const st = item.student;
+          const clsName = (Array.isArray(st.class) ? st.class[0]?.name : st.class?.name) || classesMap.get(st.class_id) || latestEnrollmentMap.get(st.id) || 'N/A';
+          studentsMap.set(st.id, {
+            name: formatStudentName(st.last_name, st.first_name).fullName || 'Inconnu',
+            className: clsName,
+            classId: st.class_id,
+            parentPhone: st.parent_phone || st.phone || '',
+            parentName: st.parent_name || ''
+          });
+        }
       });
       
       // 3. Fetch exchange rate
@@ -292,7 +344,9 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           status = 'En attente';
         }
         
+        const yearClassName = p.academic_year_id && p.student_id ? enrollmentsByYearMap.get(`${p.student_id}_${p.academic_year_id}`) : null;
         const studentInfo = studentsMap.get(p.student_id) || { name: 'Inconnu', className: 'N/A' };
+        const finalClassName = yearClassName || studentInfo.className || 'N/A';
         
         let tempAmountHtg = p.amount_htg_equivalent;
         if (!tempAmountHtg || isNaN(tempAmountHtg)) {
@@ -308,7 +362,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           studentId: p.student_id,
           classId: studentInfo.classId || p.class_id,
           academic_year_id: p.academic_year_id,
-          className: studentInfo.className,
+          className: finalClassName,
           nature: p.campaign?.name 
             ? `Campagne: ${p.campaign.name}` 
             : p.ad_hoc_campaign_id 
@@ -358,7 +412,9 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           status = 'En attente';
         }
         
+        const yearClassName = s.academic_year_id && s.student_id ? enrollmentsByYearMap.get(`${s.student_id}_${s.academic_year_id}`) : null;
         const studentInfo = studentsMap.get(s.student_id) || { name: 'Inconnu', className: 'N/A', parentPhone: '', parentName: '' };
+        const finalClassName = yearClassName || studentInfo.className || 'N/A';
         
         let tempAmountHtg = s.amount_htg_equivalent;
         if (!tempAmountHtg || isNaN(tempAmountHtg)) {
@@ -374,7 +430,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           studentId: s.student_id,
           classId: studentInfo.classId || s.class_id,
           academic_year_id: s.academic_year_id,
-          className: studentInfo.className,
+          className: finalClassName,
           nature: 'Fournitures',
           amount: s.total_amount,
           amount_htg_equivalent: tempAmountHtg,

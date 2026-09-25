@@ -68,7 +68,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         // Fetch payments made by student (order by created_at)
         const { data: paymentsData, error: paymentsErr } = await supabase
           .from('payments')
-          .select('*, campaign:ad_hoc_campaigns(id, name)')
+          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
           .eq('student_id', studentData.id)
           .order('created_at', { ascending: false });
 
@@ -107,7 +107,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                 fee_id: fee.id
               };
             })
-            .filter((c: any) => c !== null && c.academic_year_id === activeYear.id);
+            .filter((c: any) => c !== null && (!c.academic_year_id || c.academic_year_id === activeYear.id));
           
           setAdHocCampaigns(studentCamps);
         }
@@ -171,10 +171,21 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     );
   };
 
-  const admissionPayments = validPayments.filter(p => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
-  const miscPayments = validPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
-  const campaignPayments = validPayments.filter(p => !!p.ad_hoc_campaign_id);
-  const tuitionPayments = validPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
+  const isCampPmt = (p: any) => Boolean(
+    p.ad_hoc_campaign_id || 
+    p.fee_type === 'AD_HOC' || 
+    p.campaign?.id || 
+    adHocCampaigns.some((c: any) => {
+      const campName = (c.name || '').toLowerCase();
+      const nat = (p.nature || p.label || p.type || '').toLowerCase();
+      return (campName && nat && (nat.includes(campName) || (campName.includes('assurance') && nat.includes('assurance'))));
+    })
+  );
+
+  const admissionPayments = validPayments.filter(p => !isCampPmt(p) && isAdmissionPayment(p));
+  const miscPayments = validPayments.filter(p => !isCampPmt(p) && !isAdmissionPayment(p) && isMiscPayment(p));
+  const campaignPayments = validPayments.filter(p => isCampPmt(p));
+  const tuitionPayments = validPayments.filter(p => !isCampPmt(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
   // Frais prévus
   const admissionNativeHTG = Number(feePlan?.inscription_fee || 0);
@@ -200,7 +211,15 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
   // Campagnes ad-hoc
   const campaignBreakdowns = adHocCampaigns.map(camp => {
-    const campPayments = payments.filter((p: any) => p.ad_hoc_campaign_id === camp.id && p.status !== 'ANNULE');
+    const campPayments = payments.filter((p: any) => {
+      if (p.status === 'ANNULE') return false;
+      if (p.ad_hoc_campaign_id === camp.id) return true;
+      if (p.campaign?.id === camp.id) return true;
+      const campName = (camp.name || '').toLowerCase();
+      const nat = (p.nature || p.label || p.type || '').toLowerCase();
+      if (campName && nat && (nat.includes(campName) || (campName.includes('assurance') && nat.includes('assurance')))) return true;
+      return false;
+    });
     const rawAmount = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
     const isUSD = camp.currency === 'USD';
     const campHTG = isUSD ? 0 : rawAmount;
@@ -684,16 +703,22 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   const appliedRate = Number(payment.exchange_rate_applied || (isUSD && payment.amount_htg_equivalent ? (payment.amount_htg_equivalent / rawAmount) : exchangeRate));
                   const baseHTG = Number(payment.amount_htg_equivalent || (isUSD ? rawAmount * appliedRate : rawAmount));
 
-                  const isTuitionFee = payment.fee_type === 'SCOLARITE' || (!payment.fee_type && (!payment.nature || payment.nature === 'SCOLARITE' || payment.nature === 'Scolarité'));
-                  const isAdmissionFee = payment.fee_type === 'INSCRIPTION' || payment.nature === 'INSCRIPTION' || payment.nature === "Frais d'inscription";
-                  const isMiscFee = isMiscPayment(payment);
-                  const matchedCampaign = payment.ad_hoc_campaign_id ? campaignBreakdowns.find(c => c.camp.id === payment.ad_hoc_campaign_id) : null;
+                  const isCamp = isCampPmt(payment);
+                  const isTuitionFee = !isCamp && (payment.fee_type === 'SCOLARITE' || (!payment.fee_type && (!payment.nature || payment.nature === 'SCOLARITE' || payment.nature === 'Scolarité')));
+                  const isAdmissionFee = !isCamp && (payment.fee_type === 'INSCRIPTION' || payment.nature === 'INSCRIPTION' || payment.nature === "Frais d'inscription");
+                  const isMiscFee = !isCamp && isMiscPayment(payment);
+                  const matchedCampaign = isCamp ? campaignBreakdowns.find(c => 
+                    c.camp.id === payment.ad_hoc_campaign_id || 
+                    c.camp.id === payment.campaign?.id ||
+                    (c.camp.name && (payment.nature || payment.type || '').toLowerCase().includes(c.camp.name.toLowerCase())) ||
+                    (c.camp.name && c.camp.name.toLowerCase().includes('assurance') && (payment.nature || payment.type || '').toLowerCase().includes('assurance'))
+                  ) : null;
+                  const isCampaignPlannedInUSD = Boolean(matchedCampaign && matchedCampaign.camp.currency === 'USD');
                   const isFeePlannedInUSD = Boolean(
                     (isTuitionFee && tuitionNativeUSD > 0) ||
                     (isAdmissionFee && admissionNativeUSD > 0) ||
                     (isMiscFee && miscNativeUSD > 0) ||
-                    (matchedCampaign && matchedCampaign.camp.currency === 'USD') ||
-                    (payment.campaign?.currency === 'USD')
+                    isCampaignPlannedInUSD
                   );
 
                   return (
@@ -776,12 +801,12 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                           </div>
                         ) : (
                           <div 
-                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-50 text-slate-600 border border-slate-200 text-[11px] font-medium whitespace-nowrap shadow-2xs"
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-900 border border-emerald-200 text-[11px] font-bold whitespace-nowrap shadow-2xs"
                             title="Frais planifié en Gourdes et payé directement en Gourdes. Aucune conversion de devises requise."
                           >
-                            <span className="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>
-                            <span className="font-bold text-slate-700">N/A</span>
-                            <span className="text-slate-400 text-[10px]">(Frais 100% HTG)</span>
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0"></span>
+                            <span className="font-mono">Paiement Direct HTG</span>
+                            <span className="text-emerald-700 text-[10px] font-semibold">(Sans conversion)</span>
                           </div>
                         )}
                       </td>

@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { supabase } from '../supabase';
+import { supabase, isValidUuid } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { 
   Search, 
@@ -61,6 +61,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -145,27 +146,88 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
-        let classesQuery = supabase.from('classes').select('*').eq('school_id', effectiveSchoolId).order('name');
-        if (currentCampusId) classesQuery = classesQuery.eq('campus_id', currentCampusId);
+        // 1. Récupération exhaustive des classes de l'établissement (sans exclusion d'annexe pour résolution globale)
+        let classesQuery = supabase.from('classes').select('id, name, level, campus_id').eq('school_id', effectiveSchoolId).order('name');
         const { data: classesData } = await classesQuery;
         
         if (classesData) {
           setClasses(classesData);
-          if (classesData.length > 0) setGenClass(classesData[0].id);
+          if (classesData.length > 0) {
+            const preferredClass = (currentCampusId && currentCampusId !== 'GLOBAL' && isValidUuid(currentCampusId))
+              ? (classesData.find(c => c.campus_id === currentCampusId) || classesData[0])
+              : classesData[0];
+            setGenClass(preferredClass.id);
+          }
         }
 
-        let studentsQuery = supabase.from('students').select('id, first_name, last_name, class_id, code, phone, parent_phone').eq('school_id', effectiveSchoolId);
-        if (currentCampusId) studentsQuery = studentsQuery.eq('campus_id', currentCampusId);
+        // 2. Récupération exhaustive des élèves avec relations imbriquées (nom de classe direct si disponible)
+        let studentsQuery = supabase
+          .from('students')
+          .select('id, first_name, last_name, class_id, code, phone, parent_phone, campus_id, reference_number, class:classes(id, name)')
+          .eq('school_id', effectiveSchoolId)
+          .limit(5000);
         const { data: studentsData } = await studentsQuery;
-        if (studentsData) setStudents(studentsData);
 
-        let paymentsQuery = supabase.from('payments').select('*, campaign:ad_hoc_campaigns(id, name)').eq('school_id', effectiveSchoolId).order('created_at', { ascending: false });
-        if (currentCampusId) paymentsQuery = paymentsQuery.eq('campus_id', currentCampusId);
+        // 3. Récupération des inscriptions (enrollments) pour lier chaque élève à sa classe par année scolaire
+        let enrollmentsQuery = supabase
+          .from('enrollments')
+          .select('student_id, class_id, academic_year_id, class:classes(id, name)')
+          .eq('school_id', effectiveSchoolId)
+          .limit(5000);
+        const { data: enrollmentsData } = await enrollmentsQuery;
+        if (enrollmentsData) {
+          setEnrollments(enrollmentsData);
+        }
+
+        // 4. Récupération des paiements avec jointure PostgREST intégrée sur l'élève et sa classe
+        let paymentsQuery = supabase
+          .from('payments')
+          .select(`
+            *,
+            campaign:ad_hoc_campaigns(id, name),
+            student:students(
+              id,
+              first_name,
+              last_name,
+              code,
+              phone,
+              parent_phone,
+              class_id,
+              campus_id,
+              class:classes(id, name)
+            )
+          `)
+          .eq('school_id', effectiveSchoolId)
+          .order('created_at', { ascending: false });
+
+        if (currentCampusId && currentCampusId !== 'GLOBAL' && isValidUuid(currentCampusId)) {
+          paymentsQuery = paymentsQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
+        }
         const { data: paymentsData } = await paymentsQuery;
 
-        // Récupération et harmonisation des reçus de fournitures scolaires
-        let suppliesQuery = supabase.from('school_supplies').select('*').eq('school_id', effectiveSchoolId).order('created_at', { ascending: false });
-        if (currentCampusId) suppliesQuery = suppliesQuery.eq('campus_id', currentCampusId);
+        // 5. Récupération et harmonisation des reçus de fournitures scolaires avec jointure élève
+        let suppliesQuery = supabase
+          .from('school_supplies')
+          .select(`
+            *,
+            student:students(
+              id,
+              first_name,
+              last_name,
+              code,
+              phone,
+              parent_phone,
+              class_id,
+              campus_id,
+              class:classes(id, name)
+            )
+          `)
+          .eq('school_id', effectiveSchoolId)
+          .order('created_at', { ascending: false });
+
+        if (currentCampusId && currentCampusId !== 'GLOBAL' && isValidUuid(currentCampusId)) {
+          suppliesQuery = suppliesQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
+        }
         const { data: suppliesData } = await suppliesQuery;
 
         const groupedHistorySupplies = new Map<string, any>();
@@ -175,6 +237,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             const existing = groupedHistorySupplies.get(txId);
             existing.total_amount = Number(existing.total_amount || 0) + Number(s.total_amount || 0);
             existing.amount_htg_equivalent = Number(existing.amount_htg_equivalent || 0) + Number(s.amount_htg_equivalent || s.total_amount || 0);
+            if (!existing.student && s.student) existing.student = s.student;
+            if (!existing.student_id && s.student_id) existing.student_id = s.student_id;
           } else {
             groupedHistorySupplies.set(txId, { ...s });
           }
@@ -193,6 +257,49 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }));
 
         const allPayments = [...(paymentsData || []), ...suppliesPayments];
+
+        // 6. Résolution et rattrapage infaillible de TOUS les élèves apparaissant dans les transactions
+        const knownStudentIds = new Set((studentsData || []).map((s: any) => s.id));
+        const resolvedStudents = [...(studentsData || [])];
+
+        // Intégrer les élèves issus des jointures directes
+        allPayments.forEach((p: any) => {
+          if (p.student && p.student.id && !knownStudentIds.has(p.student.id)) {
+            knownStudentIds.add(p.student.id);
+            resolvedStudents.push(p.student);
+          }
+        });
+
+        // Détection de tout élève référencé par student_id mais absent de la liste
+        const missingStudentIds = Array.from(new Set(
+          allPayments
+            .map((p: any) => p.student_id)
+            .filter((id: string) => id && !knownStudentIds.has(id))
+        ));
+
+        if (missingStudentIds.length > 0) {
+          try {
+            for (let i = 0; i < missingStudentIds.length; i += 100) {
+              const chunk = missingStudentIds.slice(i, i + 100);
+              const { data: fetchedMissing } = await supabase
+                .from('students')
+                .select('id, first_name, last_name, class_id, code, phone, parent_phone, campus_id, reference_number, class:classes(id, name)')
+                .in('id', chunk);
+              if (fetchedMissing && fetchedMissing.length > 0) {
+                fetchedMissing.forEach(s => {
+                  if (!knownStudentIds.has(s.id)) {
+                    knownStudentIds.add(s.id);
+                    resolvedStudents.push(s);
+                  }
+                });
+              }
+            }
+          } catch (fetchErr) {
+            console.warn("Rattrapage des élèves par IDs:", fetchErr);
+          }
+        }
+
+        setStudents(resolvedStudents);
         setPayments(allPayments);
 
       } catch (e) {
@@ -246,6 +353,72 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     );
   };
 
+  // Dictionnaires de recherche accélérée et multi-niveaux pour les classes et inscriptions
+  const classesMap = useMemo(() => {
+    const map = new Map<string, string>();
+    classes.forEach(c => {
+      if (c.id && c.name) map.set(c.id, c.name);
+    });
+    return map;
+  }, [classes]);
+
+  const enrollmentsMap = useMemo(() => {
+    const byYearMap = new Map<string, string>(); // `${student_id}_${academic_year_id}` -> className
+    const latestMap = new Map<string, string>(); // `${student_id}` -> className
+    (enrollments || []).forEach(e => {
+      const clsName = e.class?.name || classesMap.get(e.class_id) || '';
+      if (clsName && e.student_id) {
+        if (e.academic_year_id) {
+          byYearMap.set(`${e.student_id}_${e.academic_year_id}`, clsName);
+        }
+        latestMap.set(e.student_id, clsName);
+      }
+    });
+    return { byYearMap, latestMap };
+  }, [enrollments, classesMap]);
+
+  // Fonction centrale de résolution Élève & Classe garantissant la non-disparition des données
+  const resolveStudentAndClass = (p: any) => {
+    const student = (p.student_id ? students.find(s => s.id === p.student_id) : null) || p.student || null;
+
+    // 1. Nom complet de l'élève avec fallbacks structurés
+    let studentName = 'Inconnu';
+    if (student && (student.last_name || student.first_name)) {
+      studentName = formatStudentName(student.last_name, student.first_name).fullName;
+    } else if (p.studentName && p.studentName !== 'Inconnu') {
+      studentName = p.studentName;
+    } else if (p.student_name) {
+      studentName = p.student_name;
+    } else if (p.notes && typeof p.notes === 'string') {
+      const match = p.notes.match(/(?:élève|etudiant|étudiant|student)\s*[:=]\s*([^|;\n,]+)/i);
+      if (match && match[1]) {
+        studentName = match[1].trim();
+      }
+    }
+
+    // 2. Classe avec résolution contextuelle (par session académique, jointure directe, ou référentiel)
+    let studentClass = 'N/A';
+    if (p.student_id && p.academic_year_id && enrollmentsMap.byYearMap.has(`${p.student_id}_${p.academic_year_id}`)) {
+      studentClass = enrollmentsMap.byYearMap.get(`${p.student_id}_${p.academic_year_id}`)!;
+    } else if (student?.class?.name) {
+      studentClass = student.class.name;
+    } else if (student?.class_id && classesMap.has(student.class_id)) {
+      studentClass = classesMap.get(student.class_id)!;
+    } else if (p.student_id && enrollmentsMap.latestMap.has(p.student_id)) {
+      studentClass = enrollmentsMap.latestMap.get(p.student_id)!;
+    } else if (p.class_id && classesMap.has(p.class_id)) {
+      studentClass = classesMap.get(p.class_id)!;
+    } else if (p.classe && p.classe !== 'N/A') {
+      studentClass = p.classe;
+    } else if (p.className) {
+      studentClass = p.className;
+    } else if (p.class_name) {
+      studentClass = p.class_name;
+    }
+
+    return { student, studentName, studentClass };
+  };
+
   const normalizeReceiptPayment = (p: any, studentObj?: any, studentClassName?: string) => {
     const isUSD = p.currency === 'USD';
     const rawAmount = Number(p.amount || 0);
@@ -285,12 +458,21 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           : `RCP-${p.receipt_number.toUpperCase()}`)
       : (p.source === 'school_supplies' ? `FOU-${idPrefix}` : `RCP-${idPrefix}`);
 
+    const resolved = resolveStudentAndClass(p);
+    const finalStudentName = (studentObj && (studentObj.last_name || studentObj.first_name))
+      ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName
+      : (resolved.studentName !== 'Inconnu' ? resolved.studentName : (p.studentName || p.student_name || 'Inconnu'));
+
+    const finalClassName = (studentClassName && studentClassName !== 'N/A')
+      ? studentClassName
+      : (resolved.studentClass !== 'N/A' ? resolved.studentClass : (p.classe || p.className || p.class_name || 'N/A'));
+
     return {
       ...p,
       ref: formattedRef,
       receipt_code: idPrefix,
-      studentName: studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : (p.studentName || 'Inconnu'),
-      classe: studentClassName || p.className || 'N/A',
+      studentName: finalStudentName,
+      classe: finalClassName,
       date: createdDate.toLocaleDateString('fr-FR'),
       time: createdDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       nature: p.nature || (p.campaign?.name 
@@ -341,9 +523,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const fullTerm = rawQuery.toLowerCase();
 
     return payments.filter(p => {
-      const student = students.find(s => s.id === p.student_id);
-      const studentName = student ? formatStudentName(student.last_name, student.first_name).fullName : (p.studentName || 'Inconnu');
-      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : (p.classe || 'N/A');
+      const { student, studentName, studentClass } = resolveStudentAndClass(p);
 
       // Clés de correspondance pour reçus
       const idPrefix = (p.id || '').substring(0, 8).toLowerCase();
@@ -379,7 +559,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       // Filtres standard
       const matchesYear = !selectedYear || selectedYear === 'all' || !p.academic_year_id || p.academic_year_id === selectedYear;
-      const matchesClass = selectedClass === 'all' || student?.class_id === selectedClass || p.class_id === selectedClass;
+      
+      const studentClassId = student?.class_id || (p.student_id ? enrollments.find(e => e.student_id === p.student_id)?.class_id : null) || p.class_id;
+      const matchesClass = selectedClass === 'all' || studentClassId === selectedClass || p.class_id === selectedClass;
 
       let matchesDate = true;
       const today = new Date();
@@ -410,11 +592,10 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       return matchesYear && matchesClass && matchesDate;
     }).map(p => {
-      const student = students.find(s => s.id === p.student_id);
-      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : (p.classe || 'N/A');
+      const { student, studentClass } = resolveStudentAndClass(p);
       return normalizeReceiptPayment(p, student, studentClass);
     });
-  }, [payments, selectedYear, selectedClass, activeSearchQuery, cleanSearchCode, isDeepSearchEffective, dateFilter, customDate, students, classes]);
+  }, [payments, selectedYear, selectedClass, activeSearchQuery, cleanSearchCode, isDeepSearchEffective, dateFilter, customDate, students, classes, enrollments, enrollmentsMap, classesMap]);
 
   // Totaux comptables rigoureux sur les paiements filtrés
   const receiptsFilteredTotals = useMemo(() => {
@@ -489,16 +670,24 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return { foreignUSD, localHTG, totalEquivHTG };
   }, [paginatedPayments]);
 
-  // Étudiants disponibles pour la classe sélectionnée dans le générateur
+  // Étudiants disponibles pour la classe sélectionnée dans le générateur (prise en compte de class_id et des enrollments)
   const availableStudentsForGen = useMemo(() => {
-    return students.filter(s => s.class_id === genClass).map(s => {
+    return students.filter(s => {
+      if (s.class_id === genClass) return true;
+      const isEnrolled = enrollments.some(e => 
+        e.student_id === s.id && 
+        e.class_id === genClass && 
+        (!genYear || e.academic_year_id === genYear)
+      );
+      return isEnrolled;
+    }).map(s => {
       const formatted = formatStudentName(s.last_name, s.first_name);
       return {
         ...s,
         name: formatted.fullName
       };
     }).sort((a, b) => a.name.localeCompare(b.name));
-  }, [students, genClass]);
+  }, [students, genClass, genYear, enrollments]);
 
   // Options pour le SelectPill de sélection d'élève
   const studentGenOptions: SelectOption[] = useMemo(() => {
@@ -506,20 +695,23 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       value: s.id,
       label: s.name,
       badge: `ID: ${s.id.substring(0, 8)}`,
-      description: classes.find(c => c.id === s.class_id)?.name || undefined
+      description: classesMap.get(s.class_id) || classesMap.get(genClass) || undefined
     }));
-  }, [availableStudentsForGen, classes]);
+  }, [availableStudentsForGen, classesMap, genClass]);
 
   // Historique des paiements de l'élève sélectionné dans le générateur
   const studentPaymentsHistory = useMemo(() => {
     if (!selectedGenStudent) return [];
     return payments
-      .filter(p => p.student_id === selectedGenStudent.id && p.academic_year_id === genYear)
+      .filter(p => p.student_id === selectedGenStudent.id && (!genYear || !p.academic_year_id || p.academic_year_id === genYear))
       .map(p => {
-        const studentClass = classes.find(c => c.id === selectedGenStudent.class_id)?.name || 'N/A';
-        return normalizeReceiptPayment(p, selectedGenStudent, studentClass);
+        const { studentClass } = resolveStudentAndClass(p);
+        const resolvedClass = studentClass !== 'N/A' 
+          ? studentClass 
+          : (classesMap.get(selectedGenStudent.class_id) || classesMap.get(genClass) || 'N/A');
+        return normalizeReceiptPayment(p, selectedGenStudent, resolvedClass);
       });
-  }, [payments, selectedGenStudent, genYear, classes]);
+  }, [payments, selectedGenStudent, genYear, classesMap, enrollmentsMap]);
 
   // Totaux des versements de l'élève sélectionné
   const studentHistoryTotals = useMemo(() => {

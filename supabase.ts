@@ -117,42 +117,40 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for high-latency mobile networks
     
-    // Use the auth health endpoint with no-cors. This is extremely fast,
-    // does not require any custom headers, and completely bypasses CORS preflight (OPTIONS)
-    // which eliminates a whole round-trip of latency and prevents false "slow connection" triggers.
-    const response = await fetch(`${supabaseUrl}/auth/v1/health`, { 
+    // Auth health endpoint with apikey parameter to get a clean 200 OK without 401 unauthorized
+    const healthUrl = `${supabaseUrl}/auth/v1/health?apikey=${encodeURIComponent(supabaseAnonKey)}`;
+    const response = await fetch(healthUrl, { 
       method: 'GET',
-      mode: 'no-cors',
       cache: 'no-store',
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
-    return true; // If fetch didn't throw, the server is reachable and we are online!
+    return response.ok || (response.status >= 200 && response.status < 500);
   } catch (err: any) {
-    // Fallback: try the REST endpoint if auth/v1/health failed (some local setups might proxy differently)
+    // Fallback: try querying a lightweight rest endpoint with standard headers
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 3000);
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       
-      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/global_settings?select=key&limit=1`, {
         method: 'GET',
         headers: { 
           'apikey': supabaseAnonKey,
           'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json'
         },
-        mode: 'cors',
         cache: 'no-store',
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
-      return response.ok || (response.status >= 400 && response.status < 500);
+      return response.ok || (response.status >= 200 && response.status < 500);
     } catch (e) {
-      return false;
+      // If browser indicates online, give user the benefit of the doubt
+      return typeof window !== 'undefined' && window.navigator.onLine ? true : false;
     }
   }
 };

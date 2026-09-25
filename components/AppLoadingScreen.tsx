@@ -98,11 +98,11 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
     try {
       const isReachable = await Promise.race([
         checkSupabaseConnection(),
-        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 2800))
+        new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 8000))
       ]);
       const duration = Date.now() - start;
 
-      if (isReachable) {
+      if (isReachable || (typeof window !== 'undefined' && window.navigator.onLine)) {
         setNetStatus('online');
         setNetLatency(duration);
       } else {
@@ -110,8 +110,12 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
         setShowRecoveryActions(true);
       }
     } catch {
-      setNetStatus('offline');
-      setShowRecoveryActions(true);
+      if (typeof window !== 'undefined' && window.navigator.onLine) {
+        setNetStatus('online');
+      } else {
+        setNetStatus('offline');
+        setShowRecoveryActions(true);
+      }
     } finally {
       setIsCheckingNet(false);
     }
@@ -135,7 +139,7 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
 
     const recoveryTimer = setTimeout(() => {
       setShowRecoveryActions(true);
-    }, 400);
+    }, 6000);
 
     const memoInterval = setInterval(() => {
       setMemoIndex((prev) => (prev + 1) % MEMOS.length);

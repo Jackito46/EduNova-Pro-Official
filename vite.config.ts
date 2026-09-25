@@ -81,7 +81,8 @@ export default defineConfig(({ mode }) => {
               'vendor-charts': ['recharts'],
               'vendor-supabase': ['@supabase/supabase-js'],
               'vendor-pdf': ['jspdf', 'html2canvas', 'jspdf-autotable'],
-              'vendor-xlsx': ['xlsx']
+              'vendor-xlsx': ['xlsx'],
+              'vendor-utils': ['date-fns', 'react-markdown', 'qrcode']
             }
           }
         }

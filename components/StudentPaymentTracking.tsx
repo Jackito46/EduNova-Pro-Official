@@ -341,7 +341,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       const { data: allStudentPayments, error: paymentsError } = await supabase
         .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name)')
+        .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
         .eq('school_id', user.school_id)
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
@@ -392,7 +392,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         console.error("Erreur chargement student_ad_hoc_fees:", err);
       }
 
-      const activeCampaigns = isEnrolled ? campaignData
+      const activeCampaigns = campaignData
         .map((fee: any) => {
           if (!fee.campaign) return null;
           return {
@@ -402,14 +402,23 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
             fee_id: fee.id
           };
         })
-        .filter((c: any) => c !== null && c.academic_year_id === targetYear) : [];
+        .filter((c: any) => c !== null && (!c.academic_year_id || c.academic_year_id === targetYear));
 
       const campaignsExpected = activeCampaigns.reduce((sum, camp) => {
         const required = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
         return sum + required;
       }, 0);
 
-      const isCampaignPayment = (p: any) => !!p.ad_hoc_campaign_id;
+      const isCampaignPayment = (p: any) => Boolean(
+        p.ad_hoc_campaign_id || 
+        p.fee_type === 'AD_HOC' || 
+        p.campaign?.id ||
+        activeCampaigns.some((c: any) => {
+          const campName = (c.name || '').toLowerCase();
+          const nat = (p.nature || p.type || p.fee_type || p.description || '').toLowerCase();
+          return campName && nat && (nat.includes(campName) || (campName.includes('assurance') && nat.includes('assurance')));
+        })
+      );
       const isAdmissionPayment = (p: any) => {
         const feeType = (p.fee_type || '').toLowerCase();
         const nature = (p.nature || '').toLowerCase();
@@ -841,6 +850,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         tuitionBreakdown,
         miscBreakdown,
         campaignsBreakdown,
+        activeCampaigns,
         hasCampaigns: activeCampaigns.length > 0,
         classe: effectiveClassName,
         academicYear: academicYears.find(y => y.id === targetYear)?.label || enrollment?.academic_year?.label || 'Session en cours',
@@ -1637,14 +1647,40 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                   const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
                   const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
+                  // Vérifier si le versement correspond à une campagne
+                  const isCamp = Boolean(
+                    t.ad_hoc_campaign_id || 
+                    t.fee_type === 'AD_HOC' || 
+                    t.campaign?.id ||
+                    (selectedStudent?.activeCampaigns || []).some((c: any) => {
+                      const cName = (c.name || '').toLowerCase();
+                      const nat = (t.nature || t.type || t.fee_type || '').toLowerCase();
+                      return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+                    })
+                  );
+
                   // Vérifier si le frais sous-jacent a été expressément planifié en devises (USD)
-                  const isTuitionFee = t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'));
-                  const isAdmissionFee = t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription";
-                  const isMiscFee = t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers');
+                  const isTuitionFee = !isCamp && (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité')));
+                  const isAdmissionFee = !isCamp && (t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription");
+                  const isMiscFee = !isCamp && (t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers'));
                   const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedStudent?.scolariteUSD || 0) > 0 || (selectedStudent?.plan?.tuition_fee_usd || 0) > 0));
                   const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedStudent?.inscriptionUSD || 0) > 0 || (selectedStudent?.plan?.inscription_fee_usd || 0) > 0));
                   const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedStudent?.miscNativeUSD || 0) > 0);
-                  const isCampaignPlannedInUSD = Boolean(t.campaign?.currency === 'USD');
+
+                  let campCurrency = t.campaign?.currency;
+                  if (!campCurrency && t.ad_hoc_campaign_id) {
+                    const matched = (selectedStudent?.activeCampaigns || []).find((c: any) => c.id === t.ad_hoc_campaign_id);
+                    campCurrency = matched?.currency;
+                  }
+                  if (!campCurrency && isCamp) {
+                    const matched = (selectedStudent?.activeCampaigns || []).find((c: any) => {
+                      const cName = (c.name || '').toLowerCase();
+                      const nat = (t.nature || t.type || '').toLowerCase();
+                      return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+                    });
+                    campCurrency = matched?.currency;
+                  }
+                  const isCampaignPlannedInUSD = Boolean(isCamp && campCurrency === 'USD');
                   const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
                   return (
@@ -1781,14 +1817,40 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                       const appliedRate = Number(t.exchange_rate_applied || selectedStudent?.exchangeRate || 140);
                       const baseHTG = Number(t.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
+                      // Vérifier si le versement correspond à une campagne
+                      const isCamp = Boolean(
+                        t.ad_hoc_campaign_id || 
+                        t.fee_type === 'AD_HOC' || 
+                        t.campaign?.id ||
+                        (selectedStudent?.activeCampaigns || []).some((c: any) => {
+                          const cName = (c.name || '').toLowerCase();
+                          const nat = (t.nature || t.type || t.fee_type || '').toLowerCase();
+                          return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+                        })
+                      );
+
                       // Vérifier si le frais sous-jacent a été expressément planifié en devises (USD)
-                      const isTuitionFee = t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'));
-                      const isAdmissionFee = t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription";
-                      const isMiscFee = t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers');
+                      const isTuitionFee = !isCamp && (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité')));
+                      const isAdmissionFee = !isCamp && (t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription");
+                      const isMiscFee = !isCamp && (t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers'));
                       const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedStudent?.scolariteUSD || 0) > 0 || (selectedStudent?.plan?.tuition_fee_usd || 0) > 0));
                       const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedStudent?.inscriptionUSD || 0) > 0 || (selectedStudent?.plan?.inscription_fee_usd || 0) > 0));
                       const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedStudent?.miscNativeUSD || 0) > 0);
-                      const isCampaignPlannedInUSD = Boolean(t.campaign?.currency === 'USD');
+
+                      let campCurrency = t.campaign?.currency;
+                      if (!campCurrency && t.ad_hoc_campaign_id) {
+                        const matched = (selectedStudent?.activeCampaigns || []).find((c: any) => c.id === t.ad_hoc_campaign_id);
+                        campCurrency = matched?.currency;
+                      }
+                      if (!campCurrency && isCamp) {
+                        const matched = (selectedStudent?.activeCampaigns || []).find((c: any) => {
+                          const cName = (c.name || '').toLowerCase();
+                          const nat = (t.nature || t.type || '').toLowerCase();
+                          return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+                        });
+                        campCurrency = matched?.currency;
+                      }
+                      const isCampaignPlannedInUSD = Boolean(isCamp && campCurrency === 'USD');
                       const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
                       return (
@@ -2656,14 +2718,37 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                 : (t.nature || t.type || t.fee_type || 'Frais Divers');
 
               // Identify associated fee category breakdown
-              const isAdmission = t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription";
-              const isMisc = t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers');
-              const isCampaign = t.ad_hoc_campaign_id || t.fee_type === 'AD_HOC';
-              const isTuitionFee = t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'));
+              const isCampaign = Boolean(
+                t.ad_hoc_campaign_id || 
+                t.fee_type === 'AD_HOC' || 
+                t.campaign?.id ||
+                (selectedStudent?.activeCampaigns || []).some((c: any) => {
+                  const cName = (c.name || '').toLowerCase();
+                  const nat = (t.nature || t.type || t.fee_type || '').toLowerCase();
+                  return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+                })
+              );
+              const isAdmission = !isCampaign && (t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription");
+              const isMisc = !isCampaign && (t.fee_type === 'DIVERS' || t.nature?.toLowerCase().includes('divers'));
+              const isTuitionFee = !isCampaign && !isAdmission && !isMisc && (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité')));
 
               const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedStudent?.scolariteUSD || 0) > 0 || (selectedStudent?.plan?.tuition_fee_usd || 0) > 0));
               const isMiscPlannedInUSD = Boolean(isMisc && (selectedStudent?.miscNativeUSD || 0) > 0);
-              const isCampaignPlannedInUSD = Boolean(t.campaign?.currency === 'USD');
+              
+              let campCurrency = t.campaign?.currency;
+              if (!campCurrency && t.ad_hoc_campaign_id) {
+                const matched = (selectedStudent?.activeCampaigns || []).find((c: any) => c.id === t.ad_hoc_campaign_id);
+                campCurrency = matched?.currency;
+              }
+              if (!campCurrency && isCampaign) {
+                const matched = (selectedStudent?.activeCampaigns || []).find((c: any) => {
+                  const cName = (c.name || '').toLowerCase();
+                  const nat = (t.nature || t.type || '').toLowerCase();
+                  return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+                });
+                campCurrency = matched?.currency;
+              }
+              const isCampaignPlannedInUSD = Boolean(isCampaign && campCurrency === 'USD');
               const isFeePlannedInUSD = isTuitionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
               const associatedBreakdown = isCampaign

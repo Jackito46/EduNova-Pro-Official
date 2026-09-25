@@ -226,7 +226,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
       let authTimeoutId: NodeJS.Timeout;
       const authPromise = supabase.auth.signInWithPassword({ email: targetEmail, password });
       const authTimeout = new Promise<any>((_, reject) => 
-        authTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la connexion. Veuillez réessayer.")), 5000)
+        authTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la connexion. Veuillez vérifier votre connexion et réessayer.")), 20000)
       );
 
       const { data: authData, error: authError } = await Promise.race([authPromise, authTimeout]);
@@ -292,7 +292,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           .single();
         
         const profileTimeout = new Promise<any>((_, reject) => 
-          profileTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la récupération du profil.")), 3500)
+          profileTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la récupération du profil.")), 12000)
         );
 
         let profile: any = null;
@@ -372,7 +372,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
               .eq('id', finalProfile.school_id)
               .single();
             const schoolTimeout = new Promise<any>((_, reject) => 
-              schoolTimeoutId = setTimeout(() => reject(new Error("school check timeout")), 2500)
+              schoolTimeoutId = setTimeout(() => reject(new Error("school check timeout")), 10000)
             );
             const { data: schoolData, error: schoolErr } = await Promise.race([schoolPromise, schoolTimeout]);
             clearTimeout(schoolTimeoutId!);

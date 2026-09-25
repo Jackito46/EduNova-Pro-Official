@@ -815,7 +815,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       const { data: rawPayments } = await supabase
         .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name)')
+        .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
         .eq('school_id', user.school_id)
         .eq('student_id', student.id)
         .order('created_at', { ascending: false });
@@ -2600,13 +2600,20 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
                         const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
-                        const isTuitionFee = p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'));
-                        const isAdmissionFee = p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription";
-                        const isMiscFee = p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers');
+                        const isCamp = Boolean(
+                          p.ad_hoc_campaign_id || 
+                          p.fee_type === 'AD_HOC' || 
+                          p.campaign?.id || 
+                          (p.nature && (p.nature.toLowerCase().includes('campagne') || p.nature.toLowerCase().includes('assurance'))) ||
+                          (p.type && (p.type.toLowerCase().includes('campagne') || p.type.toLowerCase().includes('assurance')))
+                        );
+                        const isTuitionFee = !isCamp && (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité')));
+                        const isAdmissionFee = !isCamp && (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription");
+                        const isMiscFee = !isCamp && (p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers'));
                         const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
                         const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
                         const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
-                        const isCampaignPlannedInUSD = Boolean(p.campaign?.currency === 'USD');
+                        const isCampaignPlannedInUSD = Boolean(isCamp && p.campaign?.currency === 'USD');
                         const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
                         return (
@@ -3049,13 +3056,20 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
                           const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
-                          const isTuitionFee = p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'));
-                          const isAdmissionFee = p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription";
-                          const isMiscFee = p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers');
+                          const isCamp = Boolean(
+                            p.ad_hoc_campaign_id || 
+                            p.fee_type === 'AD_HOC' || 
+                            p.campaign?.id || 
+                            (p.nature && (p.nature.toLowerCase().includes('campagne') || p.nature.toLowerCase().includes('assurance'))) ||
+                            (p.type && (p.type.toLowerCase().includes('campagne') || p.type.toLowerCase().includes('assurance')))
+                          );
+                          const isTuitionFee = !isCamp && (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité')));
+                          const isAdmissionFee = !isCamp && (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription");
+                          const isMiscFee = !isCamp && (p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers'));
                           const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
                           const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
                           const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
-                          const isCampaignPlannedInUSD = Boolean(p.campaign?.currency === 'USD');
+                          const isCampaignPlannedInUSD = Boolean(isCamp && p.campaign?.currency === 'USD');
                           const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
                           return (

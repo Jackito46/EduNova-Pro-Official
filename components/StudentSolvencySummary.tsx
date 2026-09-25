@@ -246,7 +246,15 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         );
       };
 
-      const isCampaignPayment = (p: any) => !!p.ad_hoc_campaign_id;
+      const isCampaignPayment = (p: any) => Boolean(
+        p.ad_hoc_campaign_id ||
+        p.fee_type === 'AD_HOC' ||
+        (adHocRes.data || []).some((fee: any) => {
+          const cName = (fee.campaign?.name || '').toLowerCase();
+          const nat = (p.nature || p.label || p.type || p.description || '').toLowerCase();
+          return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+        })
+      );
 
       const admissionPayments = validPayments.filter(p => !isCampaignPayment(p) && isAdmissionPayment(p));
       const miscPayments = validPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && isMiscPayment(p));
@@ -278,7 +286,7 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
       let adHocRemaining = 0;
 
       (adHocRes.data || []).forEach((fee: any) => {
-        if (!targetYearId || fee.campaign?.academic_year_id === targetYearId) {
+        if (!targetYearId || !fee.campaign?.academic_year_id || fee.campaign?.academic_year_id === targetYearId) {
           const cAmt = fee.custom_amount !== null && fee.custom_amount !== undefined
             ? Number(fee.custom_amount)
             : Number(fee.campaign?.amount || 0);
@@ -286,7 +294,13 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
           const plannedHTG = cCurr === 'USD' ? 0 : cAmt;
           const plannedUSD = cCurr === 'USD' ? cAmt : 0;
 
-          const campPayments = validPayments.filter(p => p.ad_hoc_campaign_id === fee.campaign?.id);
+          const campPayments = validPayments.filter(p => {
+            if (p.ad_hoc_campaign_id === fee.campaign?.id) return true;
+            if (p.campaign?.id && p.campaign?.id === fee.campaign?.id) return true;
+            const cName = (fee.campaign?.name || '').toLowerCase();
+            const nat = (p.nature || p.label || p.type || p.description || '').toLowerCase();
+            return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
+          });
           const campBal = computeFeeCategoryBalance(plannedHTG, plannedUSD, campPayments, exchangeRate);
 
           adHocTotalExpected += campBal.effectiveDueHTG;

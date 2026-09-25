@@ -1542,10 +1542,37 @@ const AssignCampaignView: React.FC<{ user: UserProfile, campaign: Campaign, onBa
 
       if (paymentsError) throw paymentsError;
 
+      // Resilient fallback: Also check payments by nature/name for assigned students if ad_hoc_campaign_id was not explicitly set
+      let allMatchedPayments = [...(campaignPayments || [])];
+      const assignedStudentIds = assigns?.map((a: any) => a.student_id).filter(Boolean) || [];
+      if (assignedStudentIds.length > 0) {
+        try {
+          const { data: studentNamedPayments } = await supabase.from('payments')
+            .select('*')
+            .in('student_id', assignedStudentIds)
+            .is('ad_hoc_campaign_id', null);
+          
+          if (studentNamedPayments && studentNamedPayments.length > 0) {
+            const campName = (campaign.name || '').toLowerCase();
+            const isAssurance = campName.includes('assurance');
+            studentNamedPayments.forEach((p: any) => {
+              const nat = (p.nature || p.label || p.type || p.description || '').toLowerCase();
+              if (nat && ((campName && nat.includes(campName)) || (isAssurance && nat.includes('assurance')))) {
+                if (!allMatchedPayments.some(cp => cp.id === p.id)) {
+                  allMatchedPayments.push(p);
+                }
+              }
+            });
+          }
+        } catch (e) {
+          console.warn("Notice: could not query fallback payments by student:", e);
+        }
+      }
+
       const pmtsMap: Record<string, number> = {};
       const pmtsByStudentMap: Record<string, any[]> = {};
-      if (campaignPayments) {
-        campaignPayments.forEach((p: any) => {
+      if (allMatchedPayments) {
+        allMatchedPayments.forEach((p: any) => {
            if (p.status === 'ANNULE') return;
            const sid = p.student_id;
            let val = Number(p.amount || 0);

@@ -104,7 +104,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       // 3. Fetch Payments
       const { data: payData, error: payErr } = await supabase
         .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name)')
+        .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
         .eq('student_id', studentId)
         .order('created_at', { ascending: false });
         
@@ -133,13 +133,21 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             tLabel = 'Inscription';
           }
           return {
+            ...p,
             id: p.id,
             date: p.date || p.created_at,
             label: tLabel,
             amount: p.amount_htg_equivalent || p.amount,
             rawAmount: Number(p.amount || 0),
             currency: p.currency || 'HTG',
-            exchange_rate_applied: Number(p.exchange_rate_applied || 0)
+            exchange_rate_applied: Number(p.exchange_rate_applied || 0),
+            ad_hoc_campaign_id: p.ad_hoc_campaign_id,
+            status: p.status,
+            campaign: p.campaign,
+            fee_type: p.fee_type,
+            nature: p.nature,
+            receipt_number: p.receipt_number,
+            payment_method: p.payment_method
           };
         }),
         ...(supplyData || []).map((s: any) => ({
@@ -1017,8 +1025,33 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
 
                     {(() => {
-                      const campPayments = payments.filter((p: any) => p.ad_hoc_campaign_id === camp.id && p.status !== 'ANNULE');
-                      const totalPaidForCamp = campPayments.reduce((sum: number, p: any) => sum + Number(p.amount), 0);
+                      const campPayments = payments.filter((p: any) => {
+                        if (p.status === 'ANNULE') return false;
+                        if (p.ad_hoc_campaign_id && p.ad_hoc_campaign_id === camp.id) return true;
+                        if (p.campaign?.id && p.campaign.id === camp.id) return true;
+                        const campName = (camp.name || '').toLowerCase();
+                        const natureStr = (p.nature || p.label || p.type || '').toLowerCase();
+                        if (campName && natureStr) {
+                          if (natureStr.includes(campName) || campName.includes(natureStr)) return true;
+                          if (campName.includes('assurance') && natureStr.includes('assurance')) return true;
+                        }
+                        return false;
+                      });
+
+                      const totalPaidForCamp = campPayments.reduce((sum: number, p: any) => {
+                        const pAmt = Number(p.rawAmount || p.amount || 0);
+                        const isCampUSD = camp.currency === 'USD';
+                        const isPaymentUSD = p.currency === 'USD';
+                        if (isCampUSD && !isPaymentUSD) {
+                          const rate = Number(p.exchange_rate_applied) || 140;
+                          return sum + (rate > 0 ? pAmt / rate : pAmt);
+                        } else if (!isCampUSD && isPaymentUSD) {
+                          const rate = Number(p.exchange_rate_applied) || 140;
+                          return sum + (pAmt * rate);
+                        }
+                        return sum + pAmt;
+                      }, 0);
+
                       const requiredCampAmount = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
                       const campBalance = Math.max(requiredCampAmount - totalPaidForCamp, 0);
                       
@@ -1049,8 +1082,8 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                           <div className="flex justify-between items-center text-[10px] font-bold text-slate-700">
                             <span className="text-slate-400 text-[9px] uppercase tracking-wider">Reste à payer :</span>
-                            <span className={`font-black px-1.5 py-0.5 rounded ${campBalance === 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>
-                              {campBalance.toLocaleString()} {camp.currency}
+                            <span className={`font-black px-2 py-0.5 rounded ${campBalance === 0 ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-rose-50 text-rose-700 border border-rose-200'}`}>
+                              {campBalance === 0 ? '✅ Soldé' : `${campBalance.toLocaleString()} ${camp.currency}`}
                             </span>
                           </div>
 
@@ -1064,14 +1097,14 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   <div key={p.id || pIdx} className="flex justify-between items-center text-[9px] font-medium text-slate-600 border-b border-slate-100 pb-1 last:border-0 last:pb-0">
                                     <div className="flex flex-col">
                                       <span className="font-extrabold text-slate-800">
-                                        {p.receipt_number || `Reçu #${p.id.slice(0, 8)}`}
+                                        {p.receipt_number || `RCP-${(p.id || '').substring(0, 8).toUpperCase()}`}
                                       </span>
                                       <span className="text-[8px] text-slate-400">
-                                        {new Date(p.payment_date).toLocaleDateString()} via {p.payment_method}
+                                        {new Date(p.date || p.created_at || p.payment_date).toLocaleDateString('fr-FR')} via {p.payment_method || 'Cash'}
                                       </span>
                                     </div>
-                                    <span className="font-black text-slate-800">
-                                      {Number(p.amount).toLocaleString()} {p.currency}
+                                    <span className="font-mono font-bold text-emerald-700">
+                                      {Number(p.rawAmount || p.amount).toLocaleString()} {p.currency || 'HTG'}
                                     </span>
                                   </div>
                                 ))}

@@ -259,14 +259,17 @@ root.render(
   </React.StrictMode>
 );
 
-// Nettoyage de secours garanti après montage
+// Nettoyage de secours garanti après montage immédiat
 if (typeof window !== 'undefined') {
   requestAnimationFrame(() => {
     const splash = document.getElementById('edunova-pwa-splash');
     if (splash) {
-      splash.style.transition = 'opacity 0.25s ease-out';
+      splash.style.pointerEvents = 'none';
+      splash.style.transition = 'opacity 0.2s ease-out';
       splash.style.opacity = '0';
-      setTimeout(() => splash.remove(), 250);
+      setTimeout(() => {
+        try { splash.remove(); } catch (e) {}
+      }, 200);
     }
   });
 }
