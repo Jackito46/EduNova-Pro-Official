@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { ShieldAlert, RefreshCw, Loader2 } from 'lucide-react';
+import { ShieldAlert, RefreshCw, Loader2, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './components/Sidebar';
@@ -423,8 +423,15 @@ const App: React.FC = () => {
   
   // Inactivity Warning States
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
-  const [countdown, setCountdown] = useState(30);
+  const [countdown, setCountdown] = useState(60);
   const isWarningShowing = useRef(false);
+
+  // Format countdown into minutes:secondes (MM:SS)
+  const formatCountdown = useCallback((totalSeconds: number) => {
+    const mins = Math.floor(Math.max(0, totalSeconds) / 60);
+    const secs = Math.max(0, totalSeconds) % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }, []);
 
   const syncProfile = useCallback(async (userId: string, isRecovery: boolean = false) => {
     console.log("App.tsx: Starting syncProfile for user", userId, { isRecovery });
@@ -1011,9 +1018,10 @@ const App: React.FC = () => {
     // Bypass auto-logout and session purging during maintenance mode to let users read the maintenance message
     if (maintenanceMode && user.role !== 'SUPER_ADMIN') return;
 
-    const timeoutMins = Math.max(15, Number(sessionTimeoutMinutes) || 15);
+    const timeoutMins = Math.max(1, Number(sessionTimeoutMinutes) || 15);
     const INACTIVITY_LIMIT = timeoutMins * 60 * 1000; // e.g. 15 minutes in ms
-    const GRACE_PERIOD = 30 * 1000; // 30 seconds warning modal countdown
+    const GRACE_PERIOD_SECONDS = 60; // 60 seconds warning modal countdown (1 minute grace period)
+    const GRACE_PERIOD = GRACE_PERIOD_SECONDS * 1000;
     const TOTAL_ALLOWED_INACTIVITY = INACTIVITY_LIMIT + GRACE_PERIOD;
 
     // Retrieve last activity from localStorage or set current time
@@ -1242,7 +1250,7 @@ const App: React.FC = () => {
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (showInactivityWarning) {
-      setCountdown(30); // 30 seconds to react
+      setCountdown((prev) => (prev > 0 ? prev : 60));
       interval = setInterval(() => {
         setCountdown((prev) => {
           if (prev <= 1) {
@@ -1272,15 +1280,17 @@ const App: React.FC = () => {
     console.log("App.tsx: Rendering Login component");
     return (
       <ErrorBoundary>
-        <Login onLogin={(u) => {
-          try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-          setUser(u);
-          // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
-          if (window.location.hash !== '#/') {
-            window.location.hash = '#/';
-          }
-        }} onReset={purgeSystemState} />
-        <PwaInstallModal />
+        <HashRouter>
+          <Login onLogin={(u) => {
+            try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
+            setUser(u);
+            // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
+            if (window.location.hash !== '#/') {
+              window.location.hash = '#/';
+            }
+          }} onReset={purgeSystemState} />
+          <PwaInstallModal />
+        </HashRouter>
       </ErrorBoundary>
     );
   }
@@ -1353,22 +1363,77 @@ const App: React.FC = () => {
       )}
       {showInactivityWarning && (
         <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center animate-in fade-in zoom-in duration-200">
-            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
-              ⏳
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 text-center animate-in fade-in zoom-in duration-200 border border-slate-100">
+            {/* Warning Icon with Pulse Ring */}
+            <div className="relative w-16 h-16 mx-auto mb-4">
+              <div className={`absolute inset-0 rounded-full animate-ping opacity-25 ${countdown <= 15 ? 'bg-red-400' : 'bg-amber-400'}`}></div>
+              <div className="relative w-16 h-16 bg-amber-100 text-amber-600 rounded-full flex items-center justify-center text-3xl shadow-inner ring-4 ring-amber-50">
+                ⏳
+              </div>
             </div>
-            <h2 className="text-xl font-bold text-slate-900 mb-2">Session expirée imminente</h2>
-            <p className="text-slate-600 mb-6">
-              Pour des raisons de sécurité, votre session sera fermée dans <span className="font-bold text-red-600 text-lg">{countdown}s</span> suite à une inactivité.
+
+            <h2 className="text-xl font-bold text-slate-900 mb-1.5">Session expirée imminente</h2>
+            <p className="text-xs sm:text-sm text-slate-500 mb-4 leading-relaxed">
+              Pour des raisons de sécurité, votre session sera automatiquement fermée suite à une inactivité prolongée.
             </p>
+
+            {/* Indicateur visuel de temps restant (minutes:secondes) */}
+            <div className="bg-gradient-to-b from-slate-50 to-slate-100/90 border border-slate-200/90 rounded-2xl p-4 mb-5 shadow-inner">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2 flex items-center justify-center gap-1.5">
+                <Clock size={14} className="text-amber-600 animate-pulse shrink-0" />
+                <span>Temps restant avant déconnexion</span>
+              </div>
+
+              {/* Minuteur Digital en minutes:secondes */}
+              <div className="flex items-center justify-center gap-2 py-1">
+                <div className={`font-mono text-4xl sm:text-5xl font-black tracking-tight px-5 py-2 rounded-xl border transition-colors ${
+                  countdown <= 15
+                    ? 'bg-red-50 text-red-600 border-red-200 animate-pulse ring-2 ring-red-200'
+                    : countdown <= 30
+                    ? 'bg-amber-50 text-amber-600 border-amber-200 ring-2 ring-amber-100'
+                    : 'bg-white text-slate-800 border-slate-200 shadow-2xs'
+                }`}>
+                  {formatCountdown(countdown)}
+                </div>
+              </div>
+              <div className="text-[11px] font-semibold text-slate-500 mt-1">
+                Indicateur décompte : <span className="font-mono text-slate-700 font-bold">(minutes:secondes)</span>
+              </div>
+
+              {/* Jauge / Barre de progression visuelle */}
+              <div className="w-full bg-slate-200/80 rounded-full h-2.5 overflow-hidden mt-3 shadow-inner">
+                <div 
+                  className={`h-full transition-all duration-1000 ease-linear rounded-full ${
+                    countdown <= 15
+                      ? 'bg-red-500'
+                      : countdown <= 30
+                      ? 'bg-amber-500'
+                      : 'bg-indigo-600'
+                  }`}
+                  style={{ width: `${Math.min(100, Math.max(0, (countdown / 60) * 100))}%` }}
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-[10px] text-slate-400 font-mono font-medium mt-1.5 px-0.5">
+                <span>00:00 (Fermeture)</span>
+                <span className="font-sans font-semibold text-slate-500">
+                  {countdown > 0 ? `${countdown}s restante${countdown > 1 ? 's' : ''}` : 'Fermeture en cours...'}
+                </span>
+                <span>01:00 (Alerte)</span>
+              </div>
+            </div>
+
+            {/* Boutons d'action */}
             <div className="flex gap-3 justify-center">
               <button
+                type="button"
                 onClick={() => purgeSystemState()}
-                className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-xl font-medium transition-colors"
+                className="flex-1 px-4 py-2.5 text-slate-600 hover:text-slate-800 hover:bg-slate-100 active:bg-slate-200 rounded-xl font-semibold transition-colors text-sm border border-slate-200"
               >
                 Me déconnecter
               </button>
               <button
+                type="button"
                 onClick={() => {
                   const now = Date.now();
                   try {
@@ -1376,10 +1441,12 @@ const App: React.FC = () => {
                   } catch (e) {}
                   setShowInactivityWarning(false);
                   isWarningShowing.current = false;
+                  setCountdown(60);
                 }}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-lg shadow-blue-200"
+                className="flex-1 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-xl font-bold transition-all shadow-md shadow-indigo-200 text-sm flex items-center justify-center gap-2"
               >
-                Rester connecté
+                <RefreshCw size={15} className="shrink-0" />
+                <span>Rester connecté</span>
               </button>
             </div>
           </div>

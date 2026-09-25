@@ -19,6 +19,7 @@ import { isAutonomousAccount, isAutonomousAdmin, AUTONOMOUS_RESTRICTION_MESSAGE 
 import { SkeletonTable, FluidLoadingState, SubmittingButtonContent } from './SkeletonLoader';
 import { SelectPill, SelectOption } from './SelectPill';
 import { DoubleRegardSubmitModal } from './DoubleRegardSubmitModal';
+import { ScrollableContainer } from './ScrollableContainer';
 
 const secondarySupabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
@@ -1692,7 +1693,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
             )}
           </div>
         ) : (
-          <div className="overflow-x-auto custom-scrollbar">
+          <ScrollableContainer direction="horizontal" showClickZones={true} ariaLabel="Tableau des utilisateurs avec défilement fluide et zones de clic ciblées">
             <table className="w-full text-left min-w-[650px]">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200">
@@ -1921,7 +1922,7 @@ const UserManagementView: React.FC<{ currentUser: UserProfile }> = ({ currentUse
                 })}
               </tbody>
             </table>
-          </div>
+          </ScrollableContainer>
         )}
       </div>
 

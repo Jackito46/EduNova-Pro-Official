@@ -1,10 +1,14 @@
 
 import { initConsoleSanitizer } from './utils/consoleSanitizer';
+import { mouseScrollEnhancer } from './utils/mouseScrollEnhancer';
 
 declare const __DEPLOY_HASH__: string;
 
 // Initialisation précoce de l'interception et du nettoyage des logs de la console
 initConsoleSanitizer();
+
+// Initialisation du support complet du défilement souris et des zones de clic ciblées
+mouseScrollEnhancer.init();
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';

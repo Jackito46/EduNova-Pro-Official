@@ -2187,7 +2187,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       onClick={resetAllFields} 
                       className="text-xs font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <RotateCcw size={13} /> Changer d'étudiant
+                      <RotateCcw size={13} /> Changer d'{terminology.student.toLowerCase()}
                     </button>
                   )}
                 </div>

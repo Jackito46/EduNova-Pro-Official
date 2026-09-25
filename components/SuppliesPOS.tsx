@@ -959,10 +959,10 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                 </span>
                 <div>
                   <h3 className="text-xs font-black text-slate-900 uppercase tracking-wider">
-                    Sélection de l'élève acheteur
+                    Sélection de l'{terminology.student.toLowerCase()} acheteur
                   </h3>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    Associez la vente à un élève inscrit pour l'édition du reçu officiel
+                    Associez la vente à un {terminology.student.toLowerCase()} inscrit pour l'édition du reçu officiel
                   </p>
                 </div>
               </div>
@@ -972,7 +972,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                   className="px-3 py-1.5 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 font-extrabold text-xs transition-colors flex items-center gap-1.5 border border-indigo-100"
                 >
                   <UserCheck size={14} />
-                  <span>Changer d'élève</span>
+                  <span>Changer d'{terminology.student.toLowerCase()}</span>
                 </button>
               )}
             </div>

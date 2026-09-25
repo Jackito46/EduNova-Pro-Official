@@ -27,7 +27,8 @@ import {
   SlidersHorizontal,
   CheckCircle,
   HelpCircle,
-  Clock
+  Clock,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
@@ -90,6 +91,7 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
   // Preview & Export state
   const [isGenerating, setIsGenerating] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [pendingAutoExport, setPendingAutoExport] = useState(false);
   const [activeSubView, setActiveSubView] = useState<'bulletins' | 'palmares'>('bulletins');
   const [generatedData, setGeneratedData] = useState<ReportCardStudent[]>([]);
   const [isExporting, setIsExporting] = useState(false);
@@ -553,9 +555,11 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
       setGeneratedData(finalResults);
       setShowPreview(true);
       toast.success(`${finalResults.length} bulletin(s) généré(s) avec succès.`);
+      return true;
     } catch (err) {
       console.error("Generation error:", err);
       toast.error("Erreur lors de la génération des bulletins.");
+      return false;
     } finally {
       setIsGenerating(false);
     }
@@ -719,6 +723,44 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
+  const handleExportPDFDirect = async () => {
+    if (generationMode === 'student' && !selectedStudent) {
+      toast.error(`Veuillez sélectionner un ${terminology.student.toLowerCase()}.`);
+      return;
+    }
+    if (!selectedClassId || !selectedYearId || !term) {
+      toast.error("Veuillez sélectionner la classe, l'année et la période.");
+      return;
+    }
+    if (students.length === 0) {
+      toast.error(`Aucun ${terminology.student.toLowerCase()} trouvé pour cette sélection.`);
+      return;
+    }
+
+    // Si l'aperçu est déjà ouvert et contient les données générées
+    if (showPreview && generatedData.length > 0) {
+      await handleExportPDF();
+      return;
+    }
+
+    setPendingAutoExport(true);
+    const ok = await handleGenerate();
+    if (!ok) {
+      setPendingAutoExport(false);
+    }
+  };
+
+  // Déclenchement automatique de l'exportation PDF dès que le rendu des bulletins est prêt
+  useEffect(() => {
+    if (showPreview && pendingAutoExport && generatedData.length > 0 && !isExporting) {
+      setPendingAutoExport(false);
+      const timer = setTimeout(() => {
+        handleExportPDF();
+      }, 350);
+      return () => clearTimeout(timer);
+    }
+  }, [showPreview, pendingAutoExport, generatedData.length, isExporting]);
+
   const handleExportPalmaresPDF = () => {
     if (generatedData.length === 0) return;
 
@@ -840,6 +882,17 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </button>
         </div>
 
+        {/* Direct PDF Button in Modal Controls */}
+        <button
+          onClick={handleExportPDF}
+          disabled={isExporting}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 text-[10.5px] shadow-2xs hover:shadow-xs uppercase tracking-wider shrink-0 active:scale-95 disabled:opacity-50"
+          title="Exporter et télécharger tous les bulletins en PDF"
+        >
+          {isExporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />}
+          <span>Exporter en PDF</span>
+        </button>
+
         {generationMode === 'class' && (
           <button
             onClick={handleExportPalmaresPDF}
@@ -945,25 +998,40 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
 
-        {/* Campus Switcher (only if multi-campus) */}
-        {hasMultipleCampuses && (user.role === 'SUPER_ADMIN' || user.role === 'DIRECTOR') && (
-          <div className="relative min-w-[200px] w-full md:w-auto">
-            <select
-              className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold pl-8 pr-8 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-all"
-              value={currentCampusId || ''}
-              onChange={e => setCurrentCampusId(e.target.value || null)}
+        {/* Actions & Campus Switcher */}
+        <div className="flex flex-wrap items-center gap-2.5 w-full md:w-auto justify-end">
+          {selectedClassId && students.length > 0 && (
+            <button
+              onClick={handleExportPDFDirect}
+              disabled={isGenerating || isExporting}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-lg text-xs shadow-xs transition-all active:scale-95 disabled:opacity-50 shrink-0 cursor-pointer"
+              title="Exporter les bulletins scolaires de la classe en format PDF"
             >
-              <option value="">Tous les Campus</option>
-              {campuses.map(c => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            <Building2 size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-            <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-          </div>
-        )}
+              {isExporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              <span>Exporter en PDF</span>
+            </button>
+          )}
+
+          {/* Campus Switcher (only if multi-campus) */}
+          {hasMultipleCampuses && (user.role === 'SUPER_ADMIN' || user.role === 'DIRECTOR') && (
+            <div className="relative min-w-[200px] w-full md:w-auto">
+              <select
+                className="w-full bg-slate-50 hover:bg-slate-100 text-slate-800 text-xs font-semibold pl-8 pr-8 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer appearance-none transition-all"
+                value={currentCampusId || ''}
+                onChange={e => setCurrentCampusId(e.target.value || null)}
+              >
+                <option value="">Tous les Campus</option>
+                {campuses.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+              <Building2 size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Form Box */}
@@ -1054,12 +1122,29 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* Period / Exam Term */}
             <div className="space-y-1.5">
-              <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
-                <FileText size={13} className="text-indigo-600" />
-                {school?.school_type === 'UNIVERSITE' || school?.school_type === 'SUPERIEUR' ? 'Session / Examen' : 'Période / Évaluation'}
-              </label>
+              <div className="flex items-center justify-between gap-1">
+                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider flex items-center gap-1.5">
+                  <FileText size={13} className="text-indigo-600" />
+                  {school?.school_type === 'UNIVERSITE' || school?.school_type === 'SUPERIEUR' ? 'Session / Examen' : 'Période / Évaluation'}
+                </label>
+                {availableExams.length > 0 && term !== availableExams[availableExams.length - 1] && (
+                  <button
+                    type="button"
+                    onClick={() => setTerm(availableExams[availableExams.length - 1])}
+                    className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Basculer vers la période finale (bilan annuel et décisions de passage)"
+                  >
+                    <Sparkles size={11} className="text-amber-500" />
+                    <span>Période finale</span>
+                  </button>
+                )}
+              </div>
               <SelectPill
-                options={availableExams.map(ex => ({ value: ex, label: ex }))}
+                options={availableExams.map((ex, idx) => ({
+                  value: ex,
+                  label: ex,
+                  badge: idx === availableExams.length - 1 ? 'Bilan Final' : undefined
+                }))}
                 value={term}
                 onChange={(newTerm) => setTerm(newTerm)}
                 variant="field"
@@ -1156,14 +1241,25 @@ const ReportCardsView: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Action CTAs */}
           <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
             <button
-              onClick={handleGenerate}
-              disabled={isGenerating || (generationMode === 'student' && !selectedStudent)}
+              onClick={() => handleGenerate()}
+              disabled={isGenerating || isExporting || (generationMode === 'student' && !selectedStudent)}
               className={`flex-1 w-full py-3.5 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md flex items-center justify-center gap-2.5 transition-all transform active:scale-98 disabled:opacity-50 ${
                 isGenerating ? 'bg-indigo-400' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
               }`}
             >
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileText size={16} />}
               <span>{isGenerating ? 'Génération...' : `Générer les Bulletins (${generationMode === 'student' ? `1 ${terminology.student.toLowerCase()}` : `${students.length} ${terminology.students.toLowerCase()}`})`}</span>
+            </button>
+
+            {/* Bouton Exporter en PDF pour les administrateurs */}
+            <button
+              onClick={handleExportPDFDirect}
+              disabled={isGenerating || isExporting || !selectedClassId || students.length === 0 || (generationMode === 'student' && !selectedStudent)}
+              className="w-full sm:w-auto px-6 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs uppercase tracking-wider rounded-xl shadow-md shadow-emerald-600/20 flex items-center justify-center gap-2.5 transition-all transform active:scale-98 disabled:opacity-50 shrink-0 cursor-pointer"
+              title="Exporter et télécharger directement les bulletins scolaires de la classe en format PDF"
+            >
+              {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+              <span>{isExporting ? 'Exportation...' : 'Exporter en PDF'}</span>
             </button>
 
             {user.role === 'SUPER_ADMIN' && (
