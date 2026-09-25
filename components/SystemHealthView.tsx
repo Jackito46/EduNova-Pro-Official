@@ -636,7 +636,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 Super Admin
               </span>
             </div>
-            <p className="text-slate-500 text-xs font-medium mt-0.5 truncate">
+            <p className="text-slate-500 text-xs font-medium mt-0.5 leading-snug">
               Supervision temps réel : Moteur IA Gemini, cluster Supabase & latence des requêtes, infrastructure cloud et PWA.
             </p>
           </div>
@@ -704,7 +704,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 Protégé
               </span>
             </div>
-            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 leading-snug">
               Plafond : <strong className="text-slate-700 font-semibold">1 500 req/jour</strong>
             </p>
           </div>
@@ -731,7 +731,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 TLS 1.3
               </span>
             </div>
-            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 leading-snug">
               Cluster : <span className="text-emerald-700 font-bold">Sécurisé & Isolé</span>
             </p>
           </div>
@@ -758,7 +758,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 Certifié
               </span>
             </div>
-            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 leading-snug">
               Mode : <strong className="text-slate-700 font-semibold">{isStandalone ? 'App Installée' : 'Navigateur'}</strong>
             </p>
           </div>
@@ -783,7 +783,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
               </span>
               <span className="text-[10px] text-slate-400 font-semibold">/ {telemetry?.server.memory.heapTotalMb ?? 120} MB</span>
             </div>
-            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 leading-snug">
               Uptime : <strong className="text-slate-700 font-mono font-semibold">{formatUptime(telemetry?.server.uptimeSeconds || 3600)}</strong>
             </p>
           </div>
@@ -1099,7 +1099,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 <Lock size={14} className="text-indigo-400 shrink-0" />
                 <div className="min-w-0">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Anti-Reconnaissance</span>
-                  <span className="text-xs font-bold text-white truncate block">Endpoints Obfusqués</span>
+                  <span className="text-xs font-bold text-white block leading-tight">Endpoints Obfusqués</span>
                 </div>
               </div>
 
@@ -1107,7 +1107,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 <Shield size={14} className="text-emerald-400 shrink-0" />
                 <div className="min-w-0">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Chiffrement</span>
-                  <span className="text-xs font-bold text-white truncate block">TLS 1.3 & HSTS</span>
+                  <span className="text-xs font-bold text-white block leading-tight">TLS 1.3 & HSTS</span>
                 </div>
               </div>
 
@@ -1115,7 +1115,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 <Layers size={14} className="text-purple-400 shrink-0" />
                 <div className="min-w-0">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Isolation RLS</span>
-                  <span className="text-xs font-bold text-white truncate block">Multi-Tenant Étanche</span>
+                  <span className="text-xs font-bold text-white block leading-tight">Multi-Tenant Étanche</span>
                 </div>
               </div>
 
@@ -1123,7 +1123,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
                 <Zap size={14} className="text-amber-400 shrink-0" />
                 <div className="min-w-0">
                   <span className="text-[10px] font-bold text-slate-400 uppercase block">Anti-Saturation</span>
-                  <span className="text-xs font-bold text-white truncate block">Rate Limiting Actif</span>
+                  <span className="text-xs font-bold text-white block leading-tight">Rate Limiting Actif</span>
                 </div>
               </div>
             </div>

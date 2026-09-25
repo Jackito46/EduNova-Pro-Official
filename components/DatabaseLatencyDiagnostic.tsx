@@ -187,17 +187,17 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
   };
 
   return (
-    <div className="space-y-2.5 sm:space-y-3 font-sans animate-in fade-in duration-200">
+    <div className="space-y-2 sm:space-y-2.5 font-sans animate-in fade-in duration-200">
       
       {/* 1. MODERN COMPACT UNIFIED HEADER & TOOLBAR */}
-      <div className="bg-slate-900 p-2.5 sm:p-3 rounded-xl text-white shadow-xs border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-2.5 relative overflow-hidden">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-white/10 text-emerald-400 flex items-center justify-center shrink-0 border border-white/10">
+      <div className="bg-slate-900 p-2 sm:p-2.5 md:p-3 rounded-xl text-white shadow-xs border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-2 sm:gap-2.5 relative overflow-hidden">
+        <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+          <div className="w-7.5 h-7.5 sm:w-8 sm:h-8 rounded-lg bg-white/10 text-emerald-400 flex items-center justify-center shrink-0 border border-white/10">
             <Activity size={16} className={isRunningDiagnostic ? 'animate-spin' : 'animate-pulse'} />
           </div>
           <div className="min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-sm sm:text-base font-black tracking-tight text-white">
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+              <h2 className="text-xs sm:text-sm md:text-base font-black tracking-tight text-white">
                 Santé & Diagnostic Supabase
               </h2>
               <span className="px-1.5 py-0.2 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[9px] font-black uppercase tracking-wider">
@@ -207,33 +207,34 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                 Multi-Tenant RLS
               </span>
             </div>
-            <p className="text-[10.5px] text-slate-400 truncate mt-0.5">
+            <p className="text-[10px] sm:text-[11px] text-slate-300/90 leading-snug mt-0.5">
               Volumes d'enregistrements en direct, sondes de latence d'identité et traçabilité des requêtes PostgREST.
             </p>
           </div>
         </div>
 
-        {/* Compact Actions Toolbar */}
-        <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
+        {/* Responsive Compact Actions Toolbar */}
+        <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 flex-wrap sm:flex-nowrap w-full sm:w-auto pt-1 sm:pt-0 border-t sm:border-t-0 border-slate-800/80">
           {onRefreshDbCounts && (
             <button
               type="button"
               onClick={onRefreshDbCounts}
-              className="h-8 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+              className="flex-1 sm:flex-initial h-7 sm:h-7.5 px-2 sm:px-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-bold rounded-lg border border-slate-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
               title="Rafraîchir les compteurs réels de la base"
             >
-              <RefreshCw size={12} />
-              <span>Actualiser Compteurs</span>
+              <RefreshCw size={11} />
+              <span className="hidden xs:inline">Actualiser</span>
+              <span>Compteurs</span>
             </button>
           )}
 
           <button
             type="button"
             onClick={handleCopyReport}
-            className="h-8 px-2.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold rounded-lg border border-slate-700 flex items-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+            className="flex-1 sm:flex-initial h-7 sm:h-7.5 px-2 sm:px-2.5 bg-slate-800 hover:bg-slate-700 active:scale-95 text-slate-200 text-xs font-bold rounded-lg border border-slate-700 flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-2xs"
             title="Copier le rapport complet au format JSON"
           >
-            {copiedReport ? <Check size={12} className="text-emerald-400" /> : <Copy size={12} />}
+            {copiedReport ? <Check size={11} className="text-emerald-400" /> : <Copy size={11} />}
             <span>{copiedReport ? 'Copié !' : 'JSON'}</span>
           </button>
 
@@ -241,184 +242,184 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
             type="button"
             onClick={handleRunFullDiagnosis}
             disabled={isRunningDiagnostic}
-            className="h-8 px-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-75 disabled:cursor-not-allowed"
+            className="w-full sm:w-auto flex-1 sm:flex-initial h-7 sm:h-7.5 px-2.5 sm:px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white text-xs font-bold rounded-lg flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer disabled:opacity-75 disabled:cursor-not-allowed"
           >
-            <RefreshCw size={12} className={isRunningDiagnostic ? 'animate-spin' : ''} />
-            <span>{isRunningDiagnostic ? 'Test...' : 'Diagnostiquer Latence'}</span>
+            <RefreshCw size={11} className={isRunningDiagnostic ? 'animate-spin' : ''} />
+            <span>{isRunningDiagnostic ? 'Test en cours...' : 'Diagnostiquer Latence'}</span>
           </button>
         </div>
 
         {/* Running diagnostic strip */}
         {isRunningDiagnostic && (
-          <div className="w-full pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[11px] text-indigo-300 font-mono animate-in fade-in">
+          <div className="w-full pt-1.5 sm:pt-2 border-t border-slate-800/80 flex items-center gap-2 text-[10.5px] sm:text-[11px] text-indigo-300 font-mono animate-in fade-in">
             <span className="w-2 h-2 rounded-full bg-indigo-400 animate-ping shrink-0"></span>
-            <span className="truncate">{diagnosticStep}</span>
+            <span className="leading-tight">{diagnosticStep}</span>
           </div>
         )}
       </div>
 
-      {/* 2. UNIFIED 10-KPI METRICS GRID (DENSE RESPONSIVE: 2 COLS MOBILE / 5 COLS TABLET / 10 COLS DESKTOP) */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-10 gap-2 sm:gap-2.5">
+      {/* 2. UNIFIED 10-KPI METRICS GRID (DENSE RESPONSIVE: 2 COLS MOBILE / 3-5 COLS TABLET / 5 COLS DESKTOP TO PREVENT TEXT CLIPPING) */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1.5 sm:gap-2">
         {/* Metric 1: Ping Réseau Brut */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-emerald-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Ping Réseau</span>
-            <Globe size={12} className="text-emerald-600 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-emerald-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Ping Réseau</span>
+            <Globe size={13} className="text-emerald-600 shrink-0" />
           </div>
-          <div className="mt-1 flex items-baseline gap-1">
+          <div className="my-0.5 flex items-baseline gap-1">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight">
               {report?.basePingMs ?? (metrics.avgLatencyMs ? Math.round(metrics.avgLatencyMs) : '—')}
             </span>
-            <span className="text-[9px] font-bold text-slate-400 font-mono">ms</span>
+            <span className="text-[9.5px] font-bold text-slate-400 font-mono">ms</span>
           </div>
-          <span className="text-[9px] text-emerald-600 font-semibold block truncate mt-0.5">Transit RTT</span>
+          <span className="text-[9.5px] sm:text-[10px] text-emerald-600 font-semibold block leading-tight">Transit Aller-Retour</span>
         </div>
 
         {/* Metric 2: Latence Identité */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-indigo-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Identité Étab.</span>
-            <Server size={12} className="text-indigo-600 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-indigo-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Latence Identité</span>
+            <Server size={13} className="text-indigo-600 shrink-0" />
           </div>
-          <div className="mt-1 flex items-baseline gap-1">
+          <div className="my-0.5 flex items-baseline gap-1">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight">
               {report?.identitySelectAllMs ?? (metrics.identityLastLatencyMs || metrics.identityAvgLatencyMs || '—')}
             </span>
-            <span className="text-[9px] font-bold text-slate-400 font-mono">ms</span>
+            <span className="text-[9.5px] font-bold text-slate-400 font-mono">ms</span>
           </div>
-          <span className="text-[9px] text-indigo-600 font-semibold block truncate mt-0.5">SELECT * école</span>
+          <span className="text-[9.5px] sm:text-[10px] text-indigo-600 font-semibold block leading-tight">SELECT * Établissement</span>
         </div>
 
         {/* Metric 3: Cache Local */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-blue-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Cache Local</span>
-            <HardDrive size={12} className="text-blue-600 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-blue-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Cache Local</span>
+            <HardDrive size={13} className="text-blue-600 shrink-0" />
           </div>
-          <div className="mt-1 flex items-baseline gap-1">
+          <div className="my-0.5 flex items-baseline gap-1">
             <span className="text-base sm:text-lg font-black text-emerald-600 font-mono tracking-tight">
               {report?.cacheAccessMs ?? 1}
             </span>
-            <span className="text-[9px] font-bold text-emerald-600 font-mono">ms</span>
+            <span className="text-[9.5px] font-bold text-emerald-600 font-mono">ms</span>
           </div>
-          <span className="text-[9px] text-blue-600 font-semibold block truncate mt-0.5">Hors-ligne 0ms</span>
+          <span className="text-[9.5px] sm:text-[10px] text-blue-600 font-semibold block leading-tight">Hors-Ligne 0ms</span>
         </div>
 
         {/* Metric 4: Score Santé */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-purple-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Score Santé</span>
-            <Gauge size={12} className="text-purple-600 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-purple-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Score Santé</span>
+            <Gauge size={13} className="text-purple-600 shrink-0" />
           </div>
-          <div className="mt-1 flex items-baseline gap-1">
+          <div className="my-0.5 flex items-baseline gap-1">
             <span className={`text-base sm:text-lg font-black font-mono tracking-tight ${
               (report?.overallScore || 85) >= 80 ? 'text-emerald-600' : (report?.overallScore || 85) >= 50 ? 'text-amber-600' : 'text-rose-600'
             }`}>
               {report?.overallScore ?? 85}
             </span>
-            <span className="text-[9px] font-bold text-slate-400 font-mono">/100</span>
+            <span className="text-[9.5px] font-bold text-slate-400 font-mono">/100</span>
           </div>
-          <span className="text-[9px] text-purple-600 font-semibold block truncate mt-0.5">{report?.overallGrade ?? 'BON'}</span>
+          <span className="text-[9.5px] sm:text-[10px] text-purple-600 font-semibold block leading-tight">Note : {report?.overallGrade ?? 'OPTIMAL'}</span>
         </div>
 
         {/* Metric 5: Requêtes Capturées */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Requêtes</span>
-            <Zap size={12} className="text-amber-500 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Requêtes</span>
+            <Zap size={13} className="text-amber-500 shrink-0" />
           </div>
-          <div className="mt-1 flex items-baseline gap-1">
+          <div className="my-0.5 flex items-baseline gap-1">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight">
               {logs.length}
             </span>
-            <span className="text-[9px] font-bold text-slate-400 font-mono">logs</span>
+            <span className="text-[9.5px] font-bold text-slate-400 font-mono">logs</span>
           </div>
-          <span className="text-[9px] text-amber-600 font-semibold block truncate mt-0.5">{metrics.slowRequestsCount} lentes</span>
+          <span className="text-[9.5px] sm:text-[10px] text-amber-600 font-semibold block leading-tight">{metrics.slowRequestsCount} requête(s) lente(s)</span>
         </div>
 
         {/* Metric 6: Écoles (Volumes DB) */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Écoles</span>
-            <Database size={12} className="text-slate-400 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Établissements</span>
+            <Database size={13} className="text-slate-400 shrink-0" />
           </div>
-          <div className="mt-1">
+          <div className="my-0.5">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight block">
               {liveDbCounts?.schools ?? telemetry?.database?.tables?.schools ?? 1}
             </span>
           </div>
-          <span className="text-[9px] text-slate-500 font-medium block truncate mt-0.5">Institutions</span>
+          <span className="text-[9.5px] sm:text-[10px] text-slate-500 font-medium block leading-tight">Institutions Actives</span>
         </div>
 
         {/* Metric 7: Profils / Comptes */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Comptes</span>
-            <Database size={12} className="text-indigo-400 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Comptes</span>
+            <Database size={13} className="text-indigo-400 shrink-0" />
           </div>
-          <div className="mt-1">
+          <div className="my-0.5">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight block">
               {liveDbCounts?.profiles ?? telemetry?.database?.tables?.profiles ?? 0}
             </span>
           </div>
-          <span className="text-[9px] text-indigo-600 font-medium block truncate mt-0.5">Utilisateurs</span>
+          <span className="text-[9.5px] sm:text-[10px] text-indigo-600 font-medium block leading-tight">Profils Utilisateurs</span>
         </div>
 
         {/* Metric 8: Élèves Inscrits */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Élèves</span>
-            <Database size={12} className="text-blue-400 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Élèves</span>
+            <Database size={13} className="text-blue-400 shrink-0" />
           </div>
-          <div className="mt-1">
+          <div className="my-0.5">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight block">
               {liveDbCounts?.students ?? telemetry?.database?.tables?.students ?? 0}
             </span>
           </div>
-          <span className="text-[9px] text-blue-600 font-medium block truncate mt-0.5">Effectif</span>
+          <span className="text-[9.5px] sm:text-[10px] text-blue-600 font-medium block leading-tight">Effectifs Inscrits</span>
         </div>
 
         {/* Metric 9: Transactions Paiements */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Paiements</span>
-            <Database size={12} className="text-emerald-400 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Paiements</span>
+            <Database size={13} className="text-emerald-400 shrink-0" />
           </div>
-          <div className="mt-1">
+          <div className="my-0.5">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight block">
               {liveDbCounts?.payments ?? telemetry?.database?.tables?.payments ?? 0}
             </span>
           </div>
-          <span className="text-[9px] text-emerald-600 font-medium block truncate mt-0.5">Transactions</span>
+          <span className="text-[9.5px] sm:text-[10px] text-emerald-600 font-medium block leading-tight">Transactions Réalisées</span>
         </div>
 
         {/* Metric 10: Classes & Années */}
-        <div className="bg-white p-2.5 rounded-xl border border-slate-200/80 shadow-2xs hover:border-slate-300 transition-colors">
-          <div className="flex items-center justify-between">
-            <span className="text-[9px] font-black uppercase tracking-wider text-slate-500 truncate">Classes</span>
-            <Database size={12} className="text-amber-400 shrink-0" />
+        <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 hover:shadow-xs transition-all flex flex-col justify-between">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider text-slate-500 leading-tight">Classes</span>
+            <Database size={13} className="text-amber-400 shrink-0" />
           </div>
-          <div className="mt-1">
+          <div className="my-0.5">
             <span className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight block">
               {liveDbCounts?.classes ?? telemetry?.database?.tables?.classes ?? 0}
             </span>
           </div>
-          <span className="text-[9px] text-amber-600 font-medium block truncate mt-0.5">
-            {liveDbCounts?.academic_years ?? telemetry?.database?.tables?.academic_years ?? 1} périodes
+          <span className="text-[9.5px] sm:text-[10px] text-amber-600 font-medium block leading-tight">
+            {liveDbCounts?.academic_years ?? telemetry?.database?.tables?.academic_years ?? 1} période(s) scolaire(s)
           </span>
         </div>
       </div>
 
       {/* 3. COMPACT SECURITY & INFRASTRUCTURE GUARANTEES BAR */}
       <div className="bg-white p-2 sm:p-2.5 rounded-xl border border-slate-200/80 shadow-2xs">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 text-xs">
           <div className="flex items-center gap-2 p-1.5 bg-slate-50 rounded-lg border border-slate-200/60">
             <div className="p-1 rounded bg-slate-200 text-slate-700 shrink-0">
               <Server size={12} />
             </div>
             <div className="min-w-0">
               <span className="text-[9px] font-bold text-slate-500 uppercase block leading-none">Hôte Cloud</span>
-              <p className="font-bold text-slate-800 text-[11px] truncate leading-tight mt-0.5">Cluster Isolé</p>
+              <p className="font-bold text-slate-800 text-[11px] leading-tight mt-0.5">Cluster Isolé</p>
             </div>
           </div>
 
@@ -428,7 +429,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
             </div>
             <div className="min-w-0">
               <span className="text-[9px] font-bold text-slate-500 uppercase block leading-none">Chiffrement</span>
-              <p className="font-bold text-emerald-700 text-[11px] truncate leading-tight mt-0.5">TLS 1.3 Sécurisé</p>
+              <p className="font-bold text-emerald-700 text-[11px] leading-tight mt-0.5">TLS 1.3 Sécurisé</p>
             </div>
           </div>
 
@@ -438,7 +439,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
             </div>
             <div className="min-w-0">
               <span className="text-[9px] font-bold text-slate-500 uppercase block leading-none">Cloisonnement RLS</span>
-              <p className="font-bold text-indigo-700 text-[11px] truncate leading-tight mt-0.5">Multi-Tenant Actif</p>
+              <p className="font-bold text-indigo-700 text-[11px] leading-tight mt-0.5">Multi-Tenant Actif</p>
             </div>
           </div>
 
@@ -448,7 +449,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
             </div>
             <div className="min-w-0">
               <span className="text-[9px] font-bold text-slate-500 uppercase block leading-none">Anti-Veille</span>
-              <p className="font-bold text-purple-700 text-[11px] truncate leading-tight mt-0.5">Keep-Alive 24/7</p>
+              <p className="font-bold text-purple-700 text-[11px] leading-tight mt-0.5">Keep-Alive 24/7</p>
             </div>
           </div>
         </div>
@@ -540,9 +541,9 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
               <tbody className="divide-y divide-slate-100 text-[11px]">
                 {report.items.map((item) => (
                   <tr key={item.id} className="hover:bg-slate-50/60 transition-colors">
-                    <td className="py-2 px-3 font-bold text-slate-900">
-                      <div className="leading-tight">{item.label}</div>
-                      <div className="text-[10px] font-normal text-slate-500 max-w-sm truncate">{item.description}</div>
+                    <td className="py-1.5 px-2.5 sm:px-3 font-bold text-slate-900">
+                      <div className="leading-tight text-xs">{item.label}</div>
+                      <div className="text-[10px] font-normal text-slate-500 leading-tight mt-0.5 max-w-md">{item.description}</div>
                     </td>
                     <td className="py-2 px-3">
                       <span className="px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 font-mono text-[9.5px] font-bold">
@@ -744,7 +745,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                         </span>
                       )}
 
-                      <span className="text-slate-700 truncate text-[10.5px] font-sans">
+                      <span className="text-slate-700 text-[10.5px] font-sans truncate max-w-[190px] sm:max-w-xs md:max-w-md lg:max-w-lg block" title={log.displayEndpoint}>
                         {log.displayEndpoint}
                       </span>
                     </div>
