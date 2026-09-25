@@ -22,7 +22,7 @@ import {
   Mail,
   Globe,
   Camera,
-  Link,
+  Link as LinkIcon,
   AlertTriangle,
   CheckCircle,
   Lock,
@@ -65,9 +65,11 @@ import {
   BookOpen,
   GraduationCap,
   Wrench,
-  X
+  X,
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams, Link } from 'react-router-dom';
 import { supabase } from '../supabase';
 import { UserProfile, UserRole, SchoolType } from '../types';
 import Modal from './Modal';
@@ -97,7 +99,7 @@ import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { ApiCredentialsVault } from './ApiCredentialsVault';
 import { KobaraSettingsTab } from './KobaraSettingsTab';
 
-type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'kobara' | 'gateways' | 'security';
+type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'kobara' | 'gateways' | 'security' | 'diagnostic';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -128,7 +130,37 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     return false;
   }, []);
 
-  const [activeTab, setActiveTab] = useState<SettingsTab>('school');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'diagnostic') return 'diagnostic';
+      if (window.location.hash === '#diagnostic') return 'diagnostic';
+    }
+    return 'school';
+  });
+
+  useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam && ['school', 'campuses', 'academic', 'finance', 'payment_methods', 'kobara', 'gateways', 'security', 'diagnostic'].includes(tabParam)) {
+      setActiveTab(tabParam as SettingsTab);
+    }
+  }, [searchParams]);
+
+  const handleSelectTab = (tabId: SettingsTab) => {
+    setActiveTab(tabId);
+    try {
+      const nextParams = new URLSearchParams(searchParams);
+      if (tabId === 'school') {
+        nextParams.delete('tab');
+      } else {
+        nextParams.set('tab', tabId);
+      }
+      setSearchParams(nextParams, { replace: true });
+    } catch (e) {}
+  };
   const [paymentSubTab, setPaymentSubTab] = useState<'methods' | 'banks'>('methods');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1790,23 +1822,35 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   ];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="max-w-7xl mx-auto space-y-4 pb-12">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
       <div>
-       <h2 className="text-3xl font-black text-slate-900 tracking-tighter">Configuration Système</h2>
-       <p className="text-slate-700 mt-2 font-medium text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
+       <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tighter">Configuration Système</h2>
+       <p className="text-slate-600 mt-1 font-medium text-xs sm:text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
       </div>
-      <div className="flex items-center gap-3">
-       <div className="hidden sm:flex items-center gap-2 px-3.5 py-2 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs">
+      <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+       <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs">
         <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
         <span>Synchro Cloud Automatique</span>
        </div>
+
+       {isSuperAdmin && (
+         <Link
+          to="/super-admin/system-health?tab=database"
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 shadow-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200/80"
+          title="Ouvrir la Console Santé Système & Diagnostic de Latence Supabase"
+         >
+          <Activity size={14} className="text-indigo-600" />
+          <span>Diagnostic Latence BD</span>
+         </Link>
+       )}
+
        <button 
         onClick={fetchData} 
         title="Actualiser les paramètres"
-        className="p-3.5 bg-white border border-slate-200 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-all shadow-xs cursor-pointer active:scale-95"
+        className="p-2 sm:p-2.5 bg-white border border-slate-200 text-slate-700 hover:text-slate-900 rounded-xl hover:bg-slate-50 transition-all shadow-xs cursor-pointer active:scale-95"
        >
-        <RefreshCw size={18} className={loading ? 'animate-spin' : ''} />
+        <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
        </button>
       </div>
      </div>
@@ -1817,7 +1861,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
          {tabs.map(item => (
           <button 
            key={item.id} 
-           onClick={() => setActiveTab(item.id as SettingsTab)}
+           onClick={() => handleSelectTab(item.id as SettingsTab)}
            title={item.label}
            className={`shrink-0 lg:shrink w-auto lg:w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-3.5 xl:px-4 py-2.5 sm:py-3 rounded-xl text-xs xl:text-[13px] font-bold tracking-tight transition-all cursor-pointer text-left ${
              activeTab === item.id 
@@ -1924,14 +1968,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                  </div>
                </div>
 
-               <button 
-                 onClick={handleUpdateSchool} 
-                 disabled={saving || !canManageAllCampuses} 
-                 className="w-full sm:w-auto px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
-               >
-                 {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-                 <span>Enregistrer</span>
-               </button>
+               <div className="flex items-center gap-2 w-full sm:w-auto">
+                 {isSuperAdmin && (
+                   <Link
+                     to="/super-admin/system-health?tab=database"
+                     className="px-2.5 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                     title="Analyser le temps de chargement de l'identité et la latence Supabase dans Santé Système"
+                   >
+                     <Activity size={13} className="text-indigo-600 animate-pulse" />
+                     <span>Tester Latence BD</span>
+                   </Link>
+                 )}
+
+                 <button 
+                   onClick={handleUpdateSchool} 
+                   disabled={saving || !canManageAllCampuses} 
+                   className="flex-1 sm:flex-initial px-5 py-2 sm:py-2.5 bg-slate-900 hover:bg-black text-white rounded-xl font-bold text-xs tracking-tight flex items-center justify-center gap-2 transition-all shadow-sm active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                 >
+                   {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+                   <span>Enregistrer</span>
+                 </button>
+               </div>
              </div>
 
              <div className="p-3 sm:p-4 md:p-5 space-y-3 sm:space-y-4">
@@ -2253,7 +2310,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                        
                        <div className="relative group">
                          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-600 transition-colors">
-                           <Link size={12} />
+                           <LinkIcon size={12} />
                          </div>
                          <input 
                            type="text" 

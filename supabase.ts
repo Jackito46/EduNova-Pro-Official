@@ -1,5 +1,6 @@
 
 import { createClient } from '@supabase/supabase-js';
+import { supabaseLatencyTracker } from './services/supabaseLatencyTracker';
 
 const envUrl = import.meta.env.VITE_SUPABASE_URL;
 let originalSupabaseUrl = envUrl || 'https://iymzthjkucvhyjnxpslg.supabase.co';
@@ -377,6 +378,10 @@ if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
 // Safe global fetch wrapper that catches network errors, retries transient failures, and returns structured 503 responses
 const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const maxRetries = 2;
+  const startTime = performance.now();
+  const method = (init?.method || 'GET').toUpperCase();
+  const urlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request)?.url || '');
+
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let reqInit = init;
     let timeoutId: any = null;
@@ -388,6 +393,31 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     try {
       const response = await fetch(input, reqInit);
       if (timeoutId) clearTimeout(timeoutId);
+
+      const durationMs = Math.round(performance.now() - startTime);
+      try {
+        const parsed = supabaseLatencyTracker.parseUrlDetails(urlStr, method);
+        const cl = response.headers.get('content-length');
+        const bytes = cl ? parseInt(cl, 10) : undefined;
+        supabaseLatencyTracker.logRequest({
+          timestamp: Date.now(),
+          method,
+          url: urlStr,
+          displayEndpoint: parsed.displayEndpoint,
+          table: parsed.table,
+          status: response.status,
+          statusText: response.statusText,
+          durationMs,
+          bytesReceived: bytes,
+          isError: !response.ok && response.status >= 400,
+          errorMessage: !response.ok ? `HTTP ${response.status} ${response.statusText}` : undefined,
+          queryType: parsed.queryType,
+          isIdentityQuery: parsed.isIdentityQuery
+        });
+      } catch (logErr) {
+        // Tracker logging should never break the request flow
+      }
+
       return response;
     } catch (err: any) {
       if (timeoutId) clearTimeout(timeoutId);
@@ -403,6 +433,25 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
         continue;
       }
 
+      const durationMs = Math.round(performance.now() - startTime);
+      try {
+        const parsed = supabaseLatencyTracker.parseUrlDetails(urlStr, method);
+        supabaseLatencyTracker.logRequest({
+          timestamp: Date.now(),
+          method,
+          url: urlStr,
+          displayEndpoint: parsed.displayEndpoint,
+          table: parsed.table,
+          status: isNetworkError ? 503 : 500,
+          statusText: err.name || 'NetworkError',
+          durationMs,
+          isError: true,
+          errorMessage: err.message || 'Impossible de contacter le serveur Supabase',
+          queryType: parsed.queryType,
+          isIdentityQuery: parsed.isIdentityQuery
+        });
+      } catch (logErr) {}
+
       if (isNetworkError) {
         return new Response(JSON.stringify({
           message: "Erreur réseau: Impossible de contacter le serveur de base de données. Vérifiez votre connexion internet.",
@@ -416,6 +465,26 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
       throw err;
     }
   }
+
+  const durationMs = Math.round(performance.now() - startTime);
+  try {
+    const parsed = supabaseLatencyTracker.parseUrlDetails(urlStr, method);
+    supabaseLatencyTracker.logRequest({
+      timestamp: Date.now(),
+      method,
+      url: urlStr,
+      displayEndpoint: parsed.displayEndpoint,
+      table: parsed.table,
+      status: 503,
+      statusText: 'Service Unavailable',
+      durationMs,
+      isError: true,
+      errorMessage: "Erreur réseau: Serveur indisponible après tentatives.",
+      queryType: parsed.queryType,
+      isIdentityQuery: parsed.isIdentityQuery
+    });
+  } catch (e) {}
+
   return new Response(JSON.stringify({
     message: "Erreur réseau: Serveur indisponible.",
     code: "NETWORK_ERROR"

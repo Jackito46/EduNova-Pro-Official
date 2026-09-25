@@ -47,7 +47,8 @@ import {
   KeyRound,
   Sparkles,
   Building2,
-  Activity
+  Activity,
+  Database
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { motion } from 'framer-motion';
@@ -246,17 +247,24 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
     setMobileOpen(false);
   }, []);
 
-  const renderNavLink = React.useCallback((item: { name: string; path: string; icon?: any }, isSubItem = false, icon?: any) => (
-    <SidebarNavLink
-      key={item.path}
-      item={item}
-      isSubItem={isSubItem}
-      icon={icon}
-      isActive={location.pathname === item.path}
-      isNarrow={isNarrow}
-      onNavigate={handleNavigate}
-    />
-  ), [location.pathname, isNarrow, handleNavigate]);
+  const renderNavLink = React.useCallback((item: { name: string; path: string; icon?: any }, isSubItem = false, icon?: any) => {
+    const fullCurrent = location.pathname + location.search;
+    const isActive = item.path.includes('?')
+      ? fullCurrent === item.path
+      : (location.pathname === item.path && (!location.search || !location.search.includes('tab=')));
+
+    return (
+      <SidebarNavLink
+        key={item.path}
+        item={item}
+        isSubItem={isSubItem}
+        icon={icon}
+        isActive={isActive}
+        isNarrow={isNarrow}
+        onNavigate={handleNavigate}
+      />
+    );
+  }, [location.pathname, location.search, isNarrow, handleNavigate]);
 
   const renderMenuHeader = React.useCallback((id: string, label: string, icon: any) => (
     <SidebarMenuHeader
@@ -549,9 +557,9 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
           )}
 
           {isSuperAdmin && (
-            <div className="mt-8 pt-4 border-t border-slate-200 space-y-1">
+            <div className="mt-5 pt-3 border-t border-slate-200 space-y-0.5">
               {renderNavLink({ name: 'Super Administrateur', path: '/super-admin', icon: ShieldAlert })}
-              {renderNavLink({ name: 'Santé Système & Quotas', path: '/super-admin/system-health', icon: Activity })}
+              {renderNavLink({ name: 'Santé Système & Diagnostic BD', path: '/super-admin/system-health', icon: Activity })}
             </div>
           )}
         </nav>

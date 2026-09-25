@@ -38,6 +38,7 @@ import { aiLocalCache, AiLocalCacheStats } from '../utils/aiLocalCache';
 import { geminiService } from '../services/geminiService';
 import { aiCreditTrackingService } from '../services/aiCreditTrackingService';
 import { AiCreditAuditTable } from './AiCreditAuditTable';
+import DatabaseLatencyDiagnostic from './DatabaseLatencyDiagnostic';
 
 interface SystemHealthViewProps {
   user: UserProfile;
@@ -148,7 +149,16 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
   const [, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefreshInterval, setAutoRefreshInterval] = useState<number>(30);
-  const [activeTab, setActiveTab] = useState<'overview' | 'api' | 'database' | 'pwa' | 'infrastructure'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'api' | 'database' | 'pwa' | 'infrastructure'>(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get('tab');
+      if (tab === 'database' || tab === 'api' || tab === 'pwa' || tab === 'infrastructure') {
+        return tab;
+      }
+    }
+    return 'overview';
+  });
   const [copiedHash, setCopiedHash] = useState<string | null>(null);
   
   // Interactive diagnostic states
@@ -605,29 +615,29 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
   }
 
   return (
-    <div id="system-health-root" className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 pb-12 font-sans animate-in fade-in duration-300">
+    <div id="system-health-root" className="max-w-7xl mx-auto space-y-2.5 sm:space-y-3 pb-8 font-sans animate-in fade-in duration-300">
       
       {/* MODERN ERGONOMIC COMPACT HEADER */}
-      <div id="health-header-card" className="bg-white p-3.5 sm:p-4 md:p-5 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-4 transition-all">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-slate-900 text-emerald-400 rounded-xl flex items-center justify-center shadow-2xs shrink-0 ring-2 ring-slate-100">
-            <Activity size={20} className="animate-pulse" />
+      <div id="health-header-card" className="bg-white p-3 sm:p-3.5 md:p-4 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col lg:flex-row lg:items-center justify-between gap-3 transition-all">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 bg-slate-900 text-emerald-400 rounded-xl flex items-center justify-center shadow-2xs shrink-0 ring-2 ring-slate-100">
+            <Activity size={18} className="animate-pulse" />
           </div>
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-                Santé Système & Quotas
+              <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                Santé Système, Quotas & Diagnostics BD
               </h1>
-              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-[10px] font-bold">
+              <span className="inline-flex items-center gap-1 px-2 py-0.2 bg-emerald-50 text-emerald-700 border border-emerald-200/80 rounded-full text-[10px] font-bold">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping"></span>
-                99.9% Opérationnel
+                Opérationnel
               </span>
-              <span className="hidden sm:inline-flex items-center px-1.5 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-extrabold uppercase tracking-wide">
+              <span className="hidden sm:inline-flex items-center px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[9px] font-extrabold uppercase tracking-wide">
                 Super Admin
               </span>
             </div>
             <p className="text-slate-500 text-xs font-medium mt-0.5 truncate">
-              Supervision temps réel : Moteur IA Gemini, cluster Supabase, infrastructure et PWA.
+              Supervision temps réel : Moteur IA Gemini, cluster Supabase & latence des requêtes, infrastructure cloud et PWA.
             </p>
           </div>
         </div>
@@ -635,14 +645,14 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
         {/* COMPACT ERGONOMIC TOOLBAR */}
         <div id="health-actions-toolbar" className="flex flex-wrap items-center gap-2 w-full lg:w-auto pt-2 lg:pt-0 border-t lg:border-t-0 border-slate-100">
           {/* Auto-Refresh Select */}
-          <div className="flex items-center bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded-xl border border-slate-200/80 text-xs font-semibold text-slate-700 h-9">
+          <div className="flex items-center bg-slate-50 hover:bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80 text-xs font-semibold text-slate-700 h-8">
             <span className="text-[10px] text-slate-500 font-medium mr-1.5 whitespace-nowrap">Auto :</span>
             <select
               id="select-auto-refresh"
               value={autoRefreshInterval}
               onChange={(e) => setAutoRefreshInterval(Number(e.target.value))}
               aria-label="Fréquence d'actualisation automatique"
-              className="bg-white border border-slate-200/60 rounded-lg px-2 py-0.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+              className="bg-white border border-slate-200/60 rounded px-1.5 py-0.5 text-xs font-bold text-slate-800 focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs"
             >
               <option value={10}>10s</option>
               <option value={30}>30s</option>
@@ -656,10 +666,10 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
             id="btn-refresh-telemetry"
             onClick={() => fetchTelemetry()}
             disabled={refreshing}
-            className="flex-1 sm:flex-initial h-9 px-3.5 bg-slate-900 hover:bg-black text-white rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="flex-1 sm:flex-initial h-8 px-3 bg-slate-900 hover:bg-black text-white rounded-lg text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
             title="Rafraîchir immédiatement"
           >
-            <RefreshCw size={13} className={refreshing ? 'animate-spin text-emerald-400' : 'text-slate-300'} />
+            <RefreshCw size={12} className={refreshing ? 'animate-spin text-emerald-400' : 'text-slate-300'} />
             <span>{refreshing ? 'Actualisation...' : 'Actualiser'}</span>
           </button>
 
@@ -667,117 +677,117 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
           <button
             id="btn-export-health-report"
             onClick={handleExportReport}
-            className="flex-1 sm:flex-initial h-9 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-xl text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
+            className="flex-1 sm:flex-initial h-8 px-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-200 rounded-lg text-xs font-bold transition-all shadow-2xs active:scale-95 flex items-center justify-center gap-1.5 cursor-pointer"
             title="Télécharger le bilan système en JSON"
           >
-            <Download size={13} className="text-indigo-600 shrink-0" />
+            <Download size={12} className="text-indigo-600 shrink-0" />
             <span>Rapport JSON</span>
           </button>
         </div>
       </div>
 
       {/* 4 COMPACT VITALS CARDS (RESPONSIVE 2-COL MOBILE / 4-COL DESKTOP) */}
-      <div id="health-vitals-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+      <div id="health-vitals-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
         
         {/* Tile 1: AI Quotas */}
-        <div id="tile-quota-ai" className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-purple-300 transition-colors">
+        <div id="tile-quota-ai" className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-purple-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Quotas IA Gemini</span>
-            <span className="w-7 h-7 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
-              <Sparkles size={14} />
+            <span className="w-6 h-6 rounded-lg bg-purple-50 text-purple-600 flex items-center justify-center">
+              <Sparkles size={13} />
             </span>
           </div>
-          <div className="my-2">
+          <div className="my-1.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">15 RPM</span>
-              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-lg sm:text-xl font-black text-slate-900 font-mono">15 RPM</span>
+              <span className="text-[9.5px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                 Protégé
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5">
               Plafond : <strong className="text-slate-700 font-semibold">1 500 req/jour</strong>
             </p>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
             <span className="text-slate-500">Anti-surcoût :</span>
             <span className="font-bold text-emerald-700">Actif (0-crédit)</span>
           </div>
         </div>
 
         {/* Tile 2: Database Latency */}
-        <div id="tile-database-latency" className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-emerald-300 transition-colors">
+        <div id="tile-database-latency" className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-emerald-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Base Supabase</span>
-            <span className="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
-              <Database size={14} />
+            <span className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center">
+              <Database size={13} />
             </span>
           </div>
-          <div className="my-2">
+          <div className="my-1.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+              <span className="text-lg sm:text-xl font-black text-slate-900 font-mono">
                 {telemetry?.database.latencyMs ?? 32} ms
               </span>
-              <span className="text-[10px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-[9.5px] text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
                 TLS 1.3
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 truncate">
               Cluster : <span className="text-emerald-700 font-bold">Sécurisé & Isolé</span>
             </p>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
             <span className="text-slate-500">Sécurité RLS :</span>
             <span className="font-bold text-emerald-700">Multi-Tenant</span>
           </div>
         </div>
 
         {/* Tile 3: PWA Integrity */}
-        <div id="tile-pwa-footprint" className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-blue-300 transition-colors">
+        <div id="tile-pwa-footprint" className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-blue-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Intégrité & PWA</span>
-            <span className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
-              <Smartphone size={14} />
+            <span className="w-6 h-6 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
+              <Smartphone size={13} />
             </span>
           </div>
-          <div className="my-2">
+          <div className="my-1.5">
             <div className="flex items-baseline gap-1.5">
               <span className="text-lg sm:text-xl font-black text-slate-900 font-mono">
                 v{telemetry?.pwa.version || '2.4.0-pro'}
               </span>
-              <span className="text-[10px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">
+              <span className="text-[9.5px] text-blue-700 font-bold bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
                 Certifié
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 truncate">
               Mode : <strong className="text-slate-700 font-semibold">{isStandalone ? 'App Installée' : 'Navigateur'}</strong>
             </p>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
             <span className="text-slate-500">Service Worker :</span>
             <span className="font-bold text-emerald-700">{swActive ? 'Actif' : 'Prêt'}</span>
           </div>
         </div>
 
         {/* Tile 4: Server Runtime */}
-        <div id="tile-server-runtime" className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-amber-300 transition-colors">
+        <div id="tile-server-runtime" className="bg-white p-2.5 sm:p-3 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:border-amber-300 transition-colors">
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">Runtime Serveur</span>
-            <span className="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
-              <Cpu size={14} />
+            <span className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center">
+              <Cpu size={13} />
             </span>
           </div>
-          <div className="my-2">
+          <div className="my-1.5">
             <div className="flex items-baseline gap-1.5">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+              <span className="text-lg sm:text-xl font-black text-slate-900 font-mono">
                 {telemetry?.server.memory.heapUsedMb ?? 65} MB
               </span>
-              <span className="text-[11px] text-slate-400 font-semibold">/ {telemetry?.server.memory.heapTotalMb ?? 120} MB</span>
+              <span className="text-[10px] text-slate-400 font-semibold">/ {telemetry?.server.memory.heapTotalMb ?? 120} MB</span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium mt-0.5 truncate">
+            <p className="text-[10.5px] text-slate-500 font-medium mt-0.5 truncate">
               Uptime : <strong className="text-slate-700 font-mono font-semibold">{formatUptime(telemetry?.server.uptimeSeconds || 3600)}</strong>
             </p>
           </div>
-          <div className="pt-2 border-t border-slate-100 flex items-center justify-between text-[11px]">
+          <div className="pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
             <span className="text-slate-500">Sandbox :</span>
             <span className="font-bold text-emerald-700">Cloud Run</span>
           </div>
@@ -790,7 +800,7 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
         {[
           { id: 'overview', label: "Vue d'ensemble", icon: Gauge },
           { id: 'api', label: "Quotas API & IA", icon: Sparkles },
-          { id: 'database', label: "Base Supabase", icon: Database },
+          { id: 'database', label: "Base Supabase & Diagnostic BD", icon: Database },
           { id: 'pwa', label: "PWA & Cache", icon: Smartphone },
           { id: 'infrastructure', label: "Infrastructure", icon: Server },
         ].map((tab) => {
@@ -1650,114 +1660,18 @@ export const SystemHealthView: React.FC<SystemHealthViewProps> = ({ user }) => {
         </div>
       )}
 
-      {/* TAB 3: BASE SUPABASE */}
+      {/* TAB 3: BASE SUPABASE & DIAGNOSTIC BD */}
       {activeTab === 'database' && (
-        <div id="tab-content-database" className="space-y-3.5 sm:space-y-4 animate-in fade-in duration-200">
-          <div className="bg-white p-3.5 sm:p-4 md:p-5 rounded-2xl border border-slate-200/80 shadow-2xs space-y-3.5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-              <div>
-                <h2 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-1.5">
-                  <Database size={18} className="text-emerald-600" />
-                  Santé & Volumes Supabase
-                </h2>
-                <p className="text-slate-500 text-xs mt-0.5">
-                  Volumes d'enregistrements en direct, latence chiffrée SSL et maintien keep-alive.
-                </p>
-              </div>
-              <button
-                id="btn-refresh-tables-count"
-                onClick={() => fetchLiveDbCounts()}
-                className="h-8 px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                title="Rafraîchir les compteurs réels"
-              >
-                <RefreshCw size={12} />
-                <span>Actualiser Compteurs</span>
-              </button>
-            </div>
-
-            {/* Compact 6-Stat Grid */}
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-2.5 text-center">
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Établissements</span>
-                <strong className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-0.5 block">
-                  {liveDbCounts?.schools ?? telemetry?.database?.tables?.schools ?? 1}
-                </strong>
-                <span className="text-[9px] text-emerald-600 font-semibold block">Configurés</span>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Profils</span>
-                <strong className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-0.5 block">
-                  {liveDbCounts?.profiles ?? telemetry?.database?.tables?.profiles ?? 0}
-                </strong>
-                <span className="text-[9px] text-indigo-600 font-semibold block">Utilisateurs</span>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Élèves</span>
-                <strong className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-0.5 block">
-                  {liveDbCounts?.students ?? telemetry?.database?.tables?.students ?? 0}
-                </strong>
-                <span className="text-[9px] text-blue-600 font-semibold block">Effectif</span>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Paiements</span>
-                <strong className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-0.5 block">
-                  {liveDbCounts?.payments ?? telemetry?.database?.tables?.payments ?? 0}
-                </strong>
-                <span className="text-[9px] text-emerald-600 font-semibold block">Transactions</span>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Classes</span>
-                <strong className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-0.5 block">
-                  {liveDbCounts?.classes ?? telemetry?.database?.tables?.classes ?? 0}
-                </strong>
-                <span className="text-[9px] text-amber-600 font-semibold block">Salles</span>
-              </div>
-              <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <span className="text-[10px] uppercase font-bold text-slate-500 block">Années</span>
-                <strong className="text-lg sm:text-xl font-black text-slate-900 font-mono mt-0.5 block">
-                  {liveDbCounts?.academic_years ?? telemetry?.database?.tables?.academic_years ?? 0}
-                </strong>
-                <span className="text-[9px] text-purple-600 font-semibold block">Périodes</span>
-              </div>
-            </div>
-
-            {/* Compact Security Chips */}
-            <div className="bg-slate-50 rounded-xl p-3 border border-slate-200/70 space-y-2">
-              <div className="flex items-center justify-between border-b border-slate-200/60 pb-1.5">
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck size={14} className="text-emerald-600" />
-                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-900">
-                    Garanties de Sécurité Supabase
-                  </span>
-                </div>
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 bg-emerald-100 text-emerald-800 rounded">
-                  Zéro Fuite d'Endpoint
-                </span>
-              </div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200/70 space-y-0.5">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">Hôte Cloud</span>
-                  <p className="font-bold text-slate-800 text-[11px]">Cluster Sécurisé</p>
-                  <p className="text-[10px] text-slate-500">Sous-domaine masqué</p>
-                </div>
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200/70 space-y-0.5">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">Chiffrement</span>
-                  <p className="font-bold text-emerald-700 text-[11px]">TLS 1.3 Vérifié</p>
-                  <p className="text-[10px] text-slate-500">Flux 100% chiffrés</p>
-                </div>
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200/70 space-y-0.5">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">Politiques RLS</span>
-                  <p className="font-bold text-emerald-700 text-[11px]">Multi-Tenant Actif</p>
-                  <p className="text-[10px] text-slate-500">Cloisonnement noyau</p>
-                </div>
-                <div className="bg-white p-2.5 rounded-lg border border-slate-200/70 space-y-0.5">
-                  <span className="text-[9px] font-bold text-slate-500 uppercase">Keep-Alive</span>
-                  <p className="font-bold text-indigo-700 text-[11px]">Actif 24/7</p>
-                  <p className="text-[10px] text-slate-500">Ping toutes les 14m</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        <div id="tab-content-database" className="animate-in fade-in duration-200">
+          <DatabaseLatencyDiagnostic 
+            schoolId={user.school_id || null}
+            liveDbCounts={liveDbCounts}
+            onRefreshDbCounts={fetchLiveDbCounts}
+            telemetry={telemetry}
+            onNavigateToSchoolProfile={() => {
+              window.location.href = '/settings/ecole';
+            }}
+          />
         </div>
       )}
 

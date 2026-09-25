@@ -2160,7 +2160,7 @@ const handleDeleteSchool = async () => {
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-max lg:min-w-0 lg:flex-wrap">
             {[
               { id: 'schools', label: 'Établissements', icon: Building2, badge: stats.totalSchools },
-              { id: 'health', label: 'Santé Système & Quotas', icon: Activity },
+              { id: 'health', label: 'Santé Système & Diagnostic BD', icon: Activity },
               { id: 'backups', label: 'Sauvegardes & Restauration', icon: Archive },
               { id: 'sessions', label: 'Sessions & Sécurité', icon: KeyRound, actionExtra: fetchSecuritySessions },
               { id: 'alerts', label: 'Alertes Temps Réel', icon: ShieldAlert },
@@ -4003,12 +4003,14 @@ const handleDeleteSchool = async () => {
 
                 <div className="flex items-center gap-2">
                   <button
-                    onClick={handleRunDiagnostic}
-                    disabled={diagnosticReport.isRunning}
-                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow flex items-center gap-2 cursor-pointer active:scale-95 disabled:opacity-50"
+                    onClick={() => {
+                      setActiveView('health');
+                      toast.info("Redirection vers la console Santé Système & Diagnostic BD");
+                    }}
+                    className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs rounded-xl transition-all shadow flex items-center gap-2 cursor-pointer active:scale-95"
                   >
-                    {diagnosticReport.isRunning ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
-                    <span>{diagnosticReport.isRunning ? 'Test...' : 'Exécuter Diagnostic'}</span>
+                    <Activity size={13} />
+                    <span>Ouvrir Santé & Diagnostic BD</span>
                   </button>
                 </div>
               </div>
@@ -4073,12 +4075,14 @@ const handleDeleteSchool = async () => {
                     </div>
                   </div>
                   <button 
-                    onClick={handleRunDiagnostic}
-                    disabled={diagnosticReport.isRunning}
-                    className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer active:scale-95"
+                    onClick={() => {
+                      setActiveView('health');
+                      toast.info("Redirection vers la console Santé Système & Diagnostic BD");
+                    }}
+                    className="mt-3 w-full py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                   >
-                    {diagnosticReport.isRunning ? <Loader2 size={13} className="animate-spin" /> : <Activity size={13} />}
-                    <span>Lancer Diagnostic</span>
+                    <Activity size={13} />
+                    <span>Lancer Diagnostic BD</span>
                   </button>
                 </div>
 
