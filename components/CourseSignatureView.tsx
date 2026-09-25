@@ -4,7 +4,7 @@ import {
   AlertCircle, Loader2, Save, History, Search, Filter,
   ChevronRight, Info, ShieldCheck, Users, RefreshCw, Check, Sparkles, X, ChevronLeft,
   Building2, GraduationCap, Briefcase, FileText, CheckCheck, CalendarDays, Eye,
-  Printer, ArrowRight, UserCheck, CheckSquare, Square
+  Printer, ArrowRight, UserCheck, CheckSquare, Square, Trash2, Edit3
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { UserProfile, SchoolType } from '../types';
@@ -52,6 +52,9 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
   
   // Form state for new signature
   const [selectedAssignment, setSelectedAssignment] = useState<any | null>(null);
+  const [existingSignatureId, setExistingSignatureId] = useState<string | null>(null);
+  const [existingSignatureStatus, setExistingSignatureStatus] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [topic, setTopic] = useState('');
   const [homework, setHomework] = useState('');
   const [startTime, setStartTime] = useState('');
@@ -62,6 +65,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
   );
   const [targetStaffId, setTargetStaffId] = useState<string>('');
   const [allStaff, setAllStaff] = useState<any[]>([]);
+  const [schoolClasses, setSchoolClasses] = useState<any[]>([]);
   const [students, setStudents] = useState<any[]>([]);
   const [attendance, setAttendance] = useState<Record<string, boolean>>({});
   const [showAttendance, setShowAttendance] = useState(false);
@@ -74,7 +78,19 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [historySearch, setHistorySearch] = useState('');
   const [selectedSignatureDetails, setSelectedSignatureDetails] = useState<CourseSignature | null>(null);
 
+  const [approvedStaffAttendances, setApprovedStaffAttendances] = useState<any[]>([]);
+
   const isAdmin = user.role === 'SCHOOL_ADMIN' || user.role === 'DIRECTOR' || user.role === 'SUPER_ADMIN' || user.role === 'SECRETARY';
+
+  // Certified Manager Check: Any administrative, directorial or supervisory role is certified
+  const isCertifiedManager = useMemo(() => {
+    const role = (user?.role || '').toUpperCase();
+    return (
+      Boolean((user as any)?.is_super_admin) ||
+      isAdmin ||
+      ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'DIRECTOR', 'ADMINISTRATOR', 'SUPERVISOR', 'SECRETARY', 'MANAGER'].includes(role)
+    );
+  }, [user?.role, (user as any)?.is_super_admin, isAdmin]);
 
   // Institutional Category Detection (Multi-Tenant)
   const isUniversity = (school?.school_type as any) === SchoolType.UNIVERSITY || (school?.school_type as any) === 'UNIVERSITY';
@@ -129,6 +145,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         homeworkLabel: 'Travaux Dirigés / Lectures & Devoirs (Prochaine séance)',
         homeworkPlaceholder: 'Ex: Préparer le cas pratique N°2 et finaliser le rapport de TP avant le prochain cours...',
         ctaSign: 'Signer & Valider la Séance',
+        ctaUpdate: 'Mettre à jour la Séance',
         emptyDay: 'Aucune séance programmée',
         emptyDayDesc: 'Aucune séance magistrale ou TD n\'est inscrite à l\'emploi du temps pour cette journée.',
       };
@@ -144,6 +161,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         homeworkLabel: 'Tâches Pratiques / Fiches Techniques à Rendre',
         homeworkPlaceholder: 'Ex: Compléter le schéma unifilaire et réviser la norme NFC 15-100...',
         ctaSign: 'Signer & Valider le Module',
+        ctaUpdate: 'Mettre à jour le Module',
         emptyDay: 'Aucun module programmé',
         emptyDayDesc: 'Aucune session ou atelier pratique n\'est inscrit au planning pour cette journée.',
       };
@@ -158,6 +176,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
       homeworkLabel: 'Devoirs & Travail à Faire (Pour le prochain cours)',
       homeworkPlaceholder: 'Ex: Exercices 12 et 14 page 86 du manuel...',
       ctaSign: 'Signer & Enregistrer le Cours',
+      ctaUpdate: 'Mettre à jour l\'Émargement',
       emptyDay: 'Aucun cours programmé',
       emptyDayDesc: 'Aucun cours n\'est inscrit à l\'emploi du temps pour cette journée.',
     };
@@ -208,14 +227,19 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
     try {
       const activeCampusId = selectedCampusFilter !== 'ALL' ? selectedCampusFilter : (user.campus_id || currentCampusId);
       
+      // Fetch all classes of the school to guarantee resolution of class_id
+      const { data: allClassesData } = await supabase
+        .from('classes')
+        .select('id, name, campus_id')
+        .eq('school_id', user.school_id);
+      const availableClasses = allClassesData || [];
+      setSchoolClasses(availableClasses);
+
       let activeClassIds: string[] = [];
       if (activeCampusId && activeCampusId !== 'ALL') {
-        const { data: campusClasses } = await supabase
-          .from('classes')
-          .select('id')
-          .eq('school_id', user.school_id)
-          .eq('campus_id', activeCampusId);
-        activeClassIds = (campusClasses || []).map(c => c.id);
+        activeClassIds = availableClasses
+          .filter(c => c.campus_id === activeCampusId)
+          .map(c => c.id);
       }
 
       // 0. Get active academic year
@@ -349,9 +373,26 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
         
         if (assignmentsRes.error) throw assignmentsRes.error;
-        let finalAssignments = assignmentsRes.data || [];
+        let finalAssignments = (assignmentsRes.data || []).map((a: any) => {
+          if (!a.class_id && a.class_name && availableClasses.length > 0) {
+            const matchedClass = availableClasses.find(
+              (c: any) => c.name?.toLowerCase().trim() === a.class_name?.toLowerCase().trim()
+            );
+            if (matchedClass) {
+              // Silently persist link to database in background
+              supabase
+                .from('staff_assignments')
+                .update({ class_id: matchedClass.id })
+                .eq('id', a.id)
+                .then();
+              return { ...a, class_id: matchedClass.id };
+            }
+          }
+          return a;
+        });
+
         if (activeCampusId && activeCampusId !== 'ALL' && activeClassIds.length > 0) {
-          finalAssignments = finalAssignments.filter((a: any) => activeClassIds.includes(a.class_id));
+          finalAssignments = finalAssignments.filter((a: any) => !a.class_id || activeClassIds.includes(a.class_id));
         }
         setMyAssignments(finalAssignments);
 
@@ -378,8 +419,26 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
             .eq('staff_id', effectiveStaffId)
             .order('date', { ascending: false }).limit(30);
         }
+
+        // 5. Get staff attendances to know if teacher presence is already approved in employee attendances
+        let staffAttList: any[] = [];
+        try {
+          const { data: attData } = await supabase
+            .from('staff_attendances')
+            .select('id, staff_id, assignment_id, date, status')
+            .eq('school_id', user.school_id)
+            .eq('staff_id', effectiveStaffId)
+            .in('status', ['Présent', 'Retard']);
+          staffAttList = attData || [];
+          setApprovedStaffAttendances(staffAttList);
+        } catch (attErr) {
+          console.warn("Could not query staff_attendances:", attErr);
+        }
         
         if (signaturesRes.data) {
+          const approvedDates = new Set(staffAttList.map((a: any) => a.date));
+          const approvedAssignments = new Set(staffAttList.filter((a: any) => a.assignment_id).map((a: any) => `${a.date}_${a.assignment_id}`));
+
           const formatted = signaturesRes.data.map((s: any) => {
             let dur = 0;
             if (s.start_time && s.end_time) {
@@ -387,8 +446,28 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
               const [eh, em] = s.end_time.split(':').map(Number);
               dur = Math.max(0, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
             }
+
+            const isAttendanceApproved = approvedDates.has(s.date) || 
+              (s.assignment_id && approvedAssignments.has(`${s.date}_${s.assignment_id}`));
+
+            // If signature is SIGNED but presence is already approved in staff attendances, auto-promote to VALIDATED
+            const effectiveStatus: 'VALIDATED' | 'SIGNED' | 'REJECTED' = 
+              (s.signature_status === 'VALIDATED' || isAttendanceApproved) 
+                ? 'VALIDATED' 
+                : s.signature_status;
+
+            // Update in DB asynchronously if was SIGNED
+            if (s.signature_status === 'SIGNED' && isAttendanceApproved && s.id) {
+              supabase
+                .from('course_signatures')
+                .update({ signature_status: 'VALIDATED', updated_at: new Date().toISOString() })
+                .eq('id', s.id)
+                .then();
+            }
+
             return {
               ...s,
+              signature_status: effectiveStatus,
               duration_hours: s.duration_hours || Number(dur.toFixed(2)),
               students_present_count: s.students_present_count ?? s.present_students_count ?? null,
               class_name: s.class?.name || s.class_name,
@@ -413,7 +492,13 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Load students for attendance when assignment changes
   useEffect(() => {
-    if (!selectedAssignment?.class_id) {
+    const effectiveClassId = selectedAssignment?.class_id || (
+      selectedAssignment?.class_name && schoolClasses.length > 0
+        ? schoolClasses.find(c => c.name?.toLowerCase().trim() === selectedAssignment.class_name?.toLowerCase().trim())?.id
+        : null
+    );
+
+    if (!effectiveClassId) {
       setStudents([]);
       setAttendance({});
       setShowAttendance(false);
@@ -427,7 +512,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const { data: studentsData } = await supabase
           .from('students')
           .select('id, first_name, last_name, gender, campus_id')
-          .eq('class_id', selectedAssignment.class_id)
+          .eq('class_id', effectiveClassId)
           .eq('school_id', user.school_id)
           .eq('status', 'ACTIF')
           .order('last_name');
@@ -440,7 +525,7 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const { data: sheetData } = await supabase
           .from('attendance_sheets')
           .select('id')
-          .eq('class_id', selectedAssignment.class_id)
+          .eq('class_id', effectiveClassId)
           .eq('date', selectedDate)
           .maybeSingle();
 
@@ -479,14 +564,168 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
 
     loadClassStudents();
-  }, [selectedAssignment, selectedDate, user.school_id]);
+  }, [selectedAssignment, selectedDate, user.school_id, schoolClasses]);
 
   const handleSelectAssignment = (assignment: any) => {
-    setSelectedAssignment(assignment);
-    setStartTime(assignment.start_time.substring(0, 5));
-    setEndTime(assignment.end_time.substring(0, 5));
-    setTopic('');
-    setHomework('');
+    let resolvedClassId = assignment.class_id;
+    if (!resolvedClassId && assignment.class_name && schoolClasses.length > 0) {
+      const match = schoolClasses.find(c => c.name?.toLowerCase().trim() === assignment.class_name?.toLowerCase().trim());
+      if (match) {
+        resolvedClassId = match.id;
+      }
+    }
+    const updatedAssignment = {
+      ...assignment,
+      class_id: resolvedClassId || null
+    };
+    setSelectedAssignment(updatedAssignment);
+
+    // Look for existing signature matching this session for selectedDate
+    const existing = mySignatures.find(s => {
+      const classMatch = (resolvedClassId && s.class_id === resolvedClassId) ||
+        (assignment.class_name && s.class_name && s.class_name.toLowerCase().trim() === assignment.class_name.toLowerCase().trim());
+      const subjectMatch = s.subject_id === assignment.subject_id;
+      const dateMatch = s.date === selectedDate;
+      const timeMatch = !s.start_time || !assignment.start_time ||
+        s.start_time.substring(0, 5) === assignment.start_time.substring(0, 5);
+      return classMatch && subjectMatch && dateMatch && timeMatch;
+    });
+
+    if (existing) {
+      setExistingSignatureId(existing.id || null);
+      setExistingSignatureStatus(existing.signature_status);
+      const rawTopic = existing.topic_covered || '';
+      if (rawTopic.includes('\n[Devoirs / Tâches]: ')) {
+        const [t, hw] = rawTopic.split('\n[Devoirs / Tâches]: ');
+        setTopic(t || '');
+        setHomework(hw || '');
+      } else {
+        setTopic(rawTopic);
+        setHomework(existing.homework || '');
+      }
+      setStartTime(existing.start_time ? existing.start_time.substring(0, 5) : (assignment.start_time ? assignment.start_time.substring(0, 5) : '08:00'));
+      setEndTime(existing.end_time ? existing.end_time.substring(0, 5) : (assignment.end_time ? assignment.end_time.substring(0, 5) : '10:00'));
+      if (existing.students_present_count !== null && existing.students_present_count !== undefined) {
+        setPresentCount(existing.students_present_count.toString());
+      }
+    } else {
+      setExistingSignatureId(null);
+      setExistingSignatureStatus(null);
+      setStartTime(assignment.start_time ? assignment.start_time.substring(0, 5) : '08:00');
+      setEndTime(assignment.end_time ? assignment.end_time.substring(0, 5) : '10:00');
+      setTopic('');
+      setHomework('');
+    }
+  };
+
+  // Re-check existing signature when selectedDate changes
+  useEffect(() => {
+    if (!selectedAssignment) return;
+    const resolvedClassId = selectedAssignment.class_id;
+    const existing = mySignatures.find(s => {
+      const classMatch = (resolvedClassId && s.class_id === resolvedClassId) ||
+        (selectedAssignment.class_name && s.class_name && s.class_name.toLowerCase().trim() === selectedAssignment.class_name.toLowerCase().trim());
+      const subjectMatch = s.subject_id === selectedAssignment.subject_id;
+      const dateMatch = s.date === selectedDate;
+      const timeMatch = !s.start_time || !selectedAssignment.start_time ||
+        s.start_time.substring(0, 5) === selectedAssignment.start_time.substring(0, 5);
+      return classMatch && subjectMatch && dateMatch && timeMatch;
+    });
+
+    if (existing) {
+      setExistingSignatureId(existing.id || null);
+      setExistingSignatureStatus(existing.signature_status);
+      const rawTopic = existing.topic_covered || '';
+      if (rawTopic.includes('\n[Devoirs / Tâches]: ')) {
+        const [t, hw] = rawTopic.split('\n[Devoirs / Tâches]: ');
+        setTopic(t || '');
+        setHomework(hw || '');
+      } else {
+        setTopic(rawTopic);
+        setHomework(existing.homework || '');
+      }
+      if (existing.students_present_count !== null && existing.students_present_count !== undefined) {
+        setPresentCount(existing.students_present_count.toString());
+      }
+    } else {
+      setExistingSignatureId(null);
+      setExistingSignatureStatus(null);
+    }
+  }, [selectedDate, mySignatures]);
+
+  const handleEditFromHistory = (sig: CourseSignature) => {
+    const matchingAssignment = myAssignments.find(a => 
+      a.subject_id === sig.subject_id && 
+      (a.class_id === sig.class_id || (a.class_name && sig.class_name && a.class_name.toLowerCase().trim() === sig.class_name.toLowerCase().trim()))
+    ) || {
+      id: 'history-' + (sig.id || Math.random().toString()),
+      class_id: sig.class_id,
+      class_name: sig.class_name,
+      subject_id: sig.subject_id,
+      subject_name: sig.subject_name,
+      start_time: sig.start_time,
+      end_time: sig.end_time,
+      duration_hours: sig.duration_hours || 2
+    };
+
+    setSelectedDate(sig.date);
+    setSelectedAssignment(matchingAssignment);
+    setExistingSignatureId(sig.id || null);
+    setExistingSignatureStatus(sig.signature_status);
+
+    const rawTopic = sig.topic_covered || '';
+    if (rawTopic.includes('\n[Devoirs / Tâches]: ')) {
+      const [t, hw] = rawTopic.split('\n[Devoirs / Tâches]: ');
+      setTopic(t || '');
+      setHomework(hw || '');
+    } else {
+      setTopic(rawTopic);
+      setHomework(sig.homework || '');
+    }
+    setStartTime(sig.start_time ? sig.start_time.substring(0, 5) : '08:00');
+    setEndTime(sig.end_time ? sig.end_time.substring(0, 5) : '10:00');
+    if (sig.students_present_count !== null && sig.students_present_count !== undefined) {
+      setPresentCount(sig.students_present_count.toString());
+    }
+    window.scrollTo({ top: 300, behavior: 'smooth' });
+  };
+
+  const handleUpdateStatus = async (sigId: string, status: 'VALIDATED' | 'REJECTED' | 'SIGNED') => {
+    try {
+      const { error } = await supabase
+        .from('course_signatures')
+        .update({ signature_status: status, updated_at: new Date().toISOString() })
+        .eq('id', sigId);
+      if (error) throw error;
+      toast.success(status === 'VALIDATED' ? "Émargement validé avec succès !" : status === 'REJECTED' ? "Émargement rejeté" : "Statut réinitialisé");
+      await fetchTeacherContext();
+    } catch (err: any) {
+      toast.error("Erreur lors de la mise à jour du statut : " + err.message);
+    }
+  };
+
+  const handleDeleteSignature = async (sigId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer cet émargement certifié ?")) return;
+    setDeletingId(sigId);
+    try {
+      const { error } = await supabase
+        .from('course_signatures')
+        .delete()
+        .eq('id', sigId);
+      if (error) throw error;
+      toast.success("Émargement supprimé avec succès");
+      if (existingSignatureId === sigId) {
+        setExistingSignatureId(null);
+        setExistingSignatureStatus(null);
+        setTopic('');
+        setHomework('');
+      }
+      await fetchTeacherContext();
+    } catch (err: any) {
+      toast.error("Erreur lors de la suppression : " + err.message);
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const toggleStudentAttendance = (studentId: string) => {
@@ -509,6 +748,8 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleSubmitSignature = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (signing) return; // Prevent double submit
+
     if (!selectedAssignment) {
       toast.error("Veuillez sélectionner une séance à émarger");
       return;
@@ -532,16 +773,55 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const [eh, em] = endTime.split(':').map(Number);
       const durationHours = Math.max(0.5, ((eh * 60 + em) - (sh * 60 + sm)) / 60);
 
+      // 2. Resolve class_id robustly
+      let effectiveClassId = selectedAssignment.class_id;
+      if (!effectiveClassId && selectedAssignment.class_name && schoolClasses.length > 0) {
+        const match = schoolClasses.find(c => c.name?.toLowerCase().trim() === selectedAssignment.class_name?.toLowerCase().trim());
+        if (match) {
+          effectiveClassId = match.id;
+        }
+      }
+
+      // Auto-update assignment in background if resolved
+      if (effectiveClassId && selectedAssignment.id && !selectedAssignment.class_id) {
+        supabase
+          .from('staff_assignments')
+          .update({ class_id: effectiveClassId })
+          .eq('id', selectedAssignment.id)
+          .then();
+      }
+
+      const formattedStartTime = startTime.length === 5 ? `${startTime}:00` : startTime;
+      const formattedEndTime = endTime.length === 5 ? `${endTime}:00` : endTime;
+
+      // Check if this teacher's presence is already approved in employee attendances
+      const isPresenceApproved = approvedStaffAttendances.some((att: any) => 
+        att.date === selectedDate && 
+        (att.status === 'Présent' || att.status === 'Retard') &&
+        (!selectedAssignment.id || !att.assignment_id || att.assignment_id === selectedAssignment.id)
+      );
+
+      // Signatures by a certified manager or matching an approved presence are VALIDATED immediately, never in attente
+      const calculatedStatus: 'VALIDATED' | 'SIGNED' = (
+        isCertifiedManager || 
+        isPresenceApproved || 
+        existingSignatureStatus === 'VALIDATED'
+      ) ? 'VALIDATED' : (existingSignatureStatus || 'SIGNED');
+
       const payload: any = {
         school_id: user.school_id,
         staff_id: effectiveStaff,
-        class_id: selectedAssignment.class_id,
-        subject_id: selectedAssignment.subject_id,
+        class_id: effectiveClassId || null,
+        class_name: selectedAssignment.class_name || null,
+        subject_id: selectedAssignment.subject_id || null,
+        subject_name: selectedAssignment.subject_name || null,
+        duration_hours: durationHours,
         date: selectedDate,
-        start_time: startTime,
-        end_time: endTime,
+        start_time: formattedStartTime,
+        end_time: formattedEndTime,
         topic_covered: topic.trim() + (homework.trim() ? `\n[Devoirs / Tâches]: ${homework.trim()}` : ''),
-        signature_status: 'SIGNED'
+        signature_status: calculatedStatus,
+        recorded_by: user.id
       };
 
       if (presentCount) {
@@ -551,41 +831,202 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
         payload.academic_year_id = activeYearId;
       }
 
-      const { data, error } = await supabase
-        .from('course_signatures')
-        .insert([payload])
-        .select()
-        .single();
+      // 3. Proactively check if record already exists for this unique slot
+      let targetSigId = existingSignatureId;
+      if (!targetSigId) {
+        let checkQuery = supabase
+          .from('course_signatures')
+          .select('id')
+          .eq('school_id', user.school_id)
+          .eq('staff_id', effectiveStaff)
+          .eq('date', selectedDate)
+          .eq('start_time', formattedStartTime)
+          .eq('end_time', formattedEndTime);
 
-      if (error) throw error;
-
-      AuditLogger.log({
-        school_id: user.school_id,
-        user_id: user.id,
-        action: 'CREATE',
-        entity_type: 'course_signature',
-        entity_id: data.id,
-        details: { 
-          class_id: selectedAssignment.class_id, 
-          subject: selectedAssignment.subject_name,
-          topic,
-          date: selectedDate
+        if (effectiveClassId) {
+          checkQuery = checkQuery.eq('class_id', effectiveClassId);
         }
-      });
+        if (selectedAssignment.subject_id) {
+          checkQuery = checkQuery.eq('subject_id', selectedAssignment.subject_id);
+        }
 
-      toast.success("Émargement numérique certifié et enregistré avec succès !");
+        const { data: existingInDb } = await checkQuery.maybeSingle();
+        if (existingInDb?.id) {
+          targetSigId = existingInDb.id;
+        }
+      }
+
+      let savedRecord: any = null;
+
+      if (targetSigId) {
+        // UPDATE existing signature
+        const { data, error } = await supabase
+          .from('course_signatures')
+          .update({
+            ...payload,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', targetSigId)
+          .select()
+          .single();
+
+        if (error) throw error;
+        savedRecord = data;
+
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: 'UPDATE',
+          entity_type: 'course_signature',
+          entity_id: savedRecord.id,
+          details: { 
+            class_id: effectiveClassId || null, 
+            class_name: selectedAssignment.class_name,
+            subject: selectedAssignment.subject_name,
+            topic,
+            date: selectedDate
+          }
+        });
+      } else {
+        // INSERT new signature
+        const { data, error } = await supabase
+          .from('course_signatures')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) throw error;
+        savedRecord = data;
+
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: 'CREATE',
+          entity_type: 'course_signature',
+          entity_id: savedRecord.id,
+          details: { 
+            class_id: effectiveClassId || null, 
+            class_name: selectedAssignment.class_name,
+            subject: selectedAssignment.subject_name,
+            topic,
+            date: selectedDate
+          }
+        });
+      }
+
+      // 4. If signed by a certified manager, ensure employee presence is also marked Présent in staff_attendances
+      if (isCertifiedManager) {
+        try {
+          const { data: existingAtt } = await supabase
+            .from('staff_attendances')
+            .select('id, status')
+            .eq('school_id', user.school_id)
+            .eq('staff_id', effectiveStaff)
+            .eq('date', selectedDate)
+            .maybeSingle();
+
+          if (existingAtt) {
+            if (existingAtt.status !== 'Présent') {
+              await supabase
+                .from('staff_attendances')
+                .update({ status: 'Présent', updated_at: new Date().toISOString() })
+                .eq('id', existingAtt.id);
+            }
+          } else {
+            await supabase
+              .from('staff_attendances')
+              .insert([{
+                school_id: user.school_id,
+                staff_id: effectiveStaff,
+                assignment_id: selectedAssignment.id || null,
+                date: selectedDate,
+                start_time: formattedStartTime,
+                end_time: formattedEndTime,
+                duration_hours: durationHours,
+                status: 'Présent',
+                validated_by: user.id
+              }]);
+          }
+        } catch (syncAttErr) {
+          console.warn("Could not sync employee presence to staff_attendances:", syncAttErr);
+        }
+      }
+
+      if (calculatedStatus === 'VALIDATED') {
+        if (isCertifiedManager) {
+          toast.success("Émargement certifié et validé par la Direction avec succès !");
+        } else if (isPresenceApproved) {
+          toast.success("Émargement validé automatiquement (Présence approuvée dans la liste des employés) !");
+        } else {
+          toast.success(targetSigId ? "Émargement numérique mis à jour et validé !" : "Émargement numérique validé avec succès !");
+        }
+      } else {
+        toast.success(targetSigId ? "Émargement numérique mis à jour avec succès !" : "Émargement numérique enregistré avec succès !");
+      }
+
       setSelectedAssignment(null);
+      setExistingSignatureId(null);
+      setExistingSignatureStatus(null);
       setTopic('');
       setHomework('');
       await fetchTeacherContext();
 
     } catch (err: any) {
       console.error("Signature error:", err);
-      toast.error(err.message || "Erreur lors de l'enregistrement de l'émargement");
+
+      // Handle duplicate constraint (unique_session_signature) gracefully
+      if (err?.code === '23505' || err?.message?.includes('unique_session_signature') || err?.message?.includes('duplicate key')) {
+        try {
+          const { data: conflictRecord } = await supabase
+            .from('course_signatures')
+            .select('id')
+            .eq('school_id', user.school_id)
+            .eq('staff_id', effectiveStaff)
+            .eq('date', selectedDate)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (conflictRecord?.id) {
+            const { error: updateErr } = await supabase
+              .from('course_signatures')
+              .update({
+                topic_covered: topic.trim() + (homework.trim() ? `\n[Devoirs / Tâches]: ${homework.trim()}` : ''),
+                present_students_count: presentCount ? parseInt(presentCount) : null,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', conflictRecord.id);
+
+            if (!updateErr) {
+              toast.success("Cette séance était déjà enregistrée : vos modifications ont été mises à jour !");
+              setSelectedAssignment(null);
+              setExistingSignatureId(null);
+              setExistingSignatureStatus(null);
+              setTopic('');
+              setHomework('');
+              await fetchTeacherContext();
+              return;
+            }
+          }
+        } catch (innerErr) {
+          console.error("Fallback update error:", innerErr);
+        }
+
+        toast.info("Cette séance a déjà été émargée pour cette date et cet horaire.");
+        return;
+      }
+
+      const isClassError = err?.message?.includes('class_id') || err?.code === '23502';
+      toast.error(
+        isClassError
+          ? "Impossible d'enregistrer l'émargement : la classe associée est introuvable ou non reliée. Veuillez vérifier la configuration de la classe."
+          : (err.message || "Erreur lors de l'enregistrement de l'émargement")
+      );
     } finally {
       setSigning(false);
     }
   };
+
 
   // KPI Calculations
   const kpis = useMemo(() => {
@@ -869,11 +1310,16 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="space-y-2">
                 {todayAssignments.map((assignment) => {
                   const isSelected = selectedAssignment?.id === assignment.id;
-                  const alreadySigned = mySignatures.some(
-                    s => s.class_id === assignment.class_id && 
-                         s.subject_id === assignment.subject_id && 
-                         s.date === selectedDate
-                  );
+                  const matchingSig = mySignatures.find(s => {
+                    const classMatches = (assignment.class_id && s.class_id === assignment.class_id) || 
+                      (assignment.class_name && s.class_name && s.class_name.toLowerCase().trim() === assignment.class_name.toLowerCase().trim());
+                    const subjectMatches = s.subject_id === assignment.subject_id;
+                    const dateMatches = s.date === selectedDate;
+                    const timeMatches = !s.start_time || !assignment.start_time || 
+                      s.start_time.substring(0, 5) === assignment.start_time.substring(0, 5);
+                    return classMatches && subjectMatches && dateMatches && timeMatches;
+                  });
+                  const alreadySigned = !!matchingSig;
 
                   return (
                     <button
@@ -920,9 +1366,11 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <span className={`inline-flex items-center gap-1 text-[10px] font-extrabold px-2 py-0.5 rounded-lg border ${
                             isSelected 
                               ? 'bg-white text-emerald-700 border-white' 
-                              : 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : matchingSig?.signature_status === 'VALIDATED'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                              : 'bg-amber-100 text-amber-800 border-amber-200'
                           }`}>
-                            <CheckCircle2 size={11} /> Émargé
+                            <CheckCircle2 size={11} /> {matchingSig?.signature_status === 'VALIDATED' ? 'Validé' : 'Émargé'}
                           </span>
                         ) : (
                           <span className={`p-1 rounded-lg transition-all ${
@@ -968,6 +1416,15 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <span className="text-[10px] font-bold text-slate-500">
                         {formattedSelectedDate}
                       </span>
+                      {existingSignatureId && (
+                        <span className={`text-[10px] font-extrabold px-1.5 py-0.5 rounded uppercase border ${
+                          existingSignatureStatus === 'VALIDATED'
+                            ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                            : 'bg-amber-100 text-amber-800 border-amber-200'
+                        }`}>
+                          {existingSignatureStatus === 'VALIDATED' ? 'Validé' : 'Émargé'}
+                        </span>
+                      )}
                     </div>
                     <h4 className="font-black text-slate-900 text-sm sm:text-base">{selectedAssignment.subject_name}</h4>
                     <p className="text-[11px] sm:text-xs text-slate-600 flex items-center gap-1.5 pt-0.5">
@@ -978,12 +1435,33 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                   <button
                     type="button"
-                    onClick={() => setSelectedAssignment(null)}
+                    onClick={() => {
+                      setSelectedAssignment(null);
+                      setExistingSignatureId(null);
+                      setExistingSignatureStatus(null);
+                      setTopic('');
+                      setHomework('');
+                    }}
                     className="text-xs font-bold text-slate-600 hover:text-slate-900 bg-white px-2.5 py-1 rounded-lg border border-slate-200 shadow-2xs hover:bg-slate-50 transition-all cursor-pointer"
                   >
                     Changer de cours
                   </button>
                 </div>
+
+                {/* Banner when editing existing signature */}
+                {existingSignatureId && (
+                  <div className="p-2.5 bg-amber-50/90 border border-amber-200/90 rounded-xl flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 text-amber-900">
+                      <Info size={15} className="shrink-0 text-amber-600" />
+                      <span>
+                        Cette séance a déjà été certifiée pour ce créneau ({existingSignatureStatus === 'VALIDATED' ? 'Validée' : 'En attente'}). Vous êtes en mode modification : vos modifications mettront à jour cet enregistrement.
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-amber-800 bg-amber-200/70 px-2 py-0.5 rounded shrink-0">
+                      Mode Modification
+                    </span>
+                  </div>
+                )}
 
                 {/* Topic Covered Field */}
                 <div>
@@ -1119,7 +1597,13 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="pt-2 flex items-center justify-end gap-2 border-t border-slate-100">
                   <button
                     type="button"
-                    onClick={() => setSelectedAssignment(null)}
+                    onClick={() => {
+                      setSelectedAssignment(null);
+                      setExistingSignatureId(null);
+                      setExistingSignatureStatus(null);
+                      setTopic('');
+                      setHomework('');
+                    }}
                     className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition-all cursor-pointer"
                   >
                     Annuler
@@ -1127,10 +1611,20 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button
                     type="submit"
                     disabled={signing}
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-indigo-600/20 flex items-center gap-2 disabled:opacity-50 cursor-pointer"
+                    className={`px-5 py-2 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 flex items-center gap-2 disabled:opacity-50 cursor-pointer ${
+                      existingSignatureId
+                        ? 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/20'
+                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-600/20'
+                    }`}
                   >
-                    {signing ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-                    {terms.ctaSign}
+                    {signing ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : existingSignatureId ? (
+                      <RefreshCw size={14} />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                    {existingSignatureId ? (terms.ctaUpdate || "Mettre à jour l'émargement") : terms.ctaSign}
                   </button>
                 </div>
               </form>
@@ -1244,7 +1738,36 @@ const CourseSignatureView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </div>
                         </div>
 
-                        <div className="shrink-0 flex items-center gap-2 self-start sm:self-auto">
+                        <div className="shrink-0 flex items-center gap-1.5 self-start sm:self-auto">
+                          <button
+                            type="button"
+                            onClick={() => handleEditFromHistory(sig)}
+                            title="Modifier cet émargement"
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Edit3 size={13} />
+                          </button>
+                          {isAdmin && sig.signature_status !== 'VALIDATED' && (
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateStatus(sig.id!, 'VALIDATED')}
+                              title="Valider la séance"
+                              className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                            >
+                              <CheckCheck size={13} />
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              type="button"
+                              disabled={deletingId === sig.id}
+                              onClick={() => handleDeleteSignature(sig.id!)}
+                              title="Supprimer cet émargement"
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                            >
+                              {deletingId === sig.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                            </button>
+                          )}
                           <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-lg border ${
                             sig.signature_status === 'VALIDATED' 
                               ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 

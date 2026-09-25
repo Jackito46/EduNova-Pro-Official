@@ -972,7 +972,9 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       // 2. Insertion avec formatage strict
       if (assignments.length > 0) {
         const dataToInsert = assignments.map(a => {
-          const resolvedClassId = a.class_id || allClasses.find(c => c.name === a.class_name)?.id;
+          const resolvedClassId = a.class_id || allClasses.find(c => 
+            c.id === a.class_id || c.name?.trim().toLowerCase() === a.class_name?.trim().toLowerCase()
+          )?.id;
           const item: any = {
             staff_id: staffId,
             school_id: user.school_id,
