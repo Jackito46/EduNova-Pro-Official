@@ -2143,7 +2143,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-      {/* Relevé de Compte Modal - Format Moderne, Fluide, Compact & Multi-Pages (École Connectée) */}
+      {/* Relevé de Compte Modal - Format Moderne, Fluide, Compact & Multi-Pages */}
       {printPreview && selectedStudent && (
         <div className="fixed inset-0 z-[1000] bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-0 sm:p-3 md:p-6 print:static print:inset-auto print:bg-white print:backdrop-blur-none animate-in fade-in duration-200 overflow-hidden print:overflow-visible print:p-0 print:m-0">
           <div className="w-full h-full max-w-5xl flex flex-col bg-slate-100 sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200/80 print:max-w-none print:w-full print:h-auto print:block print:shadow-none print:bg-white print:rounded-none">
@@ -2159,7 +2159,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                     Aperçu du Relevé de Compte
                   </h3>
                   <p className="text-[10px] sm:text-xs text-slate-500 font-medium truncate">
-                    Format officiel certifié • {schoolDetails?.name || 'École Connectée'}
+                    Format officiel certifié • {schoolDetails?.name || 'Établissement'}
                   </p>
                 </div>
               </div>
@@ -2598,7 +2598,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   {schoolDetails?.director_name || 'La Direction'}
                                 </p>
                                 <p className="text-[8px] font-bold text-indigo-600 uppercase tracking-wider">
-                                  Document Officiel Vérifié • École Connectée
+                                  Document Officiel Vérifié{schoolDetails?.name ? ` • ${schoolDetails.name}` : ''}
                                 </p>
                               </div>
                             </div>
@@ -2606,7 +2606,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                             {/* Mention légale administrative */}
                             <div className="mt-3 pt-2 border-t border-slate-100 text-center">
                               <p className="text-[7.5px] font-bold text-slate-400 uppercase tracking-[0.2em]">
-                                Ce document est généré électroniquement par le système École Connectée et certifie l'état comptable de l'élève à la date indiquée.
+                                Ce document est généré électroniquement et certifie l'état comptable de l'élève à la date indiquée.
                               </p>
                             </div>
                           </div>
@@ -2615,7 +2615,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       {/* Running Footer sur toutes les pages A4 */}
                       <div className="pt-2 mt-2 border-t border-slate-100 flex items-center justify-between text-[8px] font-mono text-slate-400 select-none">
-                        <span>Système École Connectée • ID: {selectedStudent.id.substring(0, 8).toUpperCase()}</span>
+                        <span>{schoolDetails?.name || 'Système de Gestion'} • ID: {selectedStudent.id.substring(0, 8).toUpperCase()}</span>
                         <span className="font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200">
                           Page {pageData.pageNumber} sur {pageData.totalPages}
                         </span>

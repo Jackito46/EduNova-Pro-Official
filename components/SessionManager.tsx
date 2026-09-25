@@ -1016,7 +1016,7 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             <div className="relative z-10 space-y-0.5 pr-8">
               <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 text-[10px] font-mono font-bold uppercase tracking-wider">
                 <ShieldCheck size={12} className="text-indigo-400" />
-                <span>Gouvernance Digitale • École Connectée</span>
+                <span>Gouvernance Digitale</span>
               </div>
               <h3 className="text-sm sm:text-base font-bold text-white tracking-tight">
                 Principes de Passation d'Année
@@ -1131,7 +1131,7 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             <div className="p-2.5 bg-indigo-50/80 border border-indigo-100 rounded-xl flex items-center gap-2 text-indigo-950 shadow-2xs">
               <Lightbulb size={15} className="text-indigo-600 shrink-0" />
               <p className="text-[11px] text-indigo-950 leading-snug font-medium">
-                <strong className="font-bold text-indigo-900">Recommandation École Connectée :</strong> Clôturez la saisie des notes et la remise des bulletins avant d'activer officiellement la nouvelle année.
+                <strong className="font-bold text-indigo-900">Recommandation :</strong> Clôturez la saisie des notes et la remise des bulletins avant d'activer officiellement la nouvelle année.
               </p>
             </div>
 

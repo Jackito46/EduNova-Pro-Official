@@ -25,8 +25,8 @@ interface Budget {
   created_at: string;
 }
 
-// Catégories types pour la gouvernance d'École Connectée
-const CONNECTED_SCHOOL_CATEGORIES = [
+// Catégories types pour la gouvernance budgétaire standard
+const STANDARD_BUDGET_CATEGORIES = [
   { label: 'Salaires & Primes Enseignants', icon: Users, badge: 'Personnel', defaultPlanned: 500000 },
   { label: 'Pédagogie, Examens & Laboratoires', icon: BookOpen, badge: 'Académique', defaultPlanned: 150000 },
   { label: 'Connectivité Internet & Numérique', icon: Zap, badge: 'Numérique', defaultPlanned: 60000 },
@@ -88,8 +88,8 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const categoryOptions = useMemo((): SelectOption[] => {
     const options: SelectOption[] = [];
 
-    // 1. Catégories standards École Connectée
-    CONNECTED_SCHOOL_CATEGORIES.forEach(cat => {
+    // 1. Catégories standards
+    STANDARD_BUDGET_CATEGORIES.forEach(cat => {
       options.push({
         value: cat.label,
         label: cat.label,
@@ -235,7 +235,7 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const handleOpenNewModal = () => {
     setFormData({
       id: '',
-      category: CONNECTED_SCHOOL_CATEGORIES[0].label,
+      category: STANDARD_BUDGET_CATEGORIES[0].label,
       campus_id: user.campus_id || currentCampusId || 'ALL',
       planned_amount: ''
     });
@@ -343,7 +343,7 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
-  // Génération rapide du cadre budgétaire type d'École Connectée
+  // Génération rapide du cadre budgétaire type standard
   const handleGenerateStandardTemplate = async () => {
     if (!selectedYearId) {
       toast.error("Veuillez sélectionner une session académique active.");
@@ -351,7 +351,7 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
 
     const existingNames = new Set(budgets.map(b => b.category.toLowerCase().trim()));
-    const toInsert = CONNECTED_SCHOOL_CATEGORIES
+    const toInsert = STANDARD_BUDGET_CATEGORIES
       .filter(cat => !existingNames.has(cat.label.toLowerCase().trim()))
       .map(cat => ({
         school_id: user.school_id,
@@ -362,11 +362,11 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }));
 
     if (toInsert.length === 0) {
-      toast.info("Tous les postes du cadre d'École Connectée sont déjà configurés.");
+      toast.info("Tous les postes du cadre standard sont déjà configurés.");
       return;
     }
 
-    if (!window.confirm(`Générer automatiquement ${toInsert.length} ligne(s) budgétaire(s) du cadre standard École Connectée ?`)) {
+    if (!window.confirm(`Générer automatiquement ${toInsert.length} ligne(s) budgétaire(s) du cadre standard ?`)) {
       return;
     }
 
@@ -451,7 +451,7 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   return (
     <div className="space-y-2.5 sm:space-y-3 animate-in fade-in duration-200">
-      {/* 1. Header Compact et Harmonisé École Connectée */}
+      {/* 1. Header Compact et Harmonisé */}
       <div className="bg-white p-2.5 sm:p-3 rounded-xl sm:rounded-2xl shadow-xs border border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-2.5 relative">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-slate-900 text-white rounded-xl shadow-xs shrink-0">
@@ -460,9 +460,6 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <div>
             <div className="flex items-center gap-2 flex-wrap">
               <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">Planification Budgétaire</h1>
-              <span className="px-1.5 py-0.5 bg-indigo-50 text-indigo-700 rounded-md text-[9px] font-black uppercase tracking-wider border border-indigo-100">
-                Gouvernance École Connectée
-              </span>
             </div>
             <p className="text-slate-500 text-[11px] font-medium leading-none mt-0.5">
               Arbitrage des dotations, cadrage des centres de coûts et maîtrise des décaissements en temps réel.
@@ -938,7 +935,7 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       if (!isCustomCategory) {
                         setCustomCategoryInput('');
                       } else {
-                        setFormData(prev => ({ ...prev, category: CONNECTED_SCHOOL_CATEGORIES[0].label }));
+                        setFormData(prev => ({ ...prev, category: STANDARD_BUDGET_CATEGORIES[0].label }));
                       }
                     }}
                     className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 hover:underline cursor-pointer"
@@ -993,7 +990,7 @@ const BudgetPlanningView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {/* Suggestions directes rapides en pilules sous la liste */}
                 <div className="flex flex-wrap gap-1 pt-0.5">
-                  {CONNECTED_SCHOOL_CATEGORIES.slice(0, 4).map((cat, idx) => (
+                  {STANDARD_BUDGET_CATEGORIES.slice(0, 4).map((cat, idx) => (
                     <button
                       key={idx}
                       type="button"

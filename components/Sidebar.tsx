@@ -363,7 +363,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                     return (
                       <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
                         <Sparkles size={11} className={isUniversity ? "text-indigo-500" : "text-amber-500"} />
-                        <span>{isUniversity ? 'Université Connectée' : 'École Connectée'}</span>
+                        <span>{isUniversity ? 'Enseignement Supérieur' : 'Système de Gestion'}</span>
                       </span>
                     );
                   })()}

@@ -967,7 +967,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     }
   };
 
-  // Gestion dynamique des pièces exigées adaptées à la terminologie d'école connectée
+  // Gestion dynamique des pièces exigées adaptées à la terminologie d'établissement
   const [newDocName, setNewDocName] = useState('');
   const [newDocDescription, setNewDocDescription] = useState('');
   const [newDocRequired, setNewDocRequired] = useState(true);
@@ -3538,7 +3538,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
             )}
 
-            {/* Sécurité du Compte (Accès & Authentification École Connectée) */}
+            {/* Sécurité du Compte (Accès & Authentification) */}
             <div className="bg-white rounded-xl shadow-2xs border border-slate-200/90 overflow-hidden">
               <div className="p-2.5 sm:p-3 border-b border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-3 bg-slate-50/70">
                 <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
@@ -3550,10 +3550,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                       <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
                         Sécurité du Compte & Authentification
                       </h3>
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        École Connectée
-                      </span>
                     </div>
                     <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
                       Compte connecté : <strong className="text-slate-700 font-semibold font-mono">{user.email}</strong>
@@ -4281,7 +4277,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         </>
       )}
 
-      {/* Modal - Exportation et Synchronisation vers GitHub (École connectée) */}
+      {/* Modal - Exportation et Synchronisation vers GitHub */}
       <Modal
         isOpen={isGitHubModalOpen}
         onClose={() => !isExportingGitHub && setIsGitHubModalOpen(false)}
@@ -4293,9 +4289,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             <div className="min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-slate-900 truncate">Exporter et Synchroniser vers GitHub</span>
-                <span className="hidden sm:inline-flex px-1.5 py-0.2 bg-indigo-50 text-indigo-700 border border-indigo-200/80 rounded text-[9px] font-black uppercase tracking-wider">
-                  École connectée
-                </span>
               </div>
             </div>
           </div>

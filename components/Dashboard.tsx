@@ -2446,7 +2446,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 <div className="mt-1 pt-2 border-t border-slate-100 flex items-center justify-between text-[9.5px] font-semibold text-slate-400">
                   <span>Centre de commande</span>
-                  <span className="text-slate-600 font-bold">École Connectée</span>
+                  <span className="text-slate-600 font-bold">Administration</span>
                 </div>
               </div>
             </div>
@@ -3260,10 +3260,6 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <h3 className="text-base sm:text-lg md:text-xl font-black text-slate-900 tracking-tight leading-tight">
                     Répartition Financière
                   </h3>
-                  <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                    École Connectée
-                  </span>
                 </div>
                 <p className="text-[10.5px] sm:text-xs text-slate-500 font-medium truncate mt-0.5">
                   Analyse des recettes consolidées par {terminology.option?.toLowerCase() || "niveau d'enseignement"}

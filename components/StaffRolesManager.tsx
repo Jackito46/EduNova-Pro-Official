@@ -126,7 +126,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
       if (error) throw error;
       setRoles(prev => [...prev, data].sort((a, b) => a.label.localeCompare(b.label)));
       setNewLabel('');
-      setSuccessMsg(`Poste "${trimmed}" ajouté avec succès au catalogue École Connectée !`);
+      setSuccessMsg(`Poste "${trimmed}" ajouté avec succès au catalogue !`);
     } catch (err: any) {
       console.error('Error adding role:', err);
       setError(err.message || "Impossible d'ajouter ce poste.");
@@ -161,7 +161,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
 
   const handleDelete = async (id: string, schoolId: string | null) => {
     if (!schoolId) {
-      setError("Les postes du socle standard École Connectée sont protégés.");
+      setError("Les postes du socle standard sont protégés.");
       return;
     }
     
@@ -290,7 +290,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
     >
       <div className="flex flex-col h-[88vh] max-h-[680px] bg-slate-50 font-sans select-none overflow-hidden">
         
-        {/* Modern Compact Header: Identity École Connectée */}
+        {/* Modern Compact Header */}
         <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 flex items-center justify-center font-bold shadow-inner shrink-0">
@@ -306,7 +306,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
                 </span>
               </div>
               <p className="text-[10px] text-slate-400 font-medium truncate mt-0.5">
-                Référentiel Métiers RH • École Connectée
+                Référentiel Métiers RH
               </p>
             </div>
           </div>
@@ -574,11 +574,11 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
                               {role.label}
                             </span>
                             
-                            {/* Inline Badges respecting École Connectée Terminology */}
+                            {/* Inline Badges respecting Terminology */}
                             {isCustom ? (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200/60 px-1.5 py-0.5 rounded shrink-0">
                                 <Building2 size={9} className="text-emerald-600" />
-                                <span>Spécifique École</span>
+                                <span>Poste Personnalisé</span>
                               </span>
                             ) : (
                               <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.5 rounded shrink-0">
@@ -618,7 +618,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
                               type="button"
                               onClick={() => setShowStandardAlert(true)}
                               className="p-1 text-slate-300 hover:text-slate-500 hover:bg-slate-100 rounded-md transition-colors cursor-pointer"
-                              title="Poste standard protégé du socle académique École Connectée"
+                              title="Poste standard protégé du socle académique"
                               aria-label="Protégé"
                             >
                               <Lock size={11} />
@@ -684,7 +684,7 @@ const StaffRolesManager: React.FC<{ user: UserProfile; isOpen: boolean; onClose:
         isOpen={showStandardAlert}
         onClose={() => setShowStandardAlert(false)}
         title="Poste Standard Protégé"
-        message="Ce poste fait partie du socle académique standard École Connectée. Il est protégé pour garantir la cohérence des rapports administratifs, financiers et académiques. Vous pouvez créer ou personnaliser vos propres postes d'établissement à l'aide du formulaire supérieur."
+        message="Ce poste fait partie du socle académique standard. Il est protégé pour garantir la cohérence des rapports administratifs, financiers et académiques. Vous pouvez créer ou personnaliser vos propres postes d'établissement à l'aide du formulaire supérieur."
         type="info"
         confirmLabel="Compris"
         onConfirm={() => setShowStandardAlert(false)}

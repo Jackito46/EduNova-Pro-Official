@@ -3662,7 +3662,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         />
       )}
 
-      {/* MODALE CATALOGUE (ÉDITEUR D'ARTICLES - HARMONISÉ ÉCOLE CONNECTÉE) */}
+      {/* MODALE CATALOGUE (ÉDITEUR D'ARTICLES) */}
       {showCatalogModal && (
         <div className="fixed inset-0 z-[300] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-200">
            <div className="bg-white w-full max-w-2xl lg:max-w-3xl rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200">
@@ -4131,7 +4131,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       </Modal>
 
       <Modal isOpen={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={performDelete} type="danger" title="Confirmation" message={deleteType === 'catalog' ? "Voulez-vous retirer cet article du catalogue ? Cela n'effacera pas les ventes passées mais bloquera les futures." : "Voulez-vous annuler ce dossier de vente ?"} />
-      {/* MODALE DE RÉAPPROVISIONNEMENT & COMMANDES FOURNISSEURS (HARMONISÉ ÉCOLE CONNECTÉE) */}
+      {/* MODALE DE RÉAPPROVISIONNEMENT & COMMANDES FOURNISSEURS */}
       {showPurchaseModal && (
         <div className="fixed inset-0 z-[1000] bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-4 md:p-6 animate-in fade-in duration-200">
           <div className={`bg-white w-full ${purchaseMode === 'batch' ? 'max-w-4xl lg:max-w-5xl' : 'max-w-2xl sm:max-w-3xl lg:max-w-4xl'} rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden flex flex-col max-h-[92vh] sm:max-h-[88vh] animate-in zoom-in-95 duration-200 transition-all`}>

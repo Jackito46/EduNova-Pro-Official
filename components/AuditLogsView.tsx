@@ -134,7 +134,7 @@ export const AuditLogsView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return map[entity] || entity;
   };
 
-  // Description enrichie pour le système école connectée
+  // Description enrichie pour le journal d'audit
   const generateActionDescription = (log: AuditLog) => {
     const { action, entity_type, details } = log;
     let obj = details;

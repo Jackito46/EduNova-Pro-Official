@@ -59,7 +59,7 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
   campusName,
   terminology: propTerminology
 }) => {
-  // Récupération sécurisée du contexte d'École Connectée et de la terminologie
+  // Récupération sécurisée du contexte d'établissement et de la terminologie
   let contextSchool: any = null;
   let contextTerminology: Terminology | null = null;
   try {
@@ -71,7 +71,7 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
   }
 
   const terminology = propTerminology || contextTerminology || getTerminology();
-  const effectiveSchoolName = propSchoolName || contextSchool?.name || 'École Connectée';
+  const effectiveSchoolName = propSchoolName || contextSchool?.name || 'Établissement';
 
   if (!isOpen || !student) return null;
 
@@ -103,7 +103,7 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
         aria-labelledby="moncash-summary-title"
         className="relative w-full max-w-md sm:max-w-lg md:max-w-2xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 overflow-hidden my-auto max-h-[94vh] flex flex-col animate-in zoom-in-95 duration-150"
       >
-        {/* En-tête Compact MonCash / École Connectée */}
+        {/* En-tête Compact MonCash */}
         <div className="bg-gradient-to-r from-red-600 via-rose-600 to-red-700 px-3.5 py-2.5 sm:px-5 sm:py-3 text-white shrink-0">
           <div className="flex items-center justify-between gap-2">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -112,9 +112,6 @@ export const MonCashSummaryModal: React.FC<MonCashSummaryModalProps> = ({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-[9px] sm:text-[10px] font-black tracking-wider uppercase px-1.5 py-0.5 rounded-md bg-white text-red-700 shadow-2xs leading-none">
-                    École Connectée
-                  </span>
                   <span className="text-[9px] sm:text-[10px] font-bold text-red-100 uppercase tracking-wide leading-none">
                     MonCash • Étape 1/2
                   </span>
