@@ -4,6 +4,7 @@
  */
 
 import { supabase, supabaseUrl } from '../supabase';
+import { ImageOptimizationService, OptimizedImageResult } from './imageOptimizationService';
 
 export interface LogoMigrationReport {
   success: boolean;
@@ -52,23 +53,35 @@ export class LogoStorageMigrationService {
 
   /**
    * Téléverse un buffer ou Blob dans Supabase Storage et retourne l'URL publique permanente.
+   * Compresse et redimensionne systématiquement l'image au format WebP ultra-léger avant envoi.
    */
   public static async uploadLogoBlob(
     targetId: string, 
-    fileOrBlob: Blob | File | Uint8Array, 
+    fileOrBlobOrString: Blob | File | string, 
     fileNamePrefix: string = 'school'
-  ): Promise<{ success: boolean; publicUrl?: string; error?: string }> {
+  ): Promise<{ 
+    success: boolean; 
+    publicUrl?: string; 
+    error?: string;
+    optimization?: OptimizedImageResult;
+  }> {
     try {
       await this.ensureStorageReady();
 
-      const mimeType = (fileOrBlob instanceof Blob ? fileOrBlob.type : null) || 'image/webp';
-      const ext = mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') || mimeType.includes('jpg') ? 'jpg' : 'webp';
-      const filePath = `${this.FOLDER}/${fileNamePrefix}_${targetId}_${Date.now()}.${ext}`;
+      // Redimensionnement et compression systématique côté client avant envoi sur le bucket
+      const optResult = await ImageOptimizationService.optimizeImage(fileOrBlobOrString, {
+        maxWidth: ImageOptimizationService.DEFAULT_LOGO_MAX_WIDTH,
+        maxHeight: ImageOptimizationService.DEFAULT_LOGO_MAX_HEIGHT,
+        quality: ImageOptimizationService.DEFAULT_QUALITY,
+        targetFormat: 'image/webp'
+      });
+
+      const filePath = `${this.FOLDER}/${fileNamePrefix}_${targetId}_${Date.now()}.${optResult.extension}`;
 
       const { error: uploadError } = await supabase.storage
         .from(this.STORAGE_BUCKET)
-        .upload(filePath, fileOrBlob, {
-          contentType: mimeType,
+        .upload(filePath, optResult.blob, {
+          contentType: optResult.mimeType,
           upsert: true
         });
 
@@ -81,7 +94,11 @@ export class LogoStorageMigrationService {
         .getPublicUrl(filePath);
 
       const publicUrl = pubData?.publicUrl || `${supabaseUrl}/storage/v1/object/public/${this.STORAGE_BUCKET}/${filePath}`;
-      return { success: true, publicUrl };
+      return { 
+        success: true, 
+        publicUrl,
+        optimization: optResult
+      };
     } catch (err: any) {
       console.error('[LogoMigration] Erreur uploadLogoBlob:', err);
       return { success: false, error: err.message || 'Erreur inconnue upload storage' };
@@ -170,27 +187,46 @@ export class LogoStorageMigrationService {
           continue;
         }
 
-        // Conversion et migration Base64 -> Supabase Storage
-        const parsed = this.base64ToBlob(logoUrl);
-        if (!parsed) {
-          report.details.push({
-            id: school.id,
-            name: school.name,
-            type: 'school',
-            previousType: 'base64',
-            newUrl: null,
-            bytesSaved: 0,
-            status: 'error',
-            error: 'Base64 corrompu ou format image invalide'
+        // Conversion, redimensionnement et compression WebP avant upload sur Supabase Storage
+        let uploadBlob: Blob;
+        let uploadMime = 'image/webp';
+        let uploadExt: 'webp' | 'jpg' | 'png' = 'webp';
+
+        try {
+          const opt = await ImageOptimizationService.optimizeImage(logoUrl, {
+            maxWidth: ImageOptimizationService.DEFAULT_LOGO_MAX_WIDTH,
+            maxHeight: ImageOptimizationService.DEFAULT_LOGO_MAX_HEIGHT,
+            quality: ImageOptimizationService.DEFAULT_QUALITY,
+            targetFormat: 'image/webp'
           });
-          continue;
+          uploadBlob = opt.blob;
+          uploadMime = opt.mimeType;
+          uploadExt = opt.extension;
+        } catch (compErr) {
+          const parsed = this.base64ToBlob(logoUrl);
+          if (!parsed) {
+            report.details.push({
+              id: school.id,
+              name: school.name,
+              type: 'school',
+              previousType: 'base64',
+              newUrl: null,
+              bytesSaved: 0,
+              status: 'error',
+              error: 'Base64 corrompu ou format image invalide'
+            });
+            continue;
+          }
+          uploadBlob = parsed.blob;
+          uploadMime = parsed.mime;
+          uploadExt = parsed.ext as any;
         }
 
-        const filePath = `${this.FOLDER}/${school.id}.${parsed.ext}`;
+        const filePath = `${this.FOLDER}/${school.id}.${uploadExt}`;
         const { error: uploadErr } = await supabase.storage
           .from(this.STORAGE_BUCKET)
-          .upload(filePath, parsed.blob, {
-            contentType: parsed.mime,
+          .upload(filePath, uploadBlob, {
+            contentType: uploadMime,
             upsert: true
           });
 
@@ -254,12 +290,32 @@ export class LogoStorageMigrationService {
         for (const campus of campuses) {
           const cLogo = campus.logo_url;
           if (cLogo && typeof cLogo === 'string' && cLogo.startsWith('data:image/')) {
-            const parsed = this.base64ToBlob(cLogo);
-            if (parsed) {
-              const filePath = `${this.FOLDER}/campus_${campus.id}.${parsed.ext}`;
-              await supabase.storage
-                .from(this.STORAGE_BUCKET)
-                .upload(filePath, parsed.blob, { contentType: parsed.mime, upsert: true });
+            let cBlob: Blob;
+            let cMime = 'image/webp';
+            let cExt: 'webp' | 'jpg' | 'png' = 'webp';
+
+            try {
+              const opt = await ImageOptimizationService.optimizeImage(cLogo, {
+                maxWidth: ImageOptimizationService.DEFAULT_LOGO_MAX_WIDTH,
+                maxHeight: ImageOptimizationService.DEFAULT_LOGO_MAX_HEIGHT,
+                quality: ImageOptimizationService.DEFAULT_QUALITY,
+                targetFormat: 'image/webp'
+              });
+              cBlob = opt.blob;
+              cMime = opt.mimeType;
+              cExt = opt.extension;
+            } catch (e) {
+              const parsed = this.base64ToBlob(cLogo);
+              if (!parsed) continue;
+              cBlob = parsed.blob;
+              cMime = parsed.mime;
+              cExt = parsed.ext as any;
+            }
+
+            const filePath = `${this.FOLDER}/campus_${campus.id}.${cExt}`;
+            await supabase.storage
+              .from(this.STORAGE_BUCKET)
+              .upload(filePath, cBlob, { contentType: cMime, upsert: true });
 
               const { data: pubData } = supabase.storage
                 .from(this.STORAGE_BUCKET)
@@ -286,7 +342,6 @@ export class LogoStorageMigrationService {
               });
             }
           }
-        }
       } catch (cErr) {
         console.warn('[LogoMigration] Aucun traitement annexe requis ou table non initialisée:', cErr);
       }

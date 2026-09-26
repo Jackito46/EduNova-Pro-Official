@@ -3,7 +3,7 @@ import { UserRole, UserProfile } from '../types';
 import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorage } from '../supabase';
 import { AuditLogger } from '../utils/auditLogger';
 import { normalizeIdentifier, containsSuspiciousPattern, validateCredentialsSanity } from '../utils/authHelpers';
-import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
@@ -27,12 +27,44 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authStep, setAuthStep] = useState(1);
   const [error, setError] = useState<string | null>(null);
+  const [sessionNotice, setSessionNotice] = useState<string | null>(null);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
   const [resetSent, setResetSent] = useState(false);
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [securitySettings, setSecuritySettings] = useState({ maxFailedAttempts: 3, lockoutDurationMinutes: 10 });
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  // Helper to distinguish normal security inactivity timeout from actual account lockout
+  const isInactivityNotice = (msg?: string | null): boolean => {
+    if (!msg) return false;
+    const lower = msg.toLowerCase();
+    return lower.includes('inactivité') || 
+           lower.includes('session a expiré') || 
+           lower.includes('session expirée') || 
+           lower.includes('déconnexion automatique') ||
+           lower.includes('période d\'inactivité');
+  };
+
+  const isLockoutError = (msg?: string | null): boolean => {
+    if (!msg) return false;
+    const lower = msg.toLowerCase();
+    return lower.includes('bloqué') || 
+           lower.includes('trop de tentatives') || 
+           lower.includes('tentatives infructueuses') || 
+           lower.includes('tentative(s) avant la désactivation') || 
+           lower.includes('désactivé suite à');
+  };
+
+  const isNetworkError = (msg?: string | null): boolean => {
+    if (!msg) return false;
+    const lower = msg.toLowerCase();
+    return lower.includes('connexion') || 
+           lower.includes('réseau') || 
+           lower.includes('timeout') || 
+           lower.includes('délai d\'attente') || 
+           lower.includes('offline');
+  };
 
   useEffect(() => {
     let stepInterval: NodeJS.Timeout;
@@ -49,9 +81,22 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
 
   React.useEffect(() => {
     try {
+      // Check for explicit gentle session notice
+      const storedNotice = window.sessionStorage.getItem('edunova_login_notice');
+      if (storedNotice) {
+        setSessionNotice(storedNotice);
+        window.sessionStorage.removeItem('edunova_login_notice');
+      }
+
+      // Check stored error
       const storedError = window.sessionStorage.getItem('edunova_login_error');
       if (storedError) {
-        setError(storedError);
+        if (isInactivityNotice(storedError)) {
+          // If it was just an inactivity timeout, treat it as a reassuring session notice, NOT an error!
+          setSessionNotice(storedError);
+        } else {
+          setError(storedError);
+        }
         window.sessionStorage.removeItem('edunova_login_error');
       }
     } catch (e) {}
@@ -546,6 +591,45 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
               </motion.div>
             )}
 
+            {/* Reassuring Session Inactivity / Security Notice */}
+            <AnimatePresence mode="wait">
+              {sessionNotice && (
+                <motion.div 
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mb-5"
+                >
+                  <div className="p-3.5 bg-blue-50/90 border border-blue-200/90 rounded-xl flex items-start gap-3 shadow-2xs">
+                    <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0 mt-0.5">
+                      <Clock size={16} className="stroke-[2.2]" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-black text-blue-950 tracking-tight">
+                          Déconnexion automatique de sécurité
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setSessionNotice(null)}
+                          className="p-1 text-blue-400 hover:text-blue-700 hover:bg-blue-100 rounded-md transition-colors cursor-pointer"
+                          title="Fermer ce message"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                      <p className="text-[11.5px] text-blue-900 font-medium leading-relaxed mt-1">
+                        {sessionNotice}
+                      </p>
+                      <p className="text-[10.5px] text-blue-700/80 font-normal mt-1">
+                        Vos données et vos droits sont intacts. Veuillez simplement saisir votre mot de passe pour reprendre votre travail.
+                      </p>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             {/* Error Message */}
             <AnimatePresence mode="wait">
               {error && (
@@ -555,63 +639,85 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                   exit={{ opacity: 0, height: 0 }}
                   className="mb-5"
                 >
-                  <div className="p-3.5 bg-rose-50 border border-rose-100 rounded-xl flex flex-col gap-2.5">
+                  <div className="p-3.5 bg-rose-50 border border-rose-200/90 rounded-xl flex flex-col gap-2">
                     <div className="flex items-start gap-2.5">
-                      <AlertCircle className="text-rose-500 shrink-0 mt-0.5" size={16} />
-                      <div className="flex-1">
-                        <p className="text-rose-700 text-xs font-bold leading-normal">{error}</p>
-                        
-                        <div className="flex flex-wrap items-center gap-2 mt-2.5">
-                          {/* Auto-Unlock / Reset password by Email Button */}
-                          <button 
+                      <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={16} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-rose-900 text-xs font-black leading-snug">
+                            {isLockoutError(error) ? "Accès temporairement restreint" : "Erreur d'authentification"}
+                          </p>
+                          <button
                             type="button"
-                            onClick={() => {
-                              setIsForgotPassword(true);
-                              setError(null);
-                              if (email) {
-                                handleResetPassword(undefined, email);
-                              }
-                            }}
-                            className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
+                            onClick={() => setError(null)}
+                            className="p-1 text-rose-400 hover:text-rose-700 hover:bg-rose-100 rounded-md transition-colors cursor-pointer"
+                            title="Fermer ce message"
                           >
-                            <Mail size={13} />
-                            <span>Débloquer par email</span>
-                          </button>
-
-                          <button 
-                            type="button"
-                            onClick={() => {
-                              try {
-                                clearFailedAttempts(email);
-                                setError(null);
-                                window.localStorage.removeItem(getAttemptsKey(email));
-                              } catch(e) {}
-                            }}
-                            className="text-[10px] uppercase tracking-widest font-black text-rose-800 hover:text-rose-900 bg-white/70 px-2 py-1 rounded-md cursor-pointer transition-colors"
-                          >
-                            Réinitialiser
-                          </button>
-                          
-                          {isRefreshTokenError(error) && (
-                            <button 
-                              type="button"
-                              onClick={() => { clearAuthStorage(); window.location.reload(); }}
-                              className="text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/70 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
-                            >
-                              Réparer Session
-                            </button>
-                          )}
-
-                          <button 
-                            type="button"
-                            onClick={testConnection}
-                            disabled={isTestingConnection}
-                            className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/70 px-2.5 py-1 rounded-md disabled:opacity-50 cursor-pointer transition-colors"
-                          >
-                            {isTestingConnection ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
-                            Tester
+                            <X size={13} />
                           </button>
                         </div>
+                        <p className="text-rose-700 text-xs font-medium leading-normal mt-0.5">{error}</p>
+                        
+                        {/* Action buttons ONLY shown when relevant */}
+                        {(isLockoutError(error) || isRefreshTokenError(error) || isNetworkError(error)) && (
+                          <div className="flex flex-wrap items-center gap-2 mt-2.5 pt-2 border-t border-rose-100">
+                            {/* Auto-Unlock / Reset password by Email Button ONLY on actual lockouts */}
+                            {isLockoutError(error) && (
+                              <>
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    setIsForgotPassword(true);
+                                    setError(null);
+                                    if (email) {
+                                      handleResetPassword(undefined, email);
+                                    }
+                                  }}
+                                  className="inline-flex items-center gap-1.5 text-[11px] font-bold text-white bg-indigo-600 hover:bg-indigo-700 px-3 py-1.5 rounded-lg shadow-sm transition-all cursor-pointer"
+                                >
+                                  <Mail size={13} />
+                                  <span>Débloquer par email</span>
+                                </button>
+
+                                <button 
+                                  type="button"
+                                  onClick={() => {
+                                    try {
+                                      clearFailedAttempts(email);
+                                      setError(null);
+                                      window.localStorage.removeItem(getAttemptsKey(email));
+                                    } catch(e) {}
+                                  }}
+                                  className="text-[10px] uppercase tracking-widest font-black text-rose-800 hover:text-rose-900 bg-white/80 border border-rose-200 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                                >
+                                  Réinitialiser
+                                </button>
+                              </>
+                            )}
+                            
+                            {isRefreshTokenError(error) && (
+                              <button 
+                                type="button"
+                                onClick={() => { clearAuthStorage(); window.location.reload(); }}
+                                className="text-[10px] uppercase tracking-widest font-black text-indigo-700 hover:text-indigo-800 bg-white/80 border border-indigo-200 px-2.5 py-1 rounded-md cursor-pointer transition-colors"
+                              >
+                                Réparer Session
+                              </button>
+                            )}
+
+                            {isNetworkError(error) && (
+                              <button 
+                                type="button"
+                                onClick={testConnection}
+                                disabled={isTestingConnection}
+                                className="flex items-center gap-1 text-[10px] uppercase tracking-widest font-black text-slate-700 hover:text-slate-900 bg-white/80 border border-slate-200 px-2.5 py-1 rounded-md disabled:opacity-50 cursor-pointer transition-colors"
+                              >
+                                {isTestingConnection ? <Loader2 size={10} className="animate-spin" /> : <Wifi size={10} />}
+                                Tester Connexion
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

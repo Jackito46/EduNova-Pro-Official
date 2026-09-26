@@ -79,6 +79,7 @@ import { isAutonomousAccount } from '../utils/autonomousAdminGuard';
 import Logo from './Logo';
 import { useSchool } from '../contexts/SchoolContext';
 import { LogoStorageMigrationService } from '../services/logoStorageMigrationService';
+import { ImageOptimizationService } from '../services/imageOptimizationService';
 import SessionManager from './SessionManager';
 import { 
   DocumentDefinition, 
@@ -259,6 +260,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   } | null>(null);
 
   // States for clearing school data
+  const [showExternalLogoInput, setShowExternalLogoInput] = useState(false);
   const [isCleanModalOpen, setIsCleanModalOpen] = useState(false);
   const [confirmSchoolName, setConfirmSchoolName] = useState('');
   const [confirmUserEmail, setConfirmUserEmail] = useState('');
@@ -422,71 +424,61 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     }
   };
 
-  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Remove harsh 2MB limit, since we are compressing it anyway, but keep a reasonable limit (e.g. 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("L'image est trop lourde. Veuillez choisir un fichier de moins de 10 Mo.");
+    if (file.size > 15 * 1024 * 1024) {
+      toast.error("L'image sélectionnée est trop volumineuse. Veuillez choisir un fichier de moins de 15 Mo.");
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        // Redimensionnement et compression
-        const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 256;
-        const MAX_HEIGHT = 256;
-        let width = img.width;
-        let height = img.height;
+    toast.loading("Optimisation et compression du logo...", { id: 'logo-upload' });
 
-        if (width > height) {
-          if (width > MAX_WIDTH) {
-            height *= MAX_WIDTH / width;
-            width = MAX_WIDTH;
-          }
-        } else {
-          if (height > MAX_HEIGHT) {
-            width *= MAX_HEIGHT / height;
-            height = MAX_HEIGHT;
-          }
+    try {
+      // 1. Compression et redimensionnement strict côté client
+      const optResult = await ImageOptimizationService.optimizeImage(file, {
+        maxWidth: ImageOptimizationService.DEFAULT_LOGO_MAX_WIDTH,
+        maxHeight: ImageOptimizationService.DEFAULT_LOGO_MAX_HEIGHT,
+        quality: ImageOptimizationService.DEFAULT_QUALITY,
+        targetFormat: 'image/webp'
+      });
+
+      const origSizeStr = ImageOptimizationService.formatBytes(optResult.originalSizeBytes);
+      const compSizeStr = ImageOptimizationService.formatBytes(optResult.compressedSizeBytes);
+
+      // 2. Upload optimisé direct vers Supabase Storage si school_id disponible
+      if (user.school_id) {
+        toast.loading(`Téléversement du logo optimisé (${compSizeStr})...`, { id: 'logo-upload' });
+        const uploadRes = await LogoStorageMigrationService.uploadLogoBlob(user.school_id, optResult.blob, 'school');
+        
+        if (uploadRes.success && uploadRes.publicUrl) {
+          setSchoolData({ ...schoolData, logo_url: uploadRes.publicUrl });
+          localStorage.setItem(`school_logo_${user.school_id}`, uploadRes.publicUrl);
+          toast.success(
+            `Logo optimisé et sauvegardé (${origSizeStr} ➔ ${compSizeStr}, -${optResult.savingsPercent}%) !`,
+            { id: 'logo-upload', duration: 4000 }
+          );
+          return;
         }
+      }
 
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        if (!ctx) return;
-
-        ctx.drawImage(img, 0, 0, width, height);
-
-        // Upload optimisé direct vers Supabase Storage (CDN public)
-        canvas.toBlob(async (blob) => {
-          if (blob && user.school_id) {
-            toast.loading("Téléversement du logo vers Supabase Storage (CDN)...", { id: 'logo-upload' });
-            const uploadRes = await LogoStorageMigrationService.uploadLogoBlob(user.school_id, blob, 'school');
-            if (uploadRes.success && uploadRes.publicUrl) {
-              setSchoolData({ ...schoolData, logo_url: uploadRes.publicUrl });
-              localStorage.setItem(`school_logo_${user.school_id}`, uploadRes.publicUrl);
-              toast.success("Logo hébergé sur Supabase Storage avec succès (0 Ko dans SQL) ! N'oubliez pas d'enregistrer.", { id: 'logo-upload' });
-              return;
-            }
-          }
-          // Fallback local WebP compressé
-          const compressedBase64 = canvas.toDataURL('image/webp', 0.8);
-          setSchoolData({ ...schoolData, logo_url: compressedBase64 });
-          localStorage.setItem(`school_logo_${user.school_id}`, compressedBase64);
-          toast.success("Logo compressé et préparé localement. N'oubliez pas d'enregistrer.", { id: 'logo-upload' });
-        }, 'image/webp', 0.85);
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.onerror = () => {
-      toast.error("Erreur lors de la lecture du fichier.");
-    };
-    reader.readAsDataURL(file);
+      // 3. Fallback WebP compressé local
+      setSchoolData({ ...schoolData, logo_url: optResult.dataUrl });
+      if (user.school_id) {
+        localStorage.setItem(`school_logo_${user.school_id}`, optResult.dataUrl);
+      }
+      toast.success(
+        `Logo compressé localement (${origSizeStr} ➔ ${compSizeStr}, -${optResult.savingsPercent}%) ! N'oubliez pas d'enregistrer.`,
+        { id: 'logo-upload', duration: 4000 }
+      );
+    } catch (err: any) {
+      console.error("Erreur lors de l'optimisation du logo:", err);
+      toast.error(err.message || "Erreur lors de l'optimisation du fichier image.", { id: 'logo-upload' });
+    } finally {
+      // Reset input value so re-selecting same file works
+      e.target.value = '';
+    }
   };
 
 
@@ -2290,54 +2282,88 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                          <p className="text-[10px] sm:text-[11px] text-slate-600 font-medium italic">Format carré (PNG ou JPG), max 2 Mo.</p>
                        </div>
                        
-                       <div className="flex flex-wrap gap-1.5">
+                       <div className="flex flex-wrap items-center gap-1.5">
                          <button 
                            type="button" 
                            onClick={() => document.getElementById('logo-upload')?.click()}
-                           className="px-2.5 py-1 bg-slate-900 text-white text-[11px] font-bold rounded-lg transition-all hover:bg-black shadow-2xs flex items-center gap-1.5 active:scale-95"
+                           className="px-2.5 py-1 bg-slate-900 text-white text-[11px] font-bold rounded-lg transition-all hover:bg-black shadow-2xs flex items-center gap-1.5 active:scale-95 cursor-pointer"
                          >
-                           <Upload size={12} /> Changer le logo
+                           <Upload size={12} /> {schoolData.logo_url ? 'Changer le logo' : 'Importer un logo'}
                          </button>
                          {schoolData.logo_url && (
                            <button 
                              type="button" 
-                             onClick={() => setSchoolData({...schoolData, logo_url: null})}
-                             className="px-2.5 py-1 bg-rose-50 text-rose-700 text-[11px] font-bold rounded-lg transition-all hover:bg-rose-100 flex items-center gap-1.5 active:scale-95"
+                             onClick={() => {
+                               setSchoolData({...schoolData, logo_url: null});
+                               if (user.school_id) localStorage.removeItem(`school_logo_${user.school_id}`);
+                             }}
+                             className="px-2.5 py-1 bg-rose-50 text-rose-700 text-[11px] font-bold rounded-lg transition-all hover:bg-rose-100 flex items-center gap-1.5 active:scale-95 cursor-pointer border border-rose-200/60"
                            >
                              <Trash2 size={12} /> Supprimer
                            </button>
                          )}
+                         <button
+                           type="button"
+                           onClick={() => setShowExternalLogoInput(!showExternalLogoInput)}
+                           className="px-2 py-1 text-[10.5px] font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-all flex items-center gap-1 cursor-pointer"
+                           title="Lier via une adresse web externe"
+                         >
+                           <LinkIcon size={11} />
+                           <span>{showExternalLogoInput ? 'Masquer lien web' : 'Lier URL web'}</span>
+                         </button>
                        </div>
-                       
-                       <div className="relative group">
-                         <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-500 group-focus-within:text-blue-600 transition-colors">
-                           <LinkIcon size={12} />
-                         </div>
-                         <input 
-                           type="text" 
-                           placeholder="OU coller l'URL de votre logo ici..."
-                           className="w-full pl-7.5 pr-8 py-1.5 bg-white border border-slate-300 text-slate-900 font-semibold text-xs rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400 placeholder:font-normal placeholder:italic transition-all font-mono shadow-2xs selection:bg-blue-600 selection:text-white"
-                           value={schoolData.logo_url && !schoolData.logo_url.startsWith('data:') ? schoolData.logo_url : ''}
-                           onChange={e => setSchoolData({...schoolData, logo_url: e.target.value})}
-                         />
-                         {schoolData.logo_url && !schoolData.logo_url.startsWith('data:') && (
-                           <button
-                             type="button"
-                             onClick={() => setSchoolData({...schoolData, logo_url: ''})}
-                             className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-                             title="Effacer l'URL"
-                           >
-                             <X size={13} />
-                           </button>
-                         )}
-                       </div>
-                       {schoolData.logo_url && schoolData.logo_url.startsWith('data:') && (
-                         <div className="flex items-center gap-1.5 text-[10px] text-emerald-700 font-bold bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/60 w-fit mt-1">
-                           <Check size={11} className="text-emerald-600" />
-                           <span>Logo importé via fichier local</span>
+
+                       {/* Status Badges - completely concealing internal Supabase storage URLs */}
+                       {Boolean(schoolData.logo_url && (schoolData.logo_url.includes('supabase.co') || schoolData.logo_url.includes('/storage/v1/object/') || schoolData.logo_url.includes('data_logos'))) && (
+                         <div className="flex items-center gap-1.5 text-[10.5px] text-indigo-700 font-bold bg-indigo-50/90 px-2.5 py-1 rounded-lg border border-indigo-200/70 w-fit shadow-2xs">
+                           <ShieldCheck size={13} className="text-indigo-600 shrink-0" />
+                           <span>Logo officiel actif • Hébergé sur le Cloud Sécurisé</span>
                          </div>
                        )}
-                     </div>
+
+                       {Boolean(schoolData.logo_url && schoolData.logo_url.startsWith('data:')) && (
+                         <div className="flex items-center gap-1.5 text-[10.5px] text-emerald-700 font-bold bg-emerald-50/90 px-2.5 py-1 rounded-lg border border-emerald-200/70 w-fit shadow-2xs">
+                           <Check size={12} className="text-emerald-600 shrink-0" />
+                           <span>Logo importé via fichier local • Prêt à être enregistré</span>
+                         </div>
+                       )}
+
+                       {/* Optional External URL Input (only shown when requested or if an external non-storage URL is set) */}
+                       {(showExternalLogoInput || (schoolData.logo_url && !schoolData.logo_url.startsWith('data:') && !schoolData.logo_url.includes('supabase.co') && !schoolData.logo_url.includes('/storage/'))) && (
+                         <div className="relative group pt-0.5">
+                           <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none text-slate-400 group-focus-within:text-blue-600 transition-colors">
+                             <LinkIcon size={12} />
+                           </div>
+                           <input 
+                             type="text" 
+                             placeholder="https://mon-etablissement.com/logo.png"
+                             className="w-full pl-7.5 pr-8 py-1.5 bg-white border border-slate-300 text-slate-900 font-medium text-xs rounded-lg outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 placeholder:text-slate-400 placeholder:italic transition-all font-mono shadow-2xs"
+                             value={
+                               schoolData.logo_url && 
+                               !schoolData.logo_url.startsWith('data:') && 
+                               !schoolData.logo_url.includes('supabase.co') && 
+                               !schoolData.logo_url.includes('/storage/') 
+                                 ? schoolData.logo_url 
+                                 : ''
+                             }
+                             onChange={e => {
+                               const val = e.target.value.trim();
+                               setSchoolData({...schoolData, logo_url: val || null});
+                             }}
+                           />
+                           {schoolData.logo_url && !schoolData.logo_url.startsWith('data:') && !schoolData.logo_url.includes('supabase.co') && !schoolData.logo_url.includes('/storage/') && (
+                             <button
+                               type="button"
+                               onClick={() => setSchoolData({...schoolData, logo_url: null})}
+                               className="absolute inset-y-0 right-0 pr-2 flex items-center text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                               title="Effacer l'URL"
+                             >
+                               <X size={13} />
+                             </button>
+                           )}
+                         </div>
+                       )}
+ "                    </div>
                    </div>
                  </div>
                </div>

@@ -1044,7 +1044,7 @@ const App: React.FC = () => {
       isWarningShowing.current = true;
       setShowInactivityWarning(false);
       try {
-        window.sessionStorage.setItem('edunova_login_error', "Votre session a expiré suite à une période d'inactivité prolongée.");
+        window.sessionStorage.setItem('edunova_login_notice', "Votre session a été fermée automatiquement pour des raisons de sécurité suite à une période d'inactivité prolongée.");
       } catch (e) {}
       purgeSystemState();
     };
@@ -1372,7 +1372,7 @@ const App: React.FC = () => {
               </div>
             </div>
 
-            <h2 className="text-xl font-bold text-slate-900 mb-1.5">Session expirée imminente</h2>
+            <h2 className="text-xl font-bold text-slate-900 mb-1.5">Expiration imminente de la session</h2>
             <p className="text-xs sm:text-sm text-slate-500 mb-4 leading-relaxed">
               Pour des raisons de sécurité, votre session sera automatiquement fermée suite à une inactivité prolongée.
             </p>
