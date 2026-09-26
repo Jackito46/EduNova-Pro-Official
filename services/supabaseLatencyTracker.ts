@@ -12,6 +12,209 @@ const getSupabaseConfig = () => {
   return { supabaseUrl: envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl, supabaseAnonKey: anonKey };
 };
 
+export interface PostgRestBadge {
+  label: string;
+  type: 'filter' | 'limit' | 'select' | 'role' | 'auth' | 'info';
+}
+
+export interface PostgRestExplanation {
+  humanAction: string;       // Libellé fonctionnel explicite en français
+  tableNameFr: string;       // Nom français de la table (ex: "Élèves & Inscriptions")
+  summary: string;           // Résumé clair de l'opération
+  badges: PostgRestBadge[];  // Paramètres clés décodés
+  cleanUrl: string;          // Chemin URL propre décodé sans %2C
+  rawQuery: string;          // Paramètres bruts
+}
+
+export const SUPABASE_TABLE_NAMES_FR: Record<string, string> = {
+  profiles: 'Utilisateurs & Profils',
+  schools: 'Identité Établissement',
+  school_campuses: 'Campus & Annexes',
+  students: 'Élèves & Inscriptions',
+  classes: 'Classes & Salles',
+  academic_years: 'Sessions & Années Scolaires',
+  payments: 'Paiements & Trésorerie',
+  fee_types: 'Grille Tarifaire & Frais',
+  student_fees: 'Échéanciers Frais',
+  ai_credits_usage: 'Consommation Crédits IA',
+  courses: 'Matières & Cours',
+  attendance: 'Assiduité & Présences',
+  grades: 'Notes & Bulletins',
+  salaries: 'Salaires & Rémunérations',
+  inventory: 'Matériel & Stocks',
+  health_ping: 'Santé Serveur Auth',
+  auth: 'Authentification JWT',
+  storage: 'Stockage Fichiers (Cloud)',
+  edge_functions: 'Fonction Serveur (Edge)',
+  rest: 'Table Supabase'
+};
+
+/**
+ * Traduit une URL PostgREST technique en action métier limpide pour les Super Admins
+ */
+export function explainPostgRestQuery(urlStr: string, method: string = 'GET', table: string = 'other'): PostgRestExplanation {
+  const m = (method || 'GET').toUpperCase();
+  const tableNameFr = SUPABASE_TABLE_NAMES_FR[table] || (table && table !== 'other' && table !== 'rest' ? `Table ${table}` : 'Données');
+
+  let cleanUrl = urlStr;
+  let rawQuery = '';
+  const badges: PostgRestBadge[] = [];
+  let humanAction = '';
+  let summary = '';
+
+  try {
+    const parsed = new URL(urlStr, typeof window !== 'undefined' ? window.location.origin : 'http://localhost');
+    rawQuery = parsed.search;
+
+    const select = parsed.searchParams.get('select');
+    const limit = parsed.searchParams.get('limit');
+    const order = parsed.searchParams.get('order');
+
+    // Clean URL representation without ugly %2C
+    const decodedSearch = decodeURIComponent(parsed.search)
+      .replace(/&/g, ' & ')
+      .replace(/\?/g, '? ');
+    cleanUrl = `${parsed.pathname}${decodedSearch ? ' ' + decodedSearch : ''}`;
+
+    // 1. Analyze Specific Endpoints
+    if (parsed.pathname.includes('/auth/v1/health')) {
+      humanAction = "Contrôle d'état réseau (Santé Authentification)";
+      summary = "Vérification en direct que le service d'authentification Supabase répond normalement.";
+      badges.push({ label: 'Ping Santé Auth', type: 'auth' }, { label: 'Sans SQL', type: 'info' });
+      return { humanAction, tableNameFr: 'Serveur Authentification', summary, badges, cleanUrl, rawQuery };
+    }
+
+    if (parsed.pathname.includes('/storage/v1/')) {
+      humanAction = "Stockage Cloud (Logos, Médias ou Documents)";
+      summary = "Accès aux fichiers statiques hébergés sur les buckets de stockage Supabase.";
+      badges.push({ label: 'Fichiers Cloud', type: 'info' });
+      return { humanAction, tableNameFr: 'Supabase Storage', summary, badges, cleanUrl, rawQuery };
+    }
+
+    if (parsed.pathname.includes('/rest/v1/rpc/')) {
+      const funcName = parsed.pathname.split('/rpc/')[1]?.split('?')[0] || 'fonction';
+      humanAction = `Exécution de la procédure SQL « ${funcName} »`;
+      summary = `Appel d'une fonction distante personnalisée (RPC) sur la base de données PostgreSQL.`;
+      badges.push({ label: `Procédure: ${funcName}`, type: 'filter' });
+      return { humanAction, tableNameFr: 'Fonction RPC', summary, badges, cleanUrl, rawQuery };
+    }
+
+    // 2. Decode Filters from query params
+    parsed.searchParams.forEach((val, key) => {
+      if (key === 'select' || key === 'apikey' || key === 'limit' || key === 'order') return;
+
+      let op = '=';
+      let valClean = val;
+      if (val.startsWith('eq.')) { op = '='; valClean = val.slice(3); }
+      else if (val.startsWith('neq.')) { op = '≠'; valClean = val.slice(4); }
+      else if (val.startsWith('gt.')) { op = '>'; valClean = val.slice(3); }
+      else if (val.startsWith('gte.')) { op = '≥'; valClean = val.slice(4); }
+      else if (val.startsWith('lt.')) { op = '<'; valClean = val.slice(3); }
+      else if (val.startsWith('lte.')) { op = '≤'; valClean = val.slice(4); }
+      else if (val.startsWith('ilike.')) { op = 'contient'; valClean = val.slice(6); }
+      else if (val.startsWith('in.')) { op = 'parmi'; valClean = val.slice(3); }
+      else if (val.startsWith('is.')) { op = 'est'; valClean = val.slice(3); }
+
+      if (valClean.length > 18 && valClean.includes('-')) {
+        valClean = valClean.slice(0, 8) + '…';
+      }
+
+      let keyFr = key;
+      if (key === 'school_id') keyFr = 'École';
+      else if (key === 'id') keyFr = 'ID';
+      else if (key === 'is_active') keyFr = 'Actif';
+      else if (key === 'status') keyFr = 'Statut';
+      else if (key === 'user_id') keyFr = 'Utilisateur';
+
+      badges.push({ label: `${keyFr} ${op} ${valClean}`, type: 'filter' });
+    });
+
+    // 3. Limit & Select badges
+    if (limit) {
+      badges.push({ label: `Limite: ${limit} ligne${Number(limit) > 1 ? 's' : ''}`, type: 'limit' });
+    }
+
+    if (select) {
+      const decodedSelect = decodeURIComponent(select);
+      if (decodedSelect === '*') {
+        badges.push({ label: 'Tous les champs (*)', type: 'select' });
+      } else if (decodedSelect === 'id') {
+        badges.push({ label: 'ID seul (test présence)', type: 'select' });
+      } else if (decodedSelect.includes('role') || decodedSelect.includes('session')) {
+        badges.push({ label: 'Droits & Session', type: 'role' });
+      }
+    }
+
+    // 4. Construct Human Action
+    if (m === 'GET') {
+      if (select === 'id' && limit === '1') {
+        humanAction = `Sonde de présence (${tableNameFr})`;
+        summary = `Vérification ultra-rapide si la table contient au moins un enregistrement (optimisé pour la latence).`;
+      } else if (table === 'profiles' && select && (select.includes('role') || select.includes('current_session_id'))) {
+        humanAction = `Contrôle de session & autorisations (Droits Super Admin)`;
+        summary = `Vérification de l'intégrité de la session connectée et des permissions administrateur.`;
+      } else if (table === 'schools' && limit === '1' && select === 'id') {
+        humanAction = `Vérification d'existence de l'établissement`;
+        summary = `Contrôle de présence de l'école active dans la base de données.`;
+      } else if (table === 'schools') {
+        humanAction = `Chargement de la configuration de l'établissement`;
+        summary = `Récupération des métadonnées, logos et paramètres officiels de l'école.`;
+      } else if (table === 'ai_credits_usage') {
+        humanAction = `Consultation du solde & suivi des crédits IA`;
+        summary = `Interrogation du compteur de consommation d'intelligence artificielle de l'établissement.`;
+      } else if (table === 'students') {
+        humanAction = limit === '1' 
+          ? `Vérification de présence d'élèves enregistrés` 
+          : `Consultation de la liste des élèves`;
+        summary = `Requête de lecture sur le registre des inscriptions d'élèves.`;
+      } else if (table === 'payments') {
+        humanAction = limit === '1' 
+          ? `Contrôle d'activité des paiements` 
+          : `Consultation des transactions et reçus de caisse`;
+        summary = `Lecture des écritures financières et paiements d'écolage.`;
+      } else if (table === 'classes') {
+        humanAction = limit === '1' 
+          ? `Contrôle d'existence des classes & divisions` 
+          : `Consultation des classes de l'école`;
+        summary = `Vérification des structures de classes associées à l'établissement.`;
+      } else if (table === 'academic_years') {
+        humanAction = limit === '1' 
+          ? `Vérification des sessions scolaires configurées` 
+          : `Consultation des années scolaires actives`;
+        summary = `Récupération du calendrier et des périodes académiques de l'école.`;
+      } else {
+        humanAction = `Consultation des données (${tableNameFr})`;
+        summary = `Lecture des enregistrements dans la table ${tableNameFr}.`;
+      }
+    } else if (m === 'PATCH' || m === 'PUT') {
+      if (table === 'profiles') {
+        humanAction = `Mise à jour du profil utilisateur ou session`;
+        summary = `Modification des attributs d'un compte (dernière connexion, session, préférences).`;
+      } else if (table === 'schools') {
+        humanAction = `Modification des paramètres de l'établissement`;
+        summary = `Enregistrement des nouvelles métadonnées ou coordonnées de l'école.`;
+      } else {
+        humanAction = `Mise à jour d'enregistrement (${tableNameFr})`;
+        summary = `Modification ciblée d'une ou plusieurs lignes dans la table ${tableNameFr}.`;
+      }
+      badges.unshift({ label: 'Écriture (Update)', type: 'info' });
+    } else if (m === 'POST') {
+      humanAction = `Création d'un nouvel enregistrement (${tableNameFr})`;
+      summary = `Insertion d'une nouvelle ligne dans la table ${tableNameFr}.`;
+      badges.unshift({ label: 'Création (Insert)', type: 'info' });
+    } else if (m === 'DELETE') {
+      humanAction = `Suppression d'enregistrement (${tableNameFr})`;
+      summary = `Effacement de données dans la table ${tableNameFr}.`;
+      badges.unshift({ label: 'Suppression (Delete)', type: 'info' });
+    }
+  } catch (e) {
+    humanAction = `${m} ${tableNameFr}`;
+    summary = `Appel de l'API Supabase sur la ressource ${table}.`;
+  }
+
+  return { humanAction, tableNameFr, summary, badges, cleanUrl, rawQuery };
+}
+
 export interface SupabaseLatencyLog {
   id: string;
   timestamp: number;
@@ -27,6 +230,7 @@ export interface SupabaseLatencyLog {
   errorMessage?: string;
   queryType: 'SELECT' | 'INSERT' | 'UPDATE' | 'DELETE' | 'RPC' | 'AUTH' | 'STORAGE' | 'OTHER';
   isIdentityQuery: boolean;
+  explanation?: PostgRestExplanation;
 }
 
 export interface TableLatencyStat {
@@ -123,8 +327,11 @@ class SupabaseLatencyTrackerService {
    * Enregistre un appel Supabase capturé
    */
   public logRequest(entry: Omit<SupabaseLatencyLog, 'id'>): SupabaseLatencyLog {
+    const explanation = entry.explanation || explainPostgRestQuery(entry.url || entry.displayEndpoint, entry.method, entry.table);
+
     const fullLog: SupabaseLatencyLog = {
       ...entry,
+      explanation,
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`
     };
 
@@ -242,12 +449,20 @@ class SupabaseLatencyTrackerService {
 
     if (filters.search) {
       const q = filters.search.toLowerCase();
-      result = result.filter(l => 
-        l.displayEndpoint.toLowerCase().includes(q) ||
-        l.table.toLowerCase().includes(q) ||
-        l.method.toLowerCase().includes(q) ||
-        (l.errorMessage && l.errorMessage.toLowerCase().includes(q))
-      );
+      result = result.filter(l => {
+        const exp = l.explanation || explainPostgRestQuery(l.url || l.displayEndpoint, l.method, l.table);
+        return (
+          l.displayEndpoint.toLowerCase().includes(q) ||
+          l.table.toLowerCase().includes(q) ||
+          l.method.toLowerCase().includes(q) ||
+          exp.humanAction.toLowerCase().includes(q) ||
+          exp.tableNameFr.toLowerCase().includes(q) ||
+          exp.summary.toLowerCase().includes(q) ||
+          exp.cleanUrl.toLowerCase().includes(q) ||
+          exp.badges.some(b => b.label.toLowerCase().includes(q)) ||
+          (l.errorMessage && l.errorMessage.toLowerCase().includes(q))
+        );
+      });
     }
 
     return result;

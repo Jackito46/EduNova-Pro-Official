@@ -33,7 +33,9 @@ import {
   SupabaseLatencyLog, 
   LatencyMetrics, 
   DiagnosticSuiteReport,
-  DiagnosticBenchmarkItem 
+  DiagnosticBenchmarkItem,
+  explainPostgRestQuery,
+  SUPABASE_TABLE_NAMES_FR 
 } from '../services/supabaseLatencyTracker';
 import { useSchool } from '../contexts/SchoolContext';
 
@@ -842,16 +844,16 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
         </div>
 
         {/* Structured Column Header for the Live Request Journal */}
-        <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3 py-2 bg-slate-100/90 border-b border-slate-200 text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
-          <div className="col-span-2">Horodatage</div>
-          <div className="col-span-3">Méthode & Table</div>
-          <div className="col-span-4">Endpoint & Paramètres PostgREST</div>
+        <div className="hidden sm:grid sm:grid-cols-12 gap-2 px-3.5 py-2.5 bg-slate-100/90 border-b border-slate-200 text-[10.5px] font-black uppercase text-slate-700 tracking-wider">
+          <div className="col-span-2">Horodatage & Méthode</div>
+          <div className="col-span-2">Table & Ressource</div>
+          <div className="col-span-5">Signification Métier & Paramètres PostgREST</div>
           <div className="col-span-1 text-center">Statut</div>
           <div className="col-span-2 text-right">Durée / Poids</div>
         </div>
 
         {/* High-Contrast Log Rows & Clear Empty States */}
-        <div className="divide-y divide-slate-100 max-h-[420px] overflow-y-auto text-xs">
+        <div className="divide-y divide-slate-100 max-h-[440px] overflow-y-auto text-xs">
           {filteredLogs.length === 0 ? (
             searchTerm || filterType !== 'all' ? (
               <div className="p-8 text-center bg-slate-50/50 space-y-3">
@@ -915,6 +917,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
             filteredLogs.map((log) => {
               const isExpanded = expandedLogId === log.id;
               const dateStr = new Date(log.timestamp).toLocaleTimeString();
+              const exp = log.explanation || explainPostgRestQuery(log.url || log.displayEndpoint, log.method, log.table);
 
               return (
                 <div 
@@ -925,42 +928,78 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                 >
                   <div 
                     onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
-                    className="p-2 sm:px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 cursor-pointer select-none"
+                    className="p-2 sm:px-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 cursor-pointer select-none"
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
-                      <span className="text-slate-600 text-[10.5px] font-mono font-semibold shrink-0">
-                        {dateStr}
-                      </span>
-
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 border ${
-                        log.method === 'GET' 
-                          ? 'bg-blue-50 text-blue-800 border-blue-200'
-                          : log.method === 'POST'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
-                          : log.method === 'PATCH' || log.method === 'PUT'
-                          ? 'bg-amber-50 text-amber-900 border-amber-200'
-                          : log.method === 'DELETE'
-                          ? 'bg-rose-50 text-rose-800 border-rose-200'
-                          : 'bg-slate-100 text-slate-800 border-slate-200'
-                      }`}>
-                        {log.method}
-                      </span>
-
-                      <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-900 text-xs font-black shrink-0 border border-slate-200">
-                        {log.table}
-                      </span>
-
-                      {log.isIdentityQuery && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 text-[9.5px] font-black shrink-0 border border-indigo-200">
-                          Identité
+                    {/* Left & Middle Block */}
+                    <div className="flex items-start sm:items-center gap-2 min-w-0 flex-1">
+                      {/* Horodatage & Method */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-slate-600 text-[10.5px] font-mono font-semibold">
+                          {dateStr}
                         </span>
-                      )}
 
-                      <span className="text-slate-800 text-xs font-mono font-medium truncate max-w-[190px] sm:max-w-xs md:max-w-md lg:max-w-lg block" title={log.displayEndpoint}>
-                        {log.displayEndpoint}
-                      </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-black shrink-0 border ${
+                          log.method === 'GET' 
+                            ? 'bg-blue-50 text-blue-800 border-blue-200'
+                            : log.method === 'POST'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : log.method === 'PATCH' || log.method === 'PUT'
+                            ? 'bg-amber-50 text-amber-900 border-amber-200'
+                            : log.method === 'DELETE'
+                            ? 'bg-rose-50 text-rose-800 border-rose-200'
+                            : 'bg-slate-100 text-slate-800 border-slate-200'
+                        }`}>
+                          {log.method}
+                        </span>
+                      </div>
+
+                      {/* Table Badge + French Table Label */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="px-2 py-0.5 rounded bg-slate-100 text-slate-900 text-xs font-black border border-slate-200" title={exp.tableNameFr}>
+                          {log.table}
+                        </span>
+
+                        {log.isIdentityQuery && (
+                          <span className="px-1.5 py-0.2 rounded-full bg-indigo-100 text-indigo-800 text-[9.5px] font-black shrink-0 border border-indigo-200">
+                            Identité
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Explicit Human Meaning & Clean PostgREST Query */}
+                      <div className="min-w-0 flex-1 space-y-0.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-slate-900 text-xs leading-snug">
+                            {exp.humanAction}
+                          </span>
+                          {/* Parameter Badges */}
+                          {exp.badges.map((b, idx) => (
+                            <span 
+                              key={idx}
+                              className={`px-1.5 py-0.2 rounded text-[9.5px] font-bold border tracking-tight ${
+                                b.type === 'limit' ? 'bg-amber-50 text-amber-800 border-amber-200/80' :
+                                b.type === 'filter' ? 'bg-indigo-50 text-indigo-800 border-indigo-200/80' :
+                                b.type === 'role' ? 'bg-purple-50 text-purple-800 border-purple-200/80' :
+                                b.type === 'auth' ? 'bg-teal-50 text-teal-800 border-teal-200/80' :
+                                'bg-slate-100 text-slate-700 border-slate-200/80'
+                              }`}
+                            >
+                              {b.label}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* Clean decoded PostgREST endpoint */}
+                        <div className="text-[10.5px] font-mono text-slate-500 truncate flex items-center gap-1.5" title={log.displayEndpoint}>
+                          <span className="text-slate-400 font-sans font-bold text-[9px] uppercase tracking-wider">PostgREST :</span>
+                          <span className="text-slate-700 bg-slate-100/80 px-1.5 py-0.2 rounded border border-slate-200 truncate font-mono">
+                            {exp.cleanUrl}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
+                    {/* Right Block (Status & Latency) */}
                     <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-center font-mono">
                       {log.bytesReceived != null && (
                         <span className="text-[10.5px] text-slate-600 font-bold">
@@ -988,14 +1027,32 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                     </div>
                   </div>
 
+                  {/* Expanded Detail Drawer with Explanations */}
                   {isExpanded && (
-                    <div className="px-3.5 py-2.5 bg-slate-900 text-slate-100 text-xs space-y-2 border-t border-slate-800 animate-in fade-in">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-indigo-400">URL Complète de la Requête :</span>
-                        <span className="text-slate-400 text-[10px] font-mono">Type : {log.queryType}</span>
+                    <div className="px-4 py-3 bg-slate-900 text-slate-100 text-xs space-y-2.5 border-t border-slate-800 animate-in fade-in">
+                      {/* Human Explanation Box */}
+                      <div className="p-2.5 bg-slate-800/80 rounded-lg border border-slate-700 space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-indigo-300 flex items-center gap-1.5">
+                            <Info size={13} className="text-indigo-400" />
+                            <span>Signification Fonctionnelle pour le Super Admin :</span>
+                          </span>
+                          <span className="text-slate-400 text-[10px] font-mono">Table : {exp.tableNameFr} ({log.table})</span>
+                        </div>
+                        <p className="text-slate-200 text-xs leading-relaxed font-sans">
+                          {exp.summary}
+                        </p>
                       </div>
-                      <div className="p-2 bg-slate-950 rounded break-all text-slate-200 font-mono text-[11px] select-all border border-slate-800 leading-relaxed">
-                        {log.url}
+
+                      {/* URL Box */}
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-indigo-400 text-[11px]">URL PostgREST Complète Décodée :</span>
+                          <span className="text-slate-400 text-[10px] font-mono">Type : {log.queryType}</span>
+                        </div>
+                        <div className="p-2 bg-slate-950 rounded break-all text-slate-200 font-mono text-[11px] select-all border border-slate-800 leading-relaxed">
+                          {log.url}
+                        </div>
                       </div>
 
                       {log.errorMessage && (
@@ -1007,7 +1064,7 @@ export const DatabaseLatencyDiagnostic: React.FC<DatabaseLatencyDiagnosticProps>
                       <div className="flex flex-wrap gap-4 text-[10.5px] text-slate-400 pt-1 font-mono">
                         <span>Horodatage : <strong className="text-slate-200">{new Date(log.timestamp).toISOString()}</strong></span>
                         <span>Durée : <strong className="text-slate-200">{log.durationMs} ms</strong></span>
-                        <span>Table : <strong className="text-slate-200">{log.table}</strong></span>
+                        <span>Méthode HTTP : <strong className="text-slate-200">{log.method}</strong></span>
                         {log.bytesReceived != null && (
                           <span>Payload : <strong className="text-slate-200">{log.bytesReceived} octets</strong></span>
                         )}
