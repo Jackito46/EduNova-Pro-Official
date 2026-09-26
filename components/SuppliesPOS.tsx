@@ -993,6 +993,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                       setStudentSearch('');
                     }}
                     placeholder={`Toutes les ${terminology.classes.toLowerCase()}...`}
+                    searchPlaceholder={`Rechercher une ${terminology.class.toLowerCase()}...`}
                     icon={GraduationCap}
                     colorScheme="indigo"
                     size="sm"
@@ -1078,7 +1079,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                       {isLoadingClassStudents || isSearchingStudent ? (
                         <div className="p-8 text-center space-y-2">
                           <Loader2 className="mx-auto animate-spin text-indigo-600" size={24} />
-                          <p className="text-xs font-bold text-slate-500">Recherche des élèves en cours...</p>
+                          <p className="text-xs font-bold text-slate-500">Recherche des {terminology.students.toLowerCase()} en cours...</p>
                         </div>
                       ) : (
                         <>
@@ -1090,9 +1091,9 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                                   <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10">
                                     <tr>
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">N°</th>
-                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Élève</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">{terminology.student}</th>
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Matricule</th>
-                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Classe</th>
+                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">{terminology.class}</th>
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Portefeuille</th>
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider text-right">Action</th>
                                     </tr>
@@ -1245,7 +1246,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                       )}
                     </div>
                     <p className="text-xs font-bold text-indigo-700 mt-0.5">
-                      Matricule: <span className="font-mono text-slate-800 font-bold">{selectedStudent.reference_number || selectedStudent.code || selectedStudent.id.substring(0,8)}</span> • Classe: <span className="font-black text-slate-900">{selectedStudent.effectiveClassName}</span>
+                      Matricule: <span className="font-mono text-slate-800 font-bold">{selectedStudent.reference_number || selectedStudent.code || selectedStudent.id.substring(0,8)}</span> • {terminology.class} : <span className="font-black text-slate-900">{selectedStudent.effectiveClassName}</span>
                     </p>
                   </div>
                 </div>
@@ -1712,7 +1713,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                   </div>
                   <p className="text-sm font-black text-slate-300">Votre panier est vide</p>
                   <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
-                    Sélectionnez un élève puis cliquez sur les articles du catalogue pour les ajouter au panier.
+                    Sélectionnez un {terminology.student.toLowerCase()} puis cliquez sur les articles du catalogue pour les ajouter au panier.
                   </p>
                 </div>
               ) : (
@@ -1839,7 +1840,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                   </label>
                   {paymentMethod === 'Portefeuille' && (
                     <span className="text-[10px] font-bold text-slate-400">
-                      Solde élève: <strong className="text-emerald-400 font-mono">{studentWallet.toLocaleString()} {paymentCurrency}</strong>
+                      Solde {terminology.student.toLowerCase()} : <strong className="text-emerald-400 font-mono">{studentWallet.toLocaleString()} {paymentCurrency}</strong>
                     </span>
                   )}
                 </div>
@@ -1916,7 +1917,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                         <Wallet size={20} />
                       </div>
                       <div>
-                        <h5 className="font-black text-white text-xs">Portefeuille de l'élève</h5>
+                        <h5 className="font-black text-white text-xs">Portefeuille de l'{terminology.student.toLowerCase()}</h5>
                         <p className="text-[11px] text-slate-400">
                           {formatStudentName(selectedStudent.last_name, selectedStudent.first_name).fullName} (#{selectedStudent.reference_number || selectedStudent.code || selectedStudent.id.substring(0,8)})
                         </p>

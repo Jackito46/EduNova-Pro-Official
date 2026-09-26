@@ -16,6 +16,7 @@ export interface SubjectSelectorPillProps {
   onSelectSubject: (subjectId: string) => void;
   labelPrefix?: string;
   allLabel?: string;
+  allSubLabel?: string;
   allowAll?: boolean;
   emptyLabel?: string;
   variant?: 'pill' | 'field' | 'compact' | 'minimal';
@@ -35,6 +36,7 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
   onSelectSubject,
   labelPrefix = 'Matière :',
   allLabel,
+  allSubLabel = 'Toutes les matières',
   allowAll = true,
   emptyLabel = 'Sélectionner une matière',
   variant = 'pill',
@@ -325,7 +327,7 @@ export const SubjectSelectorPill: React.FC<SubjectSelectorPillProps> = ({
                   {defaultAllLabel}
                 </span>
                 <span className="text-[10px] font-medium text-slate-400 block">
-                  Toutes les disciplines
+                  {allSubLabel}
                 </span>
               </div>
             </div>

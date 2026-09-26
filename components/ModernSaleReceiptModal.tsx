@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
+import { useSchool } from '../contexts/SchoolContext';
 
 export interface SaleReceiptItem {
   id?: string;
@@ -117,6 +118,7 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
   amountReceived,
   changeDue
 }) => {
+  const { terminology } = useSchool();
   // Default directly to 'thermal' as requested for Epson 80mm printer focus
   const [activeTab, setActiveTab] = useState<'thermal' | 'card' | 'invoice'>('thermal');
   const [copied, setCopied] = useState(false);
@@ -156,8 +158,8 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
       `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
       `🔖 *Ticket N° :* #${transactionRef}`,
       `📅 *Date :* ${formattedDate} à ${formattedTime}`,
-      `👤 *Acheteur / Élève :* ${studentName}`,
-      `🎓 *Classe :* ${studentClass}`,
+      `👤 *Acheteur / ${terminology.student} :* ${studentName}`,
+      `🎓 *${terminology.class} :* ${studentClass}`,
       `━━━━━━━━━━━━━━━━━━━━━━━━━━`,
       `🛒 *ARTICLES ACHETÉS :*`,
       ...items.map(item => {
@@ -266,7 +268,7 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
                 <span className="font-mono font-black text-emerald-400 truncate block">#{transactionRef}</span>
               </div>
               <div className="bg-white/5 rounded-xl p-2 border border-white/10">
-                <span className="text-[9px] uppercase font-bold text-slate-400 block">Élève / Acheteur</span>
+                <span className="text-[9px] uppercase font-bold text-slate-400 block">{terminology.student} / Acheteur</span>
                 <span className="font-black text-white truncate block">{studentName}</span>
               </div>
               <div className="bg-white/5 rounded-xl p-2 border border-white/10">
@@ -428,11 +430,11 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
 
                   <div className="space-y-0.5 text-right border-l border-dashed border-slate-300 pl-2">
                     <div>
-                      <span className="text-slate-600 uppercase text-[8px] font-bold block">Acheteur / Élève :</span>
+                      <span className="text-slate-600 uppercase text-[8px] font-bold block">Acheteur / {terminology.student} :</span>
                       <span className="font-black text-black block truncate">{studentName}</span>
                     </div>
                     <div>
-                      <span className="text-slate-600 uppercase text-[8px] font-bold block">Classe / Section :</span>
+                      <span className="text-slate-600 uppercase text-[8px] font-bold block">{terminology.class} / Section :</span>
                       <span className="font-bold text-black block truncate">{studentClass}</span>
                     </div>
                     {student?.id && (
@@ -844,7 +846,7 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
           </div>
           <div className="space-y-0.5 text-right border-l border-gray-300 pl-1.5">
             <div>
-              <p className="text-[7.5px] uppercase font-black text-gray-700">Acheteur / Élève</p>
+              <p className="text-[7.5px] uppercase font-black text-gray-700">Acheteur / {terminology.student}</p>
               <p className="font-black text-[9.5px] leading-tight">{studentName}</p>
               <p className="text-[8px] font-bold text-gray-700 italic">{studentClass}</p>
             </div>

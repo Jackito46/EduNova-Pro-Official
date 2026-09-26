@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Check, LucideIcon, Search, X, Plus } from 'lucide-react';
 
@@ -57,6 +57,26 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   const [effectiveAlign, setEffectiveAlign] = useState<'left' | 'right'>(dropdownAlign || 'left');
   const containerRef = useRef<HTMLDivElement>(null);
   const popoverRef = useRef<HTMLDivElement>(null);
+
+  const effectiveSearchPlaceholder = useMemo(() => {
+    if (searchPlaceholder) return searchPlaceholder;
+    if (placeholder && placeholder !== 'Sélectionner...') {
+      const clean = placeholder.replace(/\.\.\.$/, '').trim();
+      const lower = clean.toLowerCase();
+      if (lower.startsWith('filtrer par ')) {
+        return `Rechercher ${clean.substring(12)}...`;
+      }
+      if (lower.startsWith('toutes les ') || lower.startsWith('tous les ')) {
+        const entity = clean.replace(/^(toutes les|tous les)\s+/i, '').replace(/\s*\(\d+[^)]*\)/, '').trim();
+        return `Rechercher une ${entity.replace(/s$/, '')}...`;
+      }
+      if (lower.startsWith('sélectionner un ') || lower.startsWith('sélectionner une ')) {
+        return `Rechercher ${clean.substring(16)}...`;
+      }
+      return `Rechercher (${clean})...`;
+    }
+    return "Rechercher une option...";
+  }, [searchPlaceholder, placeholder]);
 
   const [popoverCoords, setPopoverCoords] = useState<{
     top?: number;
@@ -308,7 +328,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
                   }
                 }
               }}
-              placeholder={searchPlaceholder || "Rechercher une option..."}
+              placeholder={effectiveSearchPlaceholder}
               autoFocus
               className="w-full pl-8 pr-7 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-bold text-slate-900 placeholder:text-slate-400 outline-none focus:bg-white focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/10 transition-all"
             />

@@ -86,7 +86,7 @@ const CATEGORIES = [
 ];
 
 const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
-  const { terminology, currentCampusId, campuses } = useSchool();
+  const { school, terminology, currentCampusId, campuses } = useSchool();
   const siegeCampus = campuses?.find(
     (c) =>
       c.name.toLowerCase().includes("siège") ||
@@ -1687,11 +1687,15 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const uniqueNames = new Set<string>();
     classes.forEach(c => {
       if (c.name) {
-        uniqueNames.add(getDisciplineName(c.name));
+        if (school?.school_type === 'CLASSIC') {
+          uniqueNames.add(c.name.trim());
+        } else {
+          uniqueNames.add(getDisciplineName(c.name));
+        }
       }
     });
     return Array.from(uniqueNames).sort();
-  }, [classes, getDisciplineName]);
+  }, [classes, getDisciplineName, school?.school_type]);
 
   const [isGeneratingRecs, setIsGeneratingRecs] = useState(false);
 
@@ -1757,7 +1761,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const { error } = await supabase.from('supply_catalog').insert(recommendations);
       if (error) throw error;
 
-      toast.success(`4 articles recommandés ont été générés pour la discipline "${selectedDisciplineFilter}" !`);
+      toast.success(`4 articles recommandés ont été générés pour la ${terminology.class.toLowerCase()} "${selectedDisciplineFilter}" !`);
       fetchData();
     } catch (err: any) {
       console.error("Error generating recommendations:", err);
@@ -3420,13 +3424,14 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                    colorScheme="slate"
                    className="w-full"
                    searchable={CATEGORIES.length > 6}
+                   searchPlaceholder="Rechercher une catégorie..."
                  />
                </div>
 
                <div>
                  <SelectPill
                    options={[
-                     { value: 'Tous', label: 'Toutes les disciplines' },
+                     { value: 'Tous', label: `Toutes les ${terminology.classes.toLowerCase()}` },
                      ...disciplinesList.map(disc => ({ value: disc, label: disc }))
                    ]}
                    value={selectedDisciplineFilter}
@@ -3437,6 +3442,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                    colorScheme="slate"
                    className="w-full"
                    searchable={disciplinesList.length > 6}
+                   searchPlaceholder={`Rechercher une ${terminology.class.toLowerCase()}...`}
                  />
                </div>
 
@@ -3456,7 +3462,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                  <div className="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 mt-0.5"><Sparkles size={18} /></div>
                  <div>
                    <h4 className="font-extrabold text-sm text-slate-900">Articles Recommandés pour : {selectedDisciplineFilter}</h4>
-                   <p className="text-xs text-slate-500 mt-0.5">Aucun produit spécifique n'est configuré pour cette discipline. Vous pouvez générer un kit standard d'articles requis (Syllabus, Uniforme, Trousse & Frais techniques) en un seul clic !</p>
+                   <p className="text-xs text-slate-500 mt-0.5">Aucun produit spécifique n'est configuré pour cette {terminology.class.toLowerCase()}. Vous pouvez générer un kit standard d'articles requis (Syllabus, Uniforme, Trousse & Frais techniques) en un seul clic !</p>
                  </div>
                </div>
                <button 
@@ -3555,7 +3561,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <thead>
                          <tr className="bg-slate-50 text-[10px] font-black tracking-widest border-b border-slate-200 text-slate-400 uppercase">
                             <th className="px-6 py-4">CATÉGORIE</th>
-                            <th className="px-6 py-4">ARTICLE & PROGRAMME</th>
+                            <th className="px-6 py-4">ARTICLE & {terminology.class.toUpperCase()}</th>
                             <th className="px-6 py-4">UNITÉ</th>
                             <th className="px-6 py-4 text-right">DISPONIBILITÉ STOCK</th>
                             <th className="px-6 py-4 text-right">PRIX UNITAIRE (HTG)</th>
@@ -3576,7 +3582,7 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   </span>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 mt-1 text-[10px] font-semibold text-slate-400">
-                                    Tous programmes
+                                    Toutes les {terminology.classes.toLowerCase()}
                                   </span>
                                 )}
                              </td>
@@ -3753,12 +3759,12 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                        {/* Discipline - Style Pilule Harmonisé Feuille de Présence */}
                        <div className="space-y-1 min-w-0">
                          <label className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1">
-                           <span>Programme / Discipline</span>
+                           <span>{terminology.class} concernée</span>
                            <span className="text-slate-400 font-normal text-[10px]">(Optionnel)</span>
                          </label>
                          <SelectPill
                            options={[
-                             { value: '', label: 'Tous programmes / Général', icon: Globe },
+                             { value: '', label: `Toutes les ${terminology.classes.toLowerCase()} / Général`, icon: Globe },
                              ...disciplinesList.map(disc => ({ value: disc, label: disc, icon: GraduationCap }))
                            ]}
                            value={catalogFormData.discipline_name || ''}
@@ -3767,7 +3773,8 @@ const SuppliesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                            size="sm"
                            colorScheme="indigo"
                            searchable={disciplinesList.length > 5}
-                           placeholder="Filtrer par discipline..."
+                           searchPlaceholder={`Rechercher une ${terminology.class.toLowerCase()}...`}
+                           placeholder={`Filtrer par ${terminology.class.toLowerCase()}...`}
                            className="w-full"
                          />
                        </div>
