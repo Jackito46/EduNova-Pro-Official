@@ -931,7 +931,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 animate-in fade-in duration-300 pb-12 px-2.5 sm:px-4 md:px-0">
       {/* Header Banner - Concise, Dense & Ergonomic */}
-      <div className="bg-white p-3.5 sm:p-4 lg:p-4.5 rounded-xl shadow-xs border border-slate-200 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 relative overflow-hidden">
+      <div className="bg-white p-3.5 sm:p-4 lg:p-4.5 rounded-xl shadow-xs border border-slate-200 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3 sm:gap-4 relative overflow-hidden">
         <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-50/40 rounded-full -mr-32 -mt-32 blur-2xl pointer-events-none"></div>
         
         <div className="relative z-10 space-y-1">
@@ -982,11 +982,11 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
 
         {/* 3 Header Buttons - Dynamiquement Responsive sur Mobile, Tablette et Desktop */}
-        <div className="grid grid-cols-3 gap-1 p-1 bg-slate-100/90 rounded-xl border border-slate-200/90 relative z-10 w-full lg:w-auto lg:flex lg:items-center shadow-inner">
+        <div className="grid grid-cols-3 gap-1 sm:gap-1.5 p-1 bg-slate-100/90 rounded-xl border border-slate-200/90 relative z-10 w-full xl:w-auto xl:flex xl:items-center shadow-inner shrink-0">
           <button
             type="button"
             onClick={() => setActiveTab('form')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 lg:px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 min-h-[38px] cursor-pointer select-none ${
+            className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 xl:px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 min-h-[38px] cursor-pointer select-none ${
               activeTab === 'form' 
                 ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/90 ring-1 ring-slate-900/5' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
@@ -994,15 +994,14 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             title="Établir un acte souverain de réévaluation"
           >
             <Edit3 size={14} className={`shrink-0 ${activeTab === 'form' ? 'text-indigo-600' : 'text-slate-500'}`} /> 
-            <span className="hidden lg:inline whitespace-nowrap">Acte de Réévaluation</span>
-            <span className="hidden sm:inline lg:hidden whitespace-nowrap">Acte Rééval.</span>
+            <span className="hidden sm:inline whitespace-nowrap">Acte de Réévaluation</span>
             <span className="sm:hidden text-center truncate">Acte</span>
           </button>
           
           <button
             type="button"
             onClick={() => setActiveTab('register')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 lg:px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 min-h-[38px] cursor-pointer select-none ${
+            className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 xl:px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 min-h-[38px] cursor-pointer select-none ${
               activeTab === 'register' 
                 ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/90 ring-1 ring-slate-900/5' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
@@ -1010,8 +1009,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             title="Consulter le registre officiel et l'audit des remises"
           >
             <Award size={14} className={`shrink-0 ${activeTab === 'register' ? 'text-indigo-600' : 'text-slate-500'}`} /> 
-            <span className="hidden lg:inline whitespace-nowrap">Registre & Audit</span>
-            <span className="hidden sm:inline lg:hidden whitespace-nowrap">Registre</span>
+            <span className="hidden sm:inline whitespace-nowrap">Registre & Audit</span>
             <span className="sm:hidden text-center truncate">Registre</span>
             <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold tabular-nums shrink-0 transition-colors ${
               activeTab === 'register' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200/80 text-slate-600'
@@ -1023,7 +1021,7 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           <button
             type="button"
             onClick={() => setActiveTab('report')}
-            className={`flex items-center justify-center gap-1.5 px-2.5 sm:px-3.5 lg:px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 min-h-[38px] cursor-pointer select-none ${
+            className={`flex items-center justify-center gap-1.5 px-2 sm:px-3 xl:px-4 py-2 rounded-lg text-xs font-bold transition-all duration-150 min-h-[38px] cursor-pointer select-none ${
               activeTab === 'report' 
                 ? 'bg-white text-indigo-700 shadow-xs border border-slate-200/90 ring-1 ring-slate-900/5' 
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
@@ -1031,9 +1029,9 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             title="Grand Livre analytique et extrait officiel certifié"
           >
             <FileSpreadsheet size={14} className={`shrink-0 ${activeTab === 'report' ? 'text-indigo-600' : 'text-slate-500'}`} /> 
-            <span className="hidden xl:inline whitespace-nowrap">Grand Livre & Rapport</span>
-            <span className="hidden sm:inline xl:hidden whitespace-nowrap">Grand Livre</span>
-            <span className="sm:hidden text-center truncate">Livre</span>
+            <span className="hidden md:inline whitespace-nowrap">Grand Livre & Rapport</span>
+            <span className="hidden sm:inline md:hidden whitespace-nowrap">Grand Livre</span>
+            <span className="sm:hidden text-center truncate">Grand Livre</span>
             <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold tabular-nums shrink-0 transition-colors ${
               activeTab === 'report' ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200/80 text-slate-600'
             }`}>

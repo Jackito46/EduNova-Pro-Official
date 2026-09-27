@@ -151,10 +151,10 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
         isSpecial: true
       };
     }
-    // Sinon en HTG, ce sont les frais généraux / institutionnels annuels
+    // Sinon en HTG, ce sont les frais divers institutionnels annuels
     return {
       title: 'Frais Divers Institutionnels (Annuel Obligatoire)',
-      category: 'Frais Généraux',
+      category: 'Frais Divers',
       badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
       isSpecial: false
     };
@@ -480,11 +480,11 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                 </div>
 
-                {/* 3. Frais Divers Généraux (HTG) */}
+                {/* 3. Frais Divers Institutionnels (HTG) */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Frais Généraux</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Frais Divers</span>
                       <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">Badge & Assurance</span>
                     </div>
                     <div className="mt-1">
@@ -800,7 +800,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                       txFilter === 'DIVERS_HTG' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                     }`}
                   >
-                    Frais Généraux HTG
+                    Frais Divers HTG
                   </button>
                   <button
                     onClick={() => setTxFilter('DIVERS_USD')}

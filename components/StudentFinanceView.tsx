@@ -547,7 +547,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
               <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
                 <div>
                   <div className="border-b border-slate-100 pb-3 flex items-center justify-between mb-3.5">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Frais Divers (Généraux)</h3>
+                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Frais Divers Obligatoires</h3>
                     <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
                       Multi-Devises
                     </span>
@@ -695,7 +695,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   } else if (payment.fee_type === 'INSCRIPTION' || payment.nature === 'INSCRIPTION' || payment.nature === "Frais d'inscription") {
                     displayNature = "Frais d'inscription";
                   } else if (isMiscPayment(payment)) {
-                    displayNature = "Frais Divers (Généraux)";
+                    displayNature = "Frais Divers Obligatoires";
                   }
 
                   const isUSD = payment.currency === 'USD';
