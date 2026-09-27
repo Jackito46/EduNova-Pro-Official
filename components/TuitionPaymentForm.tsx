@@ -3443,6 +3443,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         currentExchangeRate={currentExchangeRate}
         globalDebt={globalDebt}
         academicYears={academicYears}
+        school={school}
+        campusName={selectedStudent?.campus_name || campuses?.find(c => c.id === currentCampusId)?.name}
+        campuses={campuses}
         onSelectYear={(yrId) => {
           setTargetYearId(yrId);
           if (selectedStudent) {

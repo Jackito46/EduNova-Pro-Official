@@ -295,6 +295,10 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const pastSessions = safeSessions.filter(s => !s.isCurrentSession);
   const isSolventHistory = globalDebt === 0;
 
+  // Nom de l'établissement et de l'annexe (Multi-tenant & Multi-annexe)
+  const institutionName = school?.name || school?.school_name || 'Établissement';
+  const resolvedCampusName = campusName || student?.campus_name || (campuses?.find((c: any) => c.id === (student?.campus_id || student?.class?.campus_id))?.name) || '';
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-900/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200/90 max-w-5xl w-full max-h-[92vh] flex flex-col overflow-hidden my-auto animate-in zoom-in-95 duration-200">
@@ -326,6 +330,12 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     Session {activeYear?.label || 'active'} à régulariser
                   </span>
                 )}
+                {resolvedCampusName && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 flex items-center gap-1">
+                    <Building2 size={10} />
+                    <span>Annexe : {resolvedCampusName}</span>
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap truncate">
                 <span className="font-bold text-slate-800">{studentName}</span>
@@ -333,6 +343,12 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                 <span className="font-mono text-slate-600">{studentCode}</span>
                 <span>•</span>
                 <span className="text-slate-600">{student.classe || student.class?.name || 'Classe non assignée'}</span>
+                {institutionName && (
+                  <>
+                    <span>•</span>
+                    <span className="text-slate-400 font-medium">{institutionName}</span>
+                  </>
+                )}
               </p>
             </div>
           </div>
@@ -960,7 +976,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
               </div>
 
               <div className="flex items-center justify-between pt-2 text-[11px] text-slate-400">
-                <span>Certification cryptographique & comptable École Connectée</span>
+                <span>Certification cryptographique & comptable • {institutionName}</span>
                 <span className="font-mono font-bold text-slate-600">Conforme aux registres de caisse</span>
               </div>
             </div>
@@ -971,7 +987,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
         {/* MODAL FOOTER COMPACT */}
         <div className="px-4 sm:px-6 py-2.5 sm:py-3 border-t border-slate-200 bg-slate-50 flex items-center justify-between gap-3 shrink-0">
           <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
-            Audit certifié École Connectée • {new Date().toLocaleDateString('fr-FR')}
+            Audit certifié {institutionName} {resolvedCampusName ? `(Annexe ${resolvedCampusName})` : ''} • {new Date().toLocaleDateString('fr-FR')}
           </span>
           <button
             onClick={onClose}
