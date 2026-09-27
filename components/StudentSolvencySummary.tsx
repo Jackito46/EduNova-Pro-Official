@@ -268,17 +268,19 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
 
       // 9. Calcul précis par catégorie via le moteur universel (computeFeeCategoryBalance)
       // Empêche toute résurgence de fausses dettes quand le taux de change a augmenté ultérieurement
+      const isEnrolledInTargetYear = Boolean(enrollmentRecord);
+
       const admHTG = plan ? (isReenrolled ? Number(plan.reenrollment_fee || 0) : Number(plan.inscription_fee || 0)) : 0;
       const admUSD = plan ? (isReenrolled ? Number(plan.reenrollment_fee_usd || 0) : Number(plan.inscription_fee_usd || 0)) : 0;
       const admissionBalance = computeFeeCategoryBalance(admHTG, admUSD, admissionPayments, exchangeRate);
 
-      const mHTG = (plan && plan.is_misc_mandatory) ? Number(plan.misc_fee_htg || 0) : 0;
-      const mUSD = (plan && plan.is_misc_mandatory) ? Number(plan.misc_fee_usd || 0) : 0;
+      const mHTG = (isEnrolledInTargetYear && plan && plan.is_misc_mandatory) ? Number(plan.misc_fee_htg || 0) : 0;
+      const mUSD = (isEnrolledInTargetYear && plan && plan.is_misc_mandatory) ? Number(plan.misc_fee_usd || 0) : 0;
       const miscBalance = computeFeeCategoryBalance(mHTG, mUSD, miscPayments, exchangeRate);
 
-      const tHTG = plan ? (Number(plan.tuition_fee || 0) + tuitionAddition) : tuitionAddition;
-      const tUSD = plan ? Number(plan.tuition_fee_usd || 0) : 0;
-      const tuitionBalance = computeFeeCategoryBalance(tHTG, tUSD, tuitionPayments, exchangeRate, totalDiscount);
+      const tHTG = isEnrolledInTargetYear ? (plan ? (Number(plan.tuition_fee || 0) + tuitionAddition) : tuitionAddition) : 0;
+      const tUSD = isEnrolledInTargetYear ? (plan ? Number(plan.tuition_fee_usd || 0) : 0) : 0;
+      const tuitionBalance = computeFeeCategoryBalance(tHTG, tUSD, tuitionPayments, exchangeRate, isEnrolledInTargetYear ? totalDiscount : 0);
 
       // Campagnes ad-hoc applicables
       let adHocTotalExpected = 0;

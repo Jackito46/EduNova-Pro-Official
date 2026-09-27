@@ -34,8 +34,11 @@ import {
   MessageSquare,
   Phone,
   Send,
-  Smartphone
+  Smartphone,
+  FileText,
+  X
 } from 'lucide-react';
+import { StudentDossierAuditModal, SessionAuditDetail } from './StudentDossierAuditModal';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
 import { supabase } from '../supabase';
@@ -160,6 +163,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [targetYearId, setTargetYearId] = useState<string>('');
   const [globalDebt, setGlobalDebt] = useState<number>(0);
   const [loadingDebt, setLoadingDebt] = useState(false);
+  const [dossierAuditSessions, setDossierAuditSessions] = useState<SessionAuditDetail[]>([]);
+  const [isDossierModalOpen, setIsDossierModalOpen] = useState(false);
+  const [allStudentTransactions, setAllStudentTransactions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [schoolDetails, setSchoolDetails] = useState<any>(null);
   const [cashierName, setCashierName] = useState<string>('');
@@ -603,8 +609,218 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     return () => clearTimeout(timer);
   }, [studentSearch, user?.school_id, currentCampusId]);
 
-  // 3. AUDIT GLOBAL DES DETTES (Verrouillage Administratif)
+  // 3. AUDIT APPROFONDI DU DOSSIER FINANCIER DE L'ÉLÈVE
+  const auditStudentDossierInDepth = useCallback(async (
+    studentData: any,
+    targetYearId: string,
+    currentEnrollment: any,
+    priorEnrollments: any[],
+    allPayments: any[],
+    currentPlan: any,
+    currentCampaigns: any[]
+  ) => {
+    setLoadingDebt(true);
+    try {
+      setAllStudentTransactions(allPayments || []);
+
+      // 1. Session courante / ciblée
+      const isEnrolledCurrent = Boolean(currentEnrollment);
+      const currentYearLabel = academicYears.find(y => y.id === targetYearId)?.label || activeYear?.label || 'Session Active';
+      const currentClassName = currentEnrollment?.class?.name || studentData.class?.name || (isEnrolledCurrent ? 'Classe assignée' : 'Non assignée (Régularisation)');
+      const currentLevel = currentEnrollment?.class?.level || studentData.class?.level || 'N/A';
+
+      const hasPrior = (priorEnrollments?.length || 0) > 0;
+      const curAdmDue = currentPlan 
+        ? (hasPrior ? Number(currentPlan.reenrollment_fee || 0) : Number(currentPlan.inscription_fee || 0))
+        : (isEnrolledCurrent ? 0 : 2500);
+
+      const currentSessionDetail: SessionAuditDetail = {
+        academicYearId: targetYearId,
+        academicYearLabel: currentYearLabel,
+        className: currentClassName,
+        level: currentLevel,
+        isCurrentSession: true,
+        isEnrolled: isEnrolledCurrent,
+        inscriptionDue: curAdmDue,
+        inscriptionPaid: 0,
+        inscriptionRemaining: curAdmDue,
+        inscriptionIsPaid: false,
+        miscDue: currentPlan && currentPlan.is_misc_mandatory ? Number(currentPlan.misc_fee_htg || 0) : 0,
+        miscPaid: 0,
+        miscRemaining: currentPlan && currentPlan.is_misc_mandatory ? Number(currentPlan.misc_fee_htg || 0) : 0,
+        tuitionDue: currentPlan ? Number(currentPlan.tuition_fee || 0) : 0,
+        tuitionPaid: 0,
+        tuitionRemaining: currentPlan ? Number(currentPlan.tuition_fee || 0) : 0,
+        adHocDue: 0,
+        adHocPaid: 0,
+        adHocRemaining: 0,
+        totalDue: 0,
+        totalPaid: 0,
+        remainingDebt: 0,
+        isSolvent: true
+      };
+
+      // Règle d'or : Si l'élève n'a AUCUNE inscription antérieure (0 session précédente),
+      // il ne peut en aucun cas avoir d'arriérés de sessions antérieures !
+      if (!priorEnrollments || priorEnrollments.length === 0) {
+        setGlobalDebt(0);
+        setDossierAuditSessions([currentSessionDetail]);
+        return;
+      }
+
+      // 2. Audit rigoureux et exhaustif de chaque session antérieure
+      const sessionAudits: SessionAuditDetail[] = [];
+      let cumulativePastDebt = 0;
+
+      for (const enr of priorEnrollments) {
+        const yearLabel = enr.academic_year?.label || 'Session Antérieure';
+        const clsName = enr.class?.name || 'Classe Historique';
+        const lvl = enr.class?.level || 'N/A';
+
+        // Plan tarifaire de la session passée
+        let pastPlan: any = null;
+        if (enr.class_id) {
+          try {
+            const { data: pPlan } = await supabase
+              .from('fee_plans')
+              .select('*')
+              .eq('school_id', user.school_id)
+              .eq('class_id', enr.class_id)
+              .eq('academic_year_id', enr.academic_year_id)
+              .maybeSingle();
+            pastPlan = pPlan;
+            if (!pastPlan) {
+              const { data: fbPlan } = await supabase
+                .from('fee_plans')
+                .select('*')
+                .eq('school_id', user.school_id)
+                .eq('class_id', enr.class_id)
+                .limit(1)
+                .maybeSingle();
+              pastPlan = fbPlan;
+            }
+          } catch (e) {
+            console.warn("Erreur audit plan tarifaire passé:", e);
+          }
+        }
+
+        // Paiements passés pour cette session
+        const pastPayments = (allPayments || []).filter((p: any) => {
+          if (p.academic_year_id === enr.academic_year_id) return true;
+          return false;
+        }).filter((p: any) => 
+          !p.payment_method?.includes('EN ATTENTE') && 
+          !p.payment_method?.includes('REJETÉ') &&
+          p.status !== 'ANNULE'
+        );
+
+        // Frais ad-hoc passés
+        let pastAdHocDue = 0;
+        let pastAdHocPaid = 0;
+        try {
+          const { data: pastAdHocFees } = await supabase
+            .from('student_ad_hoc_fees')
+            .select('campaign_id, custom_amount, campaign:ad_hoc_campaigns(id, name, amount, currency, academic_year_id)')
+            .eq('school_id', user.school_id)
+            .eq('student_id', studentData.id);
+          
+          if (pastAdHocFees) {
+            const relevantPastAdHocs = (pastAdHocFees as any[]).filter((f: any) => {
+              const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
+              return camp?.academic_year_id === enr.academic_year_id;
+            });
+            for (const f of relevantPastAdHocs) {
+              const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
+              const cAmt = (f.custom_amount !== null && f.custom_amount !== undefined) ? Number(f.custom_amount) : Number(camp?.amount || 0);
+              const cCurr = camp?.currency || 'HTG';
+              const dueHTG = cCurr === 'USD' ? cAmt * (currentExchangeRate || 135) : cAmt;
+              pastAdHocDue += dueHTG;
+            }
+          }
+        } catch (e) {}
+
+        const pastAdmHTG = pastPlan ? Number(pastPlan.inscription_fee || pastPlan.reenrollment_fee || 0) : 0;
+        const pastAdmUSD = pastPlan ? Number(pastPlan.inscription_fee_usd || pastPlan.reenrollment_fee_usd || 0) : 0;
+        const pastMiscHTG = pastPlan && pastPlan.is_misc_mandatory ? Number(pastPlan.misc_fee_htg || 0) : 0;
+        const pastMiscUSD = pastPlan && pastPlan.is_misc_mandatory ? Number(pastPlan.misc_fee_usd || 0) : 0;
+        const pastTuitionDiscount = Number(enr.tuition_discount || 0);
+        const pastTuitionAddition = Number(enr.tuition_addition || 0);
+        const pastStudentDiscount = Number(studentData.discount_amount || 0);
+        const pastTotalDiscount = pastTuitionDiscount + pastStudentDiscount;
+        const pastTuitionHTG = pastPlan ? (Number(pastPlan.tuition_fee || 0) + pastTuitionAddition) : pastTuitionAddition;
+        const pastTuitionUSD = pastPlan ? Number(pastPlan.tuition_fee_usd || 0) : 0;
+
+        const isAdmissionPayment = (p: any) => {
+          const s = `${p.fee_type || ''} ${p.nature || ''} ${p.type || ''} ${p.description || ''}`.toLowerCase();
+          return s.includes('inscri') || s.includes('admiss') || s.includes('reinscri') || s.includes('réinscri') || s.includes('entree') || s.includes('entrée');
+        };
+        const isMiscPayment = (p: any) => {
+          const s = `${p.fee_type || ''} ${p.nature || ''} ${p.type || ''} ${p.description || ''}`.toLowerCase();
+          return s.includes('divers') || s.includes('misc');
+        };
+
+        const pastAdmPayments = pastPayments.filter(p => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
+        const pastMiscPayments = pastPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
+        const pastTuitionPayments = pastPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
+        const pastCampaignPayments = pastPayments.filter(p => !!p.ad_hoc_campaign_id);
+
+        const pastAdmBal = computeFeeCategoryBalance(pastAdmHTG, pastAdmUSD, pastAdmPayments, currentExchangeRate);
+        const pastMiscBal = computeFeeCategoryBalance(pastMiscHTG, pastMiscUSD, pastMiscPayments, currentExchangeRate);
+        const pastTuitionBal = computeFeeCategoryBalance(pastTuitionHTG, pastTuitionUSD, pastTuitionPayments, currentExchangeRate, pastTotalDiscount);
+        pastAdHocPaid = pastCampaignPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || p.amount || 0), 0);
+
+        const sessionTotalDue = pastAdmBal.effectiveDueHTG + pastMiscBal.effectiveDueHTG + pastTuitionBal.effectiveDueHTG + pastAdHocDue;
+        const sessionTotalPaid = pastAdmBal.paidHTGEquiv + pastMiscBal.paidHTGEquiv + pastTuitionBal.paidHTGEquiv + pastAdHocPaid;
+        const sessionRemaining = pastAdmBal.remainingHTGEquiv + pastMiscBal.remainingHTGEquiv + pastTuitionBal.remainingHTGEquiv + Math.max(0, pastAdHocDue - pastAdHocPaid);
+        const isSolvent = sessionRemaining <= 50;
+        const trueRemaining = isSolvent ? 0 : Math.round(sessionRemaining);
+
+        cumulativePastDebt += trueRemaining;
+
+        sessionAudits.push({
+          academicYearId: enr.academic_year_id,
+          academicYearLabel: yearLabel,
+          className: clsName,
+          level: lvl,
+          isCurrentSession: false,
+          isEnrolled: true,
+          inscriptionDue: pastAdmBal.effectiveDueHTG,
+          inscriptionPaid: pastAdmBal.paidHTGEquiv,
+          inscriptionRemaining: pastAdmBal.remainingHTGEquiv,
+          inscriptionIsPaid: pastAdmBal.isPaid,
+          miscDue: pastMiscBal.effectiveDueHTG,
+          miscPaid: pastMiscBal.paidHTGEquiv,
+          miscRemaining: pastMiscBal.remainingHTGEquiv,
+          tuitionDue: pastTuitionBal.effectiveDueHTG,
+          tuitionPaid: pastTuitionBal.paidHTGEquiv,
+          tuitionRemaining: pastTuitionBal.remainingHTGEquiv,
+          adHocDue: pastAdHocDue,
+          adHocPaid: pastAdHocPaid,
+          adHocRemaining: Math.max(0, pastAdHocDue - pastAdHocPaid),
+          totalDue: Math.round(sessionTotalDue),
+          totalPaid: Math.round(sessionTotalPaid),
+          remainingDebt: trueRemaining,
+          isSolvent
+        });
+      }
+
+      setDossierAuditSessions([currentSessionDetail, ...sessionAudits]);
+      setGlobalDebt(cumulativePastDebt);
+    } catch (err) {
+      console.error("Erreur lors de l'audit approfondi du dossier:", err);
+      setGlobalDebt(0);
+    } finally {
+      setLoadingDebt(false);
+    }
+  }, [user?.school_id, currentExchangeRate, academicYears, activeYear]);
+
+  // Audit global des dettes (Compatibilité & Sécurité Multi-Tenant)
   const auditGlobalSolvency = useCallback(async (studentId: string, excludeYearId?: string) => {
+    // Si l'étudiant n'a pas d'autres inscriptions, dette = 0
+    if (!selectedStudent?.otherEnrollments || selectedStudent.otherEnrollments.length === 0) {
+      setGlobalDebt(0);
+      return;
+    }
     setLoadingDebt(true);
     try {
       const { data: realDebt, error } = await supabase.rpc('get_student_global_debt', { 
@@ -619,7 +835,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     } finally {
       setLoadingDebt(false);
     }
-  }, [user?.school_id]);
+  }, [user?.school_id, selectedStudent?.otherEnrollments]);
 
   const loadStudentDetails = useCallback(async (studentId: string, yearId: string) => {
     if (!yearId) return;
@@ -1078,14 +1294,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         });
         setParentPhoneCustom(data.parent_phone || data.phone || '');
         setIsLocked(true);
-        auditGlobalSolvency(data.id, yearId);
+        auditStudentDossierInDepth(data, yearId, enrollment, otherEnrollments, allStudentPayments, plan, campaignsList);
       }
     } catch (err) {
       console.error("Load details error:", err);
     } finally {
       setLoadingDebt(false);
     }
-  }, [auditGlobalSolvency, currentExchangeRate]);
+  }, [auditStudentDossierInDepth, currentExchangeRate]);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -1358,6 +1574,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setShowWhatsAppModal(false);
     setTransactionRef('');
     setGlobalDebt(0);
+    setDossierAuditSessions([]);
+    setAllStudentTransactions([]);
+    setIsDossierModalOpen(false);
     setCurrency('HTG');
     setFeeType('SCOLARITE');
     setPaymentMethod('Cash');
@@ -2099,35 +2318,35 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-6xl mx-auto space-y-4 sm:space-y-5 animate-in fade-in duration-500 pb-12">
-      {/* Header Institutionnel Moderne */}
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200">
-        <div className="flex items-center gap-3.5">
-          <div className="p-2.5 sm:p-3 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 rounded-xl sm:rounded-2xl border border-blue-100 shadow-2xs">
-            <CreditCard size={22} className="stroke-[2.2]" />
+    <div className="max-w-6xl mx-auto space-y-3 sm:space-y-3.5 animate-in fade-in duration-300 pb-8">
+      {/* Header Institutionnel Moderne & Compact */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-3 bg-white px-4 py-3 sm:px-5 sm:py-3.5 rounded-2xl shadow-xs border border-slate-200/90">
+        <div className="flex items-center gap-3">
+          <div className="p-2 sm:p-2.5 bg-gradient-to-br from-blue-50 to-indigo-50 text-blue-600 rounded-xl border border-blue-100 shadow-2xs">
+            <CreditCard size={20} className="stroke-[2.2]" />
           </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Guichet de Régularisation</h2>
-              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 text-[9.5px] font-black uppercase tracking-wider">
+              <h2 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Guichet de Régularisation</h2>
+              <span className="px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200/70 text-[9px] font-black uppercase tracking-wider">
                 Caisse & Perception
               </span>
             </div>
-            <p className="text-slate-500 text-xs mt-0.5">Encaissement des droits scolaires, régularisation tarifaire et audit de scolarité</p>
+            <p className="text-slate-500 text-[11px] mt-0.5">Encaissement des droits scolaires, régularisation tarifaire et audit de scolarité</p>
           </div>
         </div>
-        <div className="flex items-center gap-2.5 w-full md:w-auto justify-end">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
           <button
             type="button"
             onClick={() => setIsClosureModalOpen(true)}
-            className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2 border border-slate-700 active:scale-95 cursor-pointer"
+            className="px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 border border-slate-700 active:scale-95 cursor-pointer"
           >
-            <ShieldCheck size={15} className="text-emerald-400" />
+            <ShieldCheck size={14} className="text-emerald-400" />
             <span>Clôture de Caisse</span>
           </button>
           {isLocked && (
-            <div className="bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5">
-              <ShieldCheck size={15} className="text-emerald-600" />
+            <div className="bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl flex items-center gap-1.5">
+              <ShieldCheck size={14} className="text-emerald-600" />
               <span className="text-emerald-700 font-bold text-xs tracking-tight">Dossier Certifié</span>
             </div>
           )}
@@ -2135,40 +2354,47 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       </div>
 
       {apiError && (
-        <div className="bg-rose-50 border border-rose-200 p-4 sm:p-5 rounded-2xl flex items-start gap-3 animate-in slide-in-from-top-4">
-          <ShieldAlert className="text-rose-600 mt-0.5 flex-shrink-0" size={20} />
+        <div className="bg-rose-50 border border-rose-200 p-3 sm:p-3.5 rounded-xl flex items-start gap-2.5 animate-in slide-in-from-top-2">
+          <ShieldAlert className="text-rose-600 mt-0.5 flex-shrink-0" size={18} />
           <div className="flex-1">
-            <p className="text-rose-800 font-bold text-xs sm:text-sm">Erreur de Transaction</p>
+            <p className="text-rose-800 font-bold text-xs">Erreur de Transaction</p>
             <p className="text-rose-700 text-xs mt-0.5">{apiError}</p>
-            <button onClick={() => setApiError(null)} className="text-rose-600 text-[11px] font-bold tracking-tight mt-2 hover:underline">Ignorer</button>
+            <button onClick={() => setApiError(null)} className="text-rose-600 text-[10.5px] font-bold tracking-tight mt-1 hover:underline">Ignorer</button>
           </div>
         </div>
       )}
 
       {globalDebt > 0 && (
-        <div className="bg-gradient-to-r from-rose-50 via-white to-rose-50/50 border border-rose-200 p-4 sm:p-5 rounded-2xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-center gap-3">
-             <div className="p-2.5 bg-rose-100 text-rose-600 rounded-xl border border-rose-200"><ShieldAlert size={20} /></div>
+        <div className="bg-gradient-to-r from-rose-50 via-white to-rose-50/50 border border-rose-200/90 p-3 sm:p-4 rounded-xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-xs">
+          <div className="flex items-center gap-2.5">
+             <div className="p-2 bg-rose-100 text-rose-600 rounded-lg border border-rose-200"><ShieldAlert size={18} /></div>
              <div>
                <div className="flex items-center gap-2">
-                 <h3 className="text-sm sm:text-base font-black text-rose-950">Dette Globale Détectée</h3>
-                 <span className="px-2 py-0.5 bg-rose-200 text-rose-800 text-[9.5px] font-black uppercase tracking-wider rounded-md">Audit Antérieur</span>
+                 <h3 className="text-xs sm:text-sm font-black text-rose-950">Dette Globale Détectée</h3>
+                 <span className="px-1.5 py-0.2 bg-rose-200 text-rose-800 text-[9px] font-black uppercase tracking-wider rounded">Audit Antérieur</span>
                </div>
                <p className="text-xs text-rose-700 mt-0.5">L'{terminology.student.toLowerCase()} présente un reliquat total non apuré sur son historique académique.</p>
              </div>
           </div>
-          <div className="bg-white px-5 py-2.5 rounded-xl sm:rounded-2xl border border-rose-200 text-center md:text-right shadow-xs">
-             <p className="text-[9.5px] font-black text-rose-500 uppercase tracking-widest">Arriéré Total Cumulé</p>
-             <p className="text-xl sm:text-2xl font-black text-rose-700 font-mono tracking-tight">{globalDebt.toLocaleString()} HTG</p>
+          <div className="bg-white px-4 py-2 rounded-xl border border-rose-200 text-center md:text-right shadow-2xs flex flex-col items-center md:items-end gap-0.5">
+             <p className="text-[9px] font-black text-rose-500 uppercase tracking-widest">Arriéré Total Cumulé</p>
+             <p className="text-lg sm:text-xl font-black text-rose-700 font-mono tracking-tight">{globalDebt.toLocaleString()} HTG</p>
+             <button
+               type="button"
+               onClick={() => setIsDossierModalOpen(true)}
+               className="mt-0.5 text-xs font-bold text-rose-600 hover:text-rose-800 flex items-center gap-1 cursor-pointer hover:underline"
+             >
+               <FileText size={12} /> Réviser le dossier
+             </button>
           </div>
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-5">
-        <div className="lg:col-span-7 space-y-4 sm:space-y-5">
-          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-sm border border-slate-200 p-4 sm:p-5 lg:p-6 space-y-4 sm:space-y-5">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 lg:gap-4">
+        <div className="lg:col-span-7 space-y-3 sm:space-y-3.5">
+          <div className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 sm:p-4.5 space-y-3 sm:space-y-3.5">
             {loading ? (
-              <div className="py-12">
+              <div className="py-8">
                 <FluidLoadingState 
                   message="Initialisation du module finance..." 
                   subtext="Synchronisation des dettes et tarifs..." 
@@ -2178,16 +2404,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             ) : (
               <>
                 <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black uppercase text-slate-500 tracking-widest flex items-center gap-2">
-                    {isLocked ? <ShieldCheck className="text-emerald-500" size={18} /> : <Search className="text-slate-400" size={18} />}
+                  <h3 className="text-[11px] font-black uppercase text-slate-500 tracking-wider flex items-center gap-1.5">
+                    {isLocked ? <ShieldCheck className="text-emerald-500" size={16} /> : <Search className="text-slate-400" size={16} />}
                     Ciblage du Dossier {terminology.student}
                   </h3>
                   {isLocked && (
                     <button 
                       onClick={resetAllFields} 
-                      className="text-xs font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+                      className="text-xs font-bold text-slate-500 hover:text-rose-600 bg-slate-50 hover:bg-rose-50 border border-slate-200 hover:border-rose-200 px-2.5 py-1 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
                     >
-                      <RotateCcw size={13} /> Changer d'{terminology.student.toLowerCase()}
+                      <RotateCcw size={12} /> Changer d'{terminology.student.toLowerCase()}
                     </button>
                   )}
                 </div>
@@ -2197,33 +2423,33 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <input 
                   type="text" 
                   placeholder={`Rechercher un ${terminology.student.toLowerCase()} par nom ou matricule...`} 
-                  className="w-full px-5 py-4 bg-slate-50 text-slate-900 border border-slate-200 rounded-2xl text-sm outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400" 
+                  className="w-full px-4 py-2.5 sm:py-3 bg-slate-50 text-slate-900 border border-slate-200 rounded-xl text-xs sm:text-sm outline-none focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 transition-all placeholder:text-slate-400 font-medium" 
                   value={studentSearch} 
                   onChange={(e) => setStudentSearch(e.target.value)} 
                 />
                 {studentSearch.length >= 2 && (
-                  <div className="absolute top-full left-0 right-0 z-50 mt-2 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden max-h-[300px] overflow-y-auto animate-in fade-in slide-in-from-top-2 custom-scrollbar">
+                  <div className="absolute top-full left-0 right-0 z-50 mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl overflow-hidden max-h-[280px] overflow-y-auto animate-in fade-in slide-in-from-top-2 custom-scrollbar">
                     {isSearching ? (
-                      <div className="p-8 text-center">
-                        <RefreshCcw className="animate-spin text-blue-500 mx-auto mb-2" size={24} />
-                        <p className="text-sm text-slate-500">Recherche en cours...</p>
+                      <div className="p-6 text-center">
+                        <RefreshCcw className="animate-spin text-blue-500 mx-auto mb-2" size={20} />
+                        <p className="text-xs text-slate-500">Recherche en cours...</p>
                       </div>
                     ) : searchResults.length > 0 ? (
                       searchResults.map(s => (
-                        <button key={s.id} onClick={() => handleSelect(s)} className="w-full flex justify-between items-center px-6 py-4 hover:bg-blue-50/70 border-b border-slate-100 last:border-0 group transition-colors cursor-pointer text-left">
+                        <button key={s.id} onClick={() => handleSelect(s)} className="w-full flex justify-between items-center px-4 py-3 hover:bg-blue-50/70 border-b border-slate-100 last:border-0 group transition-colors cursor-pointer text-left">
                           <div>
-                            <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-sm">{s.fullName}</p>
-                            <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                            <p className="font-bold text-slate-900 group-hover:text-blue-600 transition-colors text-xs sm:text-sm">{s.fullName}</p>
+                            <p className="text-[11px] text-slate-500 mt-0.5 flex items-center gap-2">
                               <span>{s.class?.name || s.class_name || 'Aucune classe'}</span>
-                              <span className="font-mono text-[10px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Matricule: {s.reference_number || s.id?.substring(0, 8) || ''}</span>
+                              <span className="font-mono text-[9.5px] text-slate-400 bg-slate-100 px-1.5 py-0.5 rounded">Matricule: {s.reference_number || s.id?.substring(0, 8) || ''}</span>
                             </p>
                           </div>
-                          <ArrowRight size={16} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
+                          <ArrowRight size={14} className="text-slate-300 group-hover:text-blue-600 transition-colors" />
                         </button>
                       ))
                     ) : (
-                      <div className="px-6 py-8 text-center space-y-2">
-                        <p className="text-sm text-slate-500 italic">Aucun {terminology.student.toLowerCase()} trouvé pour "{studentSearch}"</p>
+                      <div className="px-4 py-6 text-center space-y-1">
+                        <p className="text-xs text-slate-500 italic">Aucun {terminology.student.toLowerCase()} trouvé pour "{studentSearch}"</p>
                         <p className="text-[10px] text-slate-400">Vérifiez l'orthographe ou essayez une partie du nom</p>
                       </div>
                     )}
@@ -2231,40 +2457,40 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
               </div>
             ) : (
-              <div className="rounded-2xl p-6 text-slate-900 shadow-xs relative overflow-hidden bg-slate-50/60 border border-slate-200 animate-in fade-in duration-300">
-                <div className="relative z-10 flex items-center gap-5">
-                    <div className="w-16 h-16 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-2xl flex items-center justify-center font-black text-2xl shadow-sm ring-4 ring-blue-50 shrink-0">
+              <div className="rounded-xl p-3.5 sm:p-4 text-slate-900 shadow-2xs relative overflow-hidden bg-slate-50/70 border border-slate-200/90 animate-in fade-in duration-200">
+                <div className="relative z-10 flex items-center gap-3.5">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-700 text-white rounded-xl flex items-center justify-center font-black text-xl shadow-xs ring-2 ring-blue-100 shrink-0">
                       {(selectedStudent.last_name || '?').charAt(0).toUpperCase()}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <h4 className="text-lg sm:text-xl font-black text-slate-900 truncate">{selectedStudent.fullName || ''}</h4>
-                        <span className="px-2 py-0.5 bg-emerald-100/80 text-emerald-800 text-[10px] font-black rounded-md uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
-                          <CheckCircle2 size={11} /> Identifié
+                        <h4 className="text-base sm:text-lg font-black text-slate-900 truncate">{selectedStudent.fullName || ''}</h4>
+                        <span className="px-1.5 py-0.2 bg-emerald-100/80 text-emerald-800 text-[9.5px] font-black rounded uppercase tracking-wider flex items-center gap-1 border border-emerald-200">
+                          <CheckCircle2 size={10} /> Identifié
                         </span>
                       </div>
-                      <p className="text-xs text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
-                        <span className="font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded border border-slate-200">ID: {selectedStudent.id.substring(0,8)}</span>
+                      <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
+                        <span className="font-mono font-bold text-slate-700 bg-white px-1.5 py-0.2 rounded border border-slate-200 text-[11px]">ID: {selectedStudent.id.substring(0,8)}</span>
                         <span>•</span>
-                        <span className="font-bold text-slate-800 bg-white px-2 py-0.5 rounded border border-slate-200">{selectedStudent.classe}</span>
+                        <span className="font-bold text-slate-800 bg-white px-1.5 py-0.2 rounded border border-slate-200 text-[11px]">{selectedStudent.classe}</span>
                       </p>
-                      <div className="flex gap-2 mt-2.5 flex-wrap">
+                      <div className="flex gap-1.5 mt-2 flex-wrap">
                         {campuses && campuses.length > 1 && selectedStudent.campus_name && (
-                          <span className="px-2.5 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[10px] font-black uppercase tracking-wider rounded-lg">📍 Annexe: {selectedStudent.campus_name}</span>
+                          <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 text-[9.5px] font-bold rounded">📍 Annexe: {selectedStudent.campus_name}</span>
                         )}
                         {selectedStudent.level && selectedStudent.level !== 'N/A' && (
-                          <span className="px-2.5 py-0.5 bg-amber-50 border border-amber-100 text-amber-700 text-[10px] font-black uppercase tracking-wider rounded-lg">🎓 Niveau: {selectedStudent.level}</span>
+                          <span className="px-2 py-0.5 bg-amber-50 border border-amber-100 text-amber-700 text-[9.5px] font-bold rounded">🎓 Niveau: {selectedStudent.level}</span>
                         )}
                       </div>
                       {selectedStudent.isNotEnrolledInTargetYear && (
-                        <div className="mt-3 bg-amber-50 border border-amber-200 text-amber-900 px-4 py-3 rounded-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-2xs">
-                          <div className="flex items-start gap-3">
-                            <AlertTriangle size={17} className="shrink-0 mt-0.5 text-amber-600" />
+                        <div className="mt-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-2xs">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
                             <div className="flex flex-col">
-                              <span className="text-xs font-bold uppercase tracking-wider text-amber-900">
+                              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
                                 {selectedStudent.otherEnrollments?.length > 0 ? 'Inscription Détectée dans une Autre Session' : "Régularisation d'Inscription"}
                               </span>
-                              <span className="text-xs mt-0.5 text-amber-800">
+                              <span className="text-[11px] text-amber-800 mt-0.5">
                                 {selectedStudent.otherEnrollments?.length > 0 ? (
                                   <>Cet(te) {terminology.student.toLowerCase()} est formellement inscrit(e) pour la session <strong className="text-amber-950 font-bold">{selectedStudent.otherEnrollments[0].academic_year?.label || 'Autre Session'}</strong>.</>
                                 ) : (
@@ -2283,14 +2509,31 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                                   loadStudentDetails(selectedStudent.id, newYr);
                                 }
                               }}
-                              className="px-3.5 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs shrink-0 self-end sm:self-center cursor-pointer flex items-center gap-1.5"
+                              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all shadow-2xs shrink-0 self-end sm:self-center cursor-pointer flex items-center gap-1.5"
                             >
-                              <Sparkles size={13} />
+                              <Sparkles size={12} />
                               Basculer sur {selectedStudent.otherEnrollments[0].academic_year?.label}
                             </button>
                           )}
                         </div>
                       )}
+                      <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                          <ShieldCheck size={13} className={globalDebt === 0 ? "text-emerald-600" : "text-rose-600"} />
+                          <span>Audit Historique : </span>
+                          <strong className={globalDebt === 0 ? "text-emerald-700 font-bold" : "text-rose-700 font-bold"}>
+                            {globalDebt === 0 ? "Solvabilité Certifiée (0 Arriéré)" : `${globalDebt.toLocaleString()} HTG d'arriérés`}
+                          </strong>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setIsDossierModalOpen(true)}
+                          className="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold rounded-lg transition-all flex items-center gap-1 cursor-pointer border border-blue-200"
+                        >
+                          <FileText size={12} />
+                          Réviser tout son dossier en profondeur
+                        </button>
+                      </div>
                     </div>
                 </div>
               </div>
@@ -2319,15 +2562,15 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             const feeDiscount = (gross || 0) - (net || 0);
 
             return (
-            <div className="flex flex-col gap-6 animate-in fade-in duration-500">
-              {/* Échéancier Section */}
+            <div className="flex flex-col gap-2.5 sm:gap-3 animate-in fade-in duration-300">
+              {/* Échéancier Section Compacte */}
               {feeType === 'SCOLARITE' && paymentLogic?.structure && paymentLogic.structure.length > 0 && (
-                <div className="bg-indigo-50/40 border border-indigo-100 rounded-3xl p-5 md:p-6 mb-2">
-                  <div className="flex items-center gap-2 mb-4">
-                    <TrendingUp size={16} className="text-indigo-600" />
-                    <h5 className="text-xs font-black uppercase tracking-widest text-indigo-950">Échéancier de Paiement Réglementaire</h5>
+                <div className="bg-indigo-50/40 border border-indigo-100 rounded-2xl p-3 sm:p-4 mb-0.5">
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <TrendingUp size={14} className="text-indigo-600" />
+                    <h5 className="text-[10px] font-black uppercase tracking-wider text-indigo-950">Échéancier Réglementaire ({terminology.tuition})</h5>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {(() => {
                       let acc = 0;
                       const totalPaid = selectedStudent.scolaritePaid;
@@ -2337,17 +2580,17 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         const isNext = !isPaid && (totalPaid + 5) >= (acc - step.amount);
                         
                         return (
-                          <div key={i} className={`p-3.5 rounded-2xl border flex flex-col justify-between transition-all ${isPaid ? 'bg-emerald-100/50 border-emerald-200 opacity-70' : isNext ? 'bg-white border-indigo-400 shadow-md ring-2 ring-indigo-500/10' : 'bg-white border-slate-200'}`}>
+                          <div key={i} className={`p-2.5 rounded-xl border flex flex-col justify-between transition-all ${isPaid ? 'bg-emerald-100/50 border-emerald-200 opacity-70' : isNext ? 'bg-white border-indigo-400 shadow-2xs ring-2 ring-indigo-500/10' : 'bg-white border-slate-200'}`}>
                             <div className="flex justify-between items-start">
-                              <span className={`text-[9px] font-black uppercase tracking-tight ${isPaid ? 'text-emerald-700' : isNext ? 'text-indigo-600' : 'text-slate-400'}`}>
+                              <span className={`text-[8.5px] font-black uppercase tracking-tight ${isPaid ? 'text-emerald-700' : isNext ? 'text-indigo-600' : 'text-slate-400'}`}>
                                 {step.label}
                               </span>
-                              {isPaid && <CheckCircle2 size={12} className="text-emerald-600" />}
-                              {isNext && <Sparkles size={12} className="text-indigo-500 animate-pulse" />}
+                              {isPaid && <CheckCircle2 size={11} className="text-emerald-600" />}
+                              {isNext && <Sparkles size={11} className="text-indigo-500 animate-pulse" />}
                             </div>
-                            <div className="mt-2">
-                              <p className={`text-sm font-black font-mono ${isPaid ? 'text-emerald-800' : 'text-slate-900'}`}>{step.amount.toLocaleString()} G</p>
-                              {step.due_date && <p className="text-[8px] font-bold text-slate-400 mt-0.5 italic">Avant le {new Date(step.due_date).toLocaleDateString()}</p>}
+                            <div className="mt-1.5">
+                              <p className={`text-xs font-black font-mono ${isPaid ? 'text-emerald-800' : 'text-slate-900'}`}>{step.amount.toLocaleString()} G</p>
+                              {step.due_date && <p className="text-[7.5px] font-bold text-slate-400 mt-0.5 italic">Avant le {new Date(step.due_date).toLocaleDateString()}</p>}
                             </div>
                           </div>
                         );
@@ -2568,20 +2811,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         {/* Volet Latéral Formulaire d'Encaissement */}
         <div className="lg:col-span-5">
-          <form onSubmit={handleValidation} className="bg-white rounded-2xl sm:rounded-3xl shadow-[0_2px_20px_-6px_rgba(0,0,0,0.07)] border border-slate-200 p-4 sm:p-5 lg:p-6 h-full flex flex-col justify-between gap-4 sm:gap-5 relative">
-            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 rounded-t-2xl sm:rounded-t-3xl" />
-            <div className="space-y-4 sm:space-y-4.5">
-              <div className="flex items-center gap-2.5 sm:gap-3">
-                <div className="p-2 sm:p-2.5 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl border border-blue-100 shadow-2xs shrink-0">
-                  <Calculator size={20} className="stroke-[2.5]" />
+          <form onSubmit={handleValidation} className="bg-white rounded-2xl shadow-xs border border-slate-200/90 p-3.5 sm:p-4.5 h-full flex flex-col justify-between gap-3 sm:gap-3.5 relative">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-500 rounded-t-2xl" />
+            <div className="space-y-3 sm:space-y-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100 shadow-2xs shrink-0">
+                  <Calculator size={18} className="stroke-[2.2]" />
                 </div>
                 <div>
-                  <h3 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">Caisse & Règlement</h3>
-                  <p className="text-[11px] sm:text-xs text-slate-500">Enregistrement et ventilation des recettes</p>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Caisse & Règlement</h3>
+                  <p className="text-[10.5px] text-slate-500">Enregistrement et ventilation des recettes</p>
                 </div>
               </div>
               
-              <div className="space-y-3.5 sm:space-y-4">
+              <div className="space-y-2.5 sm:space-y-3">
                 <div className="space-y-1 min-w-0 relative z-30">
                   <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 block">Session académique</label>
                   <AcademicSessionPill
@@ -2854,13 +3097,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <input 
                     type="number" 
                     required 
-                    className="w-full px-4 py-3 sm:py-3.5 border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl sm:rounded-2xl text-xl sm:text-2xl font-black font-mono outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 disabled:bg-slate-50" 
+                    className="w-full px-3.5 py-2.5 sm:py-3 border border-slate-200 bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl text-lg sm:text-xl font-black font-mono outline-none transition-all focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 disabled:opacity-50 disabled:bg-slate-50" 
                     placeholder="0.00" 
                     value={montantReel} 
                     onChange={(e) => setMontantReel(e.target.value)} 
                     disabled={!selectedStudent || isSubmitting} 
                   />
-                  {currency === 'USD' ? <DollarSign className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} /> : <div className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 font-black text-lg">G</div>}
+                  {currency === 'USD' ? <DollarSign className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400" size={18} /> : <div className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 font-black text-base">G</div>}
                 </div>
                 {globalDebt > 0 && (
                   <p className="text-[10px] text-rose-600 font-semibold mt-0.5">
@@ -2879,28 +3122,97 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
               </div>
               
-              {globalDebt > 0 && (
-                <div className="bg-rose-50/80 p-3 rounded-xl border border-rose-200 flex items-start gap-2.5">
-                  <AlertTriangle className="text-rose-600 mt-0.5 shrink-0" size={15} />
-                  <p className="text-[11px] text-rose-900">
-                    <strong className="font-bold">Avertissement Arriérés :</strong> L'{terminology.student.toLowerCase()} a une dette globale de {globalDebt.toLocaleString()} HTG. Assurez-vous d'imputer le paiement à la bonne session.
-                  </p>
+              {globalDebt > 0 ? (
+                <div className="bg-rose-50/80 p-3.5 rounded-2xl border border-rose-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="text-rose-600 mt-0.5 shrink-0" size={16} />
+                    <div>
+                      <p className="text-[11px] sm:text-xs text-rose-900 font-semibold leading-relaxed">
+                        <strong className="font-bold">Arriérés Confirmés :</strong> L'{terminology.student.toLowerCase()} a une dette réelle de {globalDebt.toLocaleString()} HTG sur son historique ({dossierAuditSessions.filter(s => !s.isCurrentSession && s.remainingDebt > 0).map(s => s.academicYearLabel).join(', ') || 'session(s) précédente(s)'}).
+                      </p>
+                      <p className="text-[10.5px] text-rose-700 mt-0.5">
+                        Assurez-vous d'imputer le paiement à la bonne session ou de régulariser ces arriérés.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsDossierModalOpen(true)}
+                    className="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
+                  >
+                    <FileText size={13} /> Examiner le dossier
+                  </button>
                 </div>
-              )}
-              
-              {!loadingDebt && selectedStudent && !globalDebt && Boolean(selectedStudent?.otherEnrollments && selectedStudent.otherEnrollments.length > 0) && (
-                <div className="bg-emerald-50/70 p-3 rounded-xl border border-emerald-200/70 flex items-start gap-2.5">
-                  <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={15} />
-                  <p className="text-[11px] text-emerald-900 font-medium leading-relaxed">
-                    <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est en règle pour l'ensemble des sessions antérieures ({selectedStudent.otherEnrollments.length} session(s) précédente(s)). Le versement sera imputé à la session active.
-                  </p>
-                </div>
+              ) : (
+                !loadingDebt && selectedStudent && (
+                  selectedStudent.isNotEnrolledInTargetYear ? (
+                    <div className="bg-blue-50/80 p-3.5 rounded-2xl border border-blue-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-start gap-2.5">
+                        <CheckCircle2 className="text-blue-600 mt-0.5 shrink-0" size={16} />
+                        <div>
+                          <p className="text-[11px] sm:text-xs text-blue-900 font-semibold leading-relaxed">
+                            <strong className="font-bold">Dossier Conforme (Aucun Arriéré) :</strong> L'{terminology.student.toLowerCase()} n'a aucune dette sur les sessions antérieures. Le montant saisi sera imputé directement aux frais d'inscription de la session courante ({activeYear?.label || 'Session active'}).
+                          </p>
+                          <p className="text-[10.5px] text-blue-700 mt-0.5">
+                            Frais d'inscription de la session : {(selectedStudent.inscriptionDue || 2500).toLocaleString()} HTG.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsDossierModalOpen(true)}
+                        className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
+                      >
+                        <FileText size={13} /> Réviser le dossier
+                      </button>
+                    </div>
+                  ) : Boolean(selectedStudent?.otherEnrollments && selectedStudent.otherEnrollments.length > 0) ? (
+                    <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-start gap-2.5">
+                        <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={16} />
+                        <div>
+                          <p className="text-[11px] sm:text-xs text-emerald-900 font-medium leading-relaxed">
+                            <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est 100% en règle pour l'ensemble des sessions antérieures ({selectedStudent.otherEnrollments.length} session(s) précédente(s)). Aucun arriéré à apurer.
+                          </p>
+                          <p className="text-[10.5px] text-emerald-700 mt-0.5">
+                            Le versement sera intégralement imputé à la session active ({activeYear?.label || 'Session active'}).
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsDossierModalOpen(true)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
+                      >
+                        <ShieldCheck size={13} /> Certificat d'audit
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-emerald-50/80 p-3.5 rounded-2xl border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-start gap-2.5">
+                        <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={16} />
+                        <div>
+                          <p className="text-[11px] sm:text-xs text-emerald-900 font-medium leading-relaxed">
+                            <strong className="font-bold">Dossier Initialisé :</strong> Première inscription enregistrée. Aucun arriéré antérieur.
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsDossierModalOpen(true)}
+                        className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl shrink-0 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs self-end sm:self-center"
+                      >
+                        <FileText size={13} /> Détail du dossier
+                      </button>
+                    </div>
+                  )
+                )
               )}
 
               {loadingDebt && (
                 <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-xl border border-slate-200">
                   <Loader2 size={14} className="animate-spin text-blue-600" />
-                  <span className="text-[11px] font-medium text-slate-500">Audit de solvabilité historique en cours...</span>
+                  <span className="text-[11px] font-medium text-slate-500">Audit approfondi du dossier en cours...</span>
                 </div>
               )}
             </div>
@@ -2908,7 +3220,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button 
               type="submit" 
               disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError} 
-              className={`w-full py-3.5 text-white font-bold rounded-xl sm:rounded-2xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2 sm:mt-3 cursor-pointer active:scale-98 text-sm ${
+              className={`w-full py-2.5 sm:py-3 text-white font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1 sm:mt-2 cursor-pointer active:scale-98 text-xs sm:text-sm ${
                 paymentMethod === 'MonCash'
                   ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-red-600/20'
                   : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
@@ -3118,6 +3430,25 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         isOpen={isClosureModalOpen}
         onClose={() => setIsClosureModalOpen(false)}
         user={user}
+      />
+
+      <StudentDossierAuditModal
+        isOpen={isDossierModalOpen}
+        onClose={() => setIsDossierModalOpen(false)}
+        student={selectedStudent}
+        terminology={terminology}
+        activeYear={academicYears.find(y => y.id === targetYearId) || activeYear}
+        sessions={dossierAuditSessions}
+        transactions={allStudentTransactions}
+        currentExchangeRate={currentExchangeRate}
+        globalDebt={globalDebt}
+        academicYears={academicYears}
+        onSelectYear={(yrId) => {
+          setTargetYearId(yrId);
+          if (selectedStudent) {
+            loadStudentDetails(selectedStudent.id, yrId);
+          }
+        }}
       />
     </div>
   );

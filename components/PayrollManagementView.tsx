@@ -11,6 +11,7 @@ import { PayrollAuditModal } from './PayrollAuditModal';
 import { evaluatePayrollSensitivity } from '../utils/payrollSensitivity';
 import { isAutonomousAccount, AUTONOMOUS_RESTRICTION_MESSAGE } from '../utils/autonomousAdminGuard';
 import { DoubleRegardSubmitModal } from './DoubleRegardSubmitModal';
+import { AuditLogger } from '../utils/auditLogger';
 import { 
   Wallet, Calendar, CheckCircle, Clock, AlertCircle, 
   FileText, User, Plus, Search, DollarSign, Save, X,
@@ -937,20 +938,18 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         setActiveTab('preparation');
       }, 1500);
 
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'CREATE',
-          entity_type: 'staff',
-          entity_id: data.id,
-          details: { 
-            type: 'payroll_period',
-            period: `${MONTHS[newPeriodMonth - 1]} ${newPeriodYear}`,
-            campus_id: targetCampus,
-            campus_name: getCampusName(targetCampus)
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'CREATE',
+        entity_type: 'staff',
+        entity_id: data.id,
+        details: { 
+          type: 'payroll_period',
+          period: `${MONTHS[newPeriodMonth - 1]} ${newPeriodYear}`,
+          campus_id: targetCampus,
+          campus_name: getCampusName(targetCampus)
+        }
       });
     } catch (error: any) {
       console.error("Error creating period:", error);
@@ -984,25 +983,23 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       showToast(`Période marquée comme ${status === 'VALIDATED' ? 'validée' : status === 'CLOSED' ? 'clôturée' : 'brouillon'}.`);
 
       // Audit log
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'UPDATE',
-          entity_type: 'payroll_period',
-          entity_id: periodId,
-          details: { 
-            type: 'payroll_period',
-            action_type: 'PERIOD_STATUS_UPDATED',
-            status: status,
-            period_id: periodId,
-            period_name: targetPeriod ? getPeriodName(targetPeriod) : 'Période',
-            admin_name: user.full_name,
-            admin_email: user.email,
-            admin_role: user.role,
-            summary: `Statut de la période ${targetPeriod ? getPeriodName(targetPeriod) : ''} changé en "${status}" par ${user.full_name} (${user.role})`
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'UPDATE',
+        entity_type: 'payroll_period',
+        entity_id: periodId,
+        details: { 
+          type: 'payroll_period',
+          action_type: 'PERIOD_STATUS_UPDATED',
+          status: status,
+          period_id: periodId,
+          period_name: targetPeriod ? getPeriodName(targetPeriod) : 'Période',
+          admin_name: user.full_name,
+          admin_email: user.email,
+          admin_role: user.role,
+          summary: `Statut de la période ${targetPeriod ? getPeriodName(targetPeriod) : ''} changé en "${status}" par ${user.full_name} (${user.role})`
+        }
       });
     } catch (error: any) {
       console.error("Error updating period status:", error);
@@ -1102,21 +1099,19 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       setPeriodToDelete(null);
 
       // Log the action
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'DELETE',
-          entity_type: 'staff',
-          entity_id: periodId,
-          details: { 
-            type: 'payroll_period',
-            period: getPeriodName(periodToDelete),
-            slips_count: deletedSlips.length,
-            campus_id: effectiveCampusId || null,
-            campus_name: getCampusName(effectiveCampusId)
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'DELETE',
+        entity_type: 'staff',
+        entity_id: periodId,
+        details: { 
+          type: 'payroll_period',
+          period: getPeriodName(periodToDelete),
+          slips_count: deletedSlips.length,
+          campus_id: effectiveCampusId || null,
+          campus_name: getCampusName(effectiveCampusId)
+        }
       });
 
     } catch (error: any) {
@@ -1183,40 +1178,38 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       setSlipToDelete(null);
 
       // Log the action with full audit & sensitivity context
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'PAYROLL_DELETE',
-          entity_type: 'payroll_slip',
-          entity_id: slipToDelete.id,
-          details: { 
-            type: 'payroll_slip',
-            action_type: 'PAYROLL_SLIP_DELETED',
-            is_sensitive: true,
-            severity: sensitivity.severity,
-            sensitivity_reasons: sensitivity.reasons,
-            summary: sensitivity.summary,
-            slip_id: slipToDelete.id,
-            staff_id: slipToDelete.staff_id,
-            staff_name: `${slipToDelete.staff?.first_name} ${slipToDelete.staff?.last_name}`,
-            staff_role: slipToDelete.staff?.role || '',
-            previous_values: {
-              base_salary: slipToDelete.base_salary,
-              bonuses: slipToDelete.bonuses || 0,
-              deductions: slipToDelete.deductions || 0,
-              net_salary: slipToDelete.net_salary,
-              status: slipToDelete.status
-            },
-            diff: sensitivity.diff,
-            admin_name: user.full_name || 'Administrateur',
-            admin_email: user.email,
-            admin_role: user.role,
-            campus_id: slipToDelete.campus_id || slipToDelete.staff?.campus_id || null,
-            campus_name: getCampusName(slipToDelete.campus_id || slipToDelete.staff?.campus_id, slipToDelete.staff),
-            period_name: slipToDelete.period ? `${MONTHS[slipToDelete.period.month - 1]} ${slipToDelete.period.year}` : 'Inconnue'
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'PAYROLL_DELETE',
+        entity_type: 'payroll_slip',
+        entity_id: slipToDelete.id,
+        details: { 
+          type: 'payroll_slip',
+          action_type: 'PAYROLL_SLIP_DELETED',
+          is_sensitive: true,
+          severity: sensitivity.severity,
+          sensitivity_reasons: sensitivity.reasons,
+          summary: sensitivity.summary,
+          slip_id: slipToDelete.id,
+          staff_id: slipToDelete.staff_id,
+          staff_name: `${slipToDelete.staff?.first_name} ${slipToDelete.staff?.last_name}`,
+          staff_role: slipToDelete.staff?.role || '',
+          previous_values: {
+            base_salary: slipToDelete.base_salary,
+            bonuses: slipToDelete.bonuses || 0,
+            deductions: slipToDelete.deductions || 0,
+            net_salary: slipToDelete.net_salary,
+            status: slipToDelete.status
+          },
+          diff: sensitivity.diff,
+          admin_name: user.full_name || 'Administrateur',
+          admin_email: user.email,
+          admin_role: user.role,
+          campus_id: slipToDelete.campus_id || slipToDelete.staff?.campus_id || null,
+          campus_name: getCampusName(slipToDelete.campus_id || slipToDelete.staff?.campus_id, slipToDelete.staff),
+          period_name: slipToDelete.period ? `${MONTHS[slipToDelete.period.month - 1]} ${slipToDelete.period.year}` : 'Inconnue'
+        }
       });
     } catch (error: any) {
       console.error("Error deleting slip:", error);
@@ -1296,47 +1289,45 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         if (error) throw error;
         setSlips(slips.map(s => s.id === existingSlip.id ? data : s));
         
-        import('../utils/auditLogger').then(({ AuditLogger }) => {
-          AuditLogger.log({
-            school_id: user.school_id,
-            user_id: user.id,
-            action: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_UPDATE',
-            entity_type: 'payroll_slip',
-            entity_id: existingSlip.id,
-            details: { 
-              type: 'payroll_slip',
-              action_type: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_SLIP_UPDATED',
-              slip_id: existingSlip.id,
-              staff_id: staffId,
-              is_sensitive: sensitivity.isSensitive,
-              severity: sensitivity.severity,
-              sensitivity_reasons: sensitivity.reasons,
-              summary: sensitivity.summary,
-              previous_values: {
-                base_salary: existingSlip.base_salary,
-                bonuses: existingSlip.bonuses || 0,
-                deductions: existingSlip.deductions || 0,
-                net_salary: existingSlip.net_salary
-              },
-              new_values: {
-                base_salary: base,
-                bonuses: bonus,
-                deductions: deduction,
-                net_salary: net
-              },
-              diff: sensitivity.diff,
-              admin_name: user.full_name || 'Administrateur',
-              admin_email: user.email,
-              admin_role: user.role,
-              net_salary: net,
-              staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
-              staff_role: data.staff?.role || '',
-              campus_id: data.campus_id || targetCampusId,
-              campus_name: getCampusName(data.campus_id || targetCampusId, data.staff),
-              period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue',
-              period_name: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
-            }
-          });
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_UPDATE',
+          entity_type: 'payroll_slip',
+          entity_id: existingSlip.id,
+          details: { 
+            type: 'payroll_slip',
+            action_type: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_SLIP_UPDATED',
+            slip_id: existingSlip.id,
+            staff_id: staffId,
+            is_sensitive: sensitivity.isSensitive,
+            severity: sensitivity.severity,
+            sensitivity_reasons: sensitivity.reasons,
+            summary: sensitivity.summary,
+            previous_values: {
+              base_salary: existingSlip.base_salary,
+              bonuses: existingSlip.bonuses || 0,
+              deductions: existingSlip.deductions || 0,
+              net_salary: existingSlip.net_salary
+            },
+            new_values: {
+              base_salary: base,
+              bonuses: bonus,
+              deductions: deduction,
+              net_salary: net
+            },
+            diff: sensitivity.diff,
+            admin_name: user.full_name || 'Administrateur',
+            admin_email: user.email,
+            admin_role: user.role,
+            net_salary: net,
+            staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
+            staff_role: data.staff?.role || '',
+            campus_id: data.campus_id || targetCampusId,
+            campus_name: getCampusName(data.campus_id || targetCampusId, data.staff),
+            period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue',
+            period_name: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
+          }
         });
 
         if (sensitivity.isSensitive) {
@@ -1363,40 +1354,38 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
         if (error) throw error;
         setSlips([...slips, data]);
 
-        import('../utils/auditLogger').then(({ AuditLogger }) => {
-          AuditLogger.log({
-            school_id: user.school_id,
-            user_id: user.id,
-            action: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_CREATE',
-            entity_type: 'payroll_slip',
-            entity_id: data.id,
-            details: { 
-              type: 'payroll_slip',
-              action_type: 'PAYROLL_SLIP_CREATED',
-              slip_id: data.id,
-              staff_id: staffId,
-              is_sensitive: sensitivity.isSensitive,
-              severity: sensitivity.severity,
-              sensitivity_reasons: sensitivity.reasons,
-              summary: sensitivity.summary,
-              new_values: {
-                base_salary: base,
-                bonuses: bonus,
-                deductions: deduction,
-                net_salary: net
-              },
-              admin_name: user.full_name || 'Administrateur',
-              admin_email: user.email,
-              admin_role: user.role,
-              net_salary: net,
-              staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
-              staff_role: data.staff?.role || '',
-              campus_id: targetCampusId,
-              campus_name: getCampusName(targetCampusId, data.staff),
-              period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue',
-              period_name: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
-            }
-          });
+        AuditLogger.log({
+          school_id: user.school_id,
+          user_id: user.id,
+          action: sensitivity.isSensitive ? 'PAYROLL_SENSITIVE_UPDATE' : 'PAYROLL_CREATE',
+          entity_type: 'payroll_slip',
+          entity_id: data.id,
+          details: { 
+            type: 'payroll_slip',
+            action_type: 'PAYROLL_SLIP_CREATED',
+            slip_id: data.id,
+            staff_id: staffId,
+            is_sensitive: sensitivity.isSensitive,
+            severity: sensitivity.severity,
+            sensitivity_reasons: sensitivity.reasons,
+            summary: sensitivity.summary,
+            new_values: {
+              base_salary: base,
+              bonuses: bonus,
+              deductions: deduction,
+              net_salary: net
+            },
+            admin_name: user.full_name || 'Administrateur',
+            admin_email: user.email,
+            admin_role: user.role,
+            net_salary: net,
+            staff_name: `${data.staff?.first_name} ${data.staff?.last_name}`,
+            staff_role: data.staff?.role || '',
+            campus_id: targetCampusId,
+            campus_name: getCampusName(targetCampusId, data.staff),
+            period: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue',
+            period_name: data.period ? `${MONTHS[data.period.month - 1]} ${data.period.year}` : 'Inconnue'
+          }
         });
 
         if (sensitivity.isSensitive) {
@@ -1467,18 +1456,16 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       setSlips([...slips, ...(data || [])]);
       showToast(`${data?.length || 0} fiches de paie générées avec succès !`);
 
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'CREATE',
-          entity_type: 'staff',
-          details: { 
-            type: 'payroll_batch',
-            count: data?.length || 0,
-            period: data && data.length > 0 && data[0].period ? `${MONTHS[data[0].period.month - 1]} ${data[0].period.year}` : 'Inconnue'
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'CREATE',
+        entity_type: 'staff',
+        details: { 
+          type: 'payroll_batch',
+          count: data?.length || 0,
+          period: data && data.length > 0 && data[0].period ? `${MONTHS[data[0].period.month - 1]} ${data[0].period.year}` : 'Inconnue'
+        }
       });
     } catch (error: any) {
       console.error("Error preparing all slips:", error);
@@ -1549,19 +1536,17 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       setSlips(prev => [...prev, ...(data || [])]);
       showToast(`${data?.length || 0} fiches de paie générées pour ${targetCampusName} !`);
 
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'CREATE',
-          entity_type: 'staff',
-          details: { 
-            type: 'payroll_batch_campus',
-            campus_id: targetCampusId,
-            campus_name: targetCampusName,
-            count: data?.length || 0
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'CREATE',
+        entity_type: 'staff',
+        details: { 
+          type: 'payroll_batch_campus',
+          campus_id: targetCampusId,
+          campus_name: targetCampusName,
+          count: data?.length || 0
+        }
       });
     } catch (error: any) {
       console.error("Error preparing slips for campus:", error);
@@ -1584,20 +1569,18 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       setSlips(prev => prev.filter(s => s.id !== slipToPurge.id));
       showToast(`Doublon de fiche pour ${staffName} supprimé avec succès.`);
 
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'DELETE',
-          entity_type: 'staff',
-          entity_id: slipToPurge.staff_id,
-          details: { 
-            type: 'payroll_slip_duplicate_purge',
-            slip_id: slipToPurge.id,
-            staff_name: staffName,
-            campus_id: slipToPurge.campus_id || null
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'DELETE',
+        entity_type: 'staff',
+        entity_id: slipToPurge.staff_id,
+        details: { 
+          type: 'payroll_slip_duplicate_purge',
+          slip_id: slipToPurge.id,
+          staff_name: staffName,
+          campus_id: slipToPurge.campus_id || null
+        }
       });
     } catch (error: any) {
       console.error("Error purging duplicate slip:", error);
@@ -1684,23 +1667,21 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
     }
 
     // Log the action
-    import('../utils/auditLogger').then(({ AuditLogger }) => {
-      AuditLogger.log({
-        school_id: user.school_id,
-        user_id: user.id,
-        action: 'PAYMENT_PROCESSED',
-        entity_type: 'staff',
-        entity_id: updatedSlip.staff_id,
-        details: { 
-          amount: updatedSlip.net_salary, 
-          currency: 'HTG', 
-          staff_name: formatStudentName(updatedSlip.staff?.last_name, updatedSlip.staff?.first_name).fullName,
-          period: updatedSlip.period ? `${MONTHS[updatedSlip.period.month - 1]} ${updatedSlip.period.year}` : 'Inconnue',
-          campus_id: updatedSlip.campus_id || updatedSlip.staff?.campus_id || null,
-          campus_name: getCampusName(updatedSlip.campus_id || updatedSlip.staff?.campus_id, updatedSlip.staff),
-          type: 'payroll'
-        }
-      });
+    AuditLogger.log({
+      school_id: user.school_id,
+      user_id: user.id,
+      action: 'PAYMENT_PROCESSED',
+      entity_type: 'staff',
+      entity_id: updatedSlip.staff_id,
+      details: { 
+        amount: updatedSlip.net_salary, 
+        currency: 'HTG', 
+        staff_name: formatStudentName(updatedSlip.staff?.last_name, updatedSlip.staff?.first_name).fullName,
+        period: updatedSlip.period ? `${MONTHS[updatedSlip.period.month - 1]} ${updatedSlip.period.year}` : 'Inconnue',
+        campus_id: updatedSlip.campus_id || updatedSlip.staff?.campus_id || null,
+        campus_name: getCampusName(updatedSlip.campus_id || updatedSlip.staff?.campus_id, updatedSlip.staff),
+        type: 'payroll'
+      }
     });
 
     return updatedSlip;
@@ -1972,21 +1953,19 @@ const PayrollManagementView: React.FC<PayrollManagementViewProps> = ({ user }) =
       showToast("Paiement de l'avance enregistré !");
 
       // Log the action
-      import('../utils/auditLogger').then(({ AuditLogger }) => {
-        AuditLogger.log({
-          school_id: user.school_id,
-          user_id: user.id,
-          action: 'PAYMENT_PROCESSED',
-          entity_type: 'staff',
-          entity_id: data.staff_id,
-          details: { 
-            amount: data.amount, 
-            currency: 'HTG', 
-            staff_name: formatStudentName(data.staff?.last_name, data.staff?.first_name).fullName,
-            type: 'salary_advance',
-            method: advancePaymentMethod
-          }
-        });
+      AuditLogger.log({
+        school_id: user.school_id,
+        user_id: user.id,
+        action: 'PAYMENT_PROCESSED',
+        entity_type: 'staff',
+        entity_id: data.staff_id,
+        details: { 
+          amount: data.amount, 
+          currency: 'HTG', 
+          staff_name: formatStudentName(data.staff?.last_name, data.staff?.first_name).fullName,
+          type: 'salary_advance',
+          method: advancePaymentMethod
+        }
       });
     } catch (error: any) {
       console.error("Error processing advance payment:", error);

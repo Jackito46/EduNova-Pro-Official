@@ -5,6 +5,8 @@
  * et d'identifier précisément les goulots d'étranglement (ex: chargement d'identité établissement).
  */
 
+import { supabase } from '../supabase';
+
 const getSupabaseConfig = () => {
   const metaEnv = typeof import.meta !== 'undefined' ? (import.meta as any).env : undefined;
   const envUrl = metaEnv?.VITE_SUPABASE_URL || 'https://iymzthjkucvhyjnxpslg.supabase.co';
@@ -615,7 +617,6 @@ class SupabaseLatencyTrackerService {
     const items: DiagnosticBenchmarkItem[] = [];
     const insights: DiagnosticDiagnosisInsight[] = [];
     const { supabaseUrl, supabaseAnonKey } = getSupabaseConfig();
-    const { supabase } = await import('../supabase');
 
     // Helper intelligent pour évaluer le statut de la requête SQL par rapport au RTT réseau
     const computeQueryStatus = (

@@ -1,62 +1,83 @@
--- Mise à jour de la fonction get_student_global_debt pour supporter le multi-devises
-CREATE OR REPLACE FUNCTION public.get_student_global_debt(p_student_id UUID)
+-- Mise à jour de la fonction get_student_global_debt pour supporter le multi-devises, le multi-tenant et l'audit sans arriérés fantômes
+DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid);
+DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid, uuid);
+DROP FUNCTION IF EXISTS public.get_student_global_debt(uuid, uuid, uuid);
+
+CREATE OR REPLACE FUNCTION public.get_student_global_debt(
+    p_student_id UUID, 
+    p_exclude_year_id UUID DEFAULT NULL::UUID,
+    p_school_id UUID DEFAULT NULL::UUID
+)
 RETURNS NUMERIC AS $$
 DECLARE
     v_total_due NUMERIC := 0;
     v_total_paid NUMERIC := 0;
-    v_discount NUMERIC := 0;
+    v_ad_hoc_due NUMERIC := 0;
+    v_has_other_enrollments BOOLEAN := FALSE;
 BEGIN
-    -- 1. Calculer tout ce que l'élève aurait dû payer (Scolarité + Frais divers obligatoires) pour chaque année où il était inscrit
+    -- 0. Vérifier si l'élève a des inscriptions antérieures distinctes de l'année exclue
+    SELECT EXISTS (
+        SELECT 1 FROM public.enrollments e
+        JOIN public.academic_years ay ON e.academic_year_id = ay.id
+        WHERE e.student_id = p_student_id
+        AND (p_school_id IS NULL OR e.school_id = p_school_id)
+        AND (p_exclude_year_id IS NULL OR e.academic_year_id IS DISTINCT FROM p_exclude_year_id)
+        AND ay.status IN ('PAST', 'ACTIVE')
+    ) INTO v_has_other_enrollments;
+
+    -- Si l'élève n'a aucune inscription antérieure, la dette historique est strictement 0
+    IF NOT v_has_other_enrollments THEN
+        RETURN 0;
+    END IF;
+
+    -- 1. Calculer tout ce que l'élève aurait dû payer (Scolarité + Frais divers obligatoires) pour chaque année antérieure
     SELECT COALESCE(SUM(
-        fp.tuition_fee + 
+        GREATEST(0, 
+            COALESCE(fp.tuition_fee, 0) 
+            - COALESCE(e.tuition_discount, 0) 
+            - COALESCE(s.discount_amount, 0) 
+            + COALESCE(e.tuition_addition, 0)
+        ) + 
         CASE WHEN fp.is_misc_mandatory THEN COALESCE(fp.misc_fee_htg, 0) ELSE 0 END
     ), 0)
     INTO v_total_due
     FROM public.enrollments e
     JOIN public.fee_plans fp ON e.class_id = fp.class_id AND e.academic_year_id = fp.academic_year_id
-    WHERE e.student_id = p_student_id;
+    JOIN public.academic_years ay ON e.academic_year_id = ay.id
+    JOIN public.students s ON e.student_id = s.id
+    WHERE e.student_id = p_student_id
+    AND (p_school_id IS NULL OR e.school_id = p_school_id)
+    AND (p_school_id IS NULL OR fp.school_id = p_school_id)
+    AND (p_school_id IS NULL OR s.school_id = p_school_id)
+    AND (p_exclude_year_id IS NULL OR e.academic_year_id IS DISTINCT FROM p_exclude_year_id)
+    AND ay.status IN ('PAST', 'ACTIVE');
 
-    -- 2. Ajouter les frais d'inscription une seule fois (pour la toute première année d'inscription à l'école)
-    SELECT COALESCE(fp.inscription_fee, 0)
-    INTO v_total_due
-    FROM (
-        SELECT fp.inscription_fee
-        FROM public.enrollments e
-        JOIN public.fee_plans fp ON e.class_id = fp.class_id AND e.academic_year_id = fp.academic_year_id
-        WHERE e.student_id = p_student_id
-        ORDER BY e.created_at ASC
-        LIMIT 1
-    ) AS first_year_fee;
+    -- 2. Ajouter les frais ad-hoc des sessions antérieures
+    SELECT COALESCE(SUM(c.amount), 0)
+    INTO v_ad_hoc_due
+    FROM public.student_ad_hoc_fees s
+    JOIN public.ad_hoc_campaigns c ON s.campaign_id = c.id
+    JOIN public.academic_years ay ON c.academic_year_id = ay.id
+    WHERE s.student_id = p_student_id
+    AND (p_school_id IS NULL OR s.school_id = p_school_id)
+    AND (p_school_id IS NULL OR c.school_id = p_school_id)
+    AND (p_exclude_year_id IS NULL OR c.academic_year_id IS DISTINCT FROM p_exclude_year_id)
+    AND ay.status IN ('PAST', 'ACTIVE');
 
-    -- On rajoute les frais d'inscription au total dû
-    -- Note: v_total_due contient déjà la somme des scolarités, on doit lui ajouter l'inscription
-    SELECT (
-        COALESCE(SUM(fp.tuition_fee + CASE WHEN fp.is_misc_mandatory THEN COALESCE(fp.misc_fee_htg, 0) ELSE 0 END), 0) +
-        COALESCE((
-            SELECT fp.inscription_fee
-            FROM public.enrollments e
-            JOIN public.fee_plans fp ON e.class_id = fp.class_id AND e.academic_year_id = fp.academic_year_id
-            WHERE e.student_id = p_student_id
-            ORDER BY e.created_at ASC
-            LIMIT 1
-        ), 0)
-    )
-    INTO v_total_due
-    FROM public.enrollments e
-    JOIN public.fee_plans fp ON e.class_id = fp.class_id AND e.academic_year_id = fp.academic_year_id
-    WHERE e.student_id = p_student_id;
+    v_total_due := v_total_due + v_ad_hoc_due;
 
-    -- 2. Soustraire les réductions accordées (actuellement stockées sur la table student, mais on pourrait les historiser plus tard)
-    -- Pour l'instant on considère que la réduction s'applique sur l'année en cours
-    SELECT COALESCE(discount_amount, 0) INTO v_discount FROM public.students WHERE id = p_student_id;
-
-    -- 3. Calculer le total des paiements effectués (en utilisant l'équivalent HTG ou le montant brut si ancien)
-    SELECT COALESCE(SUM(COALESCE(amount_htg_equivalent, amount)), 0)
+    -- 3. Calculer le total des paiements effectués pour les sessions antérieures
+    SELECT COALESCE(SUM(COALESCE(p.amount_htg_equivalent, p.amount)), 0)
     INTO v_total_paid
-    FROM public.payments
-    WHERE student_id = p_student_id;
+    FROM public.payments p
+    LEFT JOIN public.academic_years ay ON p.academic_year_id = ay.id
+    WHERE p.student_id = p_student_id 
+    AND (p_school_id IS NULL OR p.school_id = p_school_id)
+    AND (p_exclude_year_id IS NULL OR p.academic_year_id IS DISTINCT FROM p_exclude_year_id)
+    AND (p.status IS NULL OR (p.status != 'ANNULE' AND p.status NOT LIKE '%REJET%'))
+    AND (ay.id IS NULL OR ay.status IN ('PAST', 'ACTIVE'));
 
-    RETURN GREATEST(v_total_due - v_discount - v_total_paid, 0);
+    RETURN GREATEST(v_total_due - v_total_paid, 0);
 END;
 $$ LANGUAGE plpgsql;
 

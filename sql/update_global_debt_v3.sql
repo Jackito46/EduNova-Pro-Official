@@ -16,7 +16,22 @@ DECLARE
     v_total_due NUMERIC := 0;
     v_total_paid NUMERIC := 0;
     v_ad_hoc_due NUMERIC := 0;
+    v_has_other_enrollments BOOLEAN := FALSE;
 BEGIN
+    -- 0. Check if student has other enrollments distinct from excluded year
+    SELECT EXISTS (
+        SELECT 1 FROM public.enrollments e
+        JOIN public.academic_years ay ON e.academic_year_id = ay.id
+        WHERE e.student_id = p_student_id
+        AND (p_school_id IS NULL OR e.school_id = p_school_id)
+        AND (p_exclude_year_id IS NULL OR e.academic_year_id IS DISTINCT FROM p_exclude_year_id)
+        AND ay.status IN ('PAST', 'ACTIVE')
+    ) INTO v_has_other_enrollments;
+
+    IF NOT v_has_other_enrollments THEN
+        RETURN 0;
+    END IF;
+
     -- A. Calculate academic dues (Tuition + Mandatory Misc fees - Discounts + Additions)
     SELECT COALESCE(SUM(
         GREATEST(0, 
