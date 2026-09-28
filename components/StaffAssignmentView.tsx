@@ -30,6 +30,9 @@ export interface AssignmentConflict {
   title: string;
   message: string;
   recommendation?: string;
+  suggestedStart?: string;
+  suggestedEnd?: string;
+  suggestedDay?: string;
   details?: {
     teacherName?: string;
     className?: string;
@@ -58,6 +61,53 @@ const QUICK_TIME_SLOTS = [
   { label: '08h - 12h (4h)', start: '08:00', end: '12:00' },
   { label: '13h - 17h (4h)', start: '13:00', end: '17:00' },
 ];
+
+const timeToMinutesHelper = (t: string): number => {
+  if (!t) return -1;
+  const parts = t.trim().split(':');
+  if (parts.length < 2) return -1;
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  if (isNaN(h) || isNaN(m)) return -1;
+  return h * 60 + m;
+};
+
+const checkSlotOverlap = (s1: string, e1: string, s2: string, e2: string): boolean => {
+  const start1 = timeToMinutesHelper(s1);
+  const end1 = timeToMinutesHelper(e1);
+  const start2 = timeToMinutesHelper(s2);
+  const end2 = timeToMinutesHelper(e2);
+  if (start1 === -1 || end1 === -1 || start2 === -1 || end2 === -1) return false;
+  return (start1 < end2 && start2 < end1);
+};
+
+/**
+ * Calcule automatiquement le premier créneau standard libre pour cet enseignant
+ * afin d'éviter de préremplir un horaire déjà occupé dès le chargement du formulaire.
+ */
+export const findFirstAvailableSlot = (existingAssignments: StaffAssignment[], preferredDay = 'Lundi') => {
+  const orderedDays = [preferredDay, ...DAYS.filter(d => d !== preferredDay)];
+  const standardSlots = [
+    { start: '08:00', end: '10:00' },
+    { start: '10:00', end: '12:00' },
+    { start: '13:00', end: '15:00' },
+    { start: '15:00', end: '17:00' }
+  ];
+
+  for (const day of orderedDays) {
+    const dayAssignments = (existingAssignments || []).filter(a => a.day_of_week === day && a.start_time && a.end_time);
+    for (const slot of standardSlots) {
+      const hasConflict = dayAssignments.some(a => 
+        checkSlotOverlap(slot.start, slot.end, a.start_time.substring(0, 5), a.end_time.substring(0, 5))
+      );
+      if (!hasConflict) {
+        return { day, start: slot.start, end: slot.end };
+      }
+    }
+  }
+
+  return { day: 'Lundi', start: '08:00', end: '10:00' };
+};
 
 /**
  * Fonction de validation du service d'importation :
@@ -124,6 +174,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [allowAllSubjects, setAllowAllSubjects] = useState(false);
+  const [slotTouched, setSlotTouched] = useState(false);
   const [newAssignment, setNewAssignment] = useState({
     subject_id: '',
     class_id: '',
@@ -209,7 +260,17 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         if (targetYearId) {
           allSchoolQuery = allSchoolQuery.or(`academic_year_id.eq.${targetYearId},academic_year_id.is.null`);
         }
-        const { data: allAssignmentsData } = await allSchoolQuery;
+        let allAssignmentsData: any = null;
+        const res = await allSchoolQuery;
+        if (res.error) {
+          const fallbackRes = await supabase
+            .from('staff_assignments')
+            .select('id, staff_id, class_id, class_name, subject_id, subject_name, day_of_week, start_time, end_time, staff:staff_id(id, first_name, last_name, campus_id)')
+            .eq('school_id', user.school_id);
+          allAssignmentsData = fallbackRes.data;
+        } else {
+          allAssignmentsData = res.data;
+        }
         setAllSchoolAssignments(allAssignmentsData || []);
       } catch (errSchool) {
         console.warn("Erreur lors du pré-chargement des créneaux de l'école:", errSchool);
@@ -251,7 +312,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       }
 
       let classesQuery = supabase.from('classes').select('id, name, campus_id').eq('school_id', user.school_id);
-      let subjectsQuery = supabase.from('subjects').select('id, name').eq('school_id', user.school_id);
+      let subjectsQuery = supabase.from('subjects').select('id, name, code, coefficient').eq('school_id', user.school_id).order('name');
 
       if (currentCampusId && isValidUuid(currentCampusId)) {
         classesQuery = classesQuery.eq('campus_id', currentCampusId);
@@ -261,7 +322,10 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         supabase.from('staff').select('*').eq('id', staffId).single(),
         classesQuery,
         subjectsQuery,
-        supabase.from('class_subjects').select('class_id, subject_id, subject:subjects(id, name)'),
+        supabase
+          .from('class_subjects')
+          .select('id, class_id, subject_id, coefficient, school_id, subject:subjects(id, name, code)')
+          .or(`school_id.eq.${user.school_id},school_id.is.null`),
         enrollsQuery
       ]);
 
@@ -277,7 +341,17 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         setNewAssignment(prev => ({ ...prev, hourly_rate: staffRes.data.amount?.toString() || '' }));
       }
 
-      if (assignmentsRes.data) setAssignments(assignmentsRes.data);
+      if (assignmentsRes.data) {
+        setAssignments(assignmentsRes.data);
+        const freeSlot = findFirstAvailableSlot(assignmentsRes.data);
+        setNewAssignment(prev => ({
+          ...prev,
+          day: freeSlot.day,
+          start: freeSlot.start,
+          end: freeSlot.end,
+          hourly_rate: staffRes.data?.amount?.toString() || prev.hourly_rate || ''
+        }));
+      }
 
       const classesData = classesRes.data || [];
       setAllClasses(classesData);
@@ -582,6 +656,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
 
   const startEdit = useCallback((a: StaffAssignment) => {
     setEditingId(a.id);
+    setSlotTouched(true);
     const cls = allClasses.find(c => c.name === a.class_name);
     setNewAssignment({
       subject_id: a.subject_id,
@@ -597,12 +672,22 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
   const cancelEdit = () => {
     setEditingId(null);
     setAllowAllSubjects(false);
-    setNewAssignment({ subject_id: '', class_id: '', day: 'Lundi', start: '08:00', end: '10:00', hourly_rate: staff?.amount?.toString() || '' });
+    setSlotTouched(false);
+    const freeSlot = findFirstAvailableSlot(assignments);
+    setNewAssignment({
+      subject_id: '',
+      class_id: '',
+      day: freeSlot.day,
+      start: freeSlot.start,
+      end: freeSlot.end,
+      hourly_rate: staff?.amount?.toString() || ''
+    });
     setFormError(null);
   };
 
   const cloneAssignment = useCallback((a: StaffAssignment) => {
     setEditingId(null);
+    setSlotTouched(true);
     const cls = allClasses.find(c => c.name === a.class_name);
     setNewAssignment({
       subject_id: a.subject_id,
@@ -633,19 +718,49 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     };
   }, [newAssignment.start, newAssignment.end]);
 
+  // Helper to convert HH:MM to minutes
+  const timeToMinutes = (t: string): number => {
+    if (!t) return -1;
+    const parts = t.trim().split(':');
+    if (parts.length < 2) return -1;
+    const h = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    if (isNaN(h) || isNaN(m)) return -1;
+    return h * 60 + m;
+  };
+
+  const formatMinutes = (totalMinutes: number): string => {
+    const norm = ((totalMinutes % 1440) + 1440) % 1440;
+    const h = Math.floor(norm / 60);
+    const m = norm % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
   // Détection proactive et immédiate des conflits lors de la saisie (avant toute sauvegarde)
   const liveConflict = useMemo<AssignmentConflict | null>(() => {
+    // 0. Protection UX anti-alerte intempestive :
+    // Si le formulaire est à l'état initial (aucun choix effectué par l'utilisateur : pas de classe choisie,
+    // pas d'édition en cours, et aucun créneau horaire touché), on n'affiche aucun avertissement prématuré.
+    if (!editingId && !newAssignment.class_id && !slotTouched) {
+      return null;
+    }
+
     if (!newAssignment.start || !newAssignment.end || !newAssignment.day) {
       return null;
     }
 
     const checkOverlap = (start1: string, end1: string, start2: string, end2: string) => {
-      return (start1 < end2 && start2 < end1);
+      const s1 = timeToMinutes(start1);
+      const e1 = timeToMinutes(end1);
+      const s2 = timeToMinutes(start2);
+      const e2 = timeToMinutes(end2);
+      if (s1 === -1 || e1 === -1 || s2 === -1 || e2 === -1) return false;
+      return (s1 < e2 && s2 < e1);
     };
 
-    const start = new Date(`2000-01-01T${newAssignment.start}`);
-    const end = new Date(`2000-01-01T${newAssignment.end}`);
-    const diffMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+    const startMin = timeToMinutes(newAssignment.start);
+    const endMin = timeToMinutes(newAssignment.end);
+    const diffMinutes = endMin - startMin;
 
     // 1. Incohérence chronologique
     if (diffMinutes <= 0) {
@@ -654,6 +769,8 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         title: "Heure de fin antérieure ou égale au début",
         message: `L'heure de fin (${newAssignment.end}) doit être strictement postérieure à l'heure de début (${newAssignment.start}).`,
         recommendation: "Ajustez les heures pour définir un créneau chronologiquement valide.",
+        suggestedStart: newAssignment.end,
+        suggestedEnd: newAssignment.start,
         details: {
           day: newAssignment.day,
           startTime: newAssignment.start,
@@ -669,6 +786,8 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         title: "Durée de créneau trop courte",
         message: `La durée minimale requise pour un cours est de 15 minutes (${Math.round(diffMinutes)} min saisie).`,
         recommendation: "Augmentez la durée du créneau horaire.",
+        suggestedStart: newAssignment.start,
+        suggestedEnd: formatMinutes(startMin + 60),
         details: {
           day: newAssignment.day,
           startTime: newAssignment.start,
@@ -678,6 +797,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     }
 
     const teacherName = staff ? formatStudentName(staff.last_name, staff.first_name).fullName : 'Cet enseignant';
+    const reqDur = Math.max(60, diffMinutes > 0 ? diffMinutes : 120);
 
     // 3. Conflit enseignant dans la liste locale de la session en cours
     const localTeacherOverlap = assignments.find(a => {
@@ -692,11 +812,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     if (localTeacherOverlap) {
       const tStart = localTeacherOverlap.start_time.substring(0, 5);
       const tEnd = localTeacherOverlap.end_time.substring(0, 5);
+      const nextEnd = formatMinutes(timeToMinutes(tEnd) + reqDur);
       return {
         type: 'teacher',
         title: "Conflit d'horaire pour l'enseignant détecté",
         message: `${teacherName} est déjà programmé(e) pour un cours en "${localTeacherOverlap.class_name || 'autre classe'}" (${localTeacherOverlap.subject_name || 'Cours'}) de ${tStart} à ${tEnd} le ${newAssignment.day}.`,
         recommendation: `Un enseignant ne peut pas être à deux endroits simultanément. Vous pouvez débuter ce cours à partir de ${tEnd}, ou choisir un autre jour.`,
+        suggestedStart: tEnd,
+        suggestedEnd: nextEnd,
         details: {
           teacherName,
           className: localTeacherOverlap.class_name,
@@ -722,11 +845,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     if (dbTeacherOverlap) {
       const tStart = dbTeacherOverlap.start_time.substring(0, 5);
       const tEnd = dbTeacherOverlap.end_time.substring(0, 5);
+      const nextEnd = formatMinutes(timeToMinutes(tEnd) + reqDur);
       return {
         type: 'teacher',
         title: "Conflit d'horaire pour l'enseignant détecté",
         message: `${teacherName} est déjà programmé(e) pour un cours en "${dbTeacherOverlap.class_name || 'autre classe'}" (${dbTeacherOverlap.subject_name || 'Cours'}) de ${tStart} à ${tEnd} le ${newAssignment.day}.`,
         recommendation: `Un enseignant ne peut pas être à deux endroits simultanément. Vous pouvez débuter ce cours à partir de ${tEnd}, ou choisir un autre jour.`,
+        suggestedStart: tEnd,
+        suggestedEnd: nextEnd,
         details: {
           teacherName,
           className: dbTeacherOverlap.class_name,
@@ -761,11 +887,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       if (localClassOverlap) {
         const cStart = localClassOverlap.start_time.substring(0, 5);
         const cEnd = localClassOverlap.end_time.substring(0, 5);
+        const nextEnd = formatMinutes(timeToMinutes(cEnd) + reqDur);
         return {
           type: 'class',
           title: `Conflit d'horaire pour la classe ${targetClassName} détecté`,
           message: `La classe "${targetClassName}" a déjà un cours de "${localClassOverlap.subject_name}" programmé de ${cStart} à ${cEnd} le ${newAssignment.day}.`,
           recommendation: `Une classe ne peut avoir qu'un seul cours à la fois. Veuillez choisir un horaire débutant à partir de ${cEnd} ou changer de jour.`,
+          suggestedStart: cEnd,
+          suggestedEnd: nextEnd,
           details: {
             teacherName,
             className: targetClassName,
@@ -804,11 +933,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
         const cEnd = dbClassOverlap.end_time.substring(0, 5);
         const otherStaff = dbClassOverlap.staff;
         const otherStaffName = otherStaff ? formatStudentName(otherStaff.last_name, otherStaff.first_name).fullName : 'un autre enseignant';
+        const nextEnd = formatMinutes(timeToMinutes(cEnd) + reqDur);
         return {
           type: 'class',
           title: `Conflit d'horaire pour la classe ${targetClassName} détecté`,
           message: `La classe "${targetClassName}" a déjà un cours de "${dbClassOverlap.subject_name || 'Matière'}" assuré par ${otherStaffName} de ${cStart} à ${cEnd} le ${newAssignment.day}.`,
           recommendation: `Une classe ne peut avoir qu'un seul cours à la fois. Veuillez choisir un horaire débutant à partir de ${cEnd} ou changer de jour.`,
+          suggestedStart: cEnd,
+          suggestedEnd: nextEnd,
           details: {
             teacherName: otherStaffName,
             className: targetClassName,
@@ -822,7 +954,19 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     }
 
     return null;
-  }, [newAssignment, assignments, allSchoolAssignments, staff, staffId, editingId, allClasses]);
+  }, [newAssignment, assignments, allSchoolAssignments, staff, staffId, editingId, allClasses, slotTouched]);
+
+  const applySuggestedSlot = (suggestedStart: string, suggestedEnd: string, suggestedDay?: string) => {
+    setSlotTouched(true);
+    setNewAssignment(prev => ({
+      ...prev,
+      start: suggestedStart,
+      end: suggestedEnd,
+      ...(suggestedDay ? { day: suggestedDay } : {})
+    }));
+    setFormError(null);
+    toast.success(`Créneau horaire corrigé : ${suggestedStart} - ${suggestedEnd} (${suggestedDay || newAssignment.day})`);
+  };
 
   const activeConflict = liveConflict || (formError ? {
     type: 'validation' as const,
@@ -838,23 +982,37 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
     
     const targetCls = findClassInList(newAssignment.class_id, allClasses);
     const targetClassName = targetCls?.name || '';
+    const affiliatedMap = new Map<string, any>();
     const affiliatedIds = new Set<string>();
 
     // 1. Filtrer les matières strictement associées à cette classe dans class_subjects (programme officiel)
     classSubjects.forEach(cs => {
-      if (cs.class_id === newAssignment.class_id || matchClasses(cs.class_id, targetClassName || newAssignment.class_id, allClasses)) {
-        const found = findSubjectInList(cs.subject_id, availableSubjects) || (cs.subject as any);
-        if (found?.id) affiliatedIds.add(found.id);
-        else if (cs.subject_id) affiliatedIds.add(cs.subject_id);
+      const isTargetClass = cs.class_id === newAssignment.class_id || 
+                            matchClasses(cs.class_id, targetClassName || newAssignment.class_id, allClasses);
+      if (isTargetClass) {
+        const found = findSubjectInList(cs.subject_id, availableSubjects);
+        const subj = found || (Array.isArray(cs.subject) ? cs.subject[0] : cs.subject);
+        if (subj?.id) {
+          affiliatedIds.add(subj.id);
+          affiliatedMap.set(subj.id, subj);
+        } else if (cs.subject_id) {
+          affiliatedIds.add(cs.subject_id);
+        }
       }
     });
       
     // 2. Ajouter les matières déjà attribuées pour cette classe dans les assignations existantes de l'école
-    assignments.forEach(a => {
-      if (a.class_id === newAssignment.class_id || matchClasses(a.class_name || a.class_id, targetClassName || newAssignment.class_id, allClasses)) {
+    [...assignments, ...allSchoolAssignments].forEach(a => {
+      const isTargetClass = a.class_id === newAssignment.class_id || 
+                            matchClasses(a.class_name || a.class_id, targetClassName || newAssignment.class_id, allClasses);
+      if (isTargetClass) {
         const found = findSubjectInList(a.subject_id || a.subject_name, availableSubjects);
-        if (found) affiliatedIds.add(found.id);
-        else if (a.subject_id) affiliatedIds.add(a.subject_id);
+        if (found?.id) {
+          affiliatedIds.add(found.id);
+          affiliatedMap.set(found.id, found);
+        } else if (a.subject_id) {
+          affiliatedIds.add(a.subject_id);
+        }
       }
     });
 
@@ -863,19 +1021,30 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       const currentEditing = assignments.find(a => a.id === editingId);
       if (currentEditing && (currentEditing.class_id === newAssignment.class_id || matchClasses(currentEditing.class_name || currentEditing.class_id, targetClassName || newAssignment.class_id, allClasses))) {
         const found = findSubjectInList(currentEditing.subject_id || currentEditing.subject_name, availableSubjects);
-        if (found) affiliatedIds.add(found.id);
-        else if (currentEditing.subject_id) affiliatedIds.add(currentEditing.subject_id);
+        if (found?.id) {
+          affiliatedIds.add(found.id);
+          affiliatedMap.set(found.id, found);
+        } else if (currentEditing.subject_id) {
+          affiliatedIds.add(currentEditing.subject_id);
+        }
       }
     }
 
-    const affiliated = availableSubjects.filter(s => affiliatedIds.has(s.id));
-    const others = availableSubjects.filter(s => !affiliatedIds.has(s.id));
+    // Compléter avec les objets complets de availableSubjects si présents
+    availableSubjects.forEach(s => {
+      if (affiliatedIds.has(s.id) && !affiliatedMap.has(s.id)) {
+        affiliatedMap.set(s.id, s);
+      }
+    });
+
+    const affiliated = Array.from(affiliatedMap.values());
+    const others = availableSubjects.filter(s => !affiliatedMap.has(s.id));
     
     return {
       affiliatedSubjects: affiliated,
       otherSubjects: others
     };
-  }, [newAssignment.class_id, classSubjects, availableSubjects, assignments, allClasses, editingId]);
+  }, [newAssignment.class_id, classSubjects, availableSubjects, assignments, allSchoolAssignments, allClasses, editingId]);
 
   // Backward compatibility alias
   const filteredSubjects = affiliatedSubjects.length > 0 ? affiliatedSubjects : availableSubjects;
@@ -1121,14 +1290,23 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       hourly_rate: parseFloat(newAssignment.hourly_rate) || 0
     };
 
-    if (editingId) {
-      setAssignments(prev => prev.map(a => String(a.id) === String(editingId) ? updatedData : a));
-      setEditingId(null);
-    } else {
-      setAssignments(prev => [...prev, updatedData]);
-    }
+    const updatedAssignments = editingId 
+      ? assignments.map(a => String(a.id) === String(editingId) ? updatedData : a)
+      : [...assignments, updatedData];
 
-    setNewAssignment({ subject_id: '', class_id: '', day: 'Lundi', start: '08:00', end: '10:00', hourly_rate: staff?.amount?.toString() || '' });
+    setAssignments(updatedAssignments);
+    if (editingId) setEditingId(null);
+
+    const nextFree = findFirstAvailableSlot(updatedAssignments);
+    setNewAssignment({ 
+      subject_id: '', 
+      class_id: '', 
+      day: nextFree.day, 
+      start: nextFree.start, 
+      end: nextFree.end, 
+      hourly_rate: staff?.amount?.toString() || '' 
+    });
+    setSlotTouched(false);
     setHasUnsavedChanges(true);
     setSaveStatus('idle');
   };
@@ -1649,6 +1827,24 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                           </span>
                         </div>
                       )}
+
+                      {/* Bouton d'action de résolution rapide */}
+                      {activeConflict.suggestedStart && activeConflict.suggestedEnd && (
+                        <div className="pt-2 flex items-center gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            onClick={() => applySuggestedSlot(activeConflict.suggestedStart!, activeConflict.suggestedEnd!, activeConflict.suggestedDay)}
+                            className="px-3 py-1.5 bg-white hover:bg-slate-50 text-indigo-700 hover:text-indigo-900 font-extrabold text-xs rounded-xl border border-indigo-200 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                          >
+                            <Sparkles size={13} className="text-indigo-600" />
+                            <span>
+                              {activeConflict.type === 'time_order'
+                                ? `Inverser les horaires (${activeConflict.suggestedStart} - ${activeConflict.suggestedEnd})`
+                                : `Décaler automatiquement à ${activeConflict.suggestedStart} - ${activeConflict.suggestedEnd}`}
+                            </span>
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1804,9 +2000,10 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                            key={d}
                            type="button"
                            onClick={() => {
-                             setNewAssignment(prev => ({ ...prev, day: d }));
-                             setFormError(null);
-                           }}
+                              setSlotTouched(true);
+                              setNewAssignment(prev => ({ ...prev, day: d }));
+                              setFormError(null);
+                            }}
                            className={`py-1.5 text-center text-xs font-bold rounded-xl transition-all border cursor-pointer ${
                              isSelected 
                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs scale-[1.02]' 
@@ -1848,13 +2045,14 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                            key={slot.label}
                            type="button"
                            onClick={() => {
-                             setNewAssignment(prev => ({
-                               ...prev,
-                               start: slot.start,
-                               end: slot.end
-                             }));
-                             setFormError(null);
-                           }}
+                              setSlotTouched(true);
+                              setNewAssignment(prev => ({
+                                ...prev,
+                                start: slot.start,
+                                end: slot.end
+                              }));
+                              setFormError(null);
+                            }}
                            className={`px-2 py-0.5 text-[10px] font-bold rounded-lg border transition-all cursor-pointer ${
                              isSelected
                                ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
@@ -1873,9 +2071,13 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                          <input 
                            id="start" 
                            type="time" 
-                           className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono shadow-2xs" 
+                           className={`w-full px-2.5 py-1.5 bg-white text-slate-900 border rounded-xl text-xs font-bold outline-none transition-all font-mono shadow-2xs ${
+                             activeConflict?.type === 'teacher' || activeConflict?.type === 'class' || activeConflict?.type === 'time_order'
+                               ? 'border-rose-400 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/10'
+                               : 'border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10'
+                           }`}
                            value={newAssignment.start} 
-                           onChange={e => {setNewAssignment(prev => ({...prev, start: e.target.value})); setFormError(null);}} 
+                           onChange={e => { setSlotTouched(true); setNewAssignment(prev => ({...prev, start: e.target.value})); setFormError(null); }} 
                          />
                       </div>
                       <div className="space-y-1">
@@ -1883,12 +2085,37 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                          <input 
                            id="end" 
                            type="time" 
-                           className="w-full px-2.5 py-1.5 bg-white text-slate-900 border border-slate-200 focus:border-indigo-600 rounded-xl text-xs font-bold outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all font-mono shadow-2xs" 
+                           className={`w-full px-2.5 py-1.5 bg-white text-slate-900 border rounded-xl text-xs font-bold outline-none transition-all font-mono shadow-2xs ${
+                             activeConflict?.type === 'teacher' || activeConflict?.type === 'class' || activeConflict?.type === 'time_order'
+                               ? 'border-rose-400 focus:border-rose-600 focus:ring-2 focus:ring-rose-500/10'
+                               : 'border-slate-200 focus:border-indigo-600 focus:ring-2 focus:ring-indigo-500/10'
+                           }`}
                            value={newAssignment.end} 
-                           onChange={e => {setNewAssignment(prev => ({...prev, end: e.target.value})); setFormError(null);}} 
+                           onChange={e => { setSlotTouched(true); setNewAssignment(prev => ({...prev, end: e.target.value})); setFormError(null); }} 
                          />
                       </div>
                    </div>
+
+                   {/* Alerte contextuelle intégrée dans les horaires */}
+                   {activeConflict && (
+                     <div className="mt-1 flex items-center justify-between gap-2 p-2 bg-rose-50 border border-rose-200 rounded-xl text-rose-950 text-xs animate-in fade-in">
+                       <div className="flex items-center gap-1.5 min-w-0">
+                         <AlertTriangle size={13} className="text-rose-600 shrink-0" />
+                         <span className="font-bold text-[10.5px] truncate">
+                           Conflit sur ce créneau ({newAssignment.day} {newAssignment.start} - {newAssignment.end})
+                         </span>
+                       </div>
+                       {activeConflict.suggestedStart && activeConflict.suggestedEnd && (
+                         <button
+                           type="button"
+                           onClick={() => applySuggestedSlot(activeConflict.suggestedStart!, activeConflict.suggestedEnd!, activeConflict.suggestedDay)}
+                           className="text-[10px] font-extrabold text-indigo-700 bg-white px-2 py-0.5 rounded-md border border-indigo-200 hover:bg-indigo-50 shrink-0 cursor-pointer shadow-2xs transition-all"
+                         >
+                           ⚡ Corriger ({activeConflict.suggestedStart} - {activeConflict.suggestedEnd})
+                         </button>
+                       )}
+                     </div>
+                   )}
                 </div>
 
                 {/* 5. Taux horaire & Rémunération */}
@@ -1932,8 +2159,8 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                   </p>
                 </div>
 
-                {/* Erreurs de validation visuelles */}
-                {formError && (
+                {/* Erreurs de validation classiques supplémentaires si applicable */}
+                {formError && !activeConflict && (
                   <div className="bg-rose-50 border border-rose-200 rounded-xl p-3 flex items-start gap-2 animate-in fade-in slide-in-from-top-2">
                     <AlertTriangle className="text-rose-600 shrink-0 mt-0.5" size={15} />
                     <div className="flex-1 min-w-0">
@@ -1945,18 +2172,56 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                   </div>
                 )}
 
-                {/* Bouton d'action principal */}
+                {/* Bouton d'action principal avec sécurité anti-conflit */}
                 <button 
                   onClick={handleProcessAssignment} 
                   type="button"
-                  className={`w-full py-2.5 rounded-xl font-black text-xs tracking-tight transition-all flex items-center justify-center gap-2 active:scale-98 shadow-xs cursor-pointer ${
-                    editingId 
-                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20' 
-                      : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
+                  disabled={!!activeConflict || !newAssignment.class_id || !newAssignment.subject_id}
+                  className={`w-full py-2.5 rounded-xl font-black text-xs tracking-tight transition-all flex items-center justify-center gap-2 active:scale-98 shadow-xs ${
+                    activeConflict
+                      ? 'bg-rose-50 text-rose-700 border border-rose-200 cursor-not-allowed shadow-none'
+                      : (!newAssignment.class_id || !newAssignment.subject_id)
+                      ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed shadow-none'
+                      : editingId 
+                      ? 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-indigo-600/20 cursor-pointer' 
+                      : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20 cursor-pointer'
                   }`}
+                  title={
+                    activeConflict 
+                      ? "Conflit d'horaire détecté : veuillez ajuster le créneau pour valider" 
+                      : !newAssignment.class_id 
+                      ? `Veuillez sélectionner un(e) ${terminology.class.toLowerCase()}`
+                      : !newAssignment.subject_id
+                      ? `Veuillez sélectionner un(e) ${terminology.subject.toLowerCase()}`
+                      : undefined
+                  }
                 >
-                   {editingId ? <RefreshCw size={15} /> : <Plus size={15} />}
-                   {editingId ? 'Valider la modification du créneau' : 'Ajouter au planning de cours'}
+                   {activeConflict ? (
+                     <>
+                       <AlertTriangle size={15} className="text-rose-600" />
+                       <span>Conflit d'horaire détecté - Ajustement requis</span>
+                     </>
+                   ) : !newAssignment.class_id ? (
+                     <>
+                       <Layers size={15} className="text-slate-400" />
+                       <span>Choisir un(e) {terminology.class.toLowerCase()} pour continuer</span>
+                     </>
+                   ) : !newAssignment.subject_id ? (
+                     <>
+                       <BookOpen size={15} className="text-slate-400" />
+                       <span>Choisir un(e) {terminology.subject.toLowerCase()} pour continuer</span>
+                     </>
+                   ) : editingId ? (
+                     <>
+                       <RefreshCw size={15} />
+                       <span>Valider la modification du créneau</span>
+                     </>
+                   ) : (
+                     <>
+                       <Plus size={15} />
+                       <span>Ajouter au planning de cours</span>
+                     </>
+                   )}
                 </button>
               </div>
            </div>
