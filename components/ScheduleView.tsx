@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   Calendar, Clock, Download, Plus, X, AlertCircle, CheckCircle, Trash2, 
   Users, BookOpen, Banknote, GraduationCap, Building2, MapPin, Printer,
-  Layers, ChevronRight, Sparkles, Filter, Check
+  Layers, ChevronRight, Sparkles, Filter, Check, AlertTriangle, Info
 } from 'lucide-react';
 import { supabase } from '../supabase';
 import { SchoolClass, Subject, StaffMember, StaffAssignment, UserProfile, SchoolCampus } from '../types';
@@ -21,6 +21,20 @@ import {
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { StaffSelectorPill } from './StaffSelectorPill';
 import { SelectPill, SelectOption } from './SelectPill';
+
+export interface ScheduleConflict {
+  type: 'teacher' | 'class' | 'validation';
+  title: string;
+  message: string;
+  details?: {
+    teacherName?: string;
+    className?: string;
+    subjectName?: string;
+    day?: string;
+    startTime?: string;
+    endTime?: string;
+  };
+}
 
 interface ScheduleViewProps {
   user: UserProfile;
@@ -61,6 +75,14 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const [toast, setToast] = useState<{message: string, type: 'success'|'error'} | null>(null);
+  const [formConflict, setFormConflict] = useState<ScheduleConflict | null>(null);
+
+  // Clear modal conflict when form fields change
+  useEffect(() => {
+    if (formConflict) {
+      setFormConflict(null);
+    }
+  }, [formData.start_time, formData.end_time, formData.day_of_week, formData.staff_id, formData.class_id]);
 
   // Sync selectedCampusFilter with context currentCampusId when it changes
   useEffect(() => {
@@ -263,6 +285,92 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     };
   }, [formData.start_time, formData.end_time]);
 
+  // Détection proactive et en temps réel des conflits d'horaires
+  const liveConflict = useMemo<ScheduleConflict | null>(() => {
+    if (!formData.staff_id || !formData.day_of_week || !formData.start_time || !formData.end_time || !showModal) {
+      return null;
+    }
+    if (formData.start_time >= formData.end_time) {
+      return null;
+    }
+
+    const checkOverlap = (start1: string, end1: string, start2: string, end2: string) => {
+      return (start1 < end2 && start2 < end1);
+    };
+
+    // 1. Détection directe conflit enseignant
+    const teacherOverlap = allAssignments.find(a => {
+      if (String(a.id) === String(editingSchedule?.id)) return false;
+      if (String(a.staff_id) !== String(formData.staff_id)) return false;
+      if (String(a.day_of_week || '').toLowerCase() !== String(formData.day_of_week).toLowerCase()) return false;
+      if (!a.start_time || !a.end_time) return false;
+      if (activeYearId && a.academic_year_id && a.academic_year_id !== activeYearId) return false;
+      const aStart = a.start_time.substring(0, 5);
+      const aEnd = a.end_time.substring(0, 5);
+      return checkOverlap(formData.start_time, formData.end_time, aStart, aEnd);
+    });
+
+    if (teacherOverlap) {
+      const tStart = teacherOverlap.start_time.substring(0, 5);
+      const tEnd = teacherOverlap.end_time.substring(0, 5);
+      const teacherObj = staff.find(s => s.id === formData.staff_id);
+      const teacherName = teacherObj ? formatStudentName(teacherObj.last_name, teacherObj.first_name).fullName : 'Cet enseignant';
+      return {
+        type: 'teacher',
+        title: "Conflit d'horaire enseignant détecté",
+        message: `${teacherName} est déjà programmé(e) pour un cours en ${teacherOverlap.class_name || 'autre classe'} (${teacherOverlap.subject_name || 'Cours'}) de ${tStart} à ${tEnd} le ${formData.day_of_week}.`,
+        details: {
+          teacherName,
+          className: teacherOverlap.class_name,
+          subjectName: teacherOverlap.subject_name,
+          day: formData.day_of_week,
+          startTime: tStart,
+          endTime: tEnd
+        }
+      };
+    }
+
+    // 2. Détection directe conflit classe
+    if (formData.class_id) {
+      const targetClass = classes.find(c => c.id === formData.class_id);
+      const classOverlap = allAssignments.find(a => {
+        if (String(a.id) === String(editingSchedule?.id)) return false;
+        const matchesClass = a.class_id === formData.class_id || (targetClass && matchClasses(a.class_id || a.class_name, targetClass.name, classes));
+        if (!matchesClass) return false;
+        if (String(a.day_of_week || '').toLowerCase() !== String(formData.day_of_week).toLowerCase()) return false;
+        if (!a.start_time || !a.end_time) return false;
+        if (activeYearId && a.academic_year_id && a.academic_year_id !== activeYearId) return false;
+        const aStart = a.start_time.substring(0, 5);
+        const aEnd = a.end_time.substring(0, 5);
+        return checkOverlap(formData.start_time, formData.end_time, aStart, aEnd);
+      });
+
+      if (classOverlap) {
+        const cStart = classOverlap.start_time.substring(0, 5);
+        const cEnd = classOverlap.end_time.substring(0, 5);
+        const profObj = staff.find(s => s.id === classOverlap.staff_id);
+        const profName = profObj ? formatStudentName(profObj.last_name, profObj.first_name).fullName : 'un autre professeur';
+        return {
+          type: 'class',
+          title: `Conflit d'horaire ${terminology.class?.toLowerCase() || 'classe'} détecté`,
+          message: `La classe "${targetClass?.name || 'sélectionnée'}" a déjà un cours de "${classOverlap.subject_name || 'Matière'}" assuré par ${profName} de ${cStart} à ${cEnd} le ${formData.day_of_week}.`,
+          details: {
+            teacherName: profName,
+            className: targetClass?.name,
+            subjectName: classOverlap.subject_name,
+            day: formData.day_of_week,
+            startTime: cStart,
+            endTime: cEnd
+          }
+        };
+      }
+    }
+
+    return null;
+  }, [formData, allAssignments, editingSchedule, activeYearId, staff, classes, terminology, showModal]);
+
+  const activeConflict = formConflict || liveConflict;
+
   // Ensure formData.subject_id is valid when class or subjects change
   useEffect(() => {
     if (!formData.class_id) return;
@@ -323,7 +431,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
         supabase.from('staff').select('*').eq('school_id', user.school_id).eq('status', 'Actif').order('last_name'),
         supabase.from('class_subjects').select('id, class_id, subject_id, school_id').or(`school_id.eq.${user.school_id},school_id.is.null`),
         supabase.from('staff').select('id, staff_assignments!inner(id)').eq('school_id', user.school_id).eq('status', 'Actif'),
-        supabase.from('staff_assignments').select('id, class_id, class_name, subject_id, subject_name, staff_id, school_id').eq('school_id', user.school_id)
+        supabase.from('staff_assignments').select('id, class_id, class_name, subject_id, subject_name, staff_id, school_id, day_of_week, start_time, end_time').eq('school_id', user.school_id)
       ]);
 
       if (classesRes.error) throw classesRes.error;
@@ -489,6 +597,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
       end_time: timeSlot ? `${(parseInt(timeSlot.split(':')[0]) + 1).toString().padStart(2, '0')}:00` : '09:00',
       hourly_rate: initialStaff?.amount?.toString() || ''
     });
+    setFormConflict(null);
     setShowModal(true);
   };
 
@@ -506,6 +615,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
       end_time: schedule.end_time.substring(0, 5),
       hourly_rate: schedule.hourly_rate?.toString() || ''
     });
+    setFormConflict(null);
     setShowModal(true);
   };
 
@@ -514,6 +624,12 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     if (!user?.school_id) return;
 
     if (!formData.class_id || !formData.subject_id || !formData.staff_id) {
+      const err: ScheduleConflict = {
+        type: 'validation',
+        title: 'Champs obligatoires manquants',
+        message: 'Veuillez sélectionner la classe cible, la matière et l\'enseignant pour ce créneau.'
+      };
+      setFormConflict(err);
       showToast("Veuillez remplir tous les champs obligatoires.", 'error');
       return;
     }
@@ -524,6 +640,12 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     const diffHours = diffMinutes / 60;
 
     if (diffMinutes <= 0) {
+      const err: ScheduleConflict = {
+        type: 'validation',
+        title: 'Tranche horaire invalide',
+        message: "L'heure de fin doit être strictement postérieure à l'heure de début."
+      };
+      setFormConflict(err);
       showToast("L'heure de fin doit être après l'heure de début.", 'error');
       return;
     }
@@ -534,6 +656,12 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
 
     // Validation stricte : vérifier que la matière appartient au programme de la classe
     if (affiliatedSubjects.length > 0 && !affiliatedSubjects.some(s => s.id === formData.subject_id)) {
+      const err: ScheduleConflict = {
+        type: 'validation',
+        title: 'Matière hors programme',
+        message: `La matière sélectionnée ("${selectedSubject?.name || ''}") ne fait pas partie du programme officiel de la classe "${selectedClass?.name || ''}".`
+      };
+      setFormConflict(err);
       showToast(`La matière sélectionnée ("${selectedSubject?.name || ''}") ne fait pas partie du programme de la classe "${selectedClass?.name || ''}".`, 'error');
       return;
     }
@@ -578,6 +706,21 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
         if (teacherOverlap) {
           const tStart = teacherOverlap.start_time.substring(0, 5);
           const tEnd = teacherOverlap.end_time.substring(0, 5);
+          const teacherName = selectedStaff ? formatStudentName(selectedStaff.last_name, selectedStaff.first_name).fullName : "L'enseignant";
+          const conflictData: ScheduleConflict = {
+            type: 'teacher',
+            title: "Conflit d'horaire enseignant",
+            message: `${teacherName} est déjà affecté(e) à un cours en classe de "${teacherOverlap.class_name}" (${teacherOverlap.subject_name || 'Cours'}) de ${tStart} à ${tEnd} le ${formData.day_of_week}.`,
+            details: {
+              teacherName,
+              className: teacherOverlap.class_name,
+              subjectName: teacherOverlap.subject_name,
+              day: formData.day_of_week,
+              startTime: tStart,
+              endTime: tEnd
+            }
+          };
+          setFormConflict(conflictData);
           showToast(`Conflit : L'enseignant a déjà un cours en ${teacherOverlap.class_name} de ${tStart} à ${tEnd}.`, 'error');
           return;
         }
@@ -620,6 +763,20 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
           const cStart = classOverlap.start_time.substring(0, 5);
           const cEnd = classOverlap.end_time.substring(0, 5);
           const profName = classOverlap.staff ? formatStudentName(classOverlap.staff.last_name, classOverlap.staff.first_name).fullName : 'un autre professeur';
+          const conflictData: ScheduleConflict = {
+            type: 'class',
+            title: `Conflit d'horaire ${terminology.class?.toLowerCase() || 'classe'}`,
+            message: `La classe "${selectedClass?.name || 'sélectionnée'}" a déjà un cours de "${classOverlap.subject_name}" avec ${profName} de ${cStart} à ${cEnd} le ${formData.day_of_week}.`,
+            details: {
+              teacherName: profName,
+              className: selectedClass?.name,
+              subjectName: classOverlap.subject_name,
+              day: formData.day_of_week,
+              startTime: cStart,
+              endTime: cEnd
+            }
+          };
+          setFormConflict(conflictData);
           showToast(`Conflit : Cet(te) ${terminology.class?.toLowerCase() || 'classe'} a déjà un cours de ${classOverlap.subject_name} avec ${profName} de ${cStart} à ${cEnd}.`, 'error');
           return;
         }
@@ -834,7 +991,7 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
     <div className="space-y-3.5 relative pb-6">
       {/* Toast Notification */}
       {toast && (
-        <div className={`fixed bottom-5 right-5 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl text-white backdrop-blur-md animate-in slide-in-from-bottom-5 duration-200 ${toast.type === 'success' ? 'bg-emerald-600/95 border border-emerald-400/30' : 'bg-rose-600/95 border border-rose-400/30'}`}>
+        <div className={`fixed bottom-5 right-5 z-[9999] flex items-center gap-2.5 px-4 py-3 rounded-xl shadow-2xl text-white backdrop-blur-md animate-in slide-in-from-bottom-5 duration-200 ${toast.type === 'success' ? 'bg-emerald-600/95 border border-emerald-400/30' : 'bg-rose-600/95 border border-rose-400/30'}`}>
           {toast.type === 'success' ? <CheckCircle className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
           <span className="font-bold text-xs tracking-tight">{toast.message}</span>
           <button onClick={() => setToast(null)} className="ml-2 hover:opacity-75 transition-opacity">
@@ -1220,6 +1377,91 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
 
             {/* Modal Form */}
             <form onSubmit={handleSubmit} className="p-5 sm:p-6 space-y-4 overflow-y-auto overflow-x-hidden custom-scrollbar flex-1">
+              
+              {/* NOTIFICATION VISUELLE DE BLOCAGE / CONFLIT INTÉGRÉE DANS LA MODALE */}
+              {activeConflict && (
+                <div className={`p-4 rounded-2xl border-2 shadow-xs transition-all animate-in fade-in slide-in-from-top-2 duration-200 ${
+                  activeConflict.type === 'teacher' 
+                    ? 'bg-rose-50/95 border-rose-300 text-rose-950' 
+                    : activeConflict.type === 'class'
+                    ? 'bg-amber-50/95 border-amber-300 text-amber-950'
+                    : 'bg-rose-50/95 border-rose-300 text-rose-950'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${
+                      activeConflict.type === 'teacher'
+                        ? 'bg-rose-600 text-white'
+                        : activeConflict.type === 'class'
+                        ? 'bg-amber-600 text-white'
+                        : 'bg-rose-600 text-white'
+                    }`}>
+                      <AlertTriangle size={18} className="stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[11px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                          activeConflict.type === 'teacher'
+                            ? 'bg-rose-100 text-rose-800 border-rose-200'
+                            : activeConflict.type === 'class'
+                            ? 'bg-amber-100 text-amber-800 border-amber-200'
+                            : 'bg-rose-100 text-rose-800 border-rose-200'
+                        }`}>
+                          {activeConflict.title}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setFormConflict(null)}
+                          className="text-slate-400 hover:text-slate-700 p-0.5 rounded-lg transition-colors cursor-pointer"
+                          title="Masquer l'alerte"
+                        >
+                          <X size={15} />
+                        </button>
+                      </div>
+
+                      <p className="text-xs font-bold leading-relaxed text-slate-800">
+                        {activeConflict.message}
+                      </p>
+
+                      {activeConflict.details && (
+                        <div className="mt-2 bg-white/95 rounded-xl p-3 border border-slate-200 shadow-2xs text-[11.5px] space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-500 font-semibold">Créneau en conflit :</span>
+                            <span className="font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                              {activeConflict.details.day} • {activeConflict.details.startTime} - {activeConflict.details.endTime}
+                            </span>
+                          </div>
+                          {activeConflict.details.className && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500 font-semibold">Classe concernée :</span>
+                              <span className="font-bold text-slate-800">{activeConflict.details.className}</span>
+                            </div>
+                          )}
+                          {activeConflict.details.subjectName && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500 font-semibold">Matière programmée :</span>
+                              <span className="font-bold text-slate-800">{activeConflict.details.subjectName}</span>
+                            </div>
+                          )}
+                          {activeConflict.details.teacherName && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500 font-semibold">Enseignant :</span>
+                              <span className="font-bold text-slate-800">{activeConflict.details.teacherName}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-start gap-1.5 pt-1 text-[11px] font-semibold text-slate-600">
+                        <Info size={13} className="shrink-0 mt-0.5 text-indigo-600" />
+                        <span>
+                          Action recommandée : Modifiez l'heure de début/fin ci-dessous, changez le jour de la semaine ou sélectionnez un autre enseignant disponible.
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Section 1: Informations de la classe & Matière */}
               <div className="bg-slate-50/70 border border-slate-200/80 rounded-2xl p-4 sm:p-4.5 space-y-3.5">
                 <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
@@ -1274,6 +1516,12 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                       colorScheme="indigo"
                       labelPrefix=""
                     />
+                    {activeConflict?.type === 'class' && (
+                      <p className="mt-1 text-[11px] font-bold text-amber-700 flex items-center gap-1 animate-in fade-in">
+                        <AlertTriangle size={12} className="shrink-0" />
+                        <span>Cette classe a déjà un cours de {activeConflict.details?.subjectName || 'cours'} sur ce créneau</span>
+                      </p>
+                    )}
                   </div>
 
                   {/* Matière & Enseignant */}
@@ -1356,6 +1604,12 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                         labelPrefix=""
                         dropdownAlign="right"
                       />
+                      {activeConflict?.type === 'teacher' && (
+                        <p className="mt-1 text-[11px] font-bold text-rose-600 flex items-center gap-1 animate-in fade-in">
+                          <AlertTriangle size={12} className="shrink-0" />
+                          <span>Enseignant indisponible sur ce créneau ({activeConflict.details?.startTime} - {activeConflict.details?.endTime} en {activeConflict.details?.className})</span>
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1424,7 +1678,11 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                         required
                         value={formData.start_time}
                         onChange={(e) => setFormData({ ...formData, start_time: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                        className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 outline-none transition-all shadow-2xs ${
+                          activeConflict 
+                            ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/20' 
+                            : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                        }`}
                       />
                     </div>
                   </div>
@@ -1438,11 +1696,29 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                         required
                         value={formData.end_time}
                         onChange={(e) => setFormData({ ...formData, end_time: e.target.value })}
-                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-900 focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-2xs"
+                        className={`w-full px-3 py-2 bg-white border rounded-xl text-xs font-bold text-slate-900 focus:ring-2 outline-none transition-all shadow-2xs ${
+                          activeConflict 
+                            ? 'border-rose-300 focus:ring-rose-500/20 focus:border-rose-500 bg-rose-50/20' 
+                            : 'border-slate-200 focus:ring-indigo-500/20 focus:border-indigo-500'
+                        }`}
                       />
                     </div>
                   </div>
                 </div>
+
+                {activeConflict && (
+                  <div className="p-2.5 bg-rose-50/90 border border-rose-200 rounded-xl flex items-center justify-between text-rose-800 text-[11px] font-bold animate-in fade-in">
+                    <span className="flex items-center gap-1.5">
+                      <Clock size={13} className="text-rose-600 shrink-0" />
+                      <span>
+                        {activeConflict.type === 'teacher' ? "L'enseignant" : 'La classe'} a déjà un cours le {activeConflict.details?.day || formData.day_of_week} de {activeConflict.details?.startTime} à {activeConflict.details?.endTime}
+                      </span>
+                    </span>
+                    <span className="text-[9.5px] bg-rose-200/80 text-rose-950 px-1.5 py-0.5 rounded font-black uppercase tracking-wider shrink-0">
+                      Conflit
+                    </span>
+                  </div>
+                )}
 
                 {/* Taux horaire */}
                 <div>
@@ -1494,10 +1770,18 @@ const ScheduleView: React.FC<ScheduleViewProps> = ({ user }) => {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black shadow-md shadow-indigo-200 hover:shadow-lg transition-all flex items-center gap-2"
+                    className={`px-5 py-2 text-white rounded-xl text-xs font-black shadow-md transition-all flex items-center gap-2 cursor-pointer ${
+                      activeConflict
+                        ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 ring-2 ring-rose-500/30'
+                        : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200 hover:shadow-lg'
+                    }`}
                   >
-                    <Check size={15} className="stroke-[2.5]" />
-                    <span>{editingSchedule ? 'Enregistrer les modifications' : 'Ajouter le cours'}</span>
+                    {activeConflict ? <AlertTriangle size={15} className="stroke-[2.5]" /> : <Check size={15} className="stroke-[2.5]" />}
+                    <span>
+                      {activeConflict 
+                        ? 'Conflit détecté — Réviser le créneau' 
+                        : (editingSchedule ? 'Enregistrer les modifications' : 'Ajouter le cours')}
+                    </span>
                   </button>
                 </div>
               </div>

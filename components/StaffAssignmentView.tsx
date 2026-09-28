@@ -25,6 +25,21 @@ import { ClassSelectorPill, ClassSelectorItem } from './ClassSelectorPill';
 import { SubjectSelectorPill, SubjectSelectorItem } from './SubjectSelectorPill';
 import { AcademicSessionPill } from './AcademicSessionPill';
 
+export interface AssignmentConflict {
+  type: 'teacher' | 'class' | 'time_order' | 'duration' | 'validation';
+  title: string;
+  message: string;
+  recommendation?: string;
+  details?: {
+    teacherName?: string;
+    className?: string;
+    subjectName?: string;
+    day?: string;
+    startTime?: string;
+    endTime?: string;
+  };
+}
+
 const DAYS = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi'];
 const DAYS_SHORT: Record<string, string> = {
   'Lundi': 'Lun',
@@ -78,6 +93,7 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
   
   const [staff, setStaff] = useState<StaffMember | null>(null);
   const [assignments, setAssignments] = useState<StaffAssignment[]>([]);
+  const [allSchoolAssignments, setAllSchoolAssignments] = useState<any[]>([]);
   const [allClasses, setAllClasses] = useState<any[]>([]);
   const [availableClasses, setAvailableClasses] = useState<any[]>([]);
   const [availableSubjects, setAvailableSubjects] = useState<any[]>([]);
@@ -181,6 +197,22 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
           .select('*')
           .eq('staff_id', staffId)
           .eq('school_id', user.school_id);
+      }
+
+      // 2a. Charger l'ensemble des créneaux de l'établissement pour la détection proactive et instantanée des conflits
+      try {
+        let allSchoolQuery = supabase
+          .from('staff_assignments')
+          .select('id, staff_id, class_id, class_name, subject_id, subject_name, day_of_week, start_time, end_time, academic_year_id, staff:staff_id(id, first_name, last_name, campus_id)')
+          .eq('school_id', user.school_id);
+        
+        if (targetYearId) {
+          allSchoolQuery = allSchoolQuery.or(`academic_year_id.eq.${targetYearId},academic_year_id.is.null`);
+        }
+        const { data: allAssignmentsData } = await allSchoolQuery;
+        setAllSchoolAssignments(allAssignmentsData || []);
+      } catch (errSchool) {
+        console.warn("Erreur lors du pré-chargement des créneaux de l'école:", errSchool);
       }
 
       // 2b. Vérifier si l'enseignant possède un historique de cours attribués dans d'autres années
@@ -600,6 +632,204 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
       hours: hoursNum
     };
   }, [newAssignment.start, newAssignment.end]);
+
+  // Détection proactive et immédiate des conflits lors de la saisie (avant toute sauvegarde)
+  const liveConflict = useMemo<AssignmentConflict | null>(() => {
+    if (!newAssignment.start || !newAssignment.end || !newAssignment.day) {
+      return null;
+    }
+
+    const checkOverlap = (start1: string, end1: string, start2: string, end2: string) => {
+      return (start1 < end2 && start2 < end1);
+    };
+
+    const start = new Date(`2000-01-01T${newAssignment.start}`);
+    const end = new Date(`2000-01-01T${newAssignment.end}`);
+    const diffMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+
+    // 1. Incohérence chronologique
+    if (diffMinutes <= 0) {
+      return {
+        type: 'time_order',
+        title: "Heure de fin antérieure ou égale au début",
+        message: `L'heure de fin (${newAssignment.end}) doit être strictement postérieure à l'heure de début (${newAssignment.start}).`,
+        recommendation: "Ajustez les heures pour définir un créneau chronologiquement valide.",
+        details: {
+          day: newAssignment.day,
+          startTime: newAssignment.start,
+          endTime: newAssignment.end
+        }
+      };
+    }
+
+    // 2. Durée minimale
+    if (diffMinutes < 15) {
+      return {
+        type: 'duration',
+        title: "Durée de créneau trop courte",
+        message: `La durée minimale requise pour un cours est de 15 minutes (${Math.round(diffMinutes)} min saisie).`,
+        recommendation: "Augmentez la durée du créneau horaire.",
+        details: {
+          day: newAssignment.day,
+          startTime: newAssignment.start,
+          endTime: newAssignment.end
+        }
+      };
+    }
+
+    const teacherName = staff ? formatStudentName(staff.last_name, staff.first_name).fullName : 'Cet enseignant';
+
+    // 3. Conflit enseignant dans la liste locale de la session en cours
+    const localTeacherOverlap = assignments.find(a => {
+      if (String(a.id) === String(editingId)) return false;
+      if (a.day_of_week !== newAssignment.day) return false;
+      if (!a.start_time || !a.end_time) return false;
+      const s = a.start_time.substring(0, 5);
+      const e = a.end_time.substring(0, 5);
+      return checkOverlap(newAssignment.start, newAssignment.end, s, e);
+    });
+
+    if (localTeacherOverlap) {
+      const tStart = localTeacherOverlap.start_time.substring(0, 5);
+      const tEnd = localTeacherOverlap.end_time.substring(0, 5);
+      return {
+        type: 'teacher',
+        title: "Conflit d'horaire pour l'enseignant détecté",
+        message: `${teacherName} est déjà programmé(e) pour un cours en "${localTeacherOverlap.class_name || 'autre classe'}" (${localTeacherOverlap.subject_name || 'Cours'}) de ${tStart} à ${tEnd} le ${newAssignment.day}.`,
+        recommendation: `Un enseignant ne peut pas être à deux endroits simultanément. Vous pouvez débuter ce cours à partir de ${tEnd}, ou choisir un autre jour.`,
+        details: {
+          teacherName,
+          className: localTeacherOverlap.class_name,
+          subjectName: localTeacherOverlap.subject_name,
+          day: newAssignment.day,
+          startTime: tStart,
+          endTime: tEnd
+        }
+      };
+    }
+
+    // 4. Conflit enseignant dans l'ensemble des créneaux de l'école (base de données)
+    const dbTeacherOverlap = allSchoolAssignments.find(a => {
+      if (String(a.id) === String(editingId)) return false;
+      if (String(a.staff_id) !== String(staffId)) return false;
+      if (a.day_of_week !== newAssignment.day) return false;
+      if (!a.start_time || !a.end_time) return false;
+      const s = a.start_time.substring(0, 5);
+      const e = a.end_time.substring(0, 5);
+      return checkOverlap(newAssignment.start, newAssignment.end, s, e);
+    });
+
+    if (dbTeacherOverlap) {
+      const tStart = dbTeacherOverlap.start_time.substring(0, 5);
+      const tEnd = dbTeacherOverlap.end_time.substring(0, 5);
+      return {
+        type: 'teacher',
+        title: "Conflit d'horaire pour l'enseignant détecté",
+        message: `${teacherName} est déjà programmé(e) pour un cours en "${dbTeacherOverlap.class_name || 'autre classe'}" (${dbTeacherOverlap.subject_name || 'Cours'}) de ${tStart} à ${tEnd} le ${newAssignment.day}.`,
+        recommendation: `Un enseignant ne peut pas être à deux endroits simultanément. Vous pouvez débuter ce cours à partir de ${tEnd}, ou choisir un autre jour.`,
+        details: {
+          teacherName,
+          className: dbTeacherOverlap.class_name,
+          subjectName: dbTeacherOverlap.subject_name,
+          day: newAssignment.day,
+          startTime: tStart,
+          endTime: tEnd
+        }
+      };
+    }
+
+    // 5. Conflit classe (la classe sélectionnée a déjà un cours sur ce créneau)
+    if (newAssignment.class_id) {
+      const selectedCls = allClasses.find(c => String(c.id) === String(newAssignment.class_id));
+      const targetClassName = selectedCls?.name || 'la classe';
+
+      // 5a. Vérifier dans la liste locale de la session
+      const localClassOverlap = assignments.find(a => {
+        if (String(a.id) === String(editingId)) return false;
+        if (a.day_of_week !== newAssignment.day) return false;
+        if (!a.start_time || !a.end_time) return false;
+
+        const isOverlapping = checkOverlap(newAssignment.start, newAssignment.end, a.start_time.substring(0, 5), a.end_time.substring(0, 5));
+        if (!isOverlapping) return false;
+
+        if (a.class_id && newAssignment.class_id) {
+          return String(a.class_id) === String(newAssignment.class_id);
+        }
+        return a.class_name === selectedCls?.name;
+      });
+
+      if (localClassOverlap) {
+        const cStart = localClassOverlap.start_time.substring(0, 5);
+        const cEnd = localClassOverlap.end_time.substring(0, 5);
+        return {
+          type: 'class',
+          title: `Conflit d'horaire pour la classe ${targetClassName} détecté`,
+          message: `La classe "${targetClassName}" a déjà un cours de "${localClassOverlap.subject_name}" programmé de ${cStart} à ${cEnd} le ${newAssignment.day}.`,
+          recommendation: `Une classe ne peut avoir qu'un seul cours à la fois. Veuillez choisir un horaire débutant à partir de ${cEnd} ou changer de jour.`,
+          details: {
+            teacherName,
+            className: targetClassName,
+            subjectName: localClassOverlap.subject_name,
+            day: newAssignment.day,
+            startTime: cStart,
+            endTime: cEnd
+          }
+        };
+      }
+
+      // 5b. Vérifier dans allSchoolAssignments (cours dispensés par un autre prof dans cette même classe)
+      const dbClassOverlap = allSchoolAssignments.find(a => {
+        if (String(a.id) === String(editingId)) return false;
+        if (String(a.staff_id) === String(staffId)) return false;
+        if (a.day_of_week !== newAssignment.day) return false;
+        if (!a.start_time || !a.end_time) return false;
+
+        const isOverlapping = checkOverlap(newAssignment.start, newAssignment.end, a.start_time.substring(0, 5), a.end_time.substring(0, 5));
+        if (!isOverlapping) return false;
+
+        if (a.class_id && newAssignment.class_id) {
+          return String(a.class_id) === String(newAssignment.class_id);
+        }
+        if (a.class_name === selectedCls?.name) {
+          if (a.staff?.campus_id && selectedCls?.campus_id && a.staff.campus_id !== selectedCls.campus_id) {
+            return false;
+          }
+          return true;
+        }
+        return false;
+      });
+
+      if (dbClassOverlap) {
+        const cStart = dbClassOverlap.start_time.substring(0, 5);
+        const cEnd = dbClassOverlap.end_time.substring(0, 5);
+        const otherStaff = dbClassOverlap.staff;
+        const otherStaffName = otherStaff ? formatStudentName(otherStaff.last_name, otherStaff.first_name).fullName : 'un autre enseignant';
+        return {
+          type: 'class',
+          title: `Conflit d'horaire pour la classe ${targetClassName} détecté`,
+          message: `La classe "${targetClassName}" a déjà un cours de "${dbClassOverlap.subject_name || 'Matière'}" assuré par ${otherStaffName} de ${cStart} à ${cEnd} le ${newAssignment.day}.`,
+          recommendation: `Une classe ne peut avoir qu'un seul cours à la fois. Veuillez choisir un horaire débutant à partir de ${cEnd} ou changer de jour.`,
+          details: {
+            teacherName: otherStaffName,
+            className: targetClassName,
+            subjectName: dbClassOverlap.subject_name,
+            day: newAssignment.day,
+            startTime: cStart,
+            endTime: cEnd
+          }
+        };
+      }
+    }
+
+    return null;
+  }, [newAssignment, assignments, allSchoolAssignments, staff, staffId, editingId, allClasses]);
+
+  const activeConflict = liveConflict || (formError ? {
+    type: 'validation' as const,
+    title: formError.title,
+    message: formError.message,
+    recommendation: "Veuillez corriger les informations indiquées avant de valider."
+  } : null);
 
   const { affiliatedSubjects, otherSubjects } = useMemo(() => {
     if (!newAssignment.class_id) {
@@ -1337,6 +1567,93 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                 )}
               </div>
 
+              {/* BANNIÈRE CONTEXTUELLE D'AVERTISSEMENT IMMÉDIAT EN CAS DE CONFLIT DÉTECTÉ LORS DE LA SAISIE */}
+              {activeConflict && (
+                <div className={`p-3.5 sm:p-4 rounded-2xl border-2 shadow-xs transition-all animate-in fade-in slide-in-from-top-2 duration-200 ${
+                  activeConflict.type === 'teacher'
+                    ? 'bg-rose-50/95 border-rose-300 text-rose-950'
+                    : activeConflict.type === 'class'
+                    ? 'bg-amber-50/95 border-amber-300 text-amber-950'
+                    : activeConflict.type === 'time_order' || activeConflict.type === 'duration'
+                    ? 'bg-orange-50/95 border-orange-300 text-orange-950'
+                    : 'bg-rose-50/95 border-rose-300 text-rose-950'
+                }`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-8.5 h-8.5 rounded-xl flex items-center justify-center shrink-0 shadow-xs mt-0.5 ${
+                      activeConflict.type === 'teacher'
+                        ? 'bg-rose-600 text-white'
+                        : activeConflict.type === 'class'
+                        ? 'bg-amber-600 text-white'
+                        : activeConflict.type === 'time_order' || activeConflict.type === 'duration'
+                        ? 'bg-orange-600 text-white'
+                        : 'bg-rose-600 text-white'
+                    }`}>
+                      <AlertTriangle size={17} className="stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1 space-y-1.5 min-w-0">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className={`text-[10.5px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border ${
+                          activeConflict.type === 'teacher'
+                            ? 'bg-rose-100 text-rose-800 border-rose-200'
+                            : activeConflict.type === 'class'
+                            ? 'bg-amber-100 text-amber-800 border-amber-200'
+                            : activeConflict.type === 'time_order' || activeConflict.type === 'duration'
+                            ? 'bg-orange-100 text-orange-800 border-orange-200'
+                            : 'bg-rose-100 text-rose-800 border-rose-200'
+                        }`}>
+                          {activeConflict.title}
+                        </span>
+                        <span className="text-[9.5px] font-mono font-bold text-slate-500 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                          Saisie en direct
+                        </span>
+                      </div>
+
+                      <p className="text-xs font-bold leading-relaxed text-slate-800">
+                        {activeConflict.message}
+                      </p>
+
+                      {activeConflict.details && (
+                        <div className="mt-1.5 bg-white/95 rounded-xl p-2.5 border border-slate-200 shadow-2xs text-[11px] space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-slate-500 font-semibold">Créneau en conflit :</span>
+                            <span className="font-mono font-black text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                              {activeConflict.details.day} • {activeConflict.details.startTime} - {activeConflict.details.endTime}
+                            </span>
+                          </div>
+                          {activeConflict.details.className && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500 font-semibold">Classe concernée :</span>
+                              <span className="font-bold text-slate-800">{activeConflict.details.className}</span>
+                            </div>
+                          )}
+                          {activeConflict.details.subjectName && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500 font-semibold">Matière programmée :</span>
+                              <span className="font-bold text-slate-800">{activeConflict.details.subjectName}</span>
+                            </div>
+                          )}
+                          {activeConflict.details.teacherName && (
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-slate-500 font-semibold">Enseignant :</span>
+                              <span className="font-bold text-slate-800">{activeConflict.details.teacherName}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {activeConflict.recommendation && (
+                        <div className="flex items-start gap-1.5 pt-0.5 text-[10.5px] font-semibold text-slate-600">
+                          <Info size={13} className="shrink-0 mt-0.5 text-indigo-600" />
+                          <span>
+                            {activeConflict.recommendation}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-3">
                 {/* 1. Sélection de la Classe / Promotion (Pillule harmonisée) */}
                 <div className="space-y-1">
@@ -1368,6 +1685,12 @@ const StaffAssignmentView: React.FC<StaffAssignmentViewProps> = ({ user }) => {
                      className="w-full"
                      portal={true}
                    />
+                   {activeConflict?.type === 'class' && (
+                     <p className="mt-1 text-[11px] font-bold text-amber-700 flex items-center gap-1 animate-in fade-in">
+                       <AlertTriangle size={12} className="shrink-0" />
+                       <span>Cette classe a déjà un cours sur ce créneau</span>
+                     </p>
+                   )}
                    {availableClasses.length === 0 && (
                      <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs flex items-start gap-2 animate-in fade-in">
                        <AlertCircle size={14} className="shrink-0 mt-0.5 text-amber-600" />
