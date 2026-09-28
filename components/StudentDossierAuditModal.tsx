@@ -141,21 +141,13 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
     };
   }
 
-  if (ft === 'DIVERS') {
-    // Si la devise est USD, il s'agit d'une prestation spécifique / ad-hoc enregistrée en USD
-    if (isUSD) {
-      return {
-        title: descStr || typeStr || 'Frais Spécifiques USD (Prestations / Certifications)',
-        category: 'Frais Spécifique USD',
-        badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-        isSpecial: true
-      };
-    }
-    // Sinon en HTG, ce sont les frais divers institutionnels annuels
+  if (ft === 'DIVERS' || natureStr.toLowerCase().includes('divers') || typeStr.toLowerCase().includes('divers')) {
+    // Si la transaction n'est pas une campagne spécifique explicitée, c'est le poste Frais Divers Obligatoires
+    // (qu'il soit réglé en HTG ou en USD dans le cadre d'un règlement bimonétaire).
     return {
-      title: 'Frais Divers Institutionnels (Annuel Obligatoire)',
-      category: 'Frais Divers',
-      badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
+      title: descStr || typeStr || natureStr || 'Frais Divers Obligatoires',
+      category: 'Frais Divers Obligatoires',
+      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
       isSpecial: false
     };
   }
@@ -186,7 +178,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'sessions' | 'transactions' | 'certificate'>('overview');
   const [searchTx, setSearchTx] = useState('');
-  const [txFilter, setTxFilter] = useState<'ALL' | 'INSCRIPTION' | 'SCOLARITE' | 'DIVERS_HTG' | 'DIVERS_USD'>('ALL');
+  const [txFilter, setTxFilter] = useState<'ALL' | 'INSCRIPTION' | 'SCOLARITE' | 'DIVERS' | 'SPECIFIQUES'>('ALL');
 
   // Calcul analytique de tous les frais payés (Hook exécuté inconditionnellement)
   const analysis = useMemo(() => {
@@ -200,7 +192,8 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
     let tuitionPaidHTG = 0;
     let tuitionPaidUSD = 0;
 
-    let miscInstitutionalPaidHTG = 0;
+    let miscPaidHTG = 0;
+    let miscPaidUSD = 0;
     let miscSpecialPaidUSD = 0;
     let miscSpecialPaidHTG = 0;
 
@@ -221,6 +214,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
 
       const motif = resolvePaymentMotif(t, terminology || {});
       const ft = (t?.fee_type || '').toUpperCase();
+      const isMiscFee = ft === 'DIVERS' || (t?.nature || '').toLowerCase().includes('divers') || (t?.type || '').toLowerCase().includes('divers');
 
       if (ft === 'INSCRIPTION') {
         if (isUSD) inscriptionPaidUSD += amt;
@@ -228,15 +222,18 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       } else if (ft === 'SCOLARITE') {
         if (isUSD) tuitionPaidUSD += amt;
         else tuitionPaidHTG += amt;
-      } else if (motif.isSpecial || isUSD || t?.ad_hoc_campaign_id) {
+      } else if (isMiscFee && !motif.isSpecial && !t?.ad_hoc_campaign_id) {
+        // Règlement bimonétaire (HTG & USD) des Frais Divers Obligatoires
+        if (isUSD) miscPaidUSD += amt;
+        else miscPaidHTG += amt;
+      } else {
+        // Campagnes ad-hoc ou prestations spécifiques
         if (isUSD) miscSpecialPaidUSD += amt;
         else miscSpecialPaidHTG += amt;
-      } else {
-        miscInstitutionalPaidHTG += amt;
       }
     }
 
-    const hasDualMiscFees = (miscInstitutionalPaidHTG > 0 && miscSpecialPaidUSD > 0) || validTxs.filter(t => (t?.fee_type || '').toUpperCase() === 'DIVERS').length >= 2;
+    const hasDualMiscFees = (miscPaidHTG > 0 && miscPaidUSD > 0) || validTxs.filter(t => (t?.fee_type || '').toUpperCase() === 'DIVERS').length >= 2;
 
     return {
       totalPaidHTG,
@@ -246,7 +243,8 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       inscriptionPaidUSD,
       tuitionPaidHTG,
       tuitionPaidUSD,
-      miscInstitutionalPaidHTG,
+      miscPaidHTG,
+      miscPaidUSD,
       miscSpecialPaidUSD,
       miscSpecialPaidHTG,
       hasDualMiscFees,
@@ -261,12 +259,13 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       const motif = resolvePaymentMotif(tx, terminology || {});
       const isUSD = tx?.currency === 'USD';
       const ft = (tx?.fee_type || '').toUpperCase();
+      const isMiscFee = ft === 'DIVERS' || (tx?.nature || '').toLowerCase().includes('divers') || (tx?.type || '').toLowerCase().includes('divers');
 
       // Filtre catégorie
       if (txFilter === 'INSCRIPTION' && ft !== 'INSCRIPTION') return false;
       if (txFilter === 'SCOLARITE' && ft !== 'SCOLARITE') return false;
-      if (txFilter === 'DIVERS_HTG' && (ft !== 'DIVERS' || isUSD || motif.isSpecial)) return false;
-      if (txFilter === 'DIVERS_USD' && (!isUSD && !motif.isSpecial)) return false;
+      if (txFilter === 'DIVERS' && (!isMiscFee || motif.isSpecial || tx?.ad_hoc_campaign_id)) return false;
+      if (txFilter === 'SPECIFIQUES' && (isMiscFee && !motif.isSpecial && !tx?.ad_hoc_campaign_id)) return false;
 
       // Filtre recherche textuelle
       if (searchTx.trim()) {
@@ -480,27 +479,32 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                 </div>
 
-                {/* 3. Frais Divers Institutionnels (HTG) */}
+                {/* 3. Frais Divers Obligatoires (Bimonétaire HTG & USD) */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Frais Divers</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-slate-700">Frais Divers Obligatoires</span>
                       <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">Badge & Assurance</span>
                     </div>
                     <div className="mt-1">
                       <p className="text-lg font-black font-mono text-slate-900 leading-none">
-                        {analysis.miscInstitutionalPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-slate-500">HTG</span>
+                        {analysis.miscPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-slate-500">HTG</span>
                       </p>
+                      {analysis.miscPaidUSD > 0 && (
+                        <p className="text-xs font-mono font-bold text-emerald-700 mt-0.5">
+                          + ${analysis.miscPaidUSD.toLocaleString()} USD
+                        </p>
+                      )}
                       <p className="text-[10px] text-slate-400 mt-0.5">Frais annuels récurrents</p>
                     </div>
                   </div>
                   <div className="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
-                    <span className="text-slate-400">Fréquence :</span>
-                    <span className="font-bold text-slate-700">1x par an</span>
+                    <span className="text-slate-400">Attendu :</span>
+                    <span className="font-mono font-bold text-slate-700">{(student.miscDue || 0).toLocaleString()} HTG</span>
                   </div>
                 </div>
 
-                {/* 4. Frais Spécifiques (USD) */}
+                {/* 4. Frais Spécifiques (Campagnes & Options) */}
                 <div className="bg-purple-50/30 p-3 rounded-xl border border-purple-200/80 shadow-2xs hover:border-purple-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
@@ -509,18 +513,29 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     </div>
                     <div className="mt-1">
                       <p className="text-lg font-black font-mono text-purple-950 leading-none">
-                        ${analysis.miscSpecialPaidUSD.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">USD</span>
+                        {analysis.miscSpecialPaidUSD > 0 ? (
+                          <>
+                            ${analysis.miscSpecialPaidUSD.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">USD</span>
+                          </>
+                        ) : (
+                          <>
+                            {analysis.miscSpecialPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
+                          </>
+                        )}
                       </p>
-                      {analysis.miscSpecialPaidHTG > 0 && (
+                      {analysis.miscSpecialPaidUSD > 0 && analysis.miscSpecialPaidHTG > 0 && (
                         <p className="text-xs font-mono font-bold text-purple-800 mt-0.5">
                           + {analysis.miscSpecialPaidHTG.toLocaleString()} HTG
                         </p>
                       )}
+                      <p className="text-[10px] text-purple-500/80 mt-0.5">Prestations optionnelles</p>
                     </div>
                   </div>
                   <div className="mt-2.5 pt-1.5 border-t border-purple-100 flex items-center justify-between text-[10.5px]">
-                    <span className="text-purple-600">Équivalent :</span>
-                    <span className="font-mono font-bold text-purple-950">{(analysis.miscSpecialPaidUSD * (currentExchangeRate || 135)).toLocaleString()} HTG</span>
+                    <span className="text-purple-600">Total :</span>
+                    <span className="font-mono font-bold text-purple-950">
+                      {(analysis.miscSpecialPaidHTG + (analysis.miscSpecialPaidUSD * (currentExchangeRate || 135))).toLocaleString()} HTG
+                    </span>
                   </div>
                 </div>
 
@@ -660,7 +675,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
 
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Frais Divers</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Frais Divers Obligatoires</span>
                     <span className="text-sm font-black font-mono text-slate-900 mt-0.5 block">
                       {(student.miscDue || 0).toLocaleString()} HTG
                     </span>
@@ -795,20 +810,20 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     {terminology.tuition}
                   </button>
                   <button
-                    onClick={() => setTxFilter('DIVERS_HTG')}
+                    onClick={() => setTxFilter('DIVERS')}
                     className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                      txFilter === 'DIVERS_HTG' ? 'bg-slate-700 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      txFilter === 'DIVERS' ? 'bg-emerald-700 text-white' : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
                     }`}
                   >
-                    Frais Divers HTG
+                    Frais Divers Obligatoires
                   </button>
                   <button
-                    onClick={() => setTxFilter('DIVERS_USD')}
+                    onClick={() => setTxFilter('SPECIFIQUES')}
                     className={`px-2.5 py-1 text-[10.5px] font-bold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
-                      txFilter === 'DIVERS_USD' ? 'bg-purple-700 text-white' : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
+                      txFilter === 'SPECIFIQUES' ? 'bg-purple-700 text-white' : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
                     }`}
                   >
-                    Frais Spécifiques USD
+                    Campagnes & Options
                   </button>
                 </div>
               </div>

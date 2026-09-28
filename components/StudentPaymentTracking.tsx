@@ -1696,7 +1696,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-md whitespace-nowrap">
-                          {t.campaign?.name ? `Campagne: ${t.campaign.name}` : t.ad_hoc_campaign_id ? 'Frais de Campagne' : (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'))) ? 'Frais Académiques' : ((t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription") ? 'Inscription' : (t.nature || t.type || t.fee_type || 'Frais Divers'))}
+                          {t.campaign?.name ? `Campagne: ${t.campaign.name}` : t.ad_hoc_campaign_id ? 'Frais de Campagne' : (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'))) ? 'Frais Académiques' : ((t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription") ? 'Inscription' : ((t.fee_type === 'DIVERS' || (t.nature || '').toLowerCase().includes('divers')) ? 'Frais Divers Obligatoires' : (t.nature || t.type || t.fee_type || 'Frais Divers Obligatoires')))}
                         </span>
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${
                           t.status === 'ANNULE' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
@@ -1865,7 +1865,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
                             <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2.5 py-1 rounded-md whitespace-nowrap inline-block">
-                              {t.campaign?.name ? `Campagne: ${t.campaign.name}` : t.ad_hoc_campaign_id ? 'Frais de Campagne' : (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'))) ? 'Frais Académiques' : ((t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription") ? 'Inscription' : (t.nature || t.type || t.fee_type || 'Frais Divers'))}
+                              {t.campaign?.name ? `Campagne: ${t.campaign.name}` : t.ad_hoc_campaign_id ? 'Frais de Campagne' : (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'))) ? 'Frais Académiques' : ((t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription") ? 'Inscription' : ((t.fee_type === 'DIVERS' || (t.nature || '').toLowerCase().includes('divers')) ? 'Frais Divers Obligatoires' : (t.nature || t.type || t.fee_type || 'Frais Divers Obligatoires')))}
                             </span>
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
@@ -2435,7 +2435,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                     ? terminology.tuition 
                                     : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
                                     ? "Inscription" 
-                                    : (p.nature || p.type || p.fee_type || 'Frais Divers'));
+                                    : ((p.fee_type === 'DIVERS' || (p.nature || '').toLowerCase().includes('divers')) ? 'Frais Divers Obligatoires' : (p.nature || p.type || p.fee_type || 'Frais Divers Obligatoires')));
 
                                   return (
                                     <tr key={p.id} className="hover:bg-slate-50/40 transition-colors">
