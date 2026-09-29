@@ -1,160 +1,238 @@
-import React, { useState } from 'react';
-import { ShieldAlert, Send, X, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
-import { PendingActionType, UserProfile } from '../types';
-import { PendingActionsService } from '../services/pendingActionsService';
-import { toast } from 'sonner';
+import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ShieldAlert, AlertTriangle, Send, X, Loader2, CheckCircle2, FileText, Info } from 'lucide-react';
+import { UserProfile, PendingActionType } from '../types';
+import { supabase } from '../supabase';
+import { AuditLogger } from '../utils/auditLogger';
 
 interface DoubleRegardSubmitModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess?: () => void;
   user: UserProfile;
-  actionType: PendingActionType;
   title: string;
+  actionType: PendingActionType | string;
   description: string;
   targetEntityType: string;
   targetEntityId?: string | null;
   payload: Record<string, any>;
   campusId?: string | null;
+  onSuccess: () => void;
 }
 
 export const DoubleRegardSubmitModal: React.FC<DoubleRegardSubmitModalProps> = ({
   isOpen,
   onClose,
-  onSuccess,
   user,
-  actionType,
   title,
+  actionType,
   description,
   targetEntityType,
   targetEntityId,
   payload,
-  campusId
+  campusId,
+  onSuccess
 }) => {
   const [justification, setJustification] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setJustification('');
+      setError(null);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user.school_id) {
-      toast.error("Établissement manquant.");
+    if (!justification.trim()) {
+      setError("Veuillez renseigner une note de justification ou un motif explicatif pour l'administrateur valideur.");
       return;
     }
 
-    setIsSubmitting(true);
-    try {
-      const fullDescription = justification.trim() 
-        ? `${description}\n\nJustification du demandeur : ${justification.trim()}`
-        : description;
+    setSubmitting(true);
+    setError(null);
 
-      const res = await PendingActionsService.createPendingAction({
-        school_id: user.school_id,
-        campus_id: campusId !== undefined ? campusId : (user.campus_id || null),
-        action_type: actionType,
-        action_title: title,
-        description: fullDescription,
-        target_entity_type: targetEntityType,
-        target_entity_id: targetEntityId || null,
-        payload,
-        requester: user
+    try {
+      const enrichedPayload = {
+        ...payload,
+        justification: justification.trim(),
+        submitted_at: new Date().toISOString()
+      };
+
+      const { data, error: insertError } = await supabase
+        .from('pending_actions')
+        .insert([
+          {
+            school_id: user.school_id,
+            campus_id: campusId || user.campus_id || null,
+            action_type: actionType,
+            action_title: title,
+            description: description,
+            target_entity_type: targetEntityType,
+            target_entity_id: targetEntityId || null,
+            payload: enrichedPayload,
+            status: 'PENDING',
+            requester_id: user.id,
+            requester_name: user.full_name,
+            requester_email: user.email,
+            requester_role: user.role,
+            is_autonomous_requester: true
+          }
+        ])
+        .select()
+        .single();
+
+      if (insertError) throw insertError;
+
+      // Log the event for compliance and security audit trail
+      await AuditLogger.log({
+        school_id: user.school_id || '',
+        user_id: user.id,
+        action: 'CREATE',
+        entity_type: 'pending_action',
+        entity_id: data?.id,
+        details: {
+          action_type: actionType,
+          action_title: title,
+          target_entity_type: targetEntityType,
+          target_entity_id: targetEntityId,
+          justification: justification.trim(),
+          is_autonomous: true
+        }
       });
 
-      if (res.success) {
-        toast.success("Demande transmise avec succès au Double Regard !", { duration: 5000 });
-        if (onSuccess) onSuccess();
-        onClose();
-      } else {
-        toast.error(res.error || "Erreur lors de la soumission au Double Regard.");
-      }
+      onSuccess();
+      onClose();
     } catch (err: any) {
-      toast.error(err.message || "Erreur inattendue.");
+      console.error("Erreur lors de la soumission au Double Regard :", err);
+      setError(err.message || "Une erreur est survenue lors de la soumission au Double Regard.");
     } finally {
-      setIsSubmitting(false);
+      setSubmitting(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-        
-        {/* En-tête */}
-        <div className="bg-gradient-to-r from-amber-600 via-amber-700 to-amber-800 p-5 text-white flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 border border-white/30 flex items-center justify-center shrink-0">
-              <ShieldAlert className="w-6 h-6 text-amber-100" />
+    <AnimatePresence>
+      <div className="fixed inset-0 z-[9999] bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          animate={{ opacity: 1, scale: 1, y: 0 }}
+          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+          className="bg-white rounded-3xl shadow-2xl max-w-lg w-full p-5 sm:p-7 space-y-5 border border-slate-100 relative overflow-hidden"
+        >
+          {/* Accent decoration */}
+          <div className="absolute top-0 right-0 -mt-4 -mr-4 w-28 h-28 bg-amber-100 rounded-full blur-2xl pointer-events-none" />
+
+          {/* Header */}
+          <div className="flex items-start justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 bg-amber-500/10 text-amber-700 border border-amber-200 rounded-2xl flex items-center justify-center shrink-0">
+                <ShieldAlert size={24} />
+              </div>
+              <div>
+                <span className="text-[11px] font-black uppercase tracking-wider text-amber-700 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
+                  Procédure Double Regard
+                </span>
+                <h3 className="text-base sm:text-lg font-black text-slate-900 mt-1 leading-snug">
+                  {title}
+                </h3>
+              </div>
             </div>
-            <div>
-              <h3 className="text-lg font-black tracking-tight text-white flex items-center gap-2">
-                Double Regard Requis
-              </h3>
-              <p className="text-xs text-amber-100 font-medium">
-                Principe des 4-Yeux • Validation par un Titulaire RH
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={onClose} 
-            disabled={isSubmitting}
-            className="text-white/80 hover:text-white p-1 rounded-lg hover:bg-white/10 transition-colors"
-          >
-            <X size={20} />
-          </button>
-        </div>
-
-        {/* Corps */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-xl flex items-start gap-3">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-900 space-y-1">
-              <p className="font-bold">Opération sensible sous contrôle de quorum</p>
-              <p className="text-amber-800 leading-relaxed">
-                Votre profil opère sans dossier RH certifié ou l'action touche à des données critiques. Cette opération ne s'exécutera pas immédiatement : elle sera consignée dans la file du <strong>Double Regard</strong> et devra être validée par un <strong>Administrateur certifié RH</strong>.
-              </p>
-            </div>
-          </div>
-
-          <div className="space-y-2 bg-slate-50 p-4 rounded-xl border border-slate-200">
-            <div className="text-xs font-bold text-slate-500 uppercase tracking-wider">Action demandée</div>
-            <div className="text-sm font-black text-slate-800">{title}</div>
-            <p className="text-xs text-slate-600 leading-relaxed whitespace-pre-line">{description}</p>
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700">
-              Justification / Note pour l'administrateur validateur (Optionnel)
-            </label>
-            <textarea
-              value={justification}
-              onChange={(e) => setJustification(e.target.value)}
-              placeholder="Expliquez la raison de cette modification ou joignez des précisions utiles..."
-              rows={3}
-              className="w-full text-xs p-3 rounded-xl border border-slate-200 focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 outline-none transition-all placeholder:text-slate-400"
-            />
-          </div>
-
-          <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
             <button
               type="button"
               onClick={onClose}
-              disabled={isSubmitting}
-              className="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all"
+              disabled={submitting}
+              className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
             >
-              Annuler
-            </button>
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white rounded-xl text-xs font-bold shadow-md hover:shadow-lg transition-all disabled:opacity-50"
-            >
-              <Send size={14} />
-              {isSubmitting ? "Transmission en cours..." : "Soumettre au Double Regard"}
+              <X size={16} />
             </button>
           </div>
-        </form>
 
+          {/* Information box */}
+          <div className="p-3.5 bg-amber-50/90 border border-amber-200/80 rounded-2xl text-xs space-y-2">
+            <div className="flex items-center gap-2 font-bold text-amber-950">
+              <AlertTriangle size={15} className="text-amber-600 shrink-0" />
+              <span>Compte Opérateur en Mode Autonome</span>
+            </div>
+            <p className="text-amber-900/90 leading-relaxed font-medium">
+              Conformément à la politique de conformité financière et RH de l'établissement, cette action critique ne peut être appliquée directement. Elle nécessite la validation d'un Administrateur certifié RH via le flux <strong>Double Regard</strong>.
+            </p>
+          </div>
+
+          {/* Description of action */}
+          {description && (
+            <div className="p-3 bg-slate-50 border border-slate-200/70 rounded-2xl space-y-1">
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <FileText size={14} className="text-slate-500" />
+                <span>Détail de l'opération</span>
+              </div>
+              <p className="text-xs text-slate-600 whitespace-pre-line leading-relaxed">
+                {description}
+              </p>
+            </div>
+          )}
+
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                Note de justification / Motif de la demande <span className="text-rose-600">*</span>
+              </label>
+              <textarea
+                value={justification}
+                onChange={(e) => setJustification(e.target.value)}
+                rows={3}
+                required
+                placeholder="Précisez pourquoi cette action est demandée (ex: Erreur de saisie constatée lors de l'émargement, régularisation mensuelle...)"
+                className="w-full text-xs p-3 rounded-xl border border-slate-300 focus:border-amber-500 focus:ring-2 focus:ring-amber-500/20 outline-hidden resize-none transition-all placeholder:text-slate-400 font-medium"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">
+                Cette note sera transmise aux administrateurs pour examen et approbation.
+              </p>
+            </div>
+
+            {error && (
+              <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 font-medium flex items-center gap-2">
+                <AlertTriangle size={15} className="shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <div className="pt-2 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors cursor-pointer"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={submitting || !justification.trim()}
+                className="px-4 py-2 text-xs font-bold text-white bg-amber-600 hover:bg-amber-700 active:scale-95 disabled:opacity-50 disabled:pointer-events-none rounded-xl transition-all shadow-xs flex items-center gap-2 cursor-pointer"
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" />
+                    <span>Transmission...</span>
+                  </>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    <span>Soumettre au Double Regard</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+        </motion.div>
       </div>
-    </div>
+    </AnimatePresence>
   );
 };
+
+export default DoubleRegardSubmitModal;

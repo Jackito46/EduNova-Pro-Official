@@ -17,14 +17,13 @@ export const useOnlineStatus = () => {
     const duration = Date.now() - start;
     const now = new Date();
 
-    const effectiveOnline = connected || (typeof window !== 'undefined' && window.navigator.onLine);
-    setIsOnline(effectiveOnline);
+    setIsOnline(connected);
     setLastChecked(now);
 
-    if (effectiveOnline) {
+    if (connected) {
       setLatency(duration);
-      // If ping takes more than 6.5 seconds, consider it a slow connection
-      setIsSlow(duration > 6500);
+      // If ping takes more than 3 seconds, consider it a slow connection
+      setIsSlow(duration > 3000);
       setLatencyHistory(prev => {
         const updated = [...prev, duration];
         if (updated.length > 20) {

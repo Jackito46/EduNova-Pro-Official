@@ -1,14 +1,10 @@
 
 import { initConsoleSanitizer } from './utils/consoleSanitizer';
-import { mouseScrollEnhancer } from './utils/mouseScrollEnhancer';
 
 declare const __DEPLOY_HASH__: string;
 
 // Initialisation précoce de l'interception et du nettoyage des logs de la console
 initConsoleSanitizer();
-
-// Initialisation du support complet du défilement souris et des zones de clic ciblées
-mouseScrollEnhancer.init();
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import ReactDOM from 'react-dom/client';
@@ -259,17 +255,14 @@ root.render(
   </React.StrictMode>
 );
 
-// Nettoyage de secours garanti après montage immédiat
+// Nettoyage de secours garanti après montage
 if (typeof window !== 'undefined') {
   requestAnimationFrame(() => {
     const splash = document.getElementById('edunova-pwa-splash');
     if (splash) {
-      splash.style.pointerEvents = 'none';
-      splash.style.transition = 'opacity 0.2s ease-out';
+      splash.style.transition = 'opacity 0.25s ease-out';
       splash.style.opacity = '0';
-      setTimeout(() => {
-        try { splash.remove(); } catch (e) {}
-      }, 200);
+      setTimeout(() => splash.remove(), 250);
     }
   });
 }

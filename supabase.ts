@@ -1,6 +1,5 @@
 
 import { createClient } from '@supabase/supabase-js';
-import { supabaseLatencyTracker } from './services/supabaseLatencyTracker';
 
 const envUrl = import.meta.env.VITE_SUPABASE_URL;
 let originalSupabaseUrl = envUrl || 'https://iymzthjkucvhyjnxpslg.supabase.co';
@@ -118,40 +117,42 @@ export const checkSupabaseConnection = async (): Promise<boolean> => {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8s timeout for high-latency mobile networks
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3s timeout
     
-    // Auth health endpoint with apikey parameter to get a clean 200 OK without 401 unauthorized
-    const healthUrl = `${supabaseUrl}/auth/v1/health?apikey=${encodeURIComponent(supabaseAnonKey)}`;
-    const response = await fetch(healthUrl, { 
+    // Use the auth health endpoint with no-cors. This is extremely fast,
+    // does not require any custom headers, and completely bypasses CORS preflight (OPTIONS)
+    // which eliminates a whole round-trip of latency and prevents false "slow connection" triggers.
+    const response = await fetch(`${supabaseUrl}/auth/v1/health`, { 
       method: 'GET',
+      mode: 'no-cors',
       cache: 'no-store',
       signal: controller.signal
     });
     
     clearTimeout(timeoutId);
-    return response.ok || (response.status >= 200 && response.status < 500);
+    return true; // If fetch didn't throw, the server is reachable and we are online!
   } catch (err: any) {
-    // Fallback: try querying a lightweight rest endpoint with standard headers
+    // Fallback: try the REST endpoint if auth/v1/health failed (some local setups might proxy differently)
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      const timeoutId = setTimeout(() => controller.abort(), 3000);
       
-      const response = await fetch(`${supabaseUrl}/rest/v1/global_settings?select=key&limit=1`, {
+      const response = await fetch(`${supabaseUrl}/rest/v1/`, {
         method: 'GET',
         headers: { 
           'apikey': supabaseAnonKey,
           'Authorization': `Bearer ${supabaseAnonKey}`,
           'Content-Type': 'application/json'
         },
+        mode: 'cors',
         cache: 'no-store',
         signal: controller.signal
       });
       
       clearTimeout(timeoutId);
-      return response.ok || (response.status >= 200 && response.status < 500);
+      return response.ok || (response.status >= 400 && response.status < 500);
     } catch (e) {
-      // If browser indicates online, give user the benefit of the doubt
-      return typeof window !== 'undefined' && window.navigator.onLine ? true : false;
+      return false;
     }
   }
 };
@@ -378,10 +379,6 @@ if (!supabaseUrl || !supabaseUrl.startsWith('http')) {
 // Safe global fetch wrapper that catches network errors, retries transient failures, and returns structured 503 responses
 const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const maxRetries = 2;
-  const startTime = performance.now();
-  const method = (init?.method || 'GET').toUpperCase();
-  const urlStr = typeof input === 'string' ? input : (input instanceof URL ? input.href : (input as Request)?.url || '');
-
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     let reqInit = init;
     let timeoutId: any = null;
@@ -393,31 +390,6 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
     try {
       const response = await fetch(input, reqInit);
       if (timeoutId) clearTimeout(timeoutId);
-
-      const durationMs = Math.round(performance.now() - startTime);
-      try {
-        const parsed = supabaseLatencyTracker.parseUrlDetails(urlStr, method);
-        const cl = response.headers.get('content-length');
-        const bytes = cl ? parseInt(cl, 10) : undefined;
-        supabaseLatencyTracker.logRequest({
-          timestamp: Date.now(),
-          method,
-          url: urlStr,
-          displayEndpoint: parsed.displayEndpoint,
-          table: parsed.table,
-          status: response.status,
-          statusText: response.statusText,
-          durationMs,
-          bytesReceived: bytes,
-          isError: !response.ok && response.status >= 400,
-          errorMessage: !response.ok ? `HTTP ${response.status} ${response.statusText}` : undefined,
-          queryType: parsed.queryType,
-          isIdentityQuery: parsed.isIdentityQuery
-        });
-      } catch (logErr) {
-        // Tracker logging should never break the request flow
-      }
-
       return response;
     } catch (err: any) {
       if (timeoutId) clearTimeout(timeoutId);
@@ -433,25 +405,6 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
         continue;
       }
 
-      const durationMs = Math.round(performance.now() - startTime);
-      try {
-        const parsed = supabaseLatencyTracker.parseUrlDetails(urlStr, method);
-        supabaseLatencyTracker.logRequest({
-          timestamp: Date.now(),
-          method,
-          url: urlStr,
-          displayEndpoint: parsed.displayEndpoint,
-          table: parsed.table,
-          status: isNetworkError ? 503 : 500,
-          statusText: err.name || 'NetworkError',
-          durationMs,
-          isError: true,
-          errorMessage: err.message || 'Impossible de contacter le serveur Supabase',
-          queryType: parsed.queryType,
-          isIdentityQuery: parsed.isIdentityQuery
-        });
-      } catch (logErr) {}
-
       if (isNetworkError) {
         return new Response(JSON.stringify({
           message: "Erreur réseau: Impossible de contacter le serveur de base de données. Vérifiez votre connexion internet.",
@@ -465,26 +418,6 @@ const safeFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<
       throw err;
     }
   }
-
-  const durationMs = Math.round(performance.now() - startTime);
-  try {
-    const parsed = supabaseLatencyTracker.parseUrlDetails(urlStr, method);
-    supabaseLatencyTracker.logRequest({
-      timestamp: Date.now(),
-      method,
-      url: urlStr,
-      displayEndpoint: parsed.displayEndpoint,
-      table: parsed.table,
-      status: 503,
-      statusText: 'Service Unavailable',
-      durationMs,
-      isError: true,
-      errorMessage: "Erreur réseau: Serveur indisponible après tentatives.",
-      queryType: parsed.queryType,
-      isIdentityQuery: parsed.isIdentityQuery
-    });
-  } catch (e) {}
-
   return new Response(JSON.stringify({
     message: "Erreur réseau: Serveur indisponible.",
     code: "NETWORK_ERROR"

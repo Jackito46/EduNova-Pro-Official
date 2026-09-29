@@ -34,8 +34,7 @@ export type AuditAction =
   | 'PAYROLL_CREATE'
   | 'PAYROLL_DELETE'
   | 'PAYROLL_PAYMENT'
-  | 'PAYROLL_SENSITIVE_UPDATE'
-  | 'APPROVE';
+  | 'PAYROLL_SENSITIVE_UPDATE';
 
 export type EntityType = 
   | 'auth' 
@@ -60,8 +59,7 @@ export type EntityType =
   | 'enrollment'
   | 'payroll_slip'
   | 'payroll_period'
-  | 'pending_action'
-  | 'salary_advance';
+  | 'pending_action';
 
 export interface AuditLogPayload {
   school_id: string | null;

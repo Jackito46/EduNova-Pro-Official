@@ -86,7 +86,7 @@ export const PrintPreviewModal: React.FC<PrintPreviewModalProps> = ({
                     ) : (
                       <>
                         <Download size={14} className="text-slate-600" />
-                        <span>Exporter en PDF</span>
+                        <span>PDF</span>
                       </>
                     )}
                   </button>

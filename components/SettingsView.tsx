@@ -66,6 +66,7 @@ import {
   GraduationCap,
   Wrench,
   X,
+  Search,
   Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -267,6 +268,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   const [primaryAdmin, setPrimaryAdmin] = useState<{ id: string; email: string; full_name: string } | null>(null);
   const [isCleaning, setIsCleaning] = useState(false);
   const [cleanScope, setCleanScope] = useState<string>('all');
+
+  // Super Admin Gateway Governance state
+  const [isGatewaysSchoolModalOpen, setIsGatewaysSchoolModalOpen] = useState(false);
+  const [allSchoolsForGateways, setAllSchoolsForGateways] = useState<any[]>([]);
+  const [loadingAllSchools, setLoadingAllSchools] = useState(false);
+  const [gatewaysSearchQuery, setGatewaysSearchQuery] = useState('');
+  const [gatewaysStatusFilter, setGatewaysStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  const [togglingSchoolId, setTogglingSchoolId] = useState<string | null>(null);
 
   const isPrimaryAdmin = Boolean(
     isSuperAdmin || 
@@ -482,6 +491,76 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   };
 
 
+  const fetchSchoolsForGateways = async () => {
+    if (!isSuperAdmin) return;
+    setLoadingAllSchools(true);
+    try {
+      const { data, error } = await supabase
+        .from('schools')
+        .select('id, name, email, phone, status, subscription_plan, has_api_gateways, has_multi_campus')
+        .order('name');
+      if (error) throw error;
+      setAllSchoolsForGateways(data || []);
+    } catch (err: any) {
+      console.error("Erreur chargement établissements passerelles:", err);
+    } finally {
+      setLoadingAllSchools(false);
+    }
+  };
+
+  const handleToggleSchoolApiGateways = async (targetSchoolId: string, currentVal: boolean, targetSchoolName?: string) => {
+    if (!isSuperAdmin) {
+      toast.error("Action réservée au Super Administrateur.");
+      return;
+    }
+    setTogglingSchoolId(targetSchoolId);
+    const nextVal = !currentVal;
+    try {
+      const { error } = await supabase
+        .from('schools')
+        .update({ has_api_gateways: nextVal })
+        .eq('id', targetSchoolId);
+
+      if (error) throw error;
+
+      await AuditLogger.log({
+        school_id: targetSchoolId,
+        user_id: user.id,
+        action: 'UPDATE',
+        entity_type: 'school',
+        entity_id: targetSchoolId,
+        details: {
+          type: 'super_admin_toggle_api_gateways',
+          has_api_gateways: nextVal,
+          school_name: targetSchoolName || ''
+        }
+      });
+
+      // Si l'établissement cible est l'école active, synchroniser schoolData et le contexte global
+      const currentActiveSchoolId = school?.id || user.school_id;
+      if (targetSchoolId === currentActiveSchoolId) {
+        setSchoolData((prev: any) => ({ ...prev, has_api_gateways: nextVal }));
+        if (refreshSchool) await refreshSchool();
+      }
+
+      // Synchroniser la liste des établissements en mémoire
+      setAllSchoolsForGateways(prev =>
+        prev.map(s => s.id === targetSchoolId ? { ...s, has_api_gateways: nextVal } : s)
+      );
+
+      toast.success(
+        nextVal
+          ? `Passerelles API (MonCash/Natcash) activées pour ${targetSchoolName || 'cet établissement'} !`
+          : `Passerelles API désactivées pour ${targetSchoolName || 'cet établissement'}.`
+      );
+    } catch (err: any) {
+      console.error("Erreur lors de la mise à jour des passerelles :", err);
+      toast.error("Erreur : " + (err.message || "Impossible de mettre à jour le statut des passerelles"));
+    } finally {
+      setTogglingSchoolId(null);
+    }
+  };
+
   useEffect(() => {
     fetchData();
   }, [user.school_id]);
@@ -491,6 +570,10 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     setLoading(true);
     let parsedSettings: any = {};
     try {
+      if (isSuperAdmin) {
+        fetchSchoolsForGateways();
+      }
+
       const [schoolRes, yearsRes, rateRes] = await Promise.all([
         supabase.from('schools').select('*').eq('id', user.school_id).single(),
         supabase.from('academic_years').select('*').eq('school_id', user.school_id).order('label', { ascending: false }),
@@ -508,6 +591,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         // Merge settings into schoolData for easier UI handling
         const finalSchoolData = {
           ...data,
+          has_multi_campus: !!data.has_multi_campus,
+          has_api_gateways: !!data.has_api_gateways,
           global_settings: parsedSettings,
           name: data.name || "",
           address: data.address || "",
@@ -881,6 +966,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         license_number: schoolData.license_number,
         logo_url: schoolData.logo_url,
         has_multi_campus: isSuperAdmin ? !!schoolData.has_multi_campus : !!school?.has_multi_campus,
+        has_api_gateways: isSuperAdmin ? !!schoolData.has_api_gateways : !!school?.has_api_gateways,
         // Send as an object since supabase-js handles json/jsonb stringification natively.
         // If it's a text column, we must stringify it. We will send it as an object first, 
         // but if the backend strictly requires text, it would reject it. Postgrest casts objects to JSON.
@@ -1867,23 +1953,36 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
            key={item.id} 
            onClick={() => handleSelectTab(item.id as SettingsTab)}
            title={item.label}
-           className={`shrink-0 lg:shrink w-auto lg:w-full flex items-center gap-2.5 sm:gap-3 px-3 sm:px-3.5 xl:px-4 py-2.5 sm:py-3 rounded-xl text-xs xl:text-[13px] font-bold tracking-tight transition-all cursor-pointer text-left ${
+           className={`shrink-0 lg:shrink w-auto lg:w-full flex items-center justify-between gap-2 px-3 sm:px-3.5 xl:px-4 py-2.5 sm:py-3 rounded-xl text-xs xl:text-[13px] font-bold tracking-tight transition-all cursor-pointer text-left ${
              activeTab === item.id 
                ? 'bg-slate-900 text-white shadow-md shadow-slate-900/10' 
                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
            }`}
           >
-           <item.icon size={18} className={`shrink-0 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
-           <span className="min-w-0 flex-1 truncate">
-             {/* Écrans 2XL et ultra-larges (≥ 1536px) : Libellé exhaustif */}
-             <span className="hidden 2xl:inline">{item.label}</span>
-             {/* PC Portables 14" et desktop compact (1024px à 1535px) : Libellé optimisé anti-débordement */}
-             <span className="hidden lg:inline 2xl:hidden">{item.labelDesktopCompact}</span>
-             {/* Tablettes (640px à 1023px) : Libellé fluide */}
-             <span className="hidden sm:inline lg:hidden">{item.labelTablet}</span>
-             {/* Mobiles (< 640px) : Libellé compact pour navigation tactile */}
-             <span className="sm:hidden">{item.labelMobile}</span>
-           </span>
+           <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
+             <item.icon size={18} className={`shrink-0 ${activeTab === item.id ? 'text-white' : 'text-slate-500'}`} />
+             <span className="min-w-0 flex-1 truncate">
+               {/* Écrans 2XL et ultra-larges (≥ 1536px) : Libellé exhaustif */}
+               <span className="hidden 2xl:inline">{item.label}</span>
+               {/* PC Portables 14" et desktop compact (1024px à 1535px) : Libellé optimisé anti-débordement */}
+               <span className="hidden lg:inline 2xl:hidden">{item.labelDesktopCompact}</span>
+               {/* Tablettes (640px à 1023px) : Libellé fluide */}
+               <span className="hidden sm:inline lg:hidden">{item.labelTablet}</span>
+               {/* Mobiles (< 640px) : Libellé compact pour navigation tactile */}
+               <span className="sm:hidden">{item.labelMobile}</span>
+             </span>
+           </div>
+           {item.id === 'gateways' && (
+             <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 hidden sm:inline-block ${
+               (schoolData?.has_api_gateways ?? school?.has_api_gateways)
+                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                 : activeTab === 'gateways'
+                   ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
+                   : 'bg-slate-100 text-slate-500 border border-slate-200'
+             }`}>
+               {(schoolData?.has_api_gateways ?? school?.has_api_gateways) ? 'Actif' : 'Inactif'}
+             </span>
+           )}
           </button>
          ))}
         </div>
@@ -2237,6 +2336,61 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                    ) : (
                      <div className="shrink-0">
                        {school?.has_multi_campus ? (
+                         <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
+                           <CheckCircle2 size={13} /> Activé
+                         </span>
+                       ) : (
+                         <span className="text-xs font-semibold text-slate-400 flex items-center gap-1">
+                           <Lock size={13} /> Restreint
+                         </span>
+                       )}
+                     </div>
+                   )}
+                 </div>
+               </div>
+
+               {/* Option Passerelles de Paiement API */}
+               <div className="pt-2 sm:pt-2.5 border-t border-slate-100">
+                 <div className="flex items-center justify-between p-2.5 sm:p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 gap-2.5">
+                   <div className="flex items-center gap-2.5">
+                     <div className="p-1.5 sm:p-2 bg-emerald-50 text-emerald-600 rounded-xl shrink-0">
+                       <Smartphone size={16} />
+                     </div>
+                     <div>
+                       <div className="flex items-center gap-2">
+                         <p className="text-xs font-bold text-slate-900">Passerelles de Paiement API (MonCash / Natcash)</p>
+                         {(isSuperAdmin ? schoolData.has_api_gateways : school?.has_api_gateways) ? (
+                           <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-800 text-[9px] font-bold rounded-md">Actif</span>
+                         ) : (
+                           <span className="px-1.5 py-0.5 bg-slate-200 text-slate-600 text-[9px] font-bold rounded-md">Inactif</span>
+                         )}
+                       </div>
+                       <p className="text-[10px] sm:text-[11px] text-slate-500 font-medium mt-0.5">
+                         {isSuperAdmin 
+                           ? "Activer ou désactiver l'intégration des passerelles électroniques et des clés API pour cet établissement."
+                           : school?.has_api_gateways 
+                             ? "Votre établissement dispose de l'automatisation des passerelles MonCash/Natcash active."
+                             : "Pour débloquer les passerelles de paiement automatiques, contactez l'administrateur EduNova."
+                         }
+                       </p>
+                     </div>
+                   </div>
+
+                   {isSuperAdmin ? (
+                     <div className="flex items-center gap-2 shrink-0">
+                       <label className="relative inline-flex items-center cursor-pointer shrink-0">
+                         <input 
+                           type="checkbox" 
+                           className="sr-only peer" 
+                           checked={!!schoolData.has_api_gateways}
+                           onChange={e => setSchoolData({...schoolData, has_api_gateways: e.target.checked})}
+                         />
+                         <div className="w-9 h-5 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                       </label>
+                     </div>
+                   ) : (
+                     <div className="shrink-0">
+                       {school?.has_api_gateways ? (
                          <span className="text-xs font-semibold text-emerald-600 flex items-center gap-1">
                            <CheckCircle2 size={13} /> Activé
                          </span>
@@ -3537,15 +3691,151 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         )}
 
         {(activeTab === 'gateways' || (activeTab as any) === 'kobara') && (
-          <div className="animate-in slide-in-from-right duration-500">
-            <ApiCredentialsVault
-              user={user}
-              canManageAllCampuses={canManageAllCampuses}
-              moncashConfig={moncashConfig}
-              setMoncashConfig={setMoncashConfig}
-              onSaveMoncashLegacy={handleUpdateMoncash}
-              savingLegacy={saving}
-            />
+          <div className="space-y-4 animate-in slide-in-from-right duration-500">
+            {/* Super Admin Executive Governance Panel */}
+            {isSuperAdmin && (
+              <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 rounded-2xl p-4 sm:p-5 text-white border border-slate-800 shadow-md space-y-4 relative overflow-hidden">
+                <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+                
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
+                      <Smartphone size={20} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+                          SaaS Governance
+                        </span>
+                        <h4 className="text-sm font-bold text-white tracking-tight">
+                          Contrôle Super Admin — Activation des Passerelles
+                        </h4>
+                      </div>
+                      <p className="text-xs text-slate-400 font-medium mt-0.5 truncate">
+                        Établissement actif : <strong className="text-white font-bold">{school?.name || schoolData.name || 'Établissement courant'}</strong>
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        fetchSchoolsForGateways();
+                        setIsGatewaysSchoolModalOpen(true);
+                      }}
+                      className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white border border-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
+                    >
+                      <Building2 size={13} />
+                      <span>Gérer par établissement ({allSchoolsForGateways.length || '...'})</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Status bar & One-Click Toggle for current school */}
+                <div className="p-3 bg-white/5 border border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                  <div className="flex items-center gap-2.5">
+                    <div className={`w-3 h-3 rounded-full shrink-0 ${
+                      (schoolData.has_api_gateways ?? school?.has_api_gateways)
+                        ? 'bg-emerald-400 animate-pulse'
+                        : 'bg-amber-400'
+                    }`} />
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold text-white">
+                          Statut pour cet établissement :
+                        </span>
+                        {(schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
+                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-black uppercase">
+                            Passerelles Déverrouillées
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-black uppercase">
+                            Passerelles Désactivées
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
+                        {(schoolData.has_api_gateways ?? school?.has_api_gateways)
+                          ? "L'école a accès aux clés d'API (MonCash, Natcash, Kobara), aux webhooks et à la synchronisation automatique des transactions."
+                          : "Les clés d'API et la validation automatique sont désactivées. L'école gère les paiements en mode manuel uniquement."
+                        }
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={togglingSchoolId === (school?.id || user.school_id)}
+                    onClick={() => handleToggleSchoolApiGateways(
+                      school?.id || user.school_id || '',
+                      Boolean(schoolData.has_api_gateways ?? school?.has_api_gateways),
+                      school?.name || schoolData.name
+                    )}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-sm whitespace-nowrap shrink-0 ${
+                      (schoolData.has_api_gateways ?? school?.has_api_gateways)
+                        ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/30'
+                    }`}
+                  >
+                    {togglingSchoolId === (school?.id || user.school_id) ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
+                      <>
+                        <Lock size={13} />
+                        <span>Désactiver pour cette école</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 size={13} />
+                        <span>Activer pour cette école</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Non-Super Admin: If gateways are disabled, show friendly informative locked screen */}
+            {!isSuperAdmin && !(schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
+              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 text-center max-w-xl mx-auto space-y-4">
+                <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-xs">
+                  <Smartphone size={28} />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-bold text-xs rounded-full uppercase tracking-wider">
+                    Module Optionnel Non Souscrit
+                  </span>
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
+                    Passerelles MonCash & Clés API Inactives
+                  </h3>
+                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
+                    L'intégration directe des passerelles électroniques (MonCash Digicel, Natcash Natcom) et la synchronisation automatique des transactions par Webhooks ne sont pas activées pour votre établissement.
+                  </p>
+                </div>
+                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600 space-y-1 text-left">
+                  <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                    <Info size={14} className="text-blue-600 shrink-0" />
+                    Comment fonctionne votre établissement actuellement ?
+                  </p>
+                  <p className="text-[11px] text-slate-500 leading-relaxed">
+                    Les encaissements s'effectuent normalement via les modes classiques (Espèces, Chèques, Dépôts bancaires avec bordereaux). Si un parent paye par MonCash, le caissier saisit la référence manuellement.
+                  </p>
+                  <p className="text-[11px] text-indigo-700 font-semibold pt-1">
+                    Pour activer la validation automatique des paiements par Webhook, contactez votre administrateur de plateforme EduNova.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <ApiCredentialsVault
+                user={user}
+                canManageAllCampuses={canManageAllCampuses}
+                moncashConfig={moncashConfig}
+                setMoncashConfig={setMoncashConfig}
+                onSaveMoncashLegacy={handleUpdateMoncash}
+                savingLegacy={saving}
+              />
+            )}
           </div>
         )}
 
@@ -4611,6 +4901,217 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        type="danger"
        isLoading={saving}
       />
+
+     {/* Modal - Gestion Centrale des Passerelles de Paiement par Établissement (Super Admin) */}
+     {isSuperAdmin && (
+       <Modal
+         isOpen={isGatewaysSchoolModalOpen}
+         onClose={() => setIsGatewaysSchoolModalOpen(false)}
+         title="Activation des Passerelles API par Établissement"
+         hideDefaultActions={true}
+         containerClassName="max-w-2xl sm:max-w-3xl"
+       >
+         <div className="space-y-4">
+           {/* Header info */}
+           <div className="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl flex items-start justify-between gap-3 border border-slate-800 shadow-sm">
+             <div className="flex items-center gap-3">
+               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                 <Smartphone size={20} />
+               </div>
+               <div>
+                 <h4 className="text-xs sm:text-sm font-bold text-white">
+                   Supervision Multi-Établissements (MonCash / Natcash / API)
+                 </h4>
+                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">
+                   Basculez en temps réel l'activation des passerelles dans la base de données école par école.
+                 </p>
+               </div>
+             </div>
+             <div className="text-right shrink-0">
+               <span className="text-xs font-black text-emerald-400">
+                 {allSchoolsForGateways.filter(s => s.has_api_gateways).length} / {allSchoolsForGateways.length}
+               </span>
+               <p className="text-[10px] text-slate-400 font-medium">Actives</p>
+             </div>
+           </div>
+
+           {/* Search & Filter bar */}
+           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+             <div className="relative flex-1">
+               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+               <input
+                 type="text"
+                 placeholder="Rechercher une école par nom..."
+                 value={gatewaysSearchQuery}
+                 onChange={e => setGatewaysSearchQuery(e.target.value)}
+                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal"
+               />
+             </div>
+
+             <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
+               <button
+                 type="button"
+                 onClick={() => setGatewaysStatusFilter('ALL')}
+                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                   gatewaysStatusFilter === 'ALL'
+                     ? 'bg-slate-900 text-white shadow-2xs'
+                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                 }`}
+               >
+                 Tous ({allSchoolsForGateways.length})
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setGatewaysStatusFilter('ACTIVE')}
+                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                   gatewaysStatusFilter === 'ACTIVE'
+                     ? 'bg-emerald-600 text-white shadow-2xs'
+                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                 }`}
+               >
+                 Actives ({allSchoolsForGateways.filter(s => s.has_api_gateways).length})
+               </button>
+               <button
+                 type="button"
+                 onClick={() => setGatewaysStatusFilter('INACTIVE')}
+                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                   gatewaysStatusFilter === 'INACTIVE'
+                     ? 'bg-slate-700 text-white shadow-2xs'
+                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                 }`}
+               >
+                 Inactives ({allSchoolsForGateways.filter(s => !s.has_api_gateways).length})
+               </button>
+             </div>
+           </div>
+
+           {/* Schools List */}
+           <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-[420px] overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
+             {loadingAllSchools ? (
+               <div className="p-8 text-center text-slate-400">
+                 <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-600" />
+                 <p className="text-xs font-medium">Chargement des établissements...</p>
+               </div>
+             ) : (() => {
+               const filtered = allSchoolsForGateways.filter(s => {
+                 if (gatewaysSearchQuery) {
+                   const q = gatewaysSearchQuery.toLowerCase();
+                   if (!s.name?.toLowerCase().includes(q)) return false;
+                 }
+                 if (gatewaysStatusFilter === 'ACTIVE') return Boolean(s.has_api_gateways);
+                 if (gatewaysStatusFilter === 'INACTIVE') return !s.has_api_gateways;
+                 return true;
+               });
+
+               if (filtered.length === 0) {
+                 return (
+                   <div className="p-8 text-center text-slate-400">
+                     <Building2 size={24} className="mx-auto mb-2 opacity-40" />
+                     <p className="text-xs font-bold text-slate-700">Aucun établissement trouvé</p>
+                     <p className="text-[11px] text-slate-400">Essayez de modifier votre recherche ou vos filtres.</p>
+                   </div>
+                 );
+               }
+
+               return filtered.map(schoolItem => {
+                 const isCurrentSchool = schoolItem.id === (school?.id || user.school_id);
+                 const isUpdating = togglingSchoolId === schoolItem.id;
+                 const isActive = Boolean(schoolItem.has_api_gateways);
+
+                 return (
+                   <div
+                     key={schoolItem.id}
+                     className={`p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-colors ${
+                       isCurrentSchool ? 'bg-indigo-50/50' : 'hover:bg-slate-50/80'
+                     }`}
+                   >
+                     <div className="flex items-center gap-3 min-w-0">
+                       <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-xs font-black ${
+                         isActive
+                           ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                           : 'bg-slate-100 text-slate-600 border border-slate-200'
+                       }`}>
+                         <Building2 size={16} />
+                       </div>
+                       <div className="min-w-0">
+                         <div className="flex items-center gap-2 flex-wrap">
+                           <h5 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
+                             {schoolItem.name}
+                           </h5>
+                           {isCurrentSchool && (
+                             <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-800 text-[9px] font-black rounded uppercase">
+                               En cours
+                             </span>
+                           )}
+                           <span className="px-1.5 py-0.2 bg-slate-100 text-slate-600 text-[9px] font-bold rounded uppercase">
+                             {schoolItem.subscription_plan || 'Standard'}
+                           </span>
+                         </div>
+                         <div className="flex items-center gap-2 text-[11px] text-slate-500 font-medium mt-0.5">
+                           <span>{schoolItem.email || schoolItem.phone || 'Pas de contact direct'}</span>
+                           {schoolItem.has_multi_campus && (
+                             <span className="text-indigo-600 font-bold">• Multi-Annexes</span>
+                           )}
+                         </div>
+                       </div>
+                     </div>
+
+                     <div className="flex items-center gap-2.5 shrink-0">
+                       <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase hidden sm:inline-block ${
+                         isActive
+                           ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                           : 'bg-slate-100 text-slate-600 border border-slate-200'
+                       }`}>
+                         {isActive ? 'Passerelles Actives' : 'Inactif'}
+                       </span>
+
+                       <button
+                         type="button"
+                         disabled={isUpdating}
+                         onClick={() => handleToggleSchoolApiGateways(schoolItem.id, isActive, schoolItem.name)}
+                         className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs ${
+                           isActive
+                             ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200'
+                             : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs'
+                         }`}
+                       >
+                         {isUpdating ? (
+                           <Loader2 size={12} className="animate-spin" />
+                         ) : isActive ? (
+                           <>
+                             <XCircle size={13} />
+                             <span>Désactiver</span>
+                           </>
+                         ) : (
+                           <>
+                             <CheckCircle2 size={13} />
+                             <span>Activer</span>
+                           </>
+                         )}
+                       </button>
+                     </div>
+                   </div>
+                 );
+               });
+             })()}
+           </div>
+
+           {/* Footer */}
+           <div className="pt-2 flex items-center justify-between text-xs text-slate-500">
+             <span className="text-[11px]">
+               Modification instantanée enregistrée dans la base de données.
+             </span>
+             <button
+               type="button"
+               onClick={() => setIsGatewaysSchoolModalOpen(false)}
+               className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+             >
+               Fermer
+             </button>
+           </div>
+         </div>
+       </Modal>
+     )}
 
      {modalConfig && (
       <Modal

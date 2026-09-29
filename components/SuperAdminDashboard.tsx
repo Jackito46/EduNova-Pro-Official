@@ -139,6 +139,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({ user }
   const [renewDays, setRenewDays] = useState(30);
   const [isRenewing, setIsRenewing] = useState(false);
   const [hasMultiCampus, setHasMultiCampus] = useState(false);
+  const [hasApiGateways, setHasApiGateways] = useState(false);
 
   // School Deletion Modal State
   const [deleteModal, setDeleteModal] = useState<{
@@ -182,7 +183,8 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
     phone: string;
     address: string;
     has_multi_campus: boolean;
-  }>({ isOpen: false, schoolId: '', name: '', email: '', director_name: '', phone: '', address: '', has_multi_campus: false });
+    has_api_gateways?: boolean;
+  }>({ isOpen: false, schoolId: '', name: '', email: '', director_name: '', phone: '', address: '', has_multi_campus: false, has_api_gateways: false });
 
   // View State
   const [activeView, setActiveView] = useState<'schools' | 'health' | 'users' | 'logs' | 'alerts' | 'config' | 'system' | 'sessions' | 'backups'>('schools');
@@ -1506,13 +1508,14 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
           director_name: editSchoolModal.director_name,
           phone: editSchoolModal.phone,
           address: editSchoolModal.address,
-          has_multi_campus: editSchoolModal.has_multi_campus
+          has_multi_campus: editSchoolModal.has_multi_campus,
+          has_api_gateways: editSchoolModal.has_api_gateways
         })
         .eq('id', editSchoolModal.schoolId);
 
       if (error) throw error;
 
-      toast.success("Les informations de l'école et l'option Multi-Annexes ont été mises à jour.");
+      toast.success("Les informations de l'école et les options premium (Multi-Annexes & Passerelles API) ont été mises à jour.");
       setEditSchoolModal({ ...editSchoolModal, isOpen: false });
       fetchSchools();
       
@@ -1522,7 +1525,12 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
         action: 'UPDATE',
         entity_type: 'school',
         entity_id: editSchoolModal.schoolId,
-        details: { type: 'edit_school_info', school_name: editSchoolModal.name, has_multi_campus: editSchoolModal.has_multi_campus }
+        details: { 
+          type: 'edit_school_info', 
+          school_name: editSchoolModal.name, 
+          has_multi_campus: editSchoolModal.has_multi_campus,
+          has_api_gateways: editSchoolModal.has_api_gateways
+        }
       });
     } catch (err: any) {
       console.error("Erreur lors de la mise à jour :", err);
@@ -1738,6 +1746,7 @@ const handleDeleteSchool = async () => {
     setRenewPlan(school.subscription_plan || 'mensuel');
     setRenewDays(30);
     setHasMultiCampus(!!school.has_multi_campus);
+    setHasApiGateways(!!school.has_api_gateways);
     setRenewModalOpen(true);
   };
 
@@ -1761,10 +1770,13 @@ const handleDeleteSchool = async () => {
         throw new Error(res.error || "Une erreur est survenue lors de la mise à jour de l'abonnement.");
       }
 
-      // Update has_multi_campus directly in the school record
+      // Update has_multi_campus and has_api_gateways directly in the school record
       const { error: updateError } = await supabase
         .from('schools')
-        .update({ has_multi_campus: hasMultiCampus })
+        .update({ 
+          has_multi_campus: hasMultiCampus,
+          has_api_gateways: hasApiGateways
+        })
         .eq('id', selectedSchool.id);
 
       if (updateError) throw updateError;
@@ -1775,7 +1787,13 @@ const handleDeleteSchool = async () => {
         action: 'UPDATE',
         entity_type: 'school',
         entity_id: selectedSchool.id,
-        details: { type: 'subscription_renewal_premium_modules', plan: renewPlan, days: renewDays, has_multi_campus: hasMultiCampus }
+        details: { 
+          type: 'subscription_renewal_premium_modules', 
+          plan: renewPlan, 
+          days: renewDays, 
+          has_multi_campus: hasMultiCampus,
+          has_api_gateways: hasApiGateways
+        }
       });
 
       toast.success("Configuration mise à jour avec succès !");
@@ -2934,7 +2952,8 @@ const handleDeleteSchool = async () => {
                                           director_name: school.director_name || '', 
                                           phone: school.phone || '', 
                                           address: school.address || '',
-                                          has_multi_campus: !!school.has_multi_campus
+                                          has_multi_campus: !!school.has_multi_campus,
+                                          has_api_gateways: !!school.has_api_gateways
                                         })}
                                         title="Modifier l'établissement"
                                         className="hidden 2xl:inline-flex p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all border border-transparent hover:border-indigo-100 cursor-pointer"
@@ -3148,7 +3167,8 @@ const handleDeleteSchool = async () => {
                                     director_name: school.director_name || '', 
                                     phone: school.phone || '', 
                                     address: school.address || '',
-                                    has_multi_campus: !!school.has_multi_campus
+                                    has_multi_campus: !!school.has_multi_campus,
+                                    has_api_gateways: !!school.has_api_gateways
                                   })}
                                   title="Modifier"
                                   className="py-2 bg-slate-50 hover:bg-indigo-50 hover:text-indigo-700 border border-slate-200 rounded-xl text-slate-600 flex flex-col items-center justify-center gap-0.5 text-[9px] font-bold transition-all cursor-pointer"
@@ -7897,7 +7917,8 @@ const handleDeleteSchool = async () => {
                               director_name: school.director_name || '', 
                               phone: school.phone || '', 
                               address: school.address || '',
-                              has_multi_campus: !!school.has_multi_campus
+                              has_multi_campus: !!school.has_multi_campus,
+                              has_api_gateways: !!school.has_api_gateways
                             });
                           }}
                           className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 rounded-xl flex items-center gap-3 transition-colors cursor-pointer"
@@ -8076,7 +8097,8 @@ const handleDeleteSchool = async () => {
                             director_name: school.director_name || '', 
                             phone: school.phone || '', 
                             address: school.address || '',
-                            has_multi_campus: !!school.has_multi_campus
+                            has_multi_campus: !!school.has_multi_campus,
+                            has_api_gateways: !!school.has_api_gateways
                           });
                         }}
                         className="w-full px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-indigo-50 hover:text-indigo-700 flex items-center gap-2.5 transition-colors cursor-pointer"

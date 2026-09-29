@@ -548,6 +548,24 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
           </div>
 
           <div className="p-3 sm:p-3.5 space-y-3">
+            {/* Banner if API gateways are disabled by Super Admin */}
+            {!schoolData?.has_api_gateways && (
+              <div className="p-2.5 sm:p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
+                <Smartphone size={16} className="text-amber-600 mt-0.5 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-950 flex-wrap">
+                    <span>Passerelles API MonCash & Natcash inactives</span>
+                    <span className="px-1.5 py-0.2 bg-amber-200/80 text-amber-900 text-[9px] font-black rounded uppercase">
+                      Contrôle Super Admin
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-amber-800 font-medium mt-0.5 leading-relaxed">
+                    Ce module est désactivé en base de données pour cet établissement. Les paiements saisis via MonCash ou Natcash fonctionneront en mode de référence manuelle uniquement (sans vérification automatique ni webhook).
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="relative flex-1 max-w-sm">
@@ -613,6 +631,15 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                               {method.is_custom && (
                                 <span className="px-1.5 py-0.2 bg-blue-50 text-blue-700 font-mono text-[9px] font-bold rounded border border-blue-200 uppercase shrink-0">
                                   Perso
+                                </span>
+                              )}
+                              {(method.id === 'MONCASH' || method.id === 'NATCASH') && (
+                                <span className={`px-1.5 py-0.2 font-mono text-[9px] font-bold rounded border uppercase shrink-0 ${
+                                  schoolData?.has_api_gateways
+                                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                    : 'bg-amber-50 text-amber-800 border-amber-200'
+                                }`}>
+                                  {schoolData?.has_api_gateways ? 'API Active' : 'Manuel (API Inactive)'}
                                 </span>
                               )}
                             </div>

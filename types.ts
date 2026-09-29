@@ -356,6 +356,7 @@ export interface School {
   global_settings?: any;
   created_at?: string;
   has_multi_campus?: boolean;
+  has_api_gateways?: boolean;
   
   // New institutional fields
   website?: string;
