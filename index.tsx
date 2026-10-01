@@ -107,6 +107,20 @@ if ('serviceWorker' in navigator) {
 
 console.log("index.tsx: Script loaded");
 
+// Interception des erreurs de chunks périmés suite à un nouveau déploiement Vite
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    console.warn("⚡ [EduNova] Chunk dynamique manquant après mise à jour (vite:preloadError). Rechargement immédiat...");
+    const lastReload = sessionStorage.getItem('edunova_vite_preload_reload');
+    const now = Date.now();
+    if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
+      sessionStorage.setItem('edunova_vite_preload_reload', String(now));
+      window.location.reload();
+    }
+  });
+}
+
 class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean, error: Error | null}> {
   constructor(props: {children: ReactNode}) {
     super(props);
@@ -139,6 +153,25 @@ class ErrorBoundary extends Component<{children: ReactNode}, {hasError: boolean,
 
   handleUnhandledRejection = (event: PromiseRejectionEvent) => {
     const error = event.reason || event;
+    const errorStr = (error?.message || error?.stack || String(error)).toLowerCase();
+
+    // Détection et auto-rechargement transparent si un chunk lazy-loadé est périmé après redéploiement
+    if (
+      errorStr.includes('failed to fetch dynamically imported module') ||
+      errorStr.includes('loading chunk') ||
+      errorStr.includes('unexpected token \'<\'')
+    ) {
+      console.warn("⚡ [EduNova] Chunk manquant détecté via unhandledrejection. Rechargement immédiat...");
+      event.preventDefault();
+      const lastReload = sessionStorage.getItem('edunova_chunk_reload');
+      const now = Date.now();
+      if (!lastReload || now - parseInt(lastReload, 10) > 15000) {
+        sessionStorage.setItem('edunova_chunk_reload', String(now));
+        window.location.reload();
+      }
+      return;
+    }
+
     if (isRefreshTokenError(error)) {
       console.warn("Caught unhandled refresh token rejection, preventing crash...");
       event.preventDefault(); // Prevents the error from crashing the app/showing overlay

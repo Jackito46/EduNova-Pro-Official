@@ -3777,6 +3777,16 @@ async function startServer() {
         }
       }
     }));
+
+    // Protection anti-blocage : Si un asset compilé (/assets/*) est introuvable après un nouveau build,
+    // NE JAMAIS renvoyer index.html. Renvoyer un 404 strict pour permettre au client de détecter la mise à jour et recharger proprement.
+    app.all(/^\/assets\/.*/, (req, res) => {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.status(404).send('Asset not found');
+    });
+
     app.get('*all', (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
       res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');

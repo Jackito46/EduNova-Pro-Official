@@ -4,7 +4,7 @@ import {
   Building2, ShieldAlert, Users, Database, 
   Power, Download, Plus, Search, X, CheckCircle2, AlertCircle, CalendarPlus, CalendarCheck, Loader2,
   TrendingUp, ShieldCheck, Zap, ArrowUpRight, Clock, UserPlus, Server,
-  LayoutDashboard, Settings, FileText, BarChart3, Mail, Palette, Sparkles, Sliders, DollarSign, Bus, BookOpen, Package,
+  LayoutDashboard, Settings, FileText, BarChart3, Mail, Palette, Sparkles, Sliders, DollarSign, Package,
   Globe, RefreshCw, Save, Shield, CreditCard, Terminal, Info, Trash2, Pause, Play, Edit2, HardDrive, Wrench, Key, Lock, Eraser, Activity, GraduationCap, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Copy, Check, Unlock, UserX, KeyRound, ShieldOff, AlertTriangle, Archive, RotateCcw,
   MoreVertical, MoreHorizontal, Filter, Layers, Grid, List, ExternalLink, Eye, EyeOff, Settings2, Phone, MapPin, School, SlidersHorizontal,
   ArrowUpDown, UserCheck
@@ -5859,7 +5859,7 @@ const handleDeleteSchool = async () => {
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {[
                           { 
                             id: 'finance', 
@@ -5892,22 +5892,6 @@ const handleDeleteSchool = async () => {
                             icon: Package, 
                             status: 'ready',
                             statusLabel: 'Opérationnel' 
-                          },
-                          { 
-                            id: 'transport', 
-                            label: 'Transport Scolaire', 
-                            desc: 'Bus scolaires, circuits, arrêts & abonnements', 
-                            icon: Bus, 
-                            status: 'roadmap',
-                            statusLabel: 'Roadmap v2.5' 
-                          },
-                          { 
-                            id: 'library', 
-                            label: 'Bibliothèque Scolaire', 
-                            desc: 'Catalogue d\'ouvrages, prêts & retours de livres', 
-                            icon: BookOpen, 
-                            status: 'roadmap',
-                            statusLabel: 'Roadmap v2.5' 
                           }
                         ].map(module => {
                           const isChecked = config.enabledModules.includes(module.id);

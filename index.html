@@ -568,6 +568,66 @@
       }
     }
 
+    // =========================================================================
+    // Auto-Guérison Transparente (Zero-Click Recovery) & Gestion des Chunks Vite
+    // =========================================================================
+    function isChunkOrVersionError(message) {
+      if (!message) return false;
+      var str = String(message).toLowerCase();
+      return (
+        str.includes('failed to fetch dynamically imported module') ||
+        str.includes('unexpected token \'<\'') ||
+        str.includes('expected a javascript-oriented mime type') ||
+        str.includes('loading chunk') ||
+        str.includes('failed to load module script') ||
+        str.includes('error loading dynamically imported module') ||
+        str.includes('importing a module script failed') ||
+        str.includes('/assets/') ||
+        str.includes('404')
+      );
+    }
+
+    function performAutoHeal(reason) {
+      if (window.__edunovaAppReady) return;
+      var autoHealKey = 'edunova_auto_heal_timestamp';
+      var lastHeal = sessionStorage.getItem(autoHealKey);
+      var now = Date.now();
+      // Protection anti-boucle : 1 auto-guérison transparente toutes les 15 secondes max
+      if (lastHeal && (now - parseInt(lastHeal, 10)) < 15000) {
+        logDiag('AUTO_HEAL_SKIP', 'Auto-guérison déjà exécutée récemment. Affichage boutons de secours.');
+        showEmergencyButtons(reason);
+        return;
+      }
+      sessionStorage.setItem(autoHealKey, String(now));
+      logDiag('AUTO_HEAL', 'Exécution de l’auto-guérison transparente pour: ' + reason);
+      console.warn('⚡ [EduNova Auto-Heal] Détection mise à jour / chunk obsolète (' + reason + '). Nettoyage immédiat et rechargement...');
+
+      var unregisterPromise = ('serviceWorker' in navigator)
+        ? navigator.serviceWorker.getRegistrations().then(function(regs) {
+            return Promise.all(regs.map(function(r) { return r.unregister(); }));
+          }).catch(function() {})
+        : Promise.resolve();
+
+      var cachePromise = ('caches' in window)
+        ? caches.keys().then(function(keys) {
+            return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+          }).catch(function() {})
+        : Promise.resolve();
+
+      Promise.all([unregisterPromise, cachePromise]).then(function() {
+        window.location.reload();
+      }).catch(function() {
+        window.location.reload();
+      });
+    }
+
+    // Interception native des erreurs de préchargement de modules Vite (Nouveau déploiement)
+    window.addEventListener('vite:preloadError', function(event) {
+      event.preventDefault();
+      logDiag('VITE_PRELOAD_ERR', 'Événement vite:preloadError intercepté suite à une mise à jour de chunks');
+      performAutoHeal('Chunk Vite renouvelé');
+    });
+
     // Capture des erreurs de chargement de ressources (scripts, styles, polices) en phase de capture
     window.addEventListener('error', function(event) {
       var target = event.target;
@@ -582,15 +642,21 @@
         window.__edunovaDiagnostics.resourceFailures.push(failure);
         logDiag('RESOURCE_ERR', 'Échec de chargement de ressource', failure);
 
-        // Ne pas déclencher immédiatement l'écran d'urgence si l'application est en cours de montage
+        // Si un script /assets/*.js a échoué (404 après nouveau build), auto-guérison immédiate
+        if (target.tagName === 'SCRIPT' && srcOrHref.indexOf('/assets/') !== -1) {
+          performAutoHeal('Script compilé introuvable : ' + srcOrHref.split('/').pop());
+          return;
+        }
+
         setTimeout(function() {
           if (!window.__edunovaAppReady) {
-            showEmergencyActions('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
+            performAutoHeal('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
           }
-        }, 4000);
+        }, 2000);
       } else {
+        var errMsg = event.message || '';
         var errInfo = {
-          message: event.message,
+          message: errMsg,
           filename: event.filename,
           lineno: event.lineno,
           colno: event.colno,
@@ -599,11 +665,17 @@
         window.__edunovaDiagnostics.errors.push(errInfo);
         logDiag('SCRIPT_ERR', 'Erreur script non capturée', errInfo);
 
+        // Détection immédiate d'une désynchronisation de version (HTML reçu à la place d'un chunk JS)
+        if (isChunkOrVersionError(errMsg) || (event.error && isChunkOrVersionError(event.error.message))) {
+          performAutoHeal('Discordance de chunk détectée : ' + errMsg);
+          return;
+        }
+
         setTimeout(function() {
           if (!window.__edunovaAppReady) {
-            showEmergencyActions('Erreur : ' + (event.message || 'Script bloqué'));
+            performAutoHeal('Erreur : ' + (errMsg || 'Script bloqué'));
           }
-        }, 4000);
+        }, 2500);
       }
     }, true);
 
@@ -617,17 +689,23 @@
       window.__edunovaDiagnostics.errors.push(rejInfo);
       logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté', rejInfo);
 
-      // Si React est déjà prêt, ne pas perturber l'interface
+      // Si l'erreur de promesse est liée à un import dynamique de module Vite
+      if (isChunkOrVersionError(reasonStr)) {
+        event.preventDefault();
+        performAutoHeal('Rejet import dynamique : ' + reasonStr);
+        return;
+      }
+
       if (!window.__edunovaAppReady) {
         setTimeout(function() {
           if (!window.__edunovaAppReady) {
-            showEmergencyActions('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
+            performAutoHeal('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
           }
-        }, 4000);
+        }, 2500);
       }
     });
 
-    function showEmergencyActions(cause) {
+    function showEmergencyButtons(cause) {
       var actions = document.getElementById('edunova-splash-actions');
       if (actions && !window.__edunovaAppReady) {
         actions.style.display = 'flex';
@@ -643,7 +721,7 @@
       }
     }
 
-    // Gestionnaire de réinitialisation d'urgence
+    // Gestionnaire de réinitialisation d'urgence manuelle
     function clearStorageAndGoLogin() {
       logDiag('ACTION', 'Déclenchement réinitialisation complète du cache & session');
       try {
@@ -675,10 +753,10 @@
       }, 100);
     }
 
-    // Watchdog : inspection de l'état après 8000ms (adapté aux connexions à latence et 19 Mbps)
+    // Watchdog : inspection de l'état après 6000ms
     setTimeout(function() {
       if (!window.__edunovaAppReady) {
-        logDiag('WATCHDOG', 'Délai d’attente dépassé (8000ms). L’application React n’a pas encore signalé son montage.');
+        logDiag('WATCHDOG', 'Délai d’attente dépassé (6000ms). Déclenchement de l’auto-guérison...');
         
         // Audit des ressources réseau chargées
         if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
@@ -691,11 +769,11 @@
           });
         }
 
-        showEmergencyActions('Délai d’attente dépassé');
+        performAutoHeal('Délai d’attente dépassé');
       } else {
-        logDiag('WATCHDOG', 'Vérification 8000ms : Application montée avec succès');
+        logDiag('WATCHDOG', 'Vérification terminée : Application montée avec succès');
       }
-    }, 8000);
+    }, 6000);
   })();
 </script>
 <script type="module" src="/index.tsx"></script>

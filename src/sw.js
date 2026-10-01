@@ -67,10 +67,13 @@ registerRoute(
   new NavigationRoute(
     async (params) => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 6000);
+      const timeoutId = setTimeout(() => controller.abort(), 2500);
 
       try {
-        const response = await fetch(params.event.request, { signal: controller.signal });
+        const response = await fetch(params.event.request, { 
+          signal: controller.signal,
+          cache: 'no-cache'
+        });
         clearTimeout(timeoutId);
 
         if (response && response.status === 200) {
@@ -108,7 +111,7 @@ registerRoute(
       }
     },
     {
-      denylist: [/^\/api\//] // Ne jamais intercepter les requêtes API
+      denylist: [/^\/api\//, /^\/assets\//] // Ne jamais intercepter les requêtes API ni les assets compilés
     }
   )
 );
@@ -142,9 +145,16 @@ registerRoute(
   })
 );
 
-// 5. Cache des ressources statiques (images, styles, scripts non préchargés)
+// 5. Cache des ressources statiques légères (images, styles, polices - PAS les scripts /assets/*.js !)
 registerRoute(
-  ({ request }) => ['image', 'style', 'script', 'font'].includes(request.destination),
+  ({ request, url }) => {
+    // Ne JAMAIS intercepter les scripts applicatifs Vite (/assets/*.js) avec StaleWhileRevalidate !
+    // Les scripts compilés sont versionnés par hash immutable et doivent venir du réseau direct.
+    if (request.destination === 'script' || url.pathname.includes('/assets/')) {
+      return false;
+    }
+    return ['image', 'style', 'font'].includes(request.destination);
+  },
   new StaleWhileRevalidate({
     cacheName: CACHE_NAMES.static,
     plugins: [
