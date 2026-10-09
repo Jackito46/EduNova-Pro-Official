@@ -10,7 +10,7 @@ import {
   TrendingUp, CheckCircle, Info, Cloud, HardDrive, Save, Play, FolderArchive, Server,
   Copy, Database, Terminal, FileCode, Upload, FileUp, FileSpreadsheet, Image as ImageIcon,
   Lightbulb, Strikethrough, Heading1, Heading2, Heading3, Table, Highlighter, Underline,
-  ZoomIn, ZoomOut, RotateCw, Maximize2, Columns
+  ZoomIn, ZoomOut, RotateCw, Maximize2, Columns, Building2
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -22,7 +22,8 @@ import {
   HomeworkAssignmentWithDetails, 
   HomeworkAttachment, 
   HomeworkStudentRead,
-  HomeworkSubmissionType 
+  HomeworkSubmissionType,
+  HomeworkStatus
 } from '../types';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
@@ -215,7 +216,11 @@ interface TargetStudentRecipient {
 }
 
 export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultTab }) => {
-  const { terminology, currentCampusId, school } = useSchool();
+  const { terminology, currentCampusId, setCurrentCampusId, school, campuses } = useSchool();
+  const effectiveSchoolId = user.school_id || school?.id;
+  const hasMultipleCampuses = Boolean(campuses && campuses.length > 1);
+  const activeCampus = useMemo(() => campuses?.find(c => c.id === currentCampusId), [campuses, currentCampusId]);
+
   const studentTerm = terminology.student.toLowerCase();
   const studentsTerm = terminology.students.toLowerCase();
 
@@ -247,11 +252,20 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [allReadsData, setAllReadsData] = useState<HomeworkStudentRead[]>([]);
   const [dbTableMissing, setDbTableMissing] = useState(false);
 
-  // Filters
+  // Filters & Multi-Tenant / Multi-Campus Scope
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL'); // ALL, PENDING, DUE_SOON, COMPLETED
+  const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>(() => user.campus_id || currentCampusId || 'ALL');
+
+  useEffect(() => {
+    if (user.campus_id) {
+      setSelectedCampusFilter(user.campus_id);
+    } else if (currentCampusId) {
+      setSelectedCampusFilter(currentCampusId);
+    }
+  }, [currentCampusId, user.campus_id]);
   
   // Modal / Form state
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -353,6 +367,9 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [formDueTime, setFormDueTime] = useState('08:00');
   const [formDuration, setFormDuration] = useState(30);
   const [formSubmissionType, setFormSubmissionType] = useState<HomeworkSubmissionType>('IN_CLASS');
+  const [formStatus, setFormStatus] = useState<HomeworkStatus>('PUBLISHED');
+  const [formSendPushNotification, setFormSendPushNotification] = useState<boolean>(true);
+  const [publishingDraftId, setPublishingDraftId] = useState<string | null>(null);
   const [formIsGraded, setFormIsGraded] = useState(false);
   const [formMaxScore, setFormMaxScore] = useState<number>(20);
   const [formAttachments, setFormAttachments] = useState<HomeworkAttachment[]>([]);
@@ -379,20 +396,20 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const fetchMetadata = useCallback(async () => {
     try {
       let classQuery = supabase.from('classes').select('*');
-      if (user.school_id) classQuery = classQuery.eq('school_id', user.school_id);
+      if (effectiveSchoolId) classQuery = classQuery.eq('school_id', effectiveSchoolId);
       if (currentCampusId) classQuery = classQuery.eq('campus_id', currentCampusId);
 
       let subjectQuery = supabase.from('subjects').select('*');
-      if (user.school_id) subjectQuery = subjectQuery.eq('school_id', user.school_id);
+      if (effectiveSchoolId) subjectQuery = subjectQuery.eq('school_id', effectiveSchoolId);
 
       let studentQuery = supabase
         .from('students')
-        .select('id, first_name, last_name, class_id, parent_name, parent_phone, parent_email, status')
-        .eq('school_id', user.school_id)
-        .eq('status', 'Actif');
+        .select('id, first_name, last_name, class_id, parent_name, parent_phone, parent_email, status');
+      if (effectiveSchoolId) studentQuery = studentQuery.eq('school_id', effectiveSchoolId);
+      studentQuery = studentQuery.eq('status', 'Actif');
 
       let csQuery = supabase.from('class_subjects').select('id, class_id, subject_id, school_id');
-      if (user.school_id) csQuery = csQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
+      if (effectiveSchoolId) csQuery = csQuery.or(`school_id.eq.${effectiveSchoolId},school_id.is.null`);
 
       const [classRes, subjectRes, studentRes, csRes] = await Promise.all([
         classQuery, 
@@ -409,6 +426,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       // If user is a teacher, fetch their staff record and assigned classes & subjects
       if (isTeacher) {
         let staffQuery = supabase.from('staff').select('id, email, first_name, last_name');
+        if (effectiveSchoolId) staffQuery = staffQuery.eq('school_id', effectiveSchoolId);
         if (user.email) {
           staffQuery = staffQuery.or(`email.eq.${user.email},id.eq.${user.id}`);
         } else {
@@ -430,7 +448,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     } catch (err) {
       console.error('Error fetching homework metadata:', err);
     }
-  }, [user.school_id, user.id, user.email, currentCampusId, isTeacher]);
+  }, [effectiveSchoolId, user.id, user.email, currentCampusId, isTeacher]);
 
   // Exact classes assigned to the teacher
   const teacherAssignedClasses = useMemo(() => {
@@ -456,13 +474,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         .from('homework_assignments')
         .select(`
           *,
-          classes:class_id (name),
+          classes:class_id (name, campus_id),
           subjects:subject_id (name, code),
           profiles:teacher_id (full_name, email)
         `)
         .order('due_date', { ascending: false });
 
-      if (user.school_id) query = query.eq('school_id', user.school_id);
+      if (effectiveSchoolId) query = query.eq('school_id', effectiveSchoolId);
       if (currentCampusId) query = query.eq('campus_id', currentCampusId);
       
       // If teacher without admin rights:
@@ -481,7 +499,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         if (error.code === '42P01' || error.message?.includes('does not exist')) {
           setDbTableMissing(true);
           try {
-            const cached = localStorage.getItem(`edunova_homework_cache_${user.school_id || 'default'}`);
+            const cached = localStorage.getItem(`edunova_homework_cache_${effectiveSchoolId || 'default'}`);
             if (cached) {
               setAssignments(JSON.parse(cached));
             } else {
@@ -496,25 +514,32 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         }
       } else if (data) {
         setDbTableMissing(false);
-        const mapped: HomeworkAssignmentWithDetails[] = data.map((item: any) => ({
-          ...item,
-          class_name: item.classes?.name || 'Classe non assignée',
-          subject_name: item.subjects?.name || 'Matière générale',
-          subject_code: item.subjects?.code || '',
-          teacher_name: item.profiles?.full_name || item.profiles?.email || 'Enseignant'
-        }));
+        const mapped: HomeworkAssignmentWithDetails[] = data.map((item: any) => {
+          const itemClass = classes.find(c => c.id === item.class_id);
+          const effectiveCampusId = item.campus_id || item.classes?.campus_id || itemClass?.campus_id || null;
+          const campusObj = campuses?.find(cp => cp.id === effectiveCampusId);
+          return {
+            ...item,
+            campus_id: effectiveCampusId,
+            campus_name: campusObj?.name,
+            class_name: item.classes?.name || itemClass?.name || 'Classe non assignée',
+            subject_name: item.subjects?.name || 'Matière générale',
+            subject_code: item.subjects?.code || '',
+            teacher_name: item.profiles?.full_name || item.profiles?.email || 'Enseignant'
+          };
+        });
         setAssignments(mapped);
         try {
-          localStorage.setItem(`edunova_homework_cache_${user.school_id || 'default'}`, JSON.stringify(mapped));
+          localStorage.setItem(`edunova_homework_cache_${effectiveSchoolId || 'default'}`, JSON.stringify(mapped));
         } catch (e) {}
       }
 
       // Fetch all reads for analytics if authorized
-      if (canManageHomework && user.school_id) {
+      if (canManageHomework && effectiveSchoolId) {
         const { data: readsData } = await supabase
           .from('homework_student_reads')
           .select('*')
-          .eq('school_id', user.school_id);
+          .eq('school_id', effectiveSchoolId);
         if (readsData) {
           setAllReadsData(readsData);
         }
@@ -524,7 +549,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     } finally {
       setLoading(false);
     }
-  }, [user.school_id, user.id, isTeacher, isAdminOrDirector, currentCampusId, canManageHomework, teacherAssignedClassIds]);
+  }, [effectiveSchoolId, user.id, isTeacher, isAdminOrDirector, currentCampusId, canManageHomework, teacherAssignedClassIds, classes, campuses]);
 
   // Load student tracking status for current user (if student or parent)
   const fetchStudentReadStatus = useCallback(async () => {
@@ -1215,19 +1240,117 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     }
   };
 
-  // Save / Update Homework Assignment
-  const handleSaveAssignment = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Helper to trigger automatic Push Notification for homework publication
+  const triggerHomeworkPushNotification = async (
+    assignmentTitle: string,
+    classId: string,
+    subjectId: string,
+    dueDate: string
+  ): Promise<{ success: boolean; sent: number; message?: string }> => {
+    if (!effectiveSchoolId) return { success: false, sent: 0 };
+    try {
+      const targetClass = classes.find(c => c.id === classId);
+      const targetSubject = subjects.find(s => s.id === subjectId);
+      const className = targetClass?.name || 'la classe';
+      const subjectName = targetSubject?.name || 'Matière';
+      const dueDateFormatted = dueDate 
+        ? new Date(dueDate).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })
+        : 'prochainement';
+
+      const response = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolId: effectiveSchoolId,
+          campusId: targetClass?.campus_id || currentCampusId || undefined,
+          title: `📚 Devoir : ${subjectName} (${className})`,
+          body: `« ${assignmentTitle} » — À rendre pour le ${dueDateFormatted}. Cliquez pour consulter le cahier de texte.`,
+          icon: '/pwa-192x192.png',
+          url: '/mes-devoirs',
+          classId: classId || undefined,
+          roleFilters: ['STUDENT', 'PARENT']
+        })
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        return { success: true, sent: result.sent || 0, message: result.message };
+      }
+    } catch (err: any) {
+      console.warn("Notice lors de l'envoi push automatique de devoir:", err);
+    }
+    return { success: false, sent: 0 };
+  };
+
+  // Direct 1-Click Publication of a Draft (with automatic Push option)
+  const handlePublishDraft = async (assignment: HomeworkAssignmentWithDetails, sendPush: boolean = true) => {
+    setPublishingDraftId(assignment.id);
+    try {
+      let publishQuery = supabase
+        .from('homework_assignments')
+        .update({ status: 'PUBLISHED', updated_at: new Date().toISOString() })
+        .eq('id', assignment.id);
+      if (effectiveSchoolId) publishQuery = publishQuery.eq('school_id', effectiveSchoolId);
+      const { error } = await publishQuery;
+
+      if (error) {
+        if (error.code === '42P01' || error.message?.includes('does not exist')) {
+          setDbTableMissing(true);
+          const updated = assignments.map(a => a.id === assignment.id ? { ...a, status: 'PUBLISHED' as HomeworkStatus } : a);
+          setAssignments(updated);
+          try {
+            localStorage.setItem(`edunova_homework_cache_${effectiveSchoolId || 'default'}`, JSON.stringify(updated));
+          } catch (e) {}
+        } else {
+          throw error;
+        }
+      }
+
+      setAssignments(prev => prev.map(a => a.id === assignment.id ? { ...a, status: 'PUBLISHED' } : a));
+      if (activeDetailAssignment?.id === assignment.id) {
+        setActiveDetailAssignment(prev => prev ? { ...prev, status: 'PUBLISHED' } : null);
+      }
+
+      let pushDetail = '';
+      if (sendPush) {
+        const pushRes = await triggerHomeworkPushNotification(
+          assignment.title,
+          assignment.class_id,
+          assignment.subject_id,
+          assignment.due_date
+        );
+        if (pushRes.sent > 0) {
+          pushDetail = ` • 📲 ${pushRes.sent} notification(s) push envoyée(s) aux élèves & parents.`;
+        }
+      }
+
+      toast.success(`Le devoir « ${assignment.title} » est maintenant publié !${pushDetail}`);
+      fetchAssignments();
+    } catch (err: any) {
+      toast.error("Impossible de publier le devoir : " + (err.message || 'Erreur inconnue'));
+    } finally {
+      setPublishingDraftId(null);
+    }
+  };
+
+  // Save / Update Homework Assignment (with Draft & Push Notification support)
+  const handleSaveAssignment = async (e?: React.FormEvent, statusOverride?: HomeworkStatus) => {
+    if (e) e.preventDefault();
     if (!formTitle.trim() || !formClassId || !formSubjectId || !formDueDate) {
       toast.error("Veuillez remplir le titre, la classe, la matière et la date limite.");
       return;
     }
 
+    const targetClass = classes.find(c => c.id === formClassId);
+    const targetCampusId = targetClass?.campus_id || (selectedCampusFilter !== 'ALL' ? selectedCampusFilter : currentCampusId) || null;
+    const targetStatus: HomeworkStatus = statusOverride || formStatus || 'PUBLISHED';
+    const isDraft = targetStatus === 'DRAFT';
+
     setSubmittingForm(true);
     try {
       const payload: any = {
-        school_id: user.school_id,
-        campus_id: currentCampusId || null,
+        school_id: effectiveSchoolId,
+        campus_id: targetCampusId,
         class_id: formClassId,
         subject_id: formSubjectId,
         teacher_id: editingAssignment ? editingAssignment.teacher_id : user.id,
@@ -1240,14 +1363,17 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         submission_type: formSubmissionType,
         is_graded: formIsGraded,
         max_score: formIsGraded ? formMaxScore : null,
-        status: 'PUBLISHED'
+        status: targetStatus
       };
 
       if (editingAssignment) {
-        const { error } = await supabase
+        const wasDraft = editingAssignment.status === 'DRAFT';
+        let updateQuery = supabase
           .from('homework_assignments')
           .update(payload)
           .eq('id', editingAssignment.id);
+        if (effectiveSchoolId) updateQuery = updateQuery.eq('school_id', effectiveSchoolId);
+        const { error } = await updateQuery;
 
         if (error) {
           if (error.code === '42P01' || error.message?.includes('does not exist')) {
@@ -1255,14 +1381,25 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             const updated = assignments.map(a => a.id === editingAssignment.id ? { ...a, ...payload } : a);
             setAssignments(updated);
             try {
-              localStorage.setItem(`edunova_homework_cache_${user.school_id || 'default'}`, JSON.stringify(updated));
+              localStorage.setItem(`edunova_homework_cache_${effectiveSchoolId || 'default'}`, JSON.stringify(updated));
             } catch (e) {}
-            toast.warning("Modifié localement (Table Supabase en attente d'initialisation).");
+            toast.warning(isDraft ? "Brouillon modifié localement." : "Modifié localement (Table Supabase en attente d'initialisation).");
           } else {
             throw error;
           }
         } else {
-          toast.success("Devoir mis à jour avec succès !");
+          if (isDraft) {
+            toast.success("Brouillon mis à jour avec succès !", {
+              description: "Le devoir reste privé et n'est pas encore visible par les élèves."
+            });
+          } else {
+            let pushInfo = '';
+            if (formSendPushNotification && wasDraft) {
+              const pushRes = await triggerHomeworkPushNotification(formTitle, formClassId, formSubjectId, formDueDate);
+              if (pushRes.sent > 0) pushInfo = ` • 📲 ${pushRes.sent} notification(s) push envoyée(s)`;
+            }
+            toast.success(`Devoir mis à jour et publié dans le cahier de textes !${pushInfo}`);
+          }
         }
       } else {
         const { error } = await supabase
@@ -1272,11 +1409,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         if (error) {
           if (error.code === '42P01' || error.message?.includes('does not exist')) {
             setDbTableMissing(true);
-            const targetClass = classes.find(c => c.id === formClassId);
             const targetSubject = subjects.find(s => s.id === formSubjectId);
+            const campusObj = campuses?.find(cp => cp.id === targetCampusId);
             const fallbackItem: HomeworkAssignmentWithDetails = {
               id: 'local_' + Date.now(),
               ...payload,
+              campus_name: campusObj?.name,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
               class_name: targetClass?.name || 'Classe sélectionnée',
@@ -1287,16 +1425,27 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             const updated = [fallbackItem, ...assignments];
             setAssignments(updated);
             try {
-              localStorage.setItem(`edunova_homework_cache_${user.school_id || 'default'}`, JSON.stringify(updated));
+              localStorage.setItem(`edunova_homework_cache_${effectiveSchoolId || 'default'}`, JSON.stringify(updated));
             } catch (e) {}
-            toast.warning("Devoir enregistré localement !", {
-              description: "Exécutez le script SQL dans Supabase pour synchroniser le cloud."
-            });
+            toast.warning(isDraft ? "Brouillon enregistré localement !" : "Devoir enregistré localement !");
           } else {
             throw error;
           }
         } else {
-          toast.success("Devoir publié dans le cahier de textes !");
+          if (isDraft) {
+            toast.success("Brouillon enregistré avec succès !", {
+              description: "Vos supports sont prêts. Vous pourrez publier ce devoir à tout moment."
+            });
+          } else {
+            let pushNotice = '';
+            if (formSendPushNotification) {
+              const pushRes = await triggerHomeworkPushNotification(formTitle, formClassId, formSubjectId, formDueDate);
+              if (pushRes.sent > 0) {
+                pushNotice = ` • 📲 ${pushRes.sent} notification(s) push envoyée(s) aux élèves & parents !`;
+              }
+            }
+            toast.success(`Devoir publié dans le cahier de textes !${pushNotice}`);
+          }
         }
       }
 
@@ -1317,10 +1466,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       return;
     }
     try {
-      const { error } = await supabase
+      let delQuery = supabase
         .from('homework_assignments')
         .delete()
         .eq('id', id);
+      if (effectiveSchoolId) delQuery = delQuery.eq('school_id', effectiveSchoolId);
+      const { error } = await delQuery;
 
       if (error) throw error;
       toast.success("Devoir supprimé avec succès.");
@@ -1460,6 +1611,29 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     }
   }, [formClassId, availableFormSubjects, formSubjectId]);
 
+  // Classes list enriched with campus/annexe names for multi-campus clarity
+  const formClassesList = useMemo(() => {
+    const base = isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 
+      ? teacherAssignedClasses 
+      : classes;
+    if (!hasMultipleCampuses) return base;
+    return base.map(c => {
+      const cp = campuses?.find(camp => camp.id === c.campus_id);
+      return {
+        ...c,
+        name: cp ? `${c.name} (${cp.name})` : c.name
+      };
+    });
+  }, [isTeacher, isAdminOrDirector, teacherAssignedClasses, classes, hasMultipleCampuses, campuses]);
+
+  // Detected campus for the currently selected class in the form
+  const targetClassCampus = useMemo(() => {
+    if (!formClassId) return null;
+    const c = classes.find(cl => cl.id === formClassId);
+    if (!c || !c.campus_id) return null;
+    return campuses?.find(cp => cp.id === c.campus_id) || null;
+  }, [formClassId, classes, campuses]);
+
   // Handle class selection in the modal with dynamic subject adaptation
   const handleSelectFormClass = (classId: string) => {
     setFormClassId(classId);
@@ -1479,19 +1653,23 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
     const targetClasses = isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 
       ? teacherAssignedClasses 
-      : classes;
+      : (hasMultipleCampuses && selectedCampusFilter !== 'ALL'
+          ? classes.filter(c => c.campus_id === selectedCampusFilter)
+          : classes);
 
     // Use current filter class if valid, otherwise first available class
     let initialClassId = '';
     if (selectedClassId !== 'ALL' && targetClasses.some(c => c.id === selectedClassId)) {
       initialClassId = selectedClassId;
     } else {
-      initialClassId = targetClasses[0]?.id || '';
+      initialClassId = targetClasses[0]?.id || (classes[0]?.id || '');
     }
 
     setFormClassId(initialClassId);
     setFormDuration(30);
     setFormSubmissionType('IN_CLASS');
+    setFormStatus('PUBLISHED');
+    setFormSendPushNotification(true);
     setFormIsGraded(false);
     setFormMaxScore(20);
     setFormAttachments([]);
@@ -1509,6 +1687,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     setFormDueTime(assignment.due_time || '08:00');
     setFormDuration(assignment.estimated_duration_minutes || 30);
     setFormSubmissionType(assignment.submission_type);
+    setFormStatus(assignment.status || 'PUBLISHED');
+    setFormSendPushNotification(assignment.status === 'DRAFT');
     setFormIsGraded(Boolean(assignment.is_graded));
     setFormMaxScore(assignment.max_score || 20);
     setFormAttachments(assignment.attachments || []);
@@ -1711,20 +1891,40 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         a.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
         a.subject_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        a.class_name?.toLowerCase().includes(searchQuery.toLowerCase());
+        a.class_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (a.campus_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false);
 
       const matchesClass = selectedClassId === 'ALL' || a.class_id === selectedClassId;
       const matchesSubject = selectedSubjectId === 'ALL' || a.subject_id === selectedSubjectId;
 
       if (!matchesSearch || !matchesClass || !matchesSubject) return false;
 
+      // Multi-Campus / Annexe Filter
+      if (hasMultipleCampuses && selectedCampusFilter !== 'ALL') {
+        const targetClass = classes.find(c => c.id === a.class_id);
+        const matchesCampus = (a.campus_id && a.campus_id === selectedCampusFilter) || 
+          (targetClass?.campus_id === selectedCampusFilter);
+        if (!matchesCampus) return false;
+      }
+
       // Teacher filter: scope (all class homework vs only homework given by this teacher)
       if (isTeacher && !isAdminOrDirector && teacherScope === 'MINE_ONLY') {
         if (a.teacher_id !== user.id) return false;
       }
 
+      // Students and parents must NEVER see unpublished draft homework
+      if ((isStudent || isParent) && a.status === 'DRAFT') {
+        return false;
+      }
+
       // Status filter
       if (selectedStatusFilter === 'ALL') return true;
+      if (selectedStatusFilter === 'PUBLISHED') {
+        return a.status === 'PUBLISHED';
+      }
+      if (selectedStatusFilter === 'DRAFT') {
+        return a.status === 'DRAFT';
+      }
       const today = new Date().toISOString().split('T')[0];
       const readState = studentReads[a.id];
 
@@ -1743,18 +1943,20 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
       return true;
     });
-  }, [assignments, searchQuery, selectedClassId, selectedSubjectId, selectedStatusFilter, studentReads, isTeacher, isAdminOrDirector, teacherScope, user.id]);
+  }, [assignments, searchQuery, selectedClassId, selectedSubjectId, selectedStatusFilter, studentReads, isTeacher, isAdminOrDirector, teacherScope, user.id, isStudent, isParent, hasMultipleCampuses, selectedCampusFilter, classes]);
 
   // Calculations for quick dashboard stats
   const statsOverview = useMemo(() => {
     const today = new Date().toISOString().split('T')[0];
-    const total = assignments.length;
-    const dueToday = assignments.filter(a => a.due_date === today).length;
-    const upcoming = assignments.filter(a => a.due_date > today).length;
+    const visibleAssignments = assignments.filter(a => (isStudent || isParent ? a.status !== 'DRAFT' : true));
+    const total = visibleAssignments.length;
+    const dueToday = visibleAssignments.filter(a => a.due_date === today).length;
+    const upcoming = visibleAssignments.filter(a => a.due_date > today).length;
+    const draftsCount = assignments.filter(a => a.status === 'DRAFT').length;
     const completedCount = Object.values(studentReads).filter(r => r.work_status === 'COMPLETED').length;
 
-    return { total, dueToday, upcoming, completedCount };
-  }, [assignments, studentReads]);
+    return { total, dueToday, upcoming, draftsCount, completedCount };
+  }, [assignments, studentReads, isStudent, isParent]);
 
   // =========================================================================
   // RECHARTS ANALYTICS COMPUTATIONS : PAR CLASSE ET PAR MATIÈRE
@@ -1961,7 +2163,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             <BookOpen size={18} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight whitespace-nowrap">
+            <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight truncate">
               Gestion Centralisée des Devoirs
             </h1>
             <p className="text-[11px] text-slate-500 font-medium whitespace-nowrap truncate">
@@ -1974,11 +2176,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
           {/* Switch tab for teachers / directors */}
           {canManageHomework && (
-            <div className="bg-slate-100 p-0.5 rounded-xl flex text-xs font-bold border border-slate-200/70 shrink-0">
+            <div className="bg-slate-100 p-0.5 rounded-xl flex text-xs font-bold border border-slate-200/70 overflow-x-auto no-scrollbar max-w-full shrink-0">
               <button
                 type="button"
                 onClick={() => setActiveTab('assignments')}
-                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTab === 'assignments' 
                     ? 'bg-white text-indigo-700 shadow-2xs font-black' 
                     : 'text-slate-600 hover:text-slate-900'
@@ -1989,7 +2191,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               <button
                 type="button"
                 onClick={() => setActiveTab('studentView')}
-                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTab === 'studentView' 
                     ? 'bg-white text-indigo-700 shadow-2xs font-black' 
                     : 'text-slate-600 hover:text-slate-900'
@@ -2000,7 +2202,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               <button
                 type="button"
                 onClick={() => setActiveTab('analytics')}
-                className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer ${
+                className={`px-2.5 py-1.5 rounded-lg transition-all flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0 ${
                   activeTab === 'analytics' 
                     ? 'bg-white text-indigo-700 shadow-2xs font-black' 
                     : 'text-slate-600 hover:text-slate-900'
@@ -2149,6 +2351,25 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             </div>
           </div>
 
+          {/* Bannière d'accès rapide aux Brouillons pour les enseignants */}
+          {canManageHomework && statsOverview.draftsCount > 0 && (
+            <div 
+              onClick={() => setSelectedStatusFilter(prev => prev === 'DRAFT' ? 'ALL' : 'DRAFT')}
+              className="px-3.5 py-2 bg-gradient-to-r from-amber-50 to-orange-50/60 hover:bg-amber-100/70 border border-amber-200/90 rounded-xl flex items-center justify-between text-xs font-bold text-amber-950 cursor-pointer transition-colors shadow-2xs"
+            >
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                <span>
+                  Vous avez <strong>{statsOverview.draftsCount} support{statsOverview.draftsCount > 1 ? 's' : ''} en brouillon</strong> non publié{statsOverview.draftsCount > 1 ? 's' : ''} (invisible aux élèves).
+                </span>
+              </div>
+              <span className="text-[11px] text-amber-800 underline font-black flex items-center gap-1 shrink-0">
+                <span>{selectedStatusFilter === 'DRAFT' ? 'Afficher tous les devoirs' : 'Filtrer les brouillons'}</span>
+                <ChevronRight size={13} />
+              </span>
+            </div>
+          )}
+
           {/* Espace Professeur Strict & Suivi de la charge globale des devoirs */}
           {isTeacher && !isAdminOrDirector && (
             <div className="px-3.5 py-2 bg-gradient-to-r from-indigo-50/90 via-white to-indigo-50/50 border border-indigo-100 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
@@ -2213,7 +2434,25 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               />
             </div>
 
-            <div className="flex flex-wrap items-center gap-1.5">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-1 sm:pb-0 sm:flex-wrap">
+              {/* Filtre Annexe / Campus harmonisé si établissement multi-sites */}
+              {hasMultipleCampuses && !user.campus_id && (
+                <SelectPill
+                  options={[
+                    { value: 'ALL', label: 'Toutes les Annexes', badge: campuses.length.toString() },
+                    ...campuses.map(c => ({ value: c.id, label: c.name }))
+                  ]}
+                  value={selectedCampusFilter}
+                  onChange={(val) => setSelectedCampusFilter(val)}
+                  placeholder="Annexe"
+                  icon={Building2}
+                  variant="pill"
+                  size="sm"
+                  colorScheme="indigo"
+                  title="Filtrer par annexe / campus"
+                />
+              )}
+
               <ClassSelectorPill
                 classes={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 ? teacherAssignedClasses : classes}
                 selectedClassId={selectedClassId}
@@ -2242,6 +2481,10 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               <SelectPill
                 options={[
                   { value: 'ALL', label: 'Tous les statuts' },
+                  ...(canManageHomework ? [
+                    { value: 'PUBLISHED', label: 'Publiés uniquement', color: 'emerald' },
+                    { value: 'DRAFT', label: 'Brouillons uniquement', color: 'amber' }
+                  ] : []),
                   { value: 'PENDING', label: 'À faire', color: 'amber' },
                   { value: 'DUE_TODAY', label: "Pour aujourd'hui", color: 'blue' },
                   { value: 'LATE', label: 'En retard', color: 'rose' },
@@ -2357,6 +2600,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                             {assignment.subject_name}
                           </span>
+                          {/* Draft Badge */}
+                          {assignment.status === 'DRAFT' && (
+                            <span className="text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                              <FileText size={10} className="text-amber-700" />
+                              <span>Brouillon</span>
+                            </span>
+                          )}
                           {/* Teacher Ownership Badge */}
                           {canManageHomework && (
                             assignment.teacher_id === user.id ? (
@@ -2447,15 +2697,32 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                       ) : (
                         canManageHomework && (isAdminOrDirector || assignment.teacher_id === user.id) && (
                           <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleOpenReminderModal(assignment)}
-                              title="Rappeler les élèves non-lecteurs par SMS / Email"
-                              className="text-[10.5px] font-bold px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
-                            >
-                              <Bell size={11} className="text-amber-600" />
-                              <span>Rappel</span>
-                            </button>
+                            {assignment.status === 'DRAFT' ? (
+                              <button
+                                type="button"
+                                onClick={() => handlePublishDraft(assignment)}
+                                disabled={publishingDraftId === assignment.id}
+                                title="Publier ce brouillon et notifier automatiquement les élèves et parents"
+                                className="text-[10.5px] font-black px-2.5 py-1 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white shadow-2xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 disabled:opacity-50"
+                              >
+                                {publishingDraftId === assignment.id ? (
+                                  <RefreshCw size={11} className="animate-spin" />
+                                ) : (
+                                  <Send size={11} />
+                                )}
+                                <span>Publier</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleOpenReminderModal(assignment)}
+                                title="Rappeler les élèves non-lecteurs par SMS / Email"
+                                className="text-[10.5px] font-bold px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
+                              >
+                                <Bell size={11} className="text-amber-600" />
+                                <span>Rappel</span>
+                              </button>
+                            )}
                           </div>
                         )
                       )}
@@ -2702,10 +2969,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           MODAL : CREATE OR EDIT HOMEWORK ASSIGNMENT (MODERNE, SOUPLE & DYNAMIQUE)
           ========================================================================= */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className={`bg-white rounded-2xl ${editorViewMode === 'SPLIT' ? 'max-w-5xl' : 'max-w-xl sm:max-w-2xl lg:max-w-3xl'} w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150 transition-all`}>
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className={`bg-white rounded-t-2xl sm:rounded-2xl ${editorViewMode === 'SPLIT' ? 'max-w-5xl' : 'max-w-xl sm:max-w-2xl lg:max-w-3xl'} w-full border border-slate-200 shadow-2xl flex flex-col h-[94dvh] sm:h-auto max-h-[96dvh] sm:max-h-[90vh] my-0 sm:my-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150 transition-all`}>
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-1.5 sm:hidden shrink-0" />
+
             {/* Modal Header */}
-            <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
                   {editingAssignment ? <Edit3 size={15} /> : <BookOpen size={15} />}
@@ -2723,14 +2993,15 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer min-h-[38px] min-w-[38px] flex items-center justify-center"
                 title="Fermer"
               >
-                <X size={16} />
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAssignment} className="p-4 sm:p-5 space-y-3.5 max-h-[82vh] overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleSaveAssignment} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="p-3 sm:p-5 space-y-3.5 flex-1 overflow-y-auto custom-scrollbar">
               
               {/* Row 1 : Classe & Matière (Adaptée strictement à la classe) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50/70 rounded-xl border border-slate-200/90">
@@ -2807,9 +3078,9 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-indigo-500 transition-all placeholder:text-slate-400"
                 />
                 
-                {/* Suggestions rapides de titres */}
-                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                  <span className="text-[10px] text-slate-400 font-bold">Suggestions :</span>
+                {/* Suggestions rapides de titres avec défilement horizontal fluide */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 pt-0.5 -mx-0.5 px-0.5">
+                  <span className="text-[10px] text-slate-400 font-bold shrink-0">Suggestions :</span>
                   {[
                     "Exercices du manuel",
                     "Devoir Maison n°",
@@ -2821,7 +3092,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                       key={sIdx}
                       type="button"
                       onClick={() => setFormTitle(prev => prev ? `${prev} - ${sugg}` : sugg)}
-                      className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors cursor-pointer"
+                      className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors cursor-pointer shrink-0 whitespace-nowrap"
                     >
                       + {sugg}
                     </button>
@@ -2832,8 +3103,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               {/* Row 3 : Zone Pédagogique Centrale (Éditeur Enrichi Moderne & Prévisualisation Documents) */}
               <div className="space-y-2 pt-1 border-t border-slate-100">
                 
-                {/* Segmented Switcher : Mode de contenu */}
-                <div className="flex items-center justify-between flex-wrap gap-2">
+                {/* Segmented Switcher : Mode de contenu (Adaptatif sur Mobile) */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
                     <span>Contenu & Document du devoir</span>
                     {formAttachments.length > 0 && (
@@ -2843,33 +3114,33 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                     )}
                   </span>
                   
-                  <div className="bg-slate-100 p-0.5 rounded-xl flex items-center border border-slate-200 text-xs font-bold">
+                  <div className="bg-slate-100 p-0.5 rounded-xl grid grid-cols-3 sm:flex items-center border border-slate-200 text-xs font-bold w-full sm:w-auto">
                     <button
                       type="button"
                       onClick={() => setFormContentMode('TYPE')}
-                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      className={`px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                         formContentMode === 'TYPE'
                           ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <FileText size={12} />
-                      <span>Rédiger en ligne</span>
+                      <FileText size={12} className="shrink-0" />
+                      <span className="truncate">Rédiger</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => setFormContentMode('ATTACH_DOC')}
-                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      className={`px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer text-center ${
                         formContentMode === 'ATTACH_DOC'
                           ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <Paperclip size={12} />
-                      <span>Document prêt (PDF / Word)</span>
+                      <Paperclip size={12} className="shrink-0" />
+                      <span className="truncate">Document</span>
                       {formAttachments.length > 0 && (
-                        <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-bold">
+                        <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-bold shrink-0">
                           {formAttachments.length}
                         </span>
                       )}
@@ -2878,13 +3149,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                     <button
                       type="button"
                       onClick={() => setFormContentMode('BOTH')}
-                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                      className={`px-2 py-1.5 sm:px-2.5 sm:py-1 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer text-center ${
                         formContentMode === 'BOTH'
                           ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                           : 'text-slate-600 hover:text-slate-900'
                       }`}
                     >
-                      <span>Les deux</span>
+                      <span className="truncate">Les deux</span>
                     </button>
                   </div>
                 </div>
@@ -2894,19 +3165,19 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   <div className="space-y-1.5 animate-in fade-in duration-150">
                     
                     {/* Header Éditeur : Modèles rapides & Sélecteur de vue (Rédiger / Scindé / Aperçu Élève) */}
-                    <div className="flex items-center justify-between gap-2 flex-wrap pb-0.5">
-                      {/* Modèles types rapides */}
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-0.5">
+                      {/* Modèles types rapides avec défilement fluide horizontal sur mobile */}
+                      <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 -mx-0.5 px-0.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1 shrink-0">
                           <Sparkles size={11} className="text-amber-500" />
-                          <span>Gabarits pros :</span>
+                          <span>Gabarits :</span>
                         </span>
                         {HOMEWORK_TEMPLATES.map((tmpl) => (
                           <button
                             key={tmpl.id}
                             type="button"
                             onClick={() => applyTemplate(tmpl.content)}
-                            className="px-2 py-0.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/70 rounded-md text-[10.5px] font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                            className="px-2 py-0.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/70 rounded-md text-[10.5px] font-semibold transition-all flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap"
                             title="Insérer ce modèle complet"
                           >
                             <span>{tmpl.icon}</span>
@@ -2916,11 +3187,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                       </div>
 
                       {/* Sélecteur de mode d'affichage de l'éditeur */}
-                      <div className="bg-slate-200/70 p-0.5 rounded-lg flex items-center text-[10.5px] font-bold border border-slate-300/60 ml-auto">
+                      <div className="bg-slate-200/70 p-0.5 rounded-lg flex items-center text-[10.5px] font-bold border border-slate-300/60 sm:ml-auto shrink-0 w-full sm:w-auto justify-center">
                         <button
                           type="button"
                           onClick={() => setEditorViewMode('WRITE')}
-                          className={`px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                          className={`flex-1 sm:flex-none px-2.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
                             editorViewMode === 'WRITE'
                               ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                               : 'text-slate-600 hover:text-slate-900'
@@ -2933,7 +3204,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                         <button
                           type="button"
                           onClick={() => setEditorViewMode('SPLIT')}
-                          className={`px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                          className={`flex-1 sm:flex-none px-2.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
                             editorViewMode === 'SPLIT'
                               ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                               : 'text-slate-600 hover:text-slate-900'
@@ -2941,12 +3212,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           title="Mode Scindé : saisie à gauche, rendu en direct à droite"
                         >
                           <Columns size={11} />
-                          <span>Scindé (Direct)</span>
+                          <span>Scindé</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setEditorViewMode('PREVIEW')}
-                          className={`px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                          className={`flex-1 sm:flex-none px-2.5 py-1 rounded-md transition-all flex items-center justify-center gap-1 cursor-pointer ${
                             editorViewMode === 'PREVIEW'
                               ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                               : 'text-slate-600 hover:text-slate-900'
@@ -2954,14 +3225,14 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           title="Mode Aperçu Élève plein écran"
                         >
                           <Eye size={11} />
-                          <span>Aperçu Élève</span>
+                          <span>Aperçu</span>
                         </button>
                       </div>
                     </div>
 
-                    {/* Toolbar Professionnelle de Mise en Forme Enrichie */}
-                    <div className="p-1 bg-slate-100 border border-slate-200 rounded-t-xl text-slate-700 flex items-center justify-between gap-1 flex-wrap">
-                      <div className="flex items-center gap-0.5 flex-wrap">
+                    {/* Toolbar Professionnelle de Mise en Forme Enrichie avec Touch-Scroll fluide */}
+                    <div className="p-1 bg-slate-100 border border-slate-200 rounded-t-xl text-slate-700 flex items-center gap-1 overflow-x-auto no-scrollbar">
+                      <div className="flex items-center gap-0.5 shrink-0">
                         {/* Titres */}
                         <button
                           type="button"
@@ -3632,23 +3903,152 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                 </div>
               </div>
 
-              {/* Actions Footer */}
-              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
+              {/* Row 6 : Mode de publication & Notifications Push automatiques */}
+              <div className="p-3 bg-gradient-to-r from-slate-50 via-indigo-50/30 to-slate-50 rounded-xl border border-slate-200/90 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-indigo-600"></span>
+                    <label className="text-[11px] font-bold text-slate-800 uppercase tracking-wide">
+                      Publication & Visibilité
+                    </label>
+                  </div>
+                  <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${
+                    formStatus === 'DRAFT'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
+                      : 'bg-emerald-100 text-emerald-900 border-emerald-300'
+                  }`}>
+                    {formStatus === 'DRAFT' ? '📝 Mode Brouillon' : '🚀 Publication Immédiate'}
+                  </span>
+                </div>
+
+                {/* Sélecteur Brouillon vs Publier */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setFormStatus('PUBLISHED')}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                      formStatus === 'PUBLISHED'
+                        ? 'bg-white border-indigo-500 ring-2 ring-indigo-500/10 shadow-xs'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      formStatus === 'PUBLISHED' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <Send size={13} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1">
+                        <span>Publier le devoir</span>
+                        {formStatus === 'PUBLISHED' && <Check size={12} className="text-indigo-600" />}
+                      </div>
+                      <p className="text-[10.5px] text-slate-500 leading-tight mt-0.5">
+                        Visible par les élèves et parents dans leur cahier de texte.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setFormStatus('DRAFT')}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer flex items-start gap-2.5 ${
+                      formStatus === 'DRAFT'
+                        ? 'bg-white border-amber-500 ring-2 ring-amber-500/10 shadow-xs'
+                        : 'bg-white/60 border-slate-200 hover:border-slate-300 text-slate-600'
+                    }`}
+                  >
+                    <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                      formStatus === 'DRAFT' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      <FileText size={13} />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-slate-900 flex items-center gap-1">
+                        <span>Enregistrer comme brouillon</span>
+                        {formStatus === 'DRAFT' && <Check size={12} className="text-amber-600" />}
+                      </div>
+                      <p className="text-[10.5px] text-slate-500 leading-tight mt-0.5">
+                        Invisible aux élèves. Préparez vos cours en toute tranquillité.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                {/* Option Notification Push automatique */}
+                {formStatus === 'PUBLISHED' ? (
+                  <div className="p-2.5 bg-white rounded-xl border border-indigo-100 flex items-start gap-2.5">
+                    <input
+                      type="checkbox"
+                      id="send_push_notification_cb"
+                      checked={formSendPushNotification}
+                      onChange={e => setFormSendPushNotification(e.target.checked)}
+                      className="rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 mt-0.5 cursor-pointer"
+                    />
+                    <label htmlFor="send_push_notification_cb" className="text-xs cursor-pointer flex-1">
+                      <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                        <Bell size={13} className="text-indigo-600" />
+                        Déclencher une notification push automatique vers les comptes parents/élèves
+                      </span>
+                      <span className="text-[10.5px] text-slate-500 block leading-tight mt-0.5">
+                        Alerte instantanément les smartphones et navigateurs des élèves et parents de la classe dès la publication.
+                      </span>
+                    </label>
+                  </div>
+                ) : (
+                  <div className="p-2.5 bg-amber-50/70 rounded-xl border border-amber-200/80 flex items-start gap-2 text-amber-900 text-[10.5px]">
+                    <Info size={14} className="text-amber-600 shrink-0 mt-0.5" />
+                    <span>
+                      En mode <strong>Brouillon</strong>, aucune notification push n'est envoyée et le devoir reste confidentiel jusqu'à sa publication.
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              </div>
+
+              {/* Sticky Actions Footer */}
+              <div className="p-3 sm:px-5 sm:py-3.5 bg-white/95 backdrop-blur-xs border-t border-slate-200 flex flex-col-reverse sm:flex-row sm:items-center justify-between gap-2 shrink-0 z-10 shadow-xs">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3.5 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                  className="w-full sm:w-auto px-4 py-2.5 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer text-center"
                 >
                   Annuler
                 </button>
-                <button
-                  type="submit"
-                  disabled={submittingForm}
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
-                >
-                  {submittingForm ? <RefreshCw className="animate-spin" size={13} /> : <Check size={13} />}
-                  <span>{editingAssignment ? 'Sauvegarder les modifications' : 'Publier le devoir'}</span>
-                </button>
+
+                <div className="grid grid-cols-1 sm:flex items-center gap-2 w-full sm:w-auto">
+                  {/* Bouton Enregistrer comme brouillon */}
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAssignment(undefined, 'DRAFT')}
+                    disabled={submittingForm}
+                    className={`w-full sm:w-auto px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 min-h-[42px] ${
+                      formStatus === 'DRAFT'
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 shadow-2xs font-extrabold'
+                        : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                    }`}
+                  >
+                    <FileText size={14} className="text-amber-700" />
+                    <span>{editingAssignment?.status === 'DRAFT' ? 'Sauvegarder brouillon' : 'Enregistrer comme brouillon'}</span>
+                  </button>
+
+                  {/* Bouton Publier le devoir */}
+                  <button
+                    type="button"
+                    onClick={() => handleSaveAssignment(undefined, 'PUBLISHED')}
+                    disabled={submittingForm}
+                    className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95 min-h-[42px]"
+                  >
+                    {submittingForm ? <RefreshCw className="animate-spin" size={14} /> : <Send size={14} />}
+                    <span>
+                      {editingAssignment?.status === 'DRAFT' 
+                        ? 'Publier le devoir' 
+                        : editingAssignment 
+                        ? 'Sauvegarder & Publier' 
+                        : 'Publier le devoir'}
+                    </span>
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -3659,10 +4059,10 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           MODAL : HIGH-FIDELITY DOCUMENT PREVIEW (IMAGES & PDFS)
           ========================================================================= */}
       {previewAttachment && (
-        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-5 overflow-hidden animate-in fade-in duration-150">
-          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-5 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 rounded-t-2xl sm:rounded-2xl w-full max-w-4xl h-[92dvh] sm:h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
             {/* Header */}
-            <div className="px-4 py-3 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between gap-3 text-white">
+            <div className="px-3 sm:px-4 py-2.5 sm:py-3 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between gap-2 text-white shrink-0">
               <div className="flex items-center gap-2.5 min-w-0">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-xs ${
                   getFileCategory(previewAttachment.name, previewAttachment.type) === 'pdf' || previewAttachment.url?.startsWith('data:application/pdf') ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
@@ -3830,10 +4230,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           MODAL : AUTOMATED REMINDER (SMS / EMAIL) FOR UNREAD HOMEWORK
           ========================================================================= */}
       {isReminderModalOpen && reminderAssignment && (
-        <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-xl w-full border border-slate-200 shadow-2xl flex flex-col h-[90dvh] sm:h-auto max-h-[94dvh] sm:max-h-[90vh] my-0 sm:my-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150">
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-1.5 sm:hidden shrink-0" />
             
-            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between">
+            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-amber-500/10 border-b border-amber-500/20 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-xs">
                   <Bell size={14} />
@@ -4007,7 +4409,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             </div>
 
             {/* Modal Actions */}
-            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
               <button
                 type="button"
                 onClick={() => setIsReminderModalOpen(false)}
@@ -4038,10 +4440,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           MODAL : DETAILED VIEW & TRACEABILITY TRACKING SHEET
           ========================================================================= */}
       {isDetailModalOpen && activeDetailAssignment && (
-        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-xl sm:max-w-2xl w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-xl sm:max-w-2xl w-full border border-slate-200 shadow-2xl flex flex-col h-[90dvh] sm:h-auto max-h-[94dvh] sm:max-h-[90vh] my-0 sm:my-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150">
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-slate-300 rounded-full mx-auto my-1.5 sm:hidden shrink-0" />
             
-            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-3">
+            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-slate-50 border-b border-slate-200 flex items-start justify-between gap-3 shrink-0">
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
@@ -4050,6 +4454,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                     {activeDetailAssignment.subject_name}
                   </span>
+                  {activeDetailAssignment.status === 'DRAFT' && (
+                    <span className="text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                      <FileText size={10} className="text-amber-700" />
+                      <span>Brouillon</span>
+                    </span>
+                  )}
                   {activeDetailAssignment.is_graded && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200">
                       Noté /{activeDetailAssignment.max_score || 20}
@@ -4075,6 +4485,53 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
             <div className="p-4 sm:p-5 space-y-3.5 max-h-[75vh] overflow-y-auto custom-scrollbar">
               
+              {/* Draft Alert Banner in Detail Modal */}
+              {activeDetailAssignment.status === 'DRAFT' && (
+                <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl flex items-start justify-between gap-3 text-xs text-amber-950">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 mt-0.5">
+                      <FileText size={14} />
+                    </div>
+                    <div>
+                      <p className="font-bold text-amber-900">Ce support est actuellement enregistré comme brouillon</p>
+                      <p className="text-[11px] text-amber-800/90 mt-0.5 leading-relaxed">
+                        Ce devoir est privé et n'est pas encore visible par les élèves ni par les parents. Dès que vous le publiez, une notification push peut alerter automatiquement la classe.
+                      </p>
+                    </div>
+                  </div>
+                  {canManageHomework && (isAdminOrDirector || activeDetailAssignment.teacher_id === user.id) && (
+                    <div className="flex items-center gap-1.5 shrink-0 self-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsDetailModalOpen(false);
+                          handleEditClick(activeDetailAssignment);
+                        }}
+                        className="px-2.5 py-1 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all shadow-2xs cursor-pointer flex items-center gap-1"
+                      >
+                        <Edit3 size={12} />
+                        <span>Modifier</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await handlePublishDraft(activeDetailAssignment, true);
+                        }}
+                        disabled={publishingDraftId === activeDetailAssignment.id}
+                        className="px-3 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer flex items-center gap-1 disabled:opacity-50"
+                      >
+                        {publishingDraftId === activeDetailAssignment.id ? (
+                          <RefreshCw size={12} className="animate-spin" />
+                        ) : (
+                          <Send size={12} />
+                        )}
+                        <span>Publier</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="space-y-1">
                 <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Consignes & Énoncé</h4>
                 <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl">
@@ -4214,28 +4671,37 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                       <span>Traçabilité & Lectures des Élèves</span>
                     </h4>
 
-                    <div className="flex items-center gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenReminderModal(activeDetailAssignment)}
-                        className="py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
-                      >
-                        <Bell size={11} />
-                        <span>Relancer non-lecteurs</span>
-                      </button>
+                    {activeDetailAssignment.status !== 'DRAFT' && (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenReminderModal(activeDetailAssignment)}
+                          className="py-1 px-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-[11px] font-bold transition-all flex items-center gap-1 shadow-2xs cursor-pointer"
+                        >
+                          <Bell size={11} />
+                          <span>Relancer non-lecteurs</span>
+                        </button>
 
-                      <button
-                        type="button"
-                        onClick={() => loadClassTracking(activeDetailAssignment.id)}
-                        className="p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
-                        title="Rafraîchir"
-                      >
-                        <RefreshCw size={12} className={loadingTracking ? 'animate-spin' : ''} />
-                      </button>
-                    </div>
+                        <button
+                          type="button"
+                          onClick={() => loadClassTracking(activeDetailAssignment.id)}
+                          className="p-1 text-slate-400 hover:text-slate-700 rounded-md transition-colors cursor-pointer"
+                          title="Rafraîchir"
+                        >
+                          <RefreshCw size={12} className={loadingTracking ? 'animate-spin' : ''} />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {loadingTracking ? (
+                  {activeDetailAssignment.status === 'DRAFT' ? (
+                    <div className="p-3 bg-amber-50/60 border border-dashed border-amber-200/90 rounded-xl text-center text-xs text-amber-950">
+                      <p className="font-bold">Ce devoir est encore au stade de brouillon</p>
+                      <p className="text-[11px] text-amber-800/80 mt-0.5">
+                        La traçabilité des lectures (horodatages de consultation, accusés de réception et visas des parents) s'activera automatiquement dès la publication officielle.
+                      </p>
+                    </div>
+                  ) : loadingTracking ? (
                     <div className="p-4 text-center text-xs text-slate-400">
                       Chargement des lectures...
                     </div>
@@ -4299,7 +4765,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               )}
             </div>
 
-            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between">
+            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
               <span className="text-[10px] text-slate-400">
                 ID : {activeDetailAssignment.id.substring(0, 8)}
               </span>
@@ -4319,11 +4785,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           MODAL : PLANIFIER L'ARCHIVAGE AUTOMATIQUE (CLOUD & STOCKAGE EXTERNE EN FIN DE MOIS)
           ========================================================================= */}
       {isScheduleModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-xl sm:max-w-2xl w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-slate-950/65 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-xl sm:max-w-2xl w-full border border-slate-200 shadow-2xl flex flex-col h-[90dvh] sm:h-auto max-h-[94dvh] sm:max-h-[90vh] my-0 sm:my-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150">
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-white/30 rounded-full mx-auto my-1.5 sm:hidden shrink-0" />
             
             {/* Modal Header */}
-            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-indigo-950 text-white flex items-center justify-between">
+            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-indigo-950 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-white/10 text-indigo-200 flex items-center justify-center shrink-0">
                   <FolderArchive size={14} />
@@ -4350,7 +4818,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             </div>
 
             {/* Modal Body */}
-            <form onSubmit={handleSaveArchiveSettings} className="p-4 sm:p-5 space-y-3 max-h-[78vh] overflow-y-auto custom-scrollbar">
+            <form onSubmit={handleSaveArchiveSettings} className="flex-1 flex flex-col min-h-0 overflow-hidden">
+              <div className="p-4 sm:p-5 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
               
               {/* 1. Toggle Activation Card */}
               <div className={`p-3 rounded-xl border transition-all ${
@@ -4629,9 +5098,10 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   <span>Archiver maintenant</span>
                 </button>
               </div>
+              </div>
 
               {/* Modal Footer */}
-              <div className="pt-2 border-t border-slate-200 flex items-center justify-between gap-2">
+              <div className="p-3 sm:px-5 sm:py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0 z-10">
                 <button
                   type="button"
                   onClick={() => setIsScheduleModalOpen(false)}
@@ -4659,11 +5129,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           MODAL : GUIDE & SCRIPT SQL SUPABASE (CORRECTION ERREUR 42P01 CAMPUSES)
           ========================================================================= */}
       {isSqlModalOpen && (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto">
+          <div className="bg-white rounded-t-2xl sm:rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl flex flex-col h-[90dvh] sm:h-auto max-h-[94dvh] sm:max-h-[90vh] my-0 sm:my-6 overflow-hidden animate-in fade-in slide-in-from-bottom-4 sm:zoom-in-95 duration-150">
+            {/* Mobile Drag Indicator */}
+            <div className="w-10 h-1 bg-slate-400 rounded-full mx-auto my-1.5 sm:hidden shrink-0" />
             
             {/* Header */}
-            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-slate-900 text-white flex items-center justify-between">
+            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-slate-900 text-white flex items-center justify-between shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center shrink-0">
                   <Database size={14} />
@@ -4763,7 +5235,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2">
+            <div className="px-4 py-2.5 sm:px-5 sm:py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between gap-2 shrink-0 z-10">
               <button
                 type="button"
                 onClick={() => setIsSqlModalOpen(false)}

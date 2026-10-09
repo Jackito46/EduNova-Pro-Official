@@ -3107,14 +3107,30 @@ async function startServer() {
     try {
       if (!supabase) throw new Error('Supabase client not initialized');
 
-      // Query subscribers for this school using SECURITY DEFINER rpc
-      const { data: subscriptions, error } = await supabase.rpc('admin_get_push_subscriptions', {
-        p_school_id: schoolId,
-        p_roles: roleFilters && roleFilters.length > 0 ? roleFilters : null,
-        p_class_id: classId || null
-      });
+      // Query subscribers for this school using SECURITY DEFINER rpc with fallback
+      let subscriptions: any[] = [];
+      try {
+        const { data, error } = await supabase.rpc('admin_get_push_subscriptions', {
+          p_school_id: schoolId,
+          p_roles: roleFilters && roleFilters.length > 0 ? roleFilters : null,
+          p_class_id: classId || null
+        });
 
-      if (error) throw error;
+        if (!error && Array.isArray(data)) {
+          subscriptions = data;
+        } else if (error) {
+          console.warn('RPC admin_get_push_subscriptions notice, attempting direct query:', error.message);
+          let directQuery = supabase.from('push_subscriptions').select('*').eq('school_id', schoolId);
+          const { data: directData } = await directQuery;
+          if (directData) subscriptions = directData;
+        }
+      } catch (rpcErr: any) {
+        console.warn('Fallback querying push_subscriptions table directly:', rpcErr?.message);
+        let directQuery = supabase.from('push_subscriptions').select('*').eq('school_id', schoolId);
+        const { data: directData } = await directQuery;
+        if (directData) subscriptions = directData;
+      }
+
       if (!subscriptions || subscriptions.length === 0) {
         return res.json({ success: true, sent: 0, message: 'No subscribers found' });
       }

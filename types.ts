@@ -511,6 +511,7 @@ export interface HomeworkAssignment {
 }
 
 export interface HomeworkAssignmentWithDetails extends HomeworkAssignment {
+  campus_name?: string;
   class_name?: string;
   subject_name?: string;
   subject_code?: string;
