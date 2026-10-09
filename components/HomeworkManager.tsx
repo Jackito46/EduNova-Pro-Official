@@ -216,7 +216,7 @@ interface TargetStudentRecipient {
 }
 
 export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultTab }) => {
-  const { terminology, currentCampusId, setCurrentCampusId, school, campuses } = useSchool();
+  const { terminology, currentCampusId, setCurrentCampusId, school, campuses, activeAcademicYear } = useSchool();
   const effectiveSchoolId = user.school_id || school?.id;
   const hasMultipleCampuses = Boolean(campuses && campuses.length > 1);
   const activeCampus = useMemo(() => campuses?.find(c => c.id === currentCampusId), [campuses, currentCampusId]);
@@ -258,10 +258,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL'); // ALL, PENDING, DUE_SOON, COMPLETED
   const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>(() => user.campus_id || currentCampusId || 'ALL');
+  const [formCampusFilter, setFormCampusFilter] = useState<string>(() => user.campus_id || 'ALL');
 
   useEffect(() => {
     if (user.campus_id) {
       setSelectedCampusFilter(user.campus_id);
+      setFormCampusFilter(user.campus_id);
     } else if (currentCampusId) {
       setSelectedCampusFilter(currentCampusId);
     }
@@ -397,7 +399,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     try {
       let classQuery = supabase.from('classes').select('*');
       if (effectiveSchoolId) classQuery = classQuery.eq('school_id', effectiveSchoolId);
-      if (currentCampusId) classQuery = classQuery.eq('campus_id', currentCampusId);
+      // Strictly restrict classes to user's annexe if they are an Annexe admin/staff
+      if (user.campus_id) classQuery = classQuery.eq('campus_id', user.campus_id);
 
       let subjectQuery = supabase.from('subjects').select('*');
       if (effectiveSchoolId) subjectQuery = subjectQuery.eq('school_id', effectiveSchoolId);
@@ -406,6 +409,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         .from('students')
         .select('id, first_name, last_name, class_id, parent_name, parent_phone, parent_email, status');
       if (effectiveSchoolId) studentQuery = studentQuery.eq('school_id', effectiveSchoolId);
+      if (user.campus_id) studentQuery = studentQuery.eq('campus_id', user.campus_id);
       studentQuery = studentQuery.eq('status', 'Actif');
 
       let csQuery = supabase.from('class_subjects').select('id, class_id, subject_id, school_id');
@@ -448,7 +452,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     } catch (err) {
       console.error('Error fetching homework metadata:', err);
     }
-  }, [effectiveSchoolId, user.id, user.email, currentCampusId, isTeacher]);
+  }, [effectiveSchoolId, user.id, user.email, user.campus_id, isTeacher]);
 
   // Exact classes assigned to the teacher
   const teacherAssignedClasses = useMemo(() => {
@@ -481,7 +485,13 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         .order('due_date', { ascending: false });
 
       if (effectiveSchoolId) query = query.eq('school_id', effectiveSchoolId);
-      if (currentCampusId) query = query.eq('campus_id', currentCampusId);
+      
+      const effectiveCampus = user.campus_id || 
+        (selectedCampusFilter !== 'ALL' && selectedCampusFilter !== 'GLOBAL' ? selectedCampusFilter : null);
+
+      if (effectiveCampus) {
+        query = query.eq('campus_id', effectiveCampus);
+      }
       
       // If teacher without admin rights:
       // Show assignments for their exact assigned classes (so they see all homework their students have and avoid overload)
@@ -549,7 +559,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     } finally {
       setLoading(false);
     }
-  }, [effectiveSchoolId, user.id, isTeacher, isAdminOrDirector, currentCampusId, canManageHomework, teacherAssignedClassIds, classes, campuses]);
+  }, [effectiveSchoolId, user.id, user.campus_id, isTeacher, isAdminOrDirector, selectedCampusFilter, canManageHomework, teacherAssignedClassIds, classes, campuses]);
 
   // Load student tracking status for current user (if student or parent)
   const fetchStudentReadStatus = useCallback(async () => {
@@ -603,7 +613,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             id: prev[assignmentId]?.id || 'local-' + Date.now(),
             assignment_id: assignmentId,
             student_id: studentId,
-            school_id: user.school_id || '',
+            school_id: effectiveSchoolId || '',
             is_read: true,
             first_read_at: rpcRes.first_read_at || new Date().toISOString(),
             last_read_at: rpcRes.last_read_at || new Date().toISOString(),
@@ -626,7 +636,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       const payload: any = {
         assignment_id: assignmentId,
         student_id: studentId,
-        school_id: user.school_id || '',
+        school_id: effectiveSchoolId || '',
         is_read: true,
         last_read_at: new Date().toISOString(),
         read_by_role: readerRole
@@ -667,7 +677,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         .upsert({
           assignment_id: assignmentId,
           student_id: studentId,
-          school_id: user.school_id || '',
+          school_id: effectiveSchoolId || '',
           work_status: newStatus,
           work_completed_at: newStatus === 'COMPLETED' ? new Date().toISOString() : null,
           is_read: true,
@@ -838,7 +848,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               'Authorization': `Bearer ${session?.access_token || ''}`
             },
             body: JSON.stringify({
-              schoolId: user.school_id,
+              schoolId: effectiveSchoolId,
               recipients: smsRecipients,
               content: reminderMessage.trim()
             })
@@ -867,7 +877,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               'Authorization': `Bearer ${session?.access_token || ''}`
             },
             body: JSON.stringify({
-              schoolId: user.school_id,
+              schoolId: effectiveSchoolId,
               recipients: emailRecipients,
               subject: `Rappel Devoir : ${reminderAssignment?.title || 'Devoir en attente'}`,
               content: reminderMessage.trim()
@@ -1067,7 +1077,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       
       try {
         await supabase.from('global_settings').upsert({
-          key: `homework_archive_schedule_${user.school_id || 'default'}`,
+          key: `homework_archive_schedule_${effectiveSchoolId || 'default'}`,
           value: JSON.stringify(archiveSettings)
         });
       } catch (err) {}
@@ -1099,7 +1109,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         meta: {
           archiveType: 'HOMEWORK_MONTHLY_ARCHIVE',
           generatedAt: now.toISOString(),
-          schoolId: user.school_id,
+          schoolId: effectiveSchoolId,
           schoolName: school?.name || 'EduNova Pro',
           campusId: currentCampusId || null,
           generatedBy: {
@@ -1131,7 +1141,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       // 2. Téléversement optionnel dans Supabase Storage
       let cloudUrl: string | undefined;
       try {
-        const filePath = `homework_archives/${user.school_id || 'school'}/${yearMonth}_archive.json`;
+        const filePath = `homework_archives/${effectiveSchoolId || 'school'}/${yearMonth}_archive.json`;
         const { error: uploadError } = await supabase.storage
           .from(archiveSettings.bucketName || 'academic_archives')
           .upload(filePath, blob, { upsert: true });
@@ -1336,13 +1346,27 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   // Save / Update Homework Assignment (with Draft & Push Notification support)
   const handleSaveAssignment = async (e?: React.FormEvent, statusOverride?: HomeworkStatus) => {
     if (e) e.preventDefault();
+
+    if (!effectiveSchoolId) {
+      toast.error("Établissement scolaire introuvable (Conformité Multi-tenant requise).");
+      return;
+    }
+
     if (!formTitle.trim() || !formClassId || !formSubjectId || !formDueDate) {
       toast.error("Veuillez remplir le titre, la classe, la matière et la date limite.");
       return;
     }
 
+    // RBAC Multi-Annexe protection
+    if (editingAssignment && user.campus_id && editingAssignment.campus_id && editingAssignment.campus_id !== user.campus_id) {
+      toast.error("Action refusée : Ce devoir appartient à une autre annexe.");
+      return;
+    }
+
     const targetClass = classes.find(c => c.id === formClassId);
-    const targetCampusId = targetClass?.campus_id || (selectedCampusFilter !== 'ALL' ? selectedCampusFilter : currentCampusId) || null;
+    const targetCampusId = targetClass?.campus_id || 
+      (user.campus_id ? user.campus_id : (formCampusFilter !== 'ALL' ? formCampusFilter : (selectedCampusFilter !== 'ALL' ? selectedCampusFilter : currentCampusId))) || 
+      null;
     const targetStatus: HomeworkStatus = statusOverride || formStatus || 'PUBLISHED';
     const isDraft = targetStatus === 'DRAFT';
 
@@ -1351,6 +1375,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       const payload: any = {
         school_id: effectiveSchoolId,
         campus_id: targetCampusId,
+        academic_year_id: activeAcademicYear?.id || null,
         class_id: formClassId,
         subject_id: formSubjectId,
         teacher_id: editingAssignment ? editingAssignment.teacher_id : user.id,
@@ -1462,6 +1487,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
   // Delete Homework Assignment
   const handleDeleteAssignment = async (id: string) => {
+    const toDelete = assignments.find(a => a.id === id);
+    if (user.campus_id && toDelete?.campus_id && toDelete.campus_id !== user.campus_id) {
+      toast.error("Action refusée : Vous n'êtes pas autorisé à supprimer un devoir appartenant à une autre annexe.");
+      return;
+    }
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer ce devoir ? Cette action est irréversible.")) {
       return;
     }
@@ -1611,11 +1641,19 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     }
   }, [formClassId, availableFormSubjects, formSubjectId]);
 
-  // Classes list enriched with campus/annexe names for multi-campus clarity
+  // Classes list enriched with campus/annexe names for multi-campus clarity and filtered by Annexe
   const formClassesList = useMemo(() => {
-    const base = isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 
+    let base = isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 
       ? teacherAssignedClasses 
       : classes;
+
+    // Multi-tenant annexe restriction: if user belongs to a specific annexe, enforce strictly
+    if (user.campus_id) {
+      base = base.filter(c => !c.campus_id || c.campus_id === user.campus_id);
+    } else if (hasMultipleCampuses && formCampusFilter !== 'ALL') {
+      base = base.filter(c => c.campus_id === formCampusFilter);
+    }
+
     if (!hasMultipleCampuses) return base;
     return base.map(c => {
       const cp = campuses?.find(camp => camp.id === c.campus_id);
@@ -1624,7 +1662,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         name: cp ? `${c.name} (${cp.name})` : c.name
       };
     });
-  }, [isTeacher, isAdminOrDirector, teacherAssignedClasses, classes, hasMultipleCampuses, campuses]);
+  }, [isTeacher, isAdminOrDirector, teacherAssignedClasses, classes, user.campus_id, hasMultipleCampuses, formCampusFilter, campuses]);
 
   // Detected campus for the currently selected class in the form
   const targetClassCampus = useMemo(() => {
@@ -1650,12 +1688,15 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     setShowFormattingMenu(false);
     setIsDraggingFile(false);
     setShowMathSymbols(false);
+    setFormCampusFilter(user.campus_id || (selectedCampusFilter !== 'ALL' ? selectedCampusFilter : 'ALL'));
 
     const targetClasses = isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 
       ? teacherAssignedClasses 
-      : (hasMultipleCampuses && selectedCampusFilter !== 'ALL'
-          ? classes.filter(c => c.campus_id === selectedCampusFilter)
-          : classes);
+      : (user.campus_id 
+          ? classes.filter(c => !c.campus_id || c.campus_id === user.campus_id)
+          : (hasMultipleCampuses && selectedCampusFilter !== 'ALL'
+              ? classes.filter(c => c.campus_id === selectedCampusFilter)
+              : classes));
 
     // Use current filter class if valid, otherwise first available class
     let initialClassId = '';
@@ -1678,10 +1719,17 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   };
 
   const handleEditClick = (assignment: HomeworkAssignmentWithDetails) => {
+    if (user.campus_id && assignment.campus_id && assignment.campus_id !== user.campus_id) {
+      toast.error("Action refusée : Ce devoir appartient à une autre annexe.");
+      return;
+    }
     setEditingAssignment(assignment);
     setFormTitle(assignment.title);
     setFormDescription(assignment.description);
     setFormClassId(assignment.class_id);
+    if (assignment.campus_id) {
+      setFormCampusFilter(assignment.campus_id);
+    }
     setFormSubjectId(assignment.subject_id);
     setFormDueDate(assignment.due_date);
     setFormDueTime(assignment.due_time || '08:00');
@@ -2597,6 +2645,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                             {assignment.class_name}
                           </span>
+                          {hasMultipleCampuses && assignment.campus_name && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200/80 flex items-center gap-0.5" title={`Annexe : ${assignment.campus_name}`}>
+                              <Building2 size={10} className="text-sky-600" />
+                              <span>{assignment.campus_name}</span>
+                            </span>
+                          )}
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                             {assignment.subject_name}
                           </span>
@@ -2981,12 +3035,25 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   {editingAssignment ? <Edit3 size={15} /> : <BookOpen size={15} />}
                 </div>
                 <div className="min-w-0">
-                  <h3 className="text-sm font-black text-slate-900 truncate">
-                    {editingAssignment ? 'Modifier le Devoir' : 'Nouveau Devoir'}
-                  </h3>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h3 className="text-sm font-black text-slate-900 truncate">
+                      {editingAssignment ? 'Modifier le Devoir' : 'Nouveau Devoir'}
+                    </h3>
+                    {school?.name && (
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200" title="Établissement (Multi-Tenant)">
+                        🏢 {school.name}
+                      </span>
+                    )}
+                    {targetClassCampus && (
+                      <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-sky-50 text-sky-800 border border-sky-200" title="Annexe rattachée">
+                        🏫 {targetClassCampus.name}
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 font-medium truncate">
                     {formClassId ? (classes.find(c => c.id === formClassId)?.name || 'Classe sélectionnée') : 'Sélection de la classe'}
                     {formSubjectId ? ` • ${subjects.find(s => s.id === formSubjectId)?.name || ''}` : ''}
+                    {targetClassCampus ? ` (${targetClassCampus.name})` : ''}
                   </p>
                 </div>
               </div>
@@ -3003,63 +3070,115 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             <form onSubmit={handleSaveAssignment} className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="p-3 sm:p-5 space-y-3.5 flex-1 overflow-y-auto custom-scrollbar">
               
-              {/* Row 1 : Classe & Matière (Adaptée strictement à la classe) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50/70 rounded-xl border border-slate-200/90">
-                {/* Classe cible */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-800">Classe cible *</label>
-                    {isTeacher && !isAdminOrDirector && (
-                      <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 rounded">
-                        Mes Classes Uniquement
-                      </span>
-                    )}
-                  </div>
-                  <ClassSelectorPill
-                    classes={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 ? teacherAssignedClasses : classes}
-                    selectedClassId={formClassId}
-                    onSelectClass={handleSelectFormClass}
-                    allowAll={false}
-                    emptyLabel={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length === 0 ? "Aucune classe assignée..." : "Sélectionner une classe..."}
-                    variant="field"
-                    size="sm"
-                    colorScheme="indigo"
-                    className="w-full"
-                  />
-                </div>
+              {/* Row 1 : Classe & Matière (Multi-Tenant & Multi-Annexes) */}
+              <div className="space-y-2 p-3 bg-slate-50/70 rounded-xl border border-slate-200/90">
+                {/* Sélecteur / Filtre d'annexe si multi-campus */}
+                {hasMultipleCampuses && (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-slate-200/80">
+                    <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-slate-700">
+                      <Building2 size={12} className="text-indigo-600 shrink-0" />
+                      <span>Périmètre Annexe / Campus :</span>
+                      {user.campus_id ? (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded bg-sky-100 text-sky-900 border border-sky-200">
+                          🔒 {campuses.find(c => c.id === user.campus_id)?.name || 'Mon Annexe'} (Multi-Tenant strict)
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-slate-500 font-medium">
+                          {targetClassCampus ? `Rattaché à « ${targetClassCampus.name} »` : 'Sélectionnez une classe'}
+                        </span>
+                      )}
+                    </div>
 
-                {/* Matière strictement filtrée selon la classe */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11px] font-bold text-slate-800">Matière *</label>
-                    {formClassId && (
-                      <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded ${
-                        availableFormSubjects.length > 0 
-                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/70' 
-                          : 'bg-rose-50 text-rose-800 border border-rose-200/70'
-                      }`}>
-                        {availableFormSubjects.length} matière{availableFormSubjects.length > 1 ? 's' : ''} en {classes.find(c => c.id === formClassId)?.name || 'cette classe'}
-                      </span>
+                    {!user.campus_id && (
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="text-[10px] text-slate-400 font-semibold">Filtrer par annexe :</span>
+                        <SelectPill
+                          options={[
+                            { value: 'ALL', label: 'Toutes les Annexes' },
+                            ...campuses.map(c => ({ value: c.id, label: c.name }))
+                          ]}
+                          value={formCampusFilter}
+                          onChange={(val) => {
+                            setFormCampusFilter(val);
+                            if (val !== 'ALL') {
+                              const matching = classes.filter(c => c.campus_id === val);
+                              if (matching.length > 0 && !matching.some(c => c.id === formClassId)) {
+                                handleSelectFormClass(matching[0].id);
+                              }
+                            }
+                          }}
+                          variant="compact"
+                          size="xs"
+                          colorScheme="indigo"
+                        />
+                      </div>
                     )}
                   </div>
-                  <SubjectSelectorPill
-                    subjects={availableFormSubjects}
-                    selectedSubjectId={formSubjectId}
-                    onSelectSubject={(id) => setFormSubjectId(id)}
-                    allowAll={false}
-                    emptyLabel={!formClassId ? "Sélectionnez d'abord une classe..." : availableFormSubjects.length === 0 ? "Aucune matière pour cette classe" : "Sélectionner une matière..."}
-                    labelPrefix=""
-                    variant="field"
-                    size="sm"
-                    colorScheme="indigo"
-                    className="w-full"
-                    disabled={!formClassId || availableFormSubjects.length === 0}
-                  />
-                  {formClassId && availableFormSubjects.length === 0 && (
-                    <p className="text-[10px] text-amber-700 font-medium pt-0.5">
-                      ⚠️ Aucune matière n'est configurée pour cette classe. Contactez l'administration si besoin.
-                    </p>
-                  )}
+                )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Classe cible */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-800">Classe cible *</label>
+                      {isTeacher && !isAdminOrDirector && (
+                        <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 rounded">
+                          Mes Classes Uniquement
+                        </span>
+                      )}
+                    </div>
+                    <ClassSelectorPill
+                      classes={formClassesList}
+                      selectedClassId={formClassId}
+                      onSelectClass={handleSelectFormClass}
+                      allowAll={false}
+                      emptyLabel={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length === 0 ? "Aucune classe assignée..." : "Sélectionner une classe..."}
+                      variant="field"
+                      size="sm"
+                      colorScheme="indigo"
+                      className="w-full"
+                    />
+                    {targetClassCampus && hasMultipleCampuses && (
+                      <p className="text-[10px] text-sky-700 font-semibold flex items-center gap-1 pt-0.5">
+                        <Building2 size={11} />
+                        <span>Annexe confirmée : <strong>{targetClassCampus.name}</strong></span>
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Matière strictement filtrée selon la classe */}
+                  <div className="space-y-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-[11px] font-bold text-slate-800">Matière *</label>
+                      {formClassId && (
+                        <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded ${
+                          availableFormSubjects.length > 0 
+                            ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/70' 
+                            : 'bg-rose-50 text-rose-800 border border-rose-200/70'
+                        }`}>
+                          {availableFormSubjects.length} matière{availableFormSubjects.length > 1 ? 's' : ''} en {classes.find(c => c.id === formClassId)?.name || 'cette classe'}
+                        </span>
+                      )}
+                    </div>
+                    <SubjectSelectorPill
+                      subjects={availableFormSubjects}
+                      selectedSubjectId={formSubjectId}
+                      onSelectSubject={(id) => setFormSubjectId(id)}
+                      allowAll={false}
+                      emptyLabel={!formClassId ? "Sélectionnez d'abord une classe..." : availableFormSubjects.length === 0 ? "Aucune matière pour cette classe" : "Sélectionner une matière..."}
+                      labelPrefix=""
+                      variant="field"
+                      size="sm"
+                      colorScheme="indigo"
+                      className="w-full"
+                      disabled={!formClassId || availableFormSubjects.length === 0}
+                    />
+                    {formClassId && availableFormSubjects.length === 0 && (
+                      <p className="text-[10px] text-amber-700 font-medium pt-0.5">
+                        ⚠️ Aucune matière n'est configurée pour cette classe. Contactez l'administration si besoin.
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -4451,6 +4570,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                     {activeDetailAssignment.class_name}
                   </span>
+                  {activeDetailAssignment.campus_name && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 flex items-center gap-1" title={`Annexe : ${activeDetailAssignment.campus_name}`}>
+                      <Building2 size={11} className="text-sky-600" />
+                      <span>Annexe : {activeDetailAssignment.campus_name}</span>
+                    </span>
+                  )}
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                     {activeDetailAssignment.subject_name}
                   </span>

@@ -30,6 +30,7 @@ export interface SelectPillProps {
   allowCustom?: boolean;
   onCreateCustom?: (query: string) => void;
   customActionLabel?: (query: string) => string;
+  title?: string;
 }
 
 export const SelectPill: React.FC<SelectPillProps> = ({
@@ -50,7 +51,8 @@ export const SelectPill: React.FC<SelectPillProps> = ({
   portal = true,
   allowCustom = false,
   onCreateCustom,
-  customActionLabel
+  customActionLabel,
+  title
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState('');
@@ -449,6 +451,7 @@ export const SelectPill: React.FC<SelectPillProps> = ({
     <div className={`relative inline-block ${variant === 'field' ? 'w-full' : ''} ${className}`} ref={containerRef}>
       <button
         type="button"
+        title={title}
         disabled={disabled}
         onClick={() => {
           if (!disabled) {
