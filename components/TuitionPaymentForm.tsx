@@ -36,7 +36,11 @@ import {
   Send,
   Smartphone,
   FileText,
-  X
+  X,
+  Copy,
+  Check,
+  Eye,
+  QrCode
 } from 'lucide-react';
 import { StudentDossierAuditModal, SessionAuditDetail } from './StudentDossierAuditModal';
 import { toast } from 'sonner';
@@ -59,6 +63,7 @@ import {
   buildPaymentWhatsAppText, 
   cleanPhoneForWhatsApp 
 } from './PaymentWhatsAppShare';
+import { generateReceiptQRCode } from '../utils/receiptVerification';
 import { tuitionPaymentSchema } from '../utils/validation';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -157,6 +162,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   
   // État pour le numéro de téléphone personnalisé du parent pour le partage WhatsApp
   const [parentPhoneCustom, setParentPhoneCustom] = useState<string>('');
+  const [copiedRef, setCopiedRef] = useState(false);
+
+  // Raccourci clavier Entrée pour déclencher instantanément l'impression du reçu
+  useEffect(() => {
+    if (!showReceipt) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Enter' && !showWhatsAppModal) {
+        e.preventDefault();
+        window.print();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showReceipt, showWhatsAppModal]);
 
   const [activeYear, setActiveYear] = useState<any>(null);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
@@ -180,6 +199,49 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [currentExchangeRate, setCurrentExchangeRate] = useState<number>(132.50);
   const [refError, setRefError] = useState<string | null>(null);
   const [isCheckingRef, setIsCheckingRef] = useState(false);
+
+  // État QR Code unique de certification d'authenticité pour le reçu
+  const [receiptQrDataUrl, setReceiptQrDataUrl] = useState<string>('');
+  const [receiptQrSignature, setReceiptQrSignature] = useState<string>('');
+  const [receiptQrUrl, setReceiptQrUrl] = useState<string>('');
+  const [showQrVerificationPreview, setShowQrVerificationPreview] = useState<boolean>(false);
+
+  // Génération automatique du QR code unique haute définition pour chaque reçu scellé
+  useEffect(() => {
+    if (!showReceipt || !selectedStudent) return;
+    
+    const feeLabel = feeType.startsWith('ADHOC_') 
+      ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
+      : feeType === 'INSCRIPTION' 
+      ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription") 
+      : feeType === 'SCOLARITE' 
+      ? `Frais de Scolarité` 
+      : feeType === 'DIVERS'
+      ? 'Frais Divers Obligatoires'
+      : feeType === 'CREDIT_PORTEFEUILLE'
+      ? 'Recharge Portefeuille Élève'
+      : 'Frais Divers';
+
+    generateReceiptQRCode({
+      ref: transactionRef || `RCP-${Date.now()}`,
+      studentName: selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim(),
+      studentClass: selectedStudent.classe || selectedStudent.class?.name || '',
+      amount: parseFloat(montantReel || '0'),
+      currency: currency || 'HTG',
+      feeType: feeLabel,
+      date: new Date().toLocaleDateString('fr-FR') + ' ' + new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
+      cashierName: cashierName || 'Comptabilité',
+      schoolName: schoolDetails?.name || school?.name || 'Établissement Scolaire',
+      exchangeRate: currentExchangeRate,
+      schoolId: user?.school_id
+    }).then(res => {
+      setReceiptQrDataUrl(res.dataUrl);
+      setReceiptQrSignature(res.signature);
+      setReceiptQrUrl(res.url);
+    }).catch(err => {
+      console.error('Erreur génération QR code reçu:', err);
+    });
+  }, [showReceipt, transactionRef, montantReel, currency, feeType, selectedStudent, currentExchangeRate, cashierName, schoolDetails, school, user?.school_id]);
 
   // Méthodes de paiement dynamiques configurées par l'administration
   const activePaymentMethods = useMemo(() => {
@@ -1848,15 +1910,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         } else {
           console.warn("Fallback 1 a échoué. Tentative avec payload minimaliste...", fallback1Error);
 
-          // Fallback 2: Payload minimal universel qui existe dans toutes les versions de la table
+          // Fallback 2: Payload avec typage strict garanti (fee_type, type, nature obligatoires)
           const minimalPayload: any = {
             school_id: user.school_id,
             student_id: selectedStudent.id,
             amount: amount,
             currency: currency,
             payment_method: finalPaymentMethod,
+            fee_type: isAdHoc ? 'DIVERS' : feeType,
+            type: mappedType,
+            nature: mappedType
           };
           if (paymentPayload.academic_year_id) minimalPayload.academic_year_id = paymentPayload.academic_year_id;
+          if (paymentPayload.campus_id) minimalPayload.campus_id = paymentPayload.campus_id;
 
           const { data: minData, error: minError } = await supabase.from('payments').insert([minimalPayload]).select();
 
@@ -2014,52 +2080,173 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   if (showReceipt) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
-        {/* BANDEAU CONFIRMATION ERGONOMIQUE ET COMPACT */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl shadow-sm border border-emerald-100/80 flex flex-col sm:flex-row items-center justify-between gap-4 print:hidden transition-all">
-          <div className="flex items-center gap-3.5 text-left w-full sm:w-auto">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 ring-1 ring-emerald-500/20 shadow-sm">
-              <CheckCircle2 size={22} className="text-emerald-600" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-gray-900 tracking-tight">Transaction Scellée</h2>
-                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-emerald-200/60">
-                  Certifié
-                </span>
+      <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-300 pb-16">
+        {/* BANDEAU CONFIRMATION ULTRA-MODERNE & HUB D'IMPRESSION DIRECTE */}
+        <div className="bg-white/95 backdrop-blur-md p-4 sm:p-5 rounded-2xl shadow-xl shadow-slate-900/5 border border-slate-200/90 flex flex-col lg:flex-row items-center justify-between gap-4 print:hidden transition-all">
+          <div className="flex items-center gap-3.5 text-left w-full lg:w-auto">
+            {/* Badge de confirmation animé avec ping */}
+            <div className="relative flex items-center justify-center shrink-0">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 ring-2 ring-white">
+                <CheckCircle2 size={24} className="stroke-[2.5]" />
               </div>
-              <p className="text-xs text-gray-500 font-medium">Le règlement a été certifié avec succès par l'Administration.</p>
+              <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-600 border-2 border-white"></span>
+              </span>
+            </div>
+
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h2 className="text-base font-black text-slate-900 tracking-tight">Transaction Scellée</h2>
+                <span className="bg-emerald-50 text-emerald-700 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1">
+                  <ShieldCheck size={11} className="text-emerald-600" />
+                  Certifié Officiel
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (transactionRef) {
+                      navigator.clipboard.writeText(transactionRef);
+                      setCopiedRef(true);
+                      toast.success("Référence du reçu copiée !");
+                      setTimeout(() => setCopiedRef(false), 2000);
+                    }
+                  }}
+                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer"
+                  title="Copier la référence du reçu"
+                >
+                  {copiedRef ? <Check size={10} className="text-emerald-600" /> : <Copy size={10} />}
+                  <span>#{transactionRef}</span>
+                </button>
+              </div>
+              <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                <span className="font-bold text-slate-800">{selectedStudent.fullName}</span> • <span className="text-slate-600">{selectedStudent.classe || 'N/A'}</span> • <span className="font-mono font-bold text-emerald-700">{parseFloat(montantReel || '0').toLocaleString()} {currency}</span>
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2.5 w-full sm:w-auto shrink-0 justify-end flex-wrap">
+          {/* HUB D'ACTIONS : IMPRESSION AU PREMIER PLAN */}
+          <div className="flex items-center gap-2 w-full lg:w-auto shrink-0 justify-end flex-wrap">
+            <button
+              type="button"
+              onClick={() => setShowQrVerificationPreview(true)}
+              className="flex-1 sm:flex-none px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 border border-indigo-200/90 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+              title="Tester et contrôler le QR Code d'authenticité"
+            >
+              <QrCode size={14} className="text-indigo-600" />
+              <span>Tester QR Code</span>
+            </button>
+
             <button
               type="button"
               onClick={() => setShowWhatsAppModal(true)}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-emerald-600 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
-              title="Partager le reçu sur WhatsApp (100% Gratuit)"
+              className="flex-1 sm:flex-none px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-200/90 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+              title="Partager le reçu certifié via WhatsApp"
             >
-              <MessageSquare size={15} />
-              Partager WhatsApp
+              <MessageSquare size={14} className="text-emerald-600" />
+              <span>WhatsApp</span>
             </button>
+
+            {/* HERO BUTTON: IMPRIMER LE REÇU */}
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-slate-900 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-none group px-5 sm:px-6 py-2.5 sm:py-3 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 hover:from-slate-900 hover:to-indigo-900 text-white rounded-xl font-black text-xs sm:text-sm shadow-xl shadow-slate-950/25 hover:shadow-indigo-950/35 transition-all flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer ring-2 ring-indigo-500/50 hover:ring-indigo-400"
+              title="Lancer l'impression directe (Raccourci: Touche Entrée)"
             >
-              <Printer size={15} />
-              Imprimer Reçu
+              <div className="w-5 h-5 rounded-md bg-white/15 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <Printer size={13} className="text-white" />
+              </div>
+              <span className="tracking-wide uppercase">Imprimer le Reçu</span>
+              <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono font-black bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/25">
+                Entrée ↵
+              </kbd>
             </button>
+
             <button
               type="button"
               onClick={resetAllFields}
-              className="flex-1 sm:flex-none px-4 py-2.5 bg-indigo-600 text-white rounded-xl font-semibold text-xs shadow-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              className="flex-1 sm:flex-none px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200/80 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+              title="Réinitialiser pour un nouvel encaissement"
             >
-              <PlusCircle size={15} />
-              Nouvel Encaissement
+              <PlusCircle size={14} className="text-slate-500" />
+              <span>Nouveau</span>
             </button>
           </div>
         </div>
+
+        {/* MODAL DE CONTRÔLE RAPIDE DU QR CODE D'AUTHENTICITÉ */}
+        {showQrVerificationPreview && (
+          <div className="fixed inset-0 z-50 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4 print:hidden animate-in fade-in duration-200">
+            <div className="bg-white rounded-3xl max-w-md w-full shadow-2xl border border-slate-200 overflow-hidden text-slate-900">
+              <div className="bg-gradient-to-r from-indigo-900 via-slate-900 to-slate-950 p-5 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-9 h-9 rounded-xl bg-indigo-500/30 border border-indigo-400/30 flex items-center justify-center text-indigo-300">
+                    <QrCode size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white">Vérification QR Code</h3>
+                    <p className="text-[11px] text-indigo-200 font-medium">Scellé d'authenticité de la transaction</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowQrVerificationPreview(false)}
+                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="p-6 text-center space-y-4">
+                <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 inline-block shadow-inner mx-auto">
+                  {receiptQrDataUrl ? (
+                    <img
+                      src={receiptQrDataUrl}
+                      alt="QR Code"
+                      className="w-48 h-48 object-contain mx-auto rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-48 h-48 flex items-center justify-center bg-gray-100">
+                      <Loader2 size={32} className="animate-spin text-indigo-600" />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <div className="inline-flex items-center gap-1.5 bg-emerald-50 text-emerald-800 border border-emerald-200 px-3 py-1 rounded-full text-xs font-black">
+                    <ShieldCheck size={13} className="text-emerald-600" />
+                    <span>Signature : {receiptQrSignature || `EDN-${transactionRef}`}</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-2 font-medium">
+                    Ce QR code est imprimé en bas du reçu. Tout smartphone ou lecteur de caisse le scanne pour attester instantanément de la validité du paiement.
+                  </p>
+                </div>
+
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (receiptQrUrl) {
+                        window.open(receiptQrUrl, '_blank');
+                      }
+                    }}
+                    className="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center justify-center gap-1.5"
+                  >
+                    <Eye size={14} />
+                    <span>Ouvrir la page de vérification</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowQrVerificationPreview(false)}
+                    className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-bold transition-all"
+                  >
+                    Fermer
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* MODAL DE CONFIRMATION ET VÉRIFICATION DU NUMÉRO WHATSAPP */}
         {showWhatsAppModal && (
@@ -2120,247 +2307,327 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         )}
 
-        {/* REÇU DE CAISSE TICKET 80MM (OPTIMISÉ IMPRIMANTE THERMIQUE EPSON) */}
-        <div id="thermal-receipt" className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl rounded-xl border border-gray-200 text-black font-sans leading-tight flex flex-col print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm]">
-          {/* HEADER SCOLAIRE */}
-          <div className="w-full text-center border-b-2 border-black pb-2 mb-3">
-            {schoolDetails?.logo_url && (
-              <img src={schoolDetails.logo_url} alt="Logo" className="h-12 mx-auto mb-1 object-contain" referrerPolicy="no-referrer" />
-            )}
-            <h1 className="text-[13px] font-black uppercase leading-tight">{schoolDetails?.name || 'ÉTABLISSEMENT UNIVERSITAIRE'}</h1>
-            {(() => {
-              const studentCampus = campuses?.find(c => c.id === (selectedStudent?.campus_id || currentCampusId));
-              const campusTitle = studentCampus?.name || schoolDetails?.campus_name;
-              return campusTitle ? (
-                <p className="text-[10px] font-black uppercase tracking-wider text-black mt-0.5">
-                  Annexe / Campus : {campusTitle}
-                </p>
-              ) : null;
-            })()}
-            <div className="text-[9px] font-bold opacity-90 italic mt-0.5 space-y-0.5">
-              {schoolDetails?.address && <p>{schoolDetails.address}</p>}
-              {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
-            </div>
+        {/* PODIUM D'APERÇU HAUTE FIDÉLITÉ (80MM EPSON THERMIQUE) */}
+        <div className="w-full bg-slate-100/70 p-3 sm:p-6 md:p-8 rounded-[2rem] border border-slate-200/90 shadow-inner flex flex-col items-center relative print:bg-white print:p-0 print:border-none print:shadow-none print:rounded-none">
+          {/* BARRE FLOTTANTE D'ÉTAT D'IMPRESSION */}
+          <div className="w-full max-w-[80mm] flex items-center justify-between text-[11px] font-bold text-slate-500 mb-3 px-1 print:hidden">
+            <span className="flex items-center gap-1.5 text-slate-600">
+              <Eye size={12} className="text-indigo-600" />
+              <span>Aperçu Réel Ticket 80mm</span>
+            </span>
+            <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-200 text-slate-600 font-mono font-semibold">
+              Epson / Star POS Ready
+            </span>
           </div>
 
-          {/* TITRE DU DOCUMENT */}
-          <div className="w-full text-center mb-3 py-1.5 bg-gray-100 rounded border border-gray-200 print:bg-gray-100">
-            <h2 className="text-[12px] font-black tracking-widest uppercase">REÇU DE CAISSE</h2>
-            <p className="text-[9px] font-bold opacity-80 mt-0.5">#{transactionRef}</p>
-          </div>
+          {/* TICKET DE CAISSE THERMIQUE 80MM */}
+          <div
+            id="thermal-receipt"
+            className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl shadow-slate-900/10 rounded-2xl border border-slate-200 text-black font-sans leading-tight flex flex-col relative print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm] print:rounded-none"
+          >
+            {/* LIGNE DE DÉCOUPE SUPÉRIEURE STYLISÉE */}
+            <div className="w-full flex justify-between items-center opacity-30 text-[6px] tracking-[0.25em] mb-2 font-mono print:hidden select-none" aria-hidden="true">
+              <span>• • • • • • • • • • • • • • • • • • • • • • • • • •</span>
+            </div>
 
-          {/* GRID DETAILED INFORMATION (2 COLONNES COMPACTES) */}
-          <div className="w-full grid grid-cols-2 gap-2 text-[9px] mb-3 border-b border-black pb-2">
-            <div className="space-y-1">
-              <div>
-                <p className="text-[7px] uppercase font-black text-gray-500">Date & Heure</p>
-                <p className="font-bold leading-none">{new Date().toLocaleDateString('fr-FR')} {new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</p>
-              </div>
-              <div>
-                <p className="text-[7px] uppercase font-black text-gray-500">Caissier</p>
-                <p className="font-bold leading-none">{cashierName || 'Comptabilité'}</p>
+            {/* HEADER SCOLAIRE */}
+            <div className="w-full text-center border-b-2 border-black pb-2.5 mb-3">
+              {schoolDetails?.logo_url && (
+                <img
+                  src={schoolDetails.logo_url}
+                  alt="Logo"
+                  className="h-14 mx-auto mb-1.5 object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              )}
+              <h1 className="text-[13px] font-black uppercase leading-snug tracking-tight text-black">
+                {schoolDetails?.name || 'ÉTABLISSEMENT SCOLAIRE'}
+              </h1>
+              {(() => {
+                const studentCampus = campuses?.find(c => c.id === (selectedStudent?.campus_id || currentCampusId));
+                const campusTitle = studentCampus?.name || schoolDetails?.campus_name;
+                return campusTitle ? (
+                  <p className="text-[9.5px] font-black uppercase tracking-wider text-black mt-0.5">
+                    Annexe / Campus : {campusTitle}
+                  </p>
+                ) : null;
+              })()}
+              <div className="text-[8.5px] font-bold text-gray-700 italic mt-0.5 space-y-0.5">
+                {schoolDetails?.address && <p>{schoolDetails.address}</p>}
+                {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
               </div>
             </div>
-            <div className="space-y-1 text-right border-l border-gray-200 pl-2">
-              <div>
-                <p className="text-[7px] uppercase font-black text-gray-500">Élève</p>
-                <p className="font-black text-[10px] leading-tight">{selectedStudent.fullName}</p>
-                <p className="text-[8px] font-bold text-gray-600 italic">{selectedStudent.classe || 'Non assignée'}</p>
-              </div>
-            </div>
-          </div>
 
-          {/* TYPE DE FRAIS & MODE DE PAIEMENT */}
-          <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
-            <div className="flex justify-between items-start py-0.5">
-              <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
-              <div className="text-right pl-2">
-                <span className="font-black text-[11px] block text-black uppercase">
-                  {feeType.startsWith('ADHOC_') 
-                    ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
-                    : feeType === 'INSCRIPTION' 
-                    ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription") 
-                    : feeType === 'SCOLARITE' 
-                    ? `Frais de Scolarité (${terminology.tuition})` 
-                    : feeType === 'DIVERS'
-                    ? 'Frais Divers Obligatoires'
-                    : feeType === 'CREDIT_PORTEFEUILLE'
-                    ? 'Recharge Portefeuille Élève'
-                    : 'Frais Divers'}
-                </span>
-                {/* Mention explicite si barème initialement fixé en USD */}
-                {(() => {
-                  let plannedUSD = 0;
-                  if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
-                  else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
-                  else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
-                  else if (feeType.startsWith('ADHOC_')) {
-                    const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
-                    if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
-                  }
-
-                  if (plannedUSD > 0) {
-                    return (
-                      <span className="inline-block mt-0.5 text-[8px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">
-                        Barème fixé en Dollars : ${plannedUSD} USD
-                      </span>
-                    );
-                  }
-                  return null;
-                })()}
+            {/* TITRE DU DOCUMENT AVEC CODE-BARRES */}
+            <div className="w-full text-center mb-3 py-1.5 bg-gray-100 rounded border border-gray-300 print:bg-gray-100">
+              <h2 className="text-[12px] font-black tracking-widest uppercase">REÇU DE CAISSE OFFICIEL</h2>
+              <p className="text-[9px] font-black font-mono mt-0.5">#{transactionRef}</p>
+              {/* Pattern simulation code-barres thermique propre */}
+              <div className="w-32 mx-auto my-1 flex justify-center items-center gap-[1.5px] opacity-80 h-3 overflow-hidden select-none" aria-hidden="true">
+                {[1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2].map((w, idx) => (
+                  <span
+                    key={idx}
+                    className="h-full bg-black block"
+                    style={{ width: `${w}px` }}
+                  />
+                ))}
               </div>
             </div>
-            <div className="flex justify-between items-center py-0.5">
-              <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
-              <span className="font-black text-[10px] text-black">{paymentMethod}</span>
+
+            {/* GRID DETAILED INFORMATION (2 COLONNES COMPACTES) */}
+            <div className="w-full grid grid-cols-2 gap-2 text-[9px] mb-3 border-b border-black pb-2">
+              <div className="space-y-1">
+                <div>
+                  <p className="text-[7px] uppercase font-black text-gray-500">Date & Heure</p>
+                  <p className="font-bold leading-none">{new Date().toLocaleDateString('fr-FR')} {new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] uppercase font-black text-gray-500">Caissier</p>
+                  <p className="font-bold leading-none">{cashierName || 'Comptabilité'}</p>
+                </div>
+              </div>
+              <div className="space-y-1 text-right border-l border-gray-200 pl-2">
+                <div>
+                  <p className="text-[7px] uppercase font-black text-gray-500">Élève</p>
+                  <p className="font-black text-[10px] leading-tight">{selectedStudent.fullName}</p>
+                  <p className="text-[8px] font-bold text-gray-600 italic">{selectedStudent.classe || 'Non assignée'}</p>
+                  {selectedStudent.reference_number && (
+                    <p className="text-[7px] font-mono text-gray-500">Mat: {selectedStudent.reference_number}</p>
+                  )}
+                </div>
+              </div>
             </div>
-            {paymentMethod === 'MonCash' && (
-              <>
-                {(moncashTransactionData?.transactionId || referenceNumber) && (
-                  <div className="flex justify-between items-center py-0.5 text-[8px]">
-                    <span className="font-bold uppercase text-gray-500">ID Trans. MonCash:</span>
-                    <span className="font-mono font-black">{moncashTransactionData?.transactionId || referenceNumber}</span>
-                  </div>
-                )}
-                {moncashTransactionData?.orderId && (
-                  <div className="flex justify-between items-center py-0.5 text-[7.5px]">
-                    <span className="font-medium uppercase text-gray-500">Réf. Commande:</span>
-                    <span className="font-mono font-bold text-gray-700">{moncashTransactionData.orderId}</span>
-                  </div>
-                )}
-                <div className="flex justify-between items-center py-0.5 text-[7.5px]">
-                  <span className="font-semibold uppercase text-gray-500">Validation:</span>
-                  <span className="font-bold text-black uppercase">
-                    {moncashTransactionData?.serverStatus === 'VALIDE' ? 'CERTIFIÉ DIGICEL EN TEMPS RÉEL' : (moncashTransactionData?.serverStatus || 'VALIDÉ')}
+
+            {/* TYPE DE FRAIS & MODE DE PAIEMENT */}
+            <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
+              <div className="flex justify-between items-start py-0.5">
+                <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
+                <div className="text-right pl-2">
+                  <span className="font-black text-[11px] block text-black uppercase">
+                    {feeType.startsWith('ADHOC_') 
+                      ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
+                      : feeType === 'INSCRIPTION' 
+                      ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription") 
+                      : feeType === 'SCOLARITE' 
+                      ? `Frais de Scolarité (${terminology.tuition})` 
+                      : feeType === 'DIVERS'
+                      ? 'Frais Divers Obligatoires'
+                      : feeType === 'CREDIT_PORTEFEUILLE'
+                      ? 'Recharge Portefeuille Élève'
+                      : 'Frais Divers'}
                   </span>
+                  {/* Mention explicite si barème initialement fixé en USD */}
+                  {(() => {
+                    let plannedUSD = 0;
+                    if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
+                    else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
+                    else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
+                    else if (feeType.startsWith('ADHOC_')) {
+                      const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
+                      if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                    }
+
+                    if (plannedUSD > 0) {
+                      return (
+                        <span className="inline-block mt-0.5 text-[8px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">
+                          Barème fixé en Dollars : ${plannedUSD} USD
+                        </span>
+                      );
+                    }
+                    return null;
+                  })()}
                 </div>
-              </>
-            )}
-          </div>
-
-          {/* DÉTAILS FINANCIERS & SITUATION */}
-          <div className="w-full space-y-1 text-[9px] mb-3 bg-gray-50 p-2 rounded border border-gray-200 print:bg-white print:border-black">
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-600">Total Dû (Engagement) :</span>
-              <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due')}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-600">Déjà Versé :</span>
-              <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid')}</span>
-            </div>
-          </div>
-
-          {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
-          <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
-            <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Net Perçu (Montant Réglé)</p>
-            <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
-              {parseFloat(montantReel || '0').toLocaleString()} <span className="text-[11px] font-bold">{currency}</span>
-            </p>
-
-            {/* BLOC CONVERSION DE TAUX DE CHANGE TRANSPARENT ET EXPLICITE */}
-            {(() => {
-              const paidAmount = parseFloat(montantReel || '0');
-              const isUSD = currency === 'USD';
-              let plannedUSD = 0;
-              if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
-              else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
-              else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
-              else if (feeType.startsWith('ADHOC_')) {
-                const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
-                if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
-              }
-
-              if (isUSD) {
-                const equivHTG = Math.round((paidAmount * currentExchangeRate) * 100) / 100;
-                return (
-                  <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
-                    <div className="flex justify-between items-center text-[8.5px] font-black text-black">
-                      <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
-                      <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                        1 USD = {currentExchangeRate} HTG
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                      <span>Montant versé (Devise USD) :</span>
-                      <span className="font-mono font-black">${paidAmount.toLocaleString()} USD</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
-                      <span>Contre-valeur perçue (HTG) :</span>
-                      <span className="font-mono">{equivHTG.toLocaleString()} HTG</span>
-                    </div>
-                  </div>
-                );
-              }
-
-              if (!isUSD && (plannedUSD > 0 || currentExchangeRate > 0)) {
-                const equivUSD = currentExchangeRate > 0 ? (paidAmount / currentExchangeRate).toFixed(2) : '0.00';
-                return (
-                  <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
-                    <div className="flex justify-between items-center text-[8.5px] font-black text-black">
-                      <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
-                      <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                        1 USD = {currentExchangeRate} HTG
-                      </span>
-                    </div>
-                    {plannedUSD > 0 && (
-                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                        <span>Barème fixé en Dollars :</span>
-                        <span className="font-mono font-black">${plannedUSD} USD</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                      <span>Valeur équivalente couverte :</span>
-                      <span className="font-mono font-black">≈ ${equivUSD} USD</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
-                      <span>Montant effectif encaissé en Gourdes :</span>
-                      <span className="font-mono">{paidAmount.toLocaleString()} HTG</span>
-                    </div>
-                  </div>
-                );
-              }
-
-              return null;
-            })()}
-          </div>
-
-          {/* ENGAGEMENT ET RESTE */}
-          <div className="w-full space-y-1 text-[9px] mb-4 border-b border-black pb-2">
-            {feeType === 'CREDIT_PORTEFEUILLE' ? (
-              <div className="flex justify-between items-center font-bold">
-                <span>Nouveau Solde Est.:</span>
-                <span>{(((currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0)) + parseFloat(montantReel || '0'))).toLocaleString()} {currency}</span>
               </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center font-bold">
-                  <span>Reste sur Motif:</span>
-                  <span className="text-[10px] font-black">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', montantReel, currency, paymentLogic)}</span>
-                </div>
-                <div className="flex justify-between items-center text-[8px] text-gray-600 italic">
-                  <span>Solde Global (Session):</span>
-                  <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', montantReel, currency)}</span>
-                </div>
-              </>
-            )}
-          </div>
-
-          {/* SIGNATURE & MENTION LÉGALE */}
-          <div className="w-full text-center space-y-3 mt-2">
-            <div className="w-3/4 mx-auto space-y-1 pt-2">
-              <div className="h-7 border-b border-black"></div>
-              <p className="text-[7px] font-black uppercase tracking-widest">Sign. Caissier: {cashierName || 'Direction'}</p>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
+                <span className="font-black text-[10px] text-black">{paymentMethod}</span>
+              </div>
+              {paymentMethod === 'MonCash' && (
+                <>
+                  {(moncashTransactionData?.transactionId || referenceNumber) && (
+                    <div className="flex justify-between items-center py-0.5 text-[8px]">
+                      <span className="font-bold uppercase text-gray-500">ID Trans. MonCash:</span>
+                      <span className="font-mono font-black">{moncashTransactionData?.transactionId || referenceNumber}</span>
+                    </div>
+                  )}
+                  {moncashTransactionData?.orderId && (
+                    <div className="flex justify-between items-center py-0.5 text-[7.5px]">
+                      <span className="font-medium uppercase text-gray-500">Réf. Commande:</span>
+                      <span className="font-mono font-bold text-gray-700">{moncashTransactionData.orderId}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center py-0.5 text-[7.5px]">
+                    <span className="font-semibold uppercase text-gray-500">Validation:</span>
+                    <span className="font-bold text-black uppercase">
+                      {moncashTransactionData?.serverStatus === 'VALIDE' ? 'CERTIFIÉ DIGICEL EN TEMPS RÉEL' : (moncashTransactionData?.serverStatus || 'VALIDÉ')}
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
 
-            <p className="text-[8px] font-bold italic pt-2 border-t border-black text-center">
-              Veuillez conserver ce reçu précieusement pour toute réclamation.
-            </p>
+            {/* DÉTAILS FINANCIERS & SITUATION */}
+            <div className="w-full space-y-1 text-[9px] mb-3 bg-gray-50 p-2 rounded border border-gray-200 print:bg-white print:border-black">
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-gray-600">Total Dû (Engagement) :</span>
+                <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due')}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="font-semibold text-gray-600">Déjà Versé :</span>
+                <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid')}</span>
+              </div>
+            </div>
+
+            {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
+            <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
+              <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Net Perçu (Montant Réglé)</p>
+              <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
+                {parseFloat(montantReel || '0').toLocaleString()} <span className="text-[11px] font-bold">{currency}</span>
+              </p>
+
+              {/* BLOC CONVERSION DE TAUX DE CHANGE TRANSPARENT ET EXPLICITE */}
+              {(() => {
+                const paidAmount = parseFloat(montantReel || '0');
+                const isUSD = currency === 'USD';
+                let plannedUSD = 0;
+                if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
+                else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
+                else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
+                else if (feeType.startsWith('ADHOC_')) {
+                  const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
+                  if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                }
+
+                if (isUSD) {
+                  const equivHTG = Math.round((paidAmount * currentExchangeRate) * 100) / 100;
+                  return (
+                    <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                        <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                        <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                          1 USD = {currentExchangeRate} HTG
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Montant versé (Devise USD) :</span>
+                        <span className="font-mono font-black">${paidAmount.toLocaleString()} USD</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                        <span>Contre-valeur perçue (HTG) :</span>
+                        <span className="font-mono">{equivHTG.toLocaleString()} HTG</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (!isUSD && (plannedUSD > 0 || currentExchangeRate > 0)) {
+                  const equivUSD = currentExchangeRate > 0 ? (paidAmount / currentExchangeRate).toFixed(2) : '0.00';
+                  return (
+                    <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                        <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                        <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                          1 USD = {currentExchangeRate} HTG
+                        </span>
+                      </div>
+                      {plannedUSD > 0 && (
+                        <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                          <span>Barème fixé en Dollars :</span>
+                          <span className="font-mono font-black">${plannedUSD} USD</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Valeur équivalente couverte :</span>
+                        <span className="font-mono font-black">≈ ${equivUSD} USD</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                        <span>Montant effectif encaissé en Gourdes :</span>
+                        <span className="font-mono">{paidAmount.toLocaleString()} HTG</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+            </div>
+
+            {/* ENGAGEMENT ET RESTE */}
+            <div className="w-full space-y-1 text-[9px] mb-4 border-b border-black pb-2">
+              {feeType === 'CREDIT_PORTEFEUILLE' ? (
+                <div className="flex justify-between items-center font-bold">
+                  <span>Nouveau Solde Est.:</span>
+                  <span>{(((currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0)) + parseFloat(montantReel || '0'))).toLocaleString()} {currency}</span>
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center font-bold">
+                    <span>Reste sur Motif :</span>
+                    <span className="text-[10px] font-black">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', montantReel, currency, paymentLogic)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[8px] text-gray-600 italic">
+                    <span>Solde Global (Session) :</span>
+                    <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', montantReel, currency)}</span>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* BLOC QR CODE UNIQUE D'AUTHENTICITÉ (SCAN RAPIDE SMARTPHONE) */}
+            <div className="w-full my-2.5 p-2 bg-gray-50 rounded border border-black/30 text-center flex flex-col items-center justify-center print:bg-white print:border-black">
+              <div className="bg-white p-1 rounded border border-black/40 mb-1 inline-block">
+                {receiptQrDataUrl ? (
+                  <img
+                    src={receiptQrDataUrl}
+                    alt="QR Code d'Authenticité"
+                    className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto block"
+                  />
+                ) : (
+                  <div className="w-24 h-24 flex items-center justify-center bg-gray-100">
+                    <QrCode size={30} className="text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[7.5px] font-black uppercase tracking-wider text-black">
+                Scan Rapide • Vérification d'Authenticité
+              </p>
+              <p className="text-[7px] font-mono font-bold text-gray-800 mt-0.5">
+                Scellé : {receiptQrSignature || `EDN-${transactionRef}`}
+              </p>
+              <p className="text-[6.5px] text-gray-600 italic mt-0.5">
+                Scannez avec la caméra de votre smartphone pour attester la validité
+              </p>
+            </div>
+
+            {/* SIGNATURE & CACHET NUMÉRIQUE */}
+            <div className="w-full text-center space-y-2 mt-2">
+              <div className="w-3/4 mx-auto space-y-1 pt-1">
+                <div className="h-6 border-b border-black"></div>
+                <p className="text-[7px] font-black uppercase tracking-widest text-slate-800">Sign. Caissier : {cashierName || 'Direction'}</p>
+              </div>
+
+              <div className="py-1 px-2 border border-black/30 rounded bg-gray-50/70 inline-block mx-auto text-[7.5px] font-bold text-gray-700">
+                ✓ Scellé Certifié par le Système • Conservez ce reçu précieux
+              </div>
+            </div>
+
+            {/* BUFFER MARGE DE COUPE (AUTO-CUTTER EPSON PRINTER) */}
+            <div className="w-full pt-3 mt-2 border-t border-dashed border-gray-400 text-center">
+              <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black select-none">- - - MARGE DE COUPE EPSON - - -</p>
+              <div className="h-6 print:h-12"></div>
+            </div>
           </div>
 
-          {/* BUFFER MARGE DE COUPE (AUTO-CUTTER EPSON PRINTER) */}
-          <div className="w-full pt-3 mt-2 border-t border-dashed border-gray-400 text-center">
-            <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black">- - - MARGE DE COUPE EPSON - - -</p>
-            <div className="h-6 print:h-12"></div>
+          {/* RAPPEL FLOTTANT D'IMPRESSION EN BAS DU TICKET */}
+          <div className="mt-4 flex items-center gap-3 print:hidden">
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl shadow-lg shadow-slate-900/10 flex items-center gap-2 active:scale-95 transition-all cursor-pointer ring-1 ring-slate-800"
+            >
+              <Printer size={14} />
+              <span>Imprimer le Reçu (80mm)</span>
+            </button>
           </div>
         </div>
 

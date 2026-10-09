@@ -90,6 +90,7 @@ import { PayrollSensitiveNotificationListener } from './components/PayrollSensit
 import { GlobalShortcuts } from './components/GlobalShortcuts';
 import { ModernDashboardSkeleton } from './components/SkeletonLoader';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
+import { PublicReceiptVerificationView } from './components/PublicReceiptVerificationView';
 
 // Intercept toast.error globally to prevent scary technical auth errors from showing to the user
 const originalToastError = toast.error;
@@ -1276,6 +1277,24 @@ const App: React.FC = () => {
           <p className="text-slate-600 font-medium text-sm">Fermeture sécurisée...</p>
         </div>
       </div>
+    );
+  }
+
+  // Vérification de reçu public (accessible via scan QR code sans authentification préalable)
+  const isPublicReceiptVerification = typeof window !== 'undefined' && (
+    window.location.hash.includes('verifier-recu') ||
+    window.location.search.includes('verify_receipt') ||
+    window.location.hash.includes('verify_receipt')
+  );
+
+  if (isPublicReceiptVerification) {
+    return (
+      <PublicReceiptVerificationView
+        onBackToApp={() => {
+          window.location.hash = '#/';
+          window.location.reload();
+        }}
+      />
     );
   }
 

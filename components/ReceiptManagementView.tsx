@@ -31,8 +31,10 @@ import {
   Copy,
   Check,
   Globe,
-  Zap
+  Zap,
+  QrCode
 } from 'lucide-react';
+import { generateReceiptQRCode } from '../utils/receiptVerification';
 import { toast } from 'sonner';
 import { UserProfile } from '../types';
 import { formatStudentName } from '../utils/formatters';
@@ -104,6 +106,36 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [selectedGenStudent, setSelectedGenStudent] = useState<any | null>(null);
 
   const [printPreview, setPrintPreview] = useState<any | null>(null);
+  const [reprintQrDataUrl, setReprintQrDataUrl] = useState<string>('');
+  const [reprintQrSignature, setReprintQrSignature] = useState<string>('');
+
+  useEffect(() => {
+    if (!printPreview) {
+      setReprintQrDataUrl('');
+      setReprintQrSignature('');
+      return;
+    }
+
+    const appliedRate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
+    generateReceiptQRCode({
+      ref: printPreview.receipt_number || printPreview.id || `RCP-${Date.now()}`,
+      studentName: printPreview.student_name || 'Élève',
+      studentClass: printPreview.class_name || '',
+      amount: Number(printPreview.amount || 0),
+      currency: printPreview.currency || 'HTG',
+      feeType: printPreview.nature || printPreview.fee_type || 'Frais Scolaires',
+      date: new Date(printPreview.created_at || Date.now()).toLocaleDateString('fr-FR'),
+      cashierName: cashierName || 'Comptabilité',
+      schoolName: schoolDetails?.name || school?.name || 'Établissement Scolaire',
+      exchangeRate: appliedRate,
+      schoolId: effectiveSchoolId
+    }).then(res => {
+      setReprintQrDataUrl(res.dataUrl);
+      setReprintQrSignature(res.signature);
+    }).catch(err => {
+      console.error('Erreur génération QR duplicata:', err);
+    });
+  }, [printPreview, cashierName, schoolDetails, school, effectiveSchoolId]);
 
   useEffect(() => {
     const fetchContext = async () => {
@@ -1646,6 +1678,32 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     return null;
                   })()}
+                </div>
+
+                {/* BLOC QR CODE UNIQUE D'AUTHENTICITÉ (SCAN RAPIDE SMARTPHONE) */}
+                <div className="w-full my-2.5 p-2 bg-gray-50 rounded border border-black/30 text-center flex flex-col items-center justify-center print:bg-white print:border-black">
+                  <div className="bg-white p-1 rounded border border-black/40 mb-1 inline-block">
+                    {reprintQrDataUrl ? (
+                      <img
+                        src={reprintQrDataUrl}
+                        alt="QR Code d'Authenticité"
+                        className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto block"
+                      />
+                    ) : (
+                      <div className="w-24 h-24 flex items-center justify-center bg-gray-100">
+                        <QrCode size={30} className="text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[7.5px] font-black uppercase tracking-wider text-black">
+                    Scan Rapide • Vérification d'Authenticité
+                  </p>
+                  <p className="text-[7px] font-mono font-bold text-gray-800 mt-0.5">
+                    Scellé : {reprintQrSignature || `EDN-${printPreview.receipt_number || printPreview.id}`}
+                  </p>
+                  <p className="text-[6.5px] text-gray-600 italic mt-0.5">
+                    Scannez avec votre smartphone pour attester la validité de ce duplicata
+                  </p>
                 </div>
 
                 {/* SIGNATURE & MENTION LÉGALE */}
