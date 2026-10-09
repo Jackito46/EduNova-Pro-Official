@@ -471,3 +471,100 @@ export interface PendingAction {
   updated_at: string;
 }
 
+// =========================================================================
+// MODULE DEVOIRS & CAHIER DE TEXTES CENTRALISÉ (HOMEWORK HUB)
+// =========================================================================
+
+export type HomeworkSubmissionType = 'IN_CLASS' | 'ONLINE_TEXT' | 'ONLINE_FILE' | 'NONE_READ_ONLY';
+export type HomeworkStatus = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED' | 'CANCELLED';
+export type HomeworkWorkStatus = 'TODO' | 'IN_PROGRESS' | 'COMPLETED' | 'EXCUSED';
+export type HomeworkSubmissionStatus = 'SUBMITTED' | 'LATE' | 'RESUBMITTED' | 'GRADED';
+
+export interface HomeworkAttachment {
+  name: string;
+  url: string;
+  type?: string;
+  size?: number;
+}
+
+export interface HomeworkAssignment {
+  id: string;
+  school_id: string;
+  campus_id?: string | null;
+  academic_year_id?: string | null;
+  class_id: string;
+  subject_id: string;
+  teacher_id: string;
+  title: string;
+  description: string;
+  attachments?: HomeworkAttachment[];
+  assigned_date: string;
+  due_date: string;
+  due_time?: string;
+  estimated_duration_minutes?: number;
+  submission_type: HomeworkSubmissionType;
+  is_graded?: boolean;
+  max_score?: number | null;
+  status: HomeworkStatus;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HomeworkAssignmentWithDetails extends HomeworkAssignment {
+  class_name?: string;
+  subject_name?: string;
+  subject_code?: string;
+  teacher_name?: string;
+  teacher_email?: string;
+  stats?: HomeworkAudienceStats;
+  student_status?: HomeworkStudentRead;
+}
+
+export interface HomeworkStudentRead {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  school_id: string;
+  is_read: boolean;
+  first_read_at?: string | null;
+  last_read_at?: string | null;
+  read_count: number;
+  read_by_role: 'STUDENT' | 'PARENT' | 'BOTH';
+  work_status: HomeworkWorkStatus;
+  work_completed_at?: string | null;
+  parent_acknowledged?: boolean;
+  parent_acknowledged_at?: string | null;
+  parent_notes?: string | null;
+  teacher_checked?: boolean;
+  teacher_check_status?: 'FAIT' | 'NON_FAIT' | 'PARTIEL' | 'EXCUSE' | null;
+  teacher_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HomeworkSubmission {
+  id: string;
+  assignment_id: string;
+  student_id: string;
+  school_id: string;
+  submission_text?: string | null;
+  submitted_files?: HomeworkAttachment[];
+  submitted_at: string;
+  status: HomeworkSubmissionStatus;
+  grade?: number | null;
+  teacher_feedback?: string | null;
+  graded_at?: string | null;
+  graded_by?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HomeworkAudienceStats {
+  total_students: number;
+  read_count: number;
+  read_percentage: number;
+  completed_count: number;
+  completed_percentage: number;
+  parent_acknowledged_count: number;
+}
+

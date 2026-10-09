@@ -20,6 +20,7 @@ import SubjectForm from './components/SubjectForm';
 import ClassSubjectManager from './components/ClassSubjectManager';
 import GradesView from './components/GradesView';
 import SyllabusHub from './components/SyllabusHub';
+import { HomeworkManager } from './components/HomeworkManager';
 import ReportCardsView from './components/ReportCardsView';
 import ScheduleView from './components/ScheduleView';
 import CourseSignatureView from './components/CourseSignatureView';
@@ -275,6 +276,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               {/* Student Portal Routes */}
               <Route path="/profil" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentProfileView user={user} /></RoleGuard>} />
               <Route path="/mes-cours" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentCoursesView user={user} /></RoleGuard>} />
+              <Route path="/mes-devoirs" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...academicRoles]}><HomeworkManager user={user} defaultTab="student" /></RoleGuard>} />
               <Route path="/mes-notes" element={<ModuleGuard moduleId="exams" moduleName="Mes Notes" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentGradesView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/mon-economat" element={<ModuleGuard moduleId="finance" moduleName="Mon Économat" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentFinanceView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/mon-horaire" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT]}><StudentScheduleView user={user} /></RoleGuard>} />
@@ -296,6 +298,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/matieres/ajouter" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
               <Route path="/matieres/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
               <Route path="/notes" element={<ModuleGuard moduleId="exams" moduleName="Saisie des Notes" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><GradesView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/devoirs" element={<RoleGuard user={user} allowedRoles={academicRoles}><HomeworkManager user={user} defaultTab="teacher" /></RoleGuard>} />
               <Route path="/enseignant/syllabus" element={<RoleGuard user={user} allowedRoles={academicRoles}><SyllabusHub user={user} /></RoleGuard>} />
               <Route path="/presences" element={<ModuleGuard moduleId="attendance" moduleName="Suivi des Présences" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><AttendanceView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/bulletins" element={<ModuleGuard moduleId="exams" moduleName="Édition & Clôture des Bulletins Scolaires" user={user}><RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><DesktopDeviceGuard user={user} moduleTitle="Édition & Clôture des Bulletins Scolaires"><ReportCardsView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />

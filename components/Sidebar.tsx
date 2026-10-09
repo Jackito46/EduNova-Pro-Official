@@ -48,7 +48,8 @@ import {
   Sparkles,
   Building2,
   Activity,
-  Database
+  Database,
+  CheckSquare
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { motion } from 'framer-motion';
@@ -450,6 +451,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                  <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
                    {renderNavLink({ name: 'Mon Profil', path: '/profil' }, true, UserCircle)}
                    {renderNavLink({ name: 'Mes Cours', path: '/mes-cours' }, true, BookOpen)}
+                   {renderNavLink({ name: 'Mes Devoirs', path: '/mes-devoirs' }, true, CheckSquare)}
                    {renderNavLink({ name: 'Mon Horaire', path: '/mon-horaire' }, true, Clock)}
                    {isExamsEnabled && renderNavLink({ name: 'Mes Notes', path: '/mes-notes' }, true, TrendingUp)}
                    {isFinanceEnabled && renderNavLink({ name: 'Mon Économat', path: '/mon-economat' }, true, Receipt)}
@@ -466,6 +468,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   {hasAccess(restrictedAcademicRoles) && renderNavLink({ name: `Registre ${terminology.students}`, path: '/eleves' }, true, Users)}
                   {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: 'Validation de Dossiers', path: '/eleves/validation' }, true, FileCheck)}
                   {hasAccess([...adminRoles, UserRole.SECRETARY]) && renderNavLink({ name: terminology.enrollment, path: '/eleves/ajouter' }, true, UserPlus)}
+                  {hasAccess(academicRoles) && renderNavLink({ name: 'Gestion des Devoirs', path: '/devoirs' }, true, CheckSquare)}
                   {school?.school_type !== 'CLASSIC' && (
                     renderNavLink({ name: 'Syllabus d\'évaluations', path: '/enseignant/syllabus' }, true, BookOpen)
                   )}
