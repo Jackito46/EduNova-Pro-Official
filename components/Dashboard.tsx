@@ -2527,12 +2527,19 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <p className="text-xs font-medium text-slate-400">Accès directs pour l'évaluation et la gestion de classe</p>
               </div>
             </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
               <Link to="/notes" className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all flex flex-col items-center justify-center text-center gap-2.5 group shadow-xs">
                 <div className="p-3 bg-white rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs">
                   <FileSignature size={22} />
                 </div>
                 <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-700">Saisie des Notes</span>
+              </Link>
+
+              <Link to="/devoirs" className="p-4 rounded-2xl bg-slate-50/70 border border-slate-100 hover:border-indigo-200 hover:bg-indigo-50/40 transition-all flex flex-col items-center justify-center text-center gap-2.5 group shadow-xs">
+                <div className="p-3 bg-white rounded-2xl text-indigo-600 group-hover:scale-110 transition-transform shadow-xs">
+                  <BookOpen size={22} />
+                </div>
+                <span className="text-xs font-bold text-slate-800 group-hover:text-indigo-700">Cahier de Devoirs</span>
               </Link>
               
               {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR].includes(user.role) && isPresencesEnabled && (

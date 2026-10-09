@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { 
   BookOpen, Plus, Search, Filter, Calendar, Clock, CheckCircle2, 
   AlertCircle, Eye, FileText, Paperclip, ChevronRight, Check, X, 
@@ -7,7 +8,9 @@ import {
   AlertTriangle, CheckSquare, Square, RefreshCw, BarChart2, MessageSquare, 
   Share2, ChevronDown, Award, Send, Mail, Phone, Bell, PieChart as PieChartIcon,
   TrendingUp, CheckCircle, Info, Cloud, HardDrive, Save, Play, FolderArchive, Server,
-  Copy, Database, Terminal, FileCode
+  Copy, Database, Terminal, FileCode, Upload, FileUp, FileSpreadsheet, Image as ImageIcon,
+  Lightbulb, Strikethrough, Heading1, Heading2, Heading3, Table, Highlighter, Underline,
+  ZoomIn, ZoomOut, RotateCw, Maximize2, Columns
 } from 'lucide-react';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
@@ -30,6 +33,171 @@ import { HOMEWORK_MODULE_SQL } from '../src/utils/homeworkSqlScript';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { SubjectSelectorPill } from './SubjectSelectorPill';
 import { SelectPill } from './SelectPill';
+
+// Helper to categorize attachment type
+const getFileCategory = (name: string, type?: string): 'pdf' | 'doc' | 'image' | 'sheet' | 'link' => {
+  const n = (name || '').toLowerCase();
+  const t = (type || '').toLowerCase();
+  if (n.endsWith('.pdf') || t.includes('pdf')) return 'pdf';
+  if (n.endsWith('.doc') || n.endsWith('.docx') || n.endsWith('.odt') || t.includes('word') || t.includes('document')) return 'doc';
+  if (n.endsWith('.png') || n.endsWith('.jpg') || n.endsWith('.jpeg') || n.endsWith('.webp') || t.includes('image')) return 'image';
+  if (n.endsWith('.xls') || n.endsWith('.xlsx') || t.includes('sheet') || t.includes('excel')) return 'sheet';
+  return 'link';
+};
+
+// Helper to format file size
+const formatFileSize = (bytes?: number): string => {
+  if (!bytes || isNaN(bytes)) return '';
+  if (bytes < 1024) return `${bytes} o`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} Ko`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} Mo`;
+};
+
+// Quick Templates for pedagogical homework creation
+const HOMEWORK_TEMPLATES = [
+  {
+    id: 'MANUEL',
+    label: 'Exercices du manuel',
+    icon: '📖',
+    content: `**Manuel scolaire :** Page [__], Exercices n° [__] et [__]
+
+**Consignes de travail :**
+- Réaliser les exercices sur le cahier d'exercices.
+- Détailler chaque étape de calcul ou de raisonnement.
+- Souligner les résultats finaux.
+
+**Objectif :** Consolidation des notions vues en séance.`
+  },
+  {
+    id: 'DEVOIR_MAISON',
+    label: 'Devoir Maison (DM)',
+    icon: '📝',
+    content: `**Sujet du Devoir Maison :** [Intitulé du sujet]
+
+**Directives :**
+1. Prendre le temps de bien lire l'intégralité du sujet.
+2. Rédiger les réponses sous forme de phrases complètes et soignées.
+3. Soigner la présentation et la propreté de la copie.
+
+**Critères d'évaluation :**
+- Rigueur de la démarche (10 pts)
+- Qualité de rédaction & orthographe (5 pts)
+- Soin et présentation (5 pts)`
+  },
+  {
+    id: 'REVISION',
+    label: 'Révisions de contrôle',
+    icon: '🎯',
+    content: `**Évaluation sommative prévue le :** [Date du contrôle]
+
+**Notions prioritaires à réviser :**
+- Définitions clés et vocabulaire spécifique
+- Formules et propriétés fondamentales du chapitre
+- Refaire impérativement les exercices traités en classe
+
+**Conseil :** Établir une fiche synthétique mémo.`
+  },
+  {
+    id: 'RECHERCHE',
+    label: 'Recherche documentaire',
+    icon: '🔍',
+    content: `**Thème de travail :** [Thème ou question de recherche]
+
+**Consignes :**
+- Consulter au moins 2 sources fiables (encyclopédie, ouvrages, revues).
+- Rédiger une synthèse d'une page maximum.
+- Préparer 2 ou 3 questions ouvertes pour le débat en classe.`
+  }
+];
+
+// Quick Math & Scientific Symbols
+const QUICK_MATH_SYMBOLS = ['²', '³', '√', 'π', '±', '≠', '≤', '≥', '→', '°', '×', '÷', 'Δ', 'α', 'β', '∑', '∫', '∞', '∈', '½', '¼', '¾', '≈'];
+
+// Component to render formatted homework content in Markdown with rich styling
+const FormattedHomeworkContent: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
+  if (!content) return null;
+  return (
+    <div className={`text-xs text-slate-800 leading-relaxed font-normal ${className}`}>
+      <ReactMarkdown
+        components={{
+          h1: ({ children }) => (
+            <h3 className="text-sm font-black text-slate-900 mt-2.5 mb-1.5 flex items-center gap-1.5 border-b border-slate-200/80 pb-1">
+              <span className="w-1.5 h-3.5 bg-indigo-600 rounded-full inline-block shrink-0"></span>
+              <span>{children}</span>
+            </h3>
+          ),
+          h2: ({ children }) => (
+            <h4 className="text-xs font-bold text-slate-900 mt-2 mb-1 flex items-center gap-1.5">
+              <span className="w-1 h-3 bg-indigo-500 rounded-full inline-block shrink-0"></span>
+              <span>{children}</span>
+            </h4>
+          ),
+          h3: ({ children }) => (
+            <h5 className="text-[11.5px] font-bold text-indigo-950 mt-1.5 mb-0.5">
+              {children}
+            </h5>
+          ),
+          p: ({ children }) => <p className="mb-2 leading-relaxed text-slate-700">{children}</p>,
+          strong: ({ children }) => <strong className="font-bold text-slate-950">{children}</strong>,
+          em: ({ children }) => <em className="italic text-slate-800">{children}</em>,
+          ul: ({ children }) => <ul className="list-disc pl-4 mb-2 space-y-1 text-slate-700">{children}</ul>,
+          ol: ({ children }) => <ol className="list-decimal pl-4 mb-2 space-y-1 text-slate-700">{children}</ol>,
+          li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+          hr: () => <hr className="my-2.5 border-slate-200" />,
+          blockquote: ({ children }) => {
+            const rawText = React.Children.toArray(children)
+              .map(c => (typeof c === 'string' ? c : (c as any)?.props?.children || ''))
+              .flat()
+              .join(' ');
+            
+            const isTip = rawText.includes('💡') || rawText.includes('CONSEIL');
+            const isGoal = rawText.includes('🎯') || rawText.includes('OBJECTIF');
+            const isInstruction = rawText.includes('📌') || rawText.includes('CONSIGNE');
+            const isGrade = rawText.includes('🏆') || rawText.includes('BARÈME');
+            const isWarning = rawText.includes('⚠️') || rawText.includes('ATTENTION');
+
+            let styleClass = 'bg-amber-50/80 border-amber-300/80 text-amber-950';
+            if (isTip) styleClass = 'bg-indigo-50/80 border-indigo-200 text-indigo-950';
+            else if (isGoal) styleClass = 'bg-purple-50/80 border-purple-200 text-purple-950';
+            else if (isInstruction) styleClass = 'bg-emerald-50/80 border-emerald-300 text-emerald-950';
+            else if (isGrade) styleClass = 'bg-rose-50/80 border-rose-300 text-rose-950';
+            else if (isWarning) styleClass = 'bg-amber-50/80 border-amber-300 text-amber-950';
+
+            return (
+              <div className={`my-2 p-2.5 border rounded-xl text-xs font-medium shadow-2xs ${styleClass}`}>
+                {children}
+              </div>
+            );
+          },
+          table: ({ children }) => (
+            <div className="overflow-x-auto my-2.5 rounded-xl border border-slate-200 shadow-2xs">
+              <table className="min-w-full divide-y divide-slate-200 text-xs">
+                {children}
+              </table>
+            </div>
+          ),
+          thead: ({ children }) => <thead className="bg-slate-50 font-bold text-slate-800">{children}</thead>,
+          tbody: ({ children }) => <tbody className="divide-y divide-slate-100 bg-white">{children}</tbody>,
+          tr: ({ children }) => <tr className="hover:bg-slate-50/60 transition-colors">{children}</tr>,
+          th: ({ children }) => <th className="px-3 py-1.5 text-left text-[11px] font-bold text-slate-800">{children}</th>,
+          td: ({ children }) => <td className="px-3 py-1.5 text-[11px] text-slate-700">{children}</td>,
+          code: ({ children }) => (
+            <code className="px-1.5 py-0.5 bg-slate-100 text-indigo-700 rounded text-[11px] font-mono font-medium border border-slate-200">
+              {children}
+            </code>
+          ),
+          a: ({ href, children }) => (
+            <a href={href} target="_blank" rel="noreferrer" className="text-indigo-600 hover:text-indigo-800 underline font-semibold inline-flex items-center gap-0.5">
+              {children}
+            </a>
+          )
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+};
 
 interface HomeworkManagerProps {
   user: UserProfile;
@@ -70,6 +238,10 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [assignments, setAssignments] = useState<HomeworkAssignmentWithDetails[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [classSubjects, setClassSubjects] = useState<Array<{ id?: string; class_id: string; subject_id: string }>>([]);
+  const [teacherStaffId, setTeacherStaffId] = useState<string | null>(null);
+  const [teacherAssignments, setTeacherAssignments] = useState<Array<{ class_id?: string; class_name?: string; subject_id?: string; subject_name?: string }>>([]);
+  const [teacherScope, setTeacherScope] = useState<'ALL_CLASSES_HOMEWORK' | 'MINE_ONLY'>('ALL_CLASSES_HOMEWORK');
   const [studentReads, setStudentReads] = useState<Record<string, HomeworkStudentRead>>({});
   const [allClassStudents, setAllClassStudents] = useState<any[]>([]);
   const [allReadsData, setAllReadsData] = useState<HomeworkStudentRead[]>([]);
@@ -168,7 +340,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     };
   }, []);
 
-  // Form fields
+  // Form fields & content modes
   const [formTitle, setFormTitle] = useState('');
   const [formDescription, setFormDescription] = useState('');
   const [formClassId, setFormClassId] = useState('');
@@ -188,6 +360,21 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [newAttachmentUrl, setNewAttachmentUrl] = useState('');
   const [submittingForm, setSubmittingForm] = useState(false);
 
+  // Modern Form Ergonomics & Content Modes
+  const [formContentMode, setFormContentMode] = useState<'TYPE' | 'ATTACH_DOC' | 'BOTH'>('TYPE');
+  const [editorViewMode, setEditorViewMode] = useState<'WRITE' | 'SPLIT' | 'PREVIEW'>('WRITE');
+  const [isDraggingFile, setIsDraggingFile] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const [showMathSymbols, setShowMathSymbols] = useState(false);
+  const [showFormattingMenu, setShowFormattingMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // High-Fidelity Document Preview Modal (Images & PDFs)
+  const [previewAttachment, setPreviewAttachment] = useState<HomeworkAttachment | null>(null);
+  const [previewZoom, setPreviewZoom] = useState<number>(100);
+  const [previewRotation, setPreviewRotation] = useState<number>(0);
+  const [activeInlinePreviewIdx, setActiveInlinePreviewIdx] = useState<number | null>(null);
+
   // Load Classes, Subjects, and Students metadata
   const fetchMetadata = useCallback(async () => {
     try {
@@ -204,14 +391,62 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         .eq('school_id', user.school_id)
         .eq('status', 'Actif');
 
-      const [classRes, subjectRes, studentRes] = await Promise.all([classQuery, subjectQuery, studentQuery]);
+      let csQuery = supabase.from('class_subjects').select('id, class_id, subject_id, school_id');
+      if (user.school_id) csQuery = csQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
+
+      const [classRes, subjectRes, studentRes, csRes] = await Promise.all([
+        classQuery, 
+        subjectQuery, 
+        studentQuery,
+        csQuery
+      ]);
+
       if (classRes.data) setClasses(classRes.data);
       if (subjectRes.data) setSubjects(subjectRes.data);
       if (studentRes.data) setAllClassStudents(studentRes.data);
+      if (csRes.data) setClassSubjects(csRes.data);
+
+      // If user is a teacher, fetch their staff record and assigned classes & subjects
+      if (isTeacher) {
+        let staffQuery = supabase.from('staff').select('id, email, first_name, last_name');
+        if (user.email) {
+          staffQuery = staffQuery.or(`email.eq.${user.email},id.eq.${user.id}`);
+        } else {
+          staffQuery = staffQuery.eq('id', user.id);
+        }
+        const { data: staffData } = await staffQuery.maybeSingle();
+
+        if (staffData) {
+          setTeacherStaffId(staffData.id);
+          const { data: assignData } = await supabase
+            .from('staff_assignments')
+            .select('class_id, class_name, subject_id, subject_name')
+            .eq('staff_id', staffData.id);
+          if (assignData) {
+            setTeacherAssignments(assignData);
+          }
+        }
+      }
     } catch (err) {
       console.error('Error fetching homework metadata:', err);
     }
-  }, [user.school_id, currentCampusId]);
+  }, [user.school_id, user.id, user.email, currentCampusId, isTeacher]);
+
+  // Exact classes assigned to the teacher
+  const teacherAssignedClasses = useMemo(() => {
+    if (!isTeacher || isAdminOrDirector) return classes;
+    if (!teacherAssignments || teacherAssignments.length === 0) return classes;
+
+    const assignedClassNames = new Set(teacherAssignments.map(a => a.class_name).filter(Boolean));
+    const assignedClassIds = new Set(teacherAssignments.map(a => a.class_id).filter(Boolean));
+
+    const filtered = classes.filter(c => assignedClassIds.has(c.id) || assignedClassNames.has(c.name));
+    return filtered.length > 0 ? filtered : classes;
+  }, [isTeacher, isAdminOrDirector, classes, teacherAssignments]);
+
+  const teacherAssignedClassIds = useMemo(() => {
+    return teacherAssignedClasses.map(c => c.id);
+  }, [teacherAssignedClasses]);
 
   // Load Homework Assignments & Global Reads Data
   const fetchAssignments = useCallback(async () => {
@@ -230,9 +465,14 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       if (user.school_id) query = query.eq('school_id', user.school_id);
       if (currentCampusId) query = query.eq('campus_id', currentCampusId);
       
-      // If teacher without admin rights, show assignments they created OR in their school
+      // If teacher without admin rights:
+      // Show assignments for their exact assigned classes (so they see all homework their students have and avoid overload)
       if (isTeacher && !isAdminOrDirector) {
-        query = query.eq('teacher_id', user.id);
+        if (teacherAssignedClassIds.length > 0) {
+          query = query.in('class_id', teacherAssignedClassIds);
+        } else {
+          query = query.eq('teacher_id', user.id);
+        }
       }
 
       const { data, error } = await query;
@@ -284,7 +524,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     } finally {
       setLoading(false);
     }
-  }, [user.school_id, user.id, isTeacher, isAdminOrDirector, currentCampusId, canManageHomework]);
+  }, [user.school_id, user.id, isTeacher, isAdminOrDirector, currentCampusId, canManageHomework, teacherAssignedClassIds]);
 
   // Load student tracking status for current user (if student or parent)
   const fetchStudentReadStatus = useCallback(async () => {
@@ -310,9 +550,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
   useEffect(() => {
     fetchMetadata();
-    fetchAssignments();
     fetchStudentReadStatus();
-  }, [fetchMetadata, fetchAssignments, fetchStudentReadStatus]);
+  }, [fetchMetadata, fetchStudentReadStatus]);
+
+  useEffect(() => {
+    fetchAssignments();
+  }, [fetchAssignments]);
 
   // Mark homework as read
   const recordHomeworkRead = async (assignmentId: string, manualAcknowledge = false) => {
@@ -1090,12 +1333,163 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     }
   };
 
+  // Available filter subjects: automatically adapts based on selectedClassId
+  const availableFilterSubjects = useMemo(() => {
+    if (selectedClassId === 'ALL') {
+      if (isTeacher && !isAdminOrDirector && teacherAssignments.length > 0) {
+        const teacherSubIds = new Set(teacherAssignments.map(a => a.subject_id).filter(Boolean));
+        const teacherSubNames = new Set(teacherAssignments.map(a => a.subject_name).filter(Boolean));
+        const teacherSubs = subjects.filter(s => teacherSubIds.has(s.id) || teacherSubNames.has(s.name));
+        if (teacherSubs.length > 0) return teacherSubs;
+      }
+      return subjects;
+    }
+
+    // Specific class selected: find subjects linked in class_subjects or staff_assignments
+    const selectedClass = classes.find(c => c.id === selectedClassId);
+    const classSubIds = new Set(
+      classSubjects
+        .filter(cs => cs.class_id === selectedClassId)
+        .map(cs => cs.subject_id)
+    );
+
+    teacherAssignments
+      .filter(a => a.class_id === selectedClassId || (selectedClass && a.class_name === selectedClass.name))
+      .forEach(a => {
+        if (a.subject_id) classSubIds.add(a.subject_id);
+      });
+
+    let filtered = subjects.filter(s => classSubIds.has(s.id));
+
+    // When teacher filters "Mes devoirs uniquement", only show subjects they teach in that class
+    if (isTeacher && !isAdminOrDirector && teacherScope === 'MINE_ONLY') {
+      const teacherSubsInClass = teacherAssignments
+        .filter(a => a.class_id === selectedClassId || (selectedClass && a.class_name === selectedClass.name))
+        .map(a => a.subject_id)
+        .filter(Boolean);
+      if (teacherSubsInClass.length > 0) {
+        const teacherSubSet = new Set(teacherSubsInClass);
+        const mine = filtered.filter(s => teacherSubSet.has(s.id));
+        if (mine.length > 0) filtered = mine;
+      }
+    }
+
+    return filtered.length > 0 ? filtered : (isTeacher ? subjects.filter(s => teacherAssignments.some(ta => ta.subject_id === s.id)) : subjects);
+  }, [selectedClassId, subjects, classSubjects, teacherAssignments, isTeacher, isAdminOrDirector, classes, teacherScope]);
+
+  // Auto-reset subject filter if current subject is not available for the selected class
+  useEffect(() => {
+    if (selectedClassId !== 'ALL' && selectedSubjectId !== 'ALL') {
+      const exists = availableFilterSubjects.some(s => s.id === selectedSubjectId);
+      if (!exists) {
+        setSelectedSubjectId('ALL');
+      }
+    }
+  }, [selectedClassId, availableFilterSubjects, selectedSubjectId]);
+
+  // Available form subjects: strictly adapted to the exact class selected in the creation form
+  const availableFormSubjects = useMemo(() => {
+    if (!formClassId) return [];
+
+    const selectedClass = classes.find(c => c.id === formClassId);
+    const classSubIds = new Set(
+      classSubjects
+        .filter(cs => cs.class_id === formClassId)
+        .map(cs => cs.subject_id)
+    );
+
+    teacherAssignments
+      .filter(a => a.class_id === formClassId || (selectedClass && a.class_name === selectedClass.name))
+      .forEach(a => {
+        if (a.subject_id) classSubIds.add(a.subject_id);
+      });
+
+    let filtered = subjects.filter(s => classSubIds.has(s.id));
+
+    // If teacher without admin rights, strictly restrict to subjects this teacher teaches in that class
+    if (isTeacher && !isAdminOrDirector && teacherAssignments.length > 0) {
+      const teacherSubsInClass = teacherAssignments
+        .filter(a => a.class_id === formClassId || (selectedClass && a.class_name === selectedClass.name))
+        .map(a => a.subject_id)
+        .filter(Boolean);
+      const teacherSubNamesInClass = teacherAssignments
+        .filter(a => a.class_id === formClassId || (selectedClass && a.class_name === selectedClass.name))
+        .map(a => a.subject_name)
+        .filter(Boolean);
+
+      if (teacherSubsInClass.length > 0 || teacherSubNamesInClass.length > 0) {
+        const teacherSubSet = new Set(teacherSubsInClass);
+        const teacherNameSet = new Set(teacherSubNamesInClass);
+        const strictSubs = (filtered.length > 0 ? filtered : subjects).filter(s =>
+          teacherSubSet.has(s.id) || teacherNameSet.has(s.name)
+        );
+        if (strictSubs.length > 0) {
+          return strictSubs;
+        }
+      }
+    }
+
+    if (filtered.length > 0) {
+      return filtered;
+    }
+
+    // Fallback only if no class_subjects configured yet in the school
+    if (isTeacher && !isAdminOrDirector && teacherAssignments.length > 0) {
+      const teacherOwnSubs = subjects.filter(s =>
+        teacherAssignments.some(ta => ta.subject_id === s.id || ta.subject_name === s.name)
+      );
+      if (teacherOwnSubs.length > 0) return teacherOwnSubs;
+    }
+
+    return isAdminOrDirector ? subjects : [];
+  }, [formClassId, classSubjects, subjects, teacherAssignments, classes, isTeacher, isAdminOrDirector]);
+
+  // Dynamic automatic synchronization: when target class changes, ensure selected subject is strictly valid
+  useEffect(() => {
+    if (!formClassId) {
+      setFormSubjectId('');
+      return;
+    }
+    if (availableFormSubjects.length > 0) {
+      const isCurrentValid = availableFormSubjects.some(s => s.id === formSubjectId);
+      if (!isCurrentValid) {
+        setFormSubjectId(availableFormSubjects[0].id);
+      }
+    } else {
+      setFormSubjectId('');
+    }
+  }, [formClassId, availableFormSubjects, formSubjectId]);
+
+  // Handle class selection in the modal with dynamic subject adaptation
+  const handleSelectFormClass = (classId: string) => {
+    setFormClassId(classId);
+  };
+
   const resetForm = () => {
     setEditingAssignment(null);
     setFormTitle('');
     setFormDescription('');
-    setFormClassId(classes[0]?.id || '');
-    setFormSubjectId(subjects[0]?.id || '');
+    setFormContentMode('TYPE');
+    setEditorViewMode('WRITE');
+    setPreviewAttachment(null);
+    setActiveInlinePreviewIdx(null);
+    setShowFormattingMenu(false);
+    setIsDraggingFile(false);
+    setShowMathSymbols(false);
+
+    const targetClasses = isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 
+      ? teacherAssignedClasses 
+      : classes;
+
+    // Use current filter class if valid, otherwise first available class
+    let initialClassId = '';
+    if (selectedClassId !== 'ALL' && targetClasses.some(c => c.id === selectedClassId)) {
+      initialClassId = selectedClassId;
+    } else {
+      initialClassId = targetClasses[0]?.id || '';
+    }
+
+    setFormClassId(initialClassId);
     setFormDuration(30);
     setFormSubmissionType('IN_CLASS');
     setFormIsGraded(false);
@@ -1118,6 +1512,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     setFormIsGraded(Boolean(assignment.is_graded));
     setFormMaxScore(assignment.max_score || 20);
     setFormAttachments(assignment.attachments || []);
+    setFormContentMode(assignment.attachments && assignment.attachments.length > 0 ? 'BOTH' : 'TYPE');
+    setEditorViewMode('WRITE');
+    setPreviewAttachment(null);
+    setActiveInlinePreviewIdx(null);
+    setShowFormattingMenu(false);
+    setShowMathSymbols(false);
     setIsModalOpen(true);
   };
 
@@ -1132,25 +1532,176 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     ]);
     setNewAttachmentName('');
     setNewAttachmentUrl('');
+    toast.success("Lien ajouté aux pièces jointes !");
   };
 
   const removeAttachment = (index: number) => {
     setFormAttachments(prev => prev.filter((_, i) => i !== index));
+    toast.info("Document retiré.");
   };
 
-  const insertRichTag = (prefix: string, suffix: string = '') => {
+  // Upload handler for typed files (PDF, Word docx/doc, scan/image, excel, etc.)
+  const handleFilesUpload = async (files: FileList | File[]) => {
+    if (!files || files.length === 0) return;
+    setUploadingFile(true);
+
+    try {
+      const fileList = Array.from(files);
+      let addedCount = 0;
+
+      for (const file of fileList) {
+        if (file.size > 15 * 1024 * 1024) {
+          toast.error(`Le fichier "${file.name}" dépasse la limite de 15 Mo.`);
+          continue;
+        }
+
+        const fileCategory = getFileCategory(file.name, file.type);
+        
+        // Read file as Data URL to guarantee 100% reliable persistence and offline preview
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = () => reject(new Error("Erreur lors de la lecture du fichier"));
+          reader.readAsDataURL(file);
+        });
+
+        const newAtt: HomeworkAttachment = {
+          name: file.name,
+          url: dataUrl,
+          type: fileCategory.toUpperCase(),
+          size: file.size
+        };
+
+        setFormAttachments(prev => [...prev, newAtt]);
+        addedCount++;
+
+        // Auto-fill title if currently empty
+        setFormTitle(prev => {
+          if (!prev.trim()) {
+            const cleanName = file.name
+              .replace(/\.[^/.]+$/, '')
+              .replace(/[_-]/g, ' ')
+              .replace(/\s+/g, ' ')
+              .trim();
+            return `Devoir - ${cleanName.charAt(0).toUpperCase() + cleanName.slice(1)}`;
+          }
+          return prev;
+        });
+
+        // Auto-fill description if currently empty
+        setFormDescription(prev => {
+          if (!prev.trim()) {
+            return `Consultez le document joint **${file.name}** pour réaliser les exercices et consignes demandés.`;
+          }
+          return prev;
+        });
+      }
+
+      if (addedCount > 0) {
+        toast.success(`${addedCount} document${addedCount > 1 ? 's' : ''} joint${addedCount > 1 ? 's' : ''} avec succès !`);
+      }
+    } catch (err: any) {
+      toast.error("Échec du téléversement : " + err.message);
+    } finally {
+      setUploadingFile(false);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingFile(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      handleFilesUpload(e.dataTransfer.files);
+    }
+  };
+
+  const applyTemplate = (templateContent: string) => {
+    if (editorViewMode === 'PREVIEW') setEditorViewMode('WRITE');
+    if (formDescription.trim()) {
+      setFormDescription(prev => `${prev}\n\n---\n\n${templateContent}`);
+      toast.info("Modèle ajouté à vos consignes existantes.");
+    } else {
+      setFormDescription(templateContent);
+      toast.success("Modèle de devoir appliqué avec succès !");
+    }
+  };
+
+  const insertMathSymbol = (symbol: string) => {
+    if (editorViewMode === 'PREVIEW') setEditorViewMode('WRITE');
     const textarea = document.getElementById('homework-description-textarea') as HTMLTextAreaElement;
-    if (!textarea) return;
+    if (!textarea) {
+      setFormDescription(prev => prev + symbol);
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newText = formDescription.substring(0, start) + symbol + formDescription.substring(end);
+    setFormDescription(newText);
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + symbol.length, start + symbol.length);
+    }, 50);
+  };
+
+  const insertRichTag = (prefix: string, suffix: string = '', defaultPlaceholder: string = '') => {
+    if (editorViewMode === 'PREVIEW') setEditorViewMode('WRITE');
+    const textarea = document.getElementById('homework-description-textarea') as HTMLTextAreaElement;
+    if (!textarea) {
+      setFormDescription(prev => prev + prefix + defaultPlaceholder + suffix);
+      return;
+    }
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const selectedText = formDescription.substring(start, end);
-    const replacement = `${prefix}${selectedText || 'texte'}${suffix}`;
+    const textToInsert = selectedText || defaultPlaceholder;
+    const replacement = `${prefix}${textToInsert}${suffix}`;
     const newText = formDescription.substring(0, start) + replacement + formDescription.substring(end);
     setFormDescription(newText);
     setTimeout(() => {
       textarea.focus();
-      textarea.setSelectionRange(start + prefix.length, start + prefix.length + (selectedText.length || 5));
+      const cursorStart = start + prefix.length;
+      const cursorEnd = cursorStart + textToInsert.length;
+      textarea.setSelectionRange(cursorStart, cursorEnd);
     }, 50);
+  };
+
+  const insertHeading = (level: 1 | 2 | 3) => {
+    const hashes = '#'.repeat(level);
+    insertRichTag(`\n${hashes} `, '\n', `Titre de section niveau ${level}`);
+  };
+
+  const insertCallout = (type: 'consigne' | 'attention' | 'conseil' | 'objectif' | 'bareme') => {
+    const calloutMap: Record<string, { prefix: string; text: string }> = {
+      consigne: { prefix: '\n> 📌 **CONSIGNE :** ', text: 'Énoncer précisément les étapes et le travail attendu.' },
+      attention: { prefix: '\n> ⚠️ **ATTENTION :** ', text: 'Prendre garde à bien justifier vos réponses et respecter les consignes.' },
+      conseil: { prefix: '\n> 💡 **CONSEIL :** ', text: 'Faire d\'abord un brouillon et relire attentivement avant de recopier.' },
+      objectif: { prefix: '\n> 🎯 **OBJECTIF PÉDAGOGIQUE :** ', text: 'Maîtriser les propriétés fondamentales et les définitions.' },
+      bareme: { prefix: '\n> 🏆 **BARÈME DÉTAILLÉ :** \n> - Exercice 1 : 6 pts\n> - Exercice 2 : 8 pts\n> - Rédaction & Soin : 2 pts\n', text: '' }
+    };
+    const c = calloutMap[type];
+    insertRichTag(c.prefix, '\n', c.text);
+  };
+
+  const insertChecklist = () => {
+    insertRichTag('\n- [ ] Étape 1 : ', '\n- [ ] Étape 2 : \n- [ ] Étape 3 : \n', 'Lire la consigne et préparer les outils');
+  };
+
+  const insertTable = () => {
+    const tableTemplate = `\n\n| Exercice / Question | Consigne principale | Barème |\n| :--- | :--- | :---: |\n| Question 1 | Calculer et simplifier l'expression | 4 pts |\n| Question 2 | Justifier la propriété utilisée | 4 pts |\n| Présentation | Clarté et propreté de la copie | 2 pts |\n\n`;
+    insertRichTag(tableTemplate, '');
   };
 
   // Filtered assignments
@@ -1166,6 +1717,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       const matchesSubject = selectedSubjectId === 'ALL' || a.subject_id === selectedSubjectId;
 
       if (!matchesSearch || !matchesClass || !matchesSubject) return false;
+
+      // Teacher filter: scope (all class homework vs only homework given by this teacher)
+      if (isTeacher && !isAdminOrDirector && teacherScope === 'MINE_ONLY') {
+        if (a.teacher_id !== user.id) return false;
+      }
 
       // Status filter
       if (selectedStatusFilter === 'ALL') return true;
@@ -1187,7 +1743,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
       return true;
     });
-  }, [assignments, searchQuery, selectedClassId, selectedSubjectId, selectedStatusFilter, studentReads]);
+  }, [assignments, searchQuery, selectedClassId, selectedSubjectId, selectedStatusFilter, studentReads, isTeacher, isAdminOrDirector, teacherScope, user.id]);
 
   // Calculations for quick dashboard stats
   const statsOverview = useMemo(() => {
@@ -1400,15 +1956,15 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       {/* Modern, Compact Header & Quick Actions */}
       <div className="bg-white px-3.5 py-2.5 sm:px-4 sm:py-3 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
         {/* Left: Module Identity */}
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2.5 shrink-0 min-w-0">
           <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
             <BookOpen size={18} />
           </div>
-          <div>
-            <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight">
+          <div className="min-w-0">
+            <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight whitespace-nowrap">
               Gestion Centralisée des Devoirs
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[11px] text-slate-500 font-medium whitespace-nowrap truncate">
               Cahier de textes & suivi des exercices
             </p>
           </div>
@@ -1593,6 +2149,57 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             </div>
           </div>
 
+          {/* Espace Professeur Strict & Suivi de la charge globale des devoirs */}
+          {isTeacher && !isAdminOrDirector && (
+            <div className="px-3.5 py-2 bg-gradient-to-r from-indigo-50/90 via-white to-indigo-50/50 border border-indigo-100 rounded-xl flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span className="font-bold text-slate-700">Mes classes enseignées :</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {teacherAssignedClasses.length > 0 ? (
+                    teacherAssignedClasses.map(c => (
+                      <span key={c.id} className="text-[10.5px] font-black px-2 py-0.5 rounded-md bg-indigo-100/80 text-indigo-800 border border-indigo-200">
+                        {c.name}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[11px] text-amber-700 italic font-medium">Toutes les classes de l'établissement</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 text-xs font-semibold">
+                <span className="text-slate-500 text-[11px] hidden sm:inline">Périmètre devoirs :</span>
+                <div className="bg-slate-100 p-0.5 rounded-lg flex border border-slate-200/80 text-[11px] font-bold">
+                  <button
+                    type="button"
+                    onClick={() => setTeacherScope('ALL_CLASSES_HOMEWORK')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      teacherScope === 'ALL_CLASSES_HOMEWORK'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Voir toute la charge de travail des élèves de vos classes (tous enseignants)"
+                  >
+                    Tous les devoirs de mes classes
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTeacherScope('MINE_ONLY')}
+                    className={`px-2.5 py-1 rounded-md transition-all cursor-pointer ${
+                      teacherScope === 'MINE_ONLY'
+                        ? 'bg-white text-indigo-700 shadow-2xs font-black'
+                        : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                    title="Filtrer uniquement les devoirs que vous avez vous-même créés"
+                  >
+                    Mes devoirs créés
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Compact Filter Toolbar */}
           <div className="bg-white px-3 py-2 rounded-xl border border-slate-200/80 shadow-2xs flex flex-col md:flex-row gap-2 items-stretch md:items-center justify-between">
             <div className="relative flex-1">
@@ -1608,11 +2215,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
             <div className="flex flex-wrap items-center gap-1.5">
               <ClassSelectorPill
-                classes={classes}
+                classes={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 ? teacherAssignedClasses : classes}
                 selectedClassId={selectedClassId}
                 onSelectClass={(id) => setSelectedClassId(id)}
                 allowAll={true}
-                allLabel="Toutes les classes"
+                allLabel={isTeacher && !isAdminOrDirector ? "Toutes mes classes" : "Toutes les classes"}
                 variant="pill"
                 size="sm"
                 colorScheme="indigo"
@@ -1620,11 +2227,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               />
 
               <SubjectSelectorPill
-                subjects={subjects}
+                subjects={availableFilterSubjects}
                 selectedSubjectId={selectedSubjectId}
                 onSelectSubject={(id) => setSelectedSubjectId(id)}
                 allowAll={true}
-                allLabel="Toutes les matières"
+                allLabel={selectedClassId === 'ALL' ? "Toutes les matières" : "Matières de la classe"}
                 labelPrefix=""
                 variant="pill"
                 size="sm"
@@ -1750,6 +2357,18 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-700">
                             {assignment.subject_name}
                           </span>
+                          {/* Teacher Ownership Badge */}
+                          {canManageHomework && (
+                            assignment.teacher_id === user.id ? (
+                              <span className="text-[9.5px] font-black px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                Mon devoir
+                              </span>
+                            ) : (
+                              <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200" title={`Donné par ${assignment.teacher_name}`}>
+                                Par : {assignment.teacher_name?.split(' ')[0] || 'Collègue'}
+                              </span>
+                            )
+                          )}
                           {assignment.is_graded && (
                             <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-700 border border-purple-200 flex items-center gap-1">
                               <Award size={10} /> /{assignment.max_score || 20}
@@ -1784,9 +2403,19 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
                       {/* Attachments preview */}
                       {assignment.attachments && assignment.attachments.length > 0 && (
-                        <div className="flex items-center gap-1 text-[10px] font-semibold text-slate-500 pt-0.5">
+                        <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-500 pt-0.5 flex-wrap">
                           <Paperclip size={11} className="text-indigo-500 shrink-0" />
                           <span>{assignment.attachments.length} doc{assignment.attachments.length > 1 ? 's' : ''}</span>
+                          {assignment.attachments.some(a => getFileCategory(a.name, a.type) === 'pdf') && (
+                            <span className="px-1 py-0.2 bg-rose-50 text-rose-700 font-bold text-[9px] rounded border border-rose-200">
+                              PDF
+                            </span>
+                          )}
+                          {assignment.attachments.some(a => getFileCategory(a.name, a.type) === 'doc') && (
+                            <span className="px-1 py-0.2 bg-blue-50 text-blue-700 font-bold text-[9px] rounded border border-blue-200">
+                              Word
+                            </span>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1816,17 +2445,19 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           )}
                         </div>
                       ) : (
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => handleOpenReminderModal(assignment)}
-                            title="Rappeler les élèves non-lecteurs par SMS / Email"
-                            className="text-[10.5px] font-bold px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
-                          >
-                            <Bell size={11} className="text-amber-600" />
-                            <span>Rappel</span>
-                          </button>
-                        </div>
+                        canManageHomework && (isAdminOrDirector || assignment.teacher_id === user.id) && (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleOpenReminderModal(assignment)}
+                              title="Rappeler les élèves non-lecteurs par SMS / Email"
+                              className="text-[10.5px] font-bold px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                              <Bell size={11} className="text-amber-600" />
+                              <span>Rappel</span>
+                            </button>
+                          </div>
+                        )
                       )}
 
                       <div className="flex items-center gap-1 ml-auto">
@@ -1839,7 +2470,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           <ChevronRight size={11} />
                         </button>
 
-                        {canManageHomework && (
+                        {canManageHomework && (isAdminOrDirector || assignment.teacher_id === user.id) && (
                           <>
                             <button
                               type="button"
@@ -2068,54 +2699,57 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       )}
 
       {/* =========================================================================
-          MODAL : CREATE OR EDIT HOMEWORK ASSIGNMENT
+          MODAL : CREATE OR EDIT HOMEWORK ASSIGNMENT (MODERNE, SOUPLE & DYNAMIQUE)
           ========================================================================= */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-2.5 sm:p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-xl sm:max-w-2xl w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+          <div className={`bg-white rounded-2xl ${editorViewMode === 'SPLIT' ? 'max-w-5xl' : 'max-w-xl sm:max-w-2xl lg:max-w-3xl'} w-full border border-slate-200 shadow-2xl my-6 overflow-hidden animate-in fade-in zoom-in-95 duration-150 transition-all`}>
             {/* Modal Header */}
-            <div className="px-4 py-3 sm:px-5 sm:py-3 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                  <BookOpen size={14} />
+            <div className="px-4 py-3 sm:px-5 sm:py-3.5 bg-slate-50/90 border-b border-slate-200 flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  {editingAssignment ? <Edit3 size={15} /> : <BookOpen size={15} />}
                 </div>
-                <h3 className="text-sm font-bold text-slate-900">
-                  {editingAssignment ? 'Modifier le Devoir' : 'Nouveau Devoir'}
-                </h3>
+                <div className="min-w-0">
+                  <h3 className="text-sm font-black text-slate-900 truncate">
+                    {editingAssignment ? 'Modifier le Devoir' : 'Nouveau Devoir'}
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-medium truncate">
+                    {formClassId ? (classes.find(c => c.id === formClassId)?.name || 'Classe sélectionnée') : 'Sélection de la classe'}
+                    {formSubjectId ? ` • ${subjects.find(s => s.id === formSubjectId)?.name || ''}` : ''}
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1 text-slate-400 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 rounded-lg transition-colors cursor-pointer"
+                title="Fermer"
               >
                 <X size={16} />
               </button>
             </div>
 
-            <form onSubmit={handleSaveAssignment} className="p-4 sm:p-5 space-y-3 max-h-[80vh] overflow-y-auto custom-scrollbar">
-              {/* Titre */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">Titre du devoir *</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ex: Exercices 3 et 4 page 45 - Calcul littéral"
-                  value={formTitle}
-                  onChange={e => setFormTitle(e.target.value)}
-                  className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:bg-white focus:outline-indigo-500 transition-all"
-                />
-              </div>
-
-              {/* Classe & Matière */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <form onSubmit={handleSaveAssignment} className="p-4 sm:p-5 space-y-3.5 max-h-[82vh] overflow-y-auto custom-scrollbar">
+              
+              {/* Row 1 : Classe & Matière (Adaptée strictement à la classe) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-slate-50/70 rounded-xl border border-slate-200/90">
+                {/* Classe cible */}
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700">Classe cible *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800">Classe cible *</label>
+                    {isTeacher && !isAdminOrDirector && (
+                      <span className="text-[9.5px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/60 px-1.5 py-0.2 rounded">
+                        Mes Classes Uniquement
+                      </span>
+                    )}
+                  </div>
                   <ClassSelectorPill
-                    classes={classes}
+                    classes={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length > 0 ? teacherAssignedClasses : classes}
                     selectedClassId={formClassId}
-                    onSelectClass={(id) => setFormClassId(id)}
+                    onSelectClass={handleSelectFormClass}
                     allowAll={false}
-                    emptyLabel="Sélectionner une classe..."
+                    emptyLabel={isTeacher && !isAdminOrDirector && teacherAssignedClasses.length === 0 ? "Aucune classe assignée..." : "Sélectionner une classe..."}
                     variant="field"
                     size="sm"
                     colorScheme="indigo"
@@ -2123,106 +2757,820 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   />
                 </div>
 
+                {/* Matière strictement filtrée selon la classe */}
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700">Matière *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800">Matière *</label>
+                    {formClassId && (
+                      <span className={`text-[9.5px] font-bold px-1.5 py-0.2 rounded ${
+                        availableFormSubjects.length > 0 
+                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/70' 
+                          : 'bg-rose-50 text-rose-800 border border-rose-200/70'
+                      }`}>
+                        {availableFormSubjects.length} matière{availableFormSubjects.length > 1 ? 's' : ''} en {classes.find(c => c.id === formClassId)?.name || 'cette classe'}
+                      </span>
+                    )}
+                  </div>
                   <SubjectSelectorPill
-                    subjects={subjects}
+                    subjects={availableFormSubjects}
                     selectedSubjectId={formSubjectId}
                     onSelectSubject={(id) => setFormSubjectId(id)}
                     allowAll={false}
-                    emptyLabel="Sélectionner une matière..."
+                    emptyLabel={!formClassId ? "Sélectionnez d'abord une classe..." : availableFormSubjects.length === 0 ? "Aucune matière pour cette classe" : "Sélectionner une matière..."}
                     labelPrefix=""
                     variant="field"
                     size="sm"
                     colorScheme="indigo"
                     className="w-full"
+                    disabled={!formClassId || availableFormSubjects.length === 0}
                   />
+                  {formClassId && availableFormSubjects.length === 0 && (
+                    <p className="text-[10px] text-amber-700 font-medium pt-0.5">
+                      ⚠️ Aucune matière n'est configurée pour cette classe. Contactez l'administration si besoin.
+                    </p>
+                  )}
                 </div>
               </div>
 
-              {/* Consignes & Énoncé avec Toolbar intégrée */}
-              <div className="space-y-1">
-                <label className="text-[11px] font-bold text-slate-700">Consignes & Énoncé *</label>
-                <div className="flex items-center gap-0.5 p-1 bg-slate-100 border border-slate-200 rounded-t-lg text-slate-700">
-                  <button
-                    type="button"
-                    onClick={() => insertRichTag('**', '**')}
-                    title="Gras"
-                    className="p-1 hover:bg-white rounded text-xs font-bold transition-colors cursor-pointer"
-                  >
-                    <Bold size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertRichTag('*', '*')}
-                    title="Italique"
-                    className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
-                  >
-                    <Italic size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertRichTag('\n- ')}
-                    title="Liste à puces"
-                    className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
-                  >
-                    <List size={12} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => insertRichTag('\n1. ')}
-                    title="Liste numérotée"
-                    className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
-                  >
-                    <ListOrdered size={12} />
-                  </button>
-                  <div className="w-[1px] h-3 bg-slate-300 mx-1" />
-                  <button
-                    type="button"
-                    onClick={() => insertRichTag('⚠️ **IMPORTANT :** ')}
-                    title="Important"
-                    className="px-1.5 py-0.5 hover:bg-white rounded text-[10.5px] font-bold text-amber-700 transition-colors cursor-pointer flex items-center gap-1"
-                  >
-                    <AlertCircle size={11} /> Important
-                  </button>
+              {/* Row 2 : Titre du devoir avec suggestions rapides */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-[11px] font-bold text-slate-800">Titre du devoir *</label>
+                  <span className="text-[10px] text-slate-400 font-medium">Court et explicite</span>
                 </div>
-
-                <textarea
-                  id="homework-description-textarea"
+                <input
+                  type="text"
                   required
-                  rows={3}
-                  placeholder="Rédigez les consignes, questions, pages à lire ou critères..."
-                  value={formDescription}
-                  onChange={e => setFormDescription(e.target.value)}
-                  className="w-full p-2.5 bg-slate-50 border border-t-0 border-slate-200 rounded-b-lg text-xs font-medium text-slate-900 focus:bg-white focus:outline-indigo-500 transition-all leading-relaxed"
+                  placeholder="Ex: Exercices 3 et 4 page 45 - Calcul littéral et fractions"
+                  value={formTitle}
+                  onChange={e => setFormTitle(e.target.value)}
+                  className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-900 focus:bg-white focus:outline-indigo-500 transition-all placeholder:text-slate-400"
                 />
+                
+                {/* Suggestions rapides de titres */}
+                <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                  <span className="text-[10px] text-slate-400 font-bold">Suggestions :</span>
+                  {[
+                    "Exercices du manuel",
+                    "Devoir Maison n°",
+                    "Préparation Contrôle",
+                    "Fiche d'exercices",
+                    "Lecture & Questions"
+                  ].map((sugg, sIdx) => (
+                    <button
+                      key={sIdx}
+                      type="button"
+                      onClick={() => setFormTitle(prev => prev ? `${prev} - ${sugg}` : sugg)}
+                      className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md transition-colors cursor-pointer"
+                    >
+                      + {sugg}
+                    </button>
+                  ))}
+                </div>
               </div>
 
-              {/* Échéances : Date, Heure, Durée */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              {/* Row 3 : Zone Pédagogique Centrale (Éditeur Enrichi Moderne & Prévisualisation Documents) */}
+              <div className="space-y-2 pt-1 border-t border-slate-100">
+                
+                {/* Segmented Switcher : Mode de contenu */}
+                <div className="flex items-center justify-between flex-wrap gap-2">
+                  <span className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5">
+                    <span>Contenu & Document du devoir</span>
+                    {formAttachments.length > 0 && (
+                      <span className="px-1.5 py-0.2 bg-indigo-100 text-indigo-700 rounded text-[9.5px] font-extrabold">
+                        {formAttachments.length} doc{formAttachments.length > 1 ? 's' : ''} joint{formAttachments.length > 1 ? 's' : ''}
+                      </span>
+                    )}
+                  </span>
+                  
+                  <div className="bg-slate-100 p-0.5 rounded-xl flex items-center border border-slate-200 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setFormContentMode('TYPE')}
+                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                        formContentMode === 'TYPE'
+                          ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <FileText size={12} />
+                      <span>Rédiger en ligne</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormContentMode('ATTACH_DOC')}
+                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                        formContentMode === 'ATTACH_DOC'
+                          ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Paperclip size={12} />
+                      <span>Document prêt (PDF / Word)</span>
+                      {formAttachments.length > 0 && (
+                        <span className="w-4 h-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-bold">
+                          {formAttachments.length}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setFormContentMode('BOTH')}
+                      className={`px-2.5 py-1 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer ${
+                        formContentMode === 'BOTH'
+                          ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <span>Les deux</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* SOUS-PANNEAU 1 : ÉDITEUR DE TEXTE ENRICHI MODERNE (TOOLBAR COMPLÈTE, TEMPLATES & SPLIT VIEW) */}
+                {(formContentMode === 'TYPE' || formContentMode === 'BOTH') && (
+                  <div className="space-y-1.5 animate-in fade-in duration-150">
+                    
+                    {/* Header Éditeur : Modèles rapides & Sélecteur de vue (Rédiger / Scindé / Aperçu Élève) */}
+                    <div className="flex items-center justify-between gap-2 flex-wrap pb-0.5">
+                      {/* Modèles types rapides */}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                          <Sparkles size={11} className="text-amber-500" />
+                          <span>Gabarits pros :</span>
+                        </span>
+                        {HOMEWORK_TEMPLATES.map((tmpl) => (
+                          <button
+                            key={tmpl.id}
+                            type="button"
+                            onClick={() => applyTemplate(tmpl.content)}
+                            className="px-2 py-0.5 bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 border border-indigo-200/70 rounded-md text-[10.5px] font-semibold transition-all flex items-center gap-1 cursor-pointer"
+                            title="Insérer ce modèle complet"
+                          >
+                            <span>{tmpl.icon}</span>
+                            <span>{tmpl.label}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {/* Sélecteur de mode d'affichage de l'éditeur */}
+                      <div className="bg-slate-200/70 p-0.5 rounded-lg flex items-center text-[10.5px] font-bold border border-slate-300/60 ml-auto">
+                        <button
+                          type="button"
+                          onClick={() => setEditorViewMode('WRITE')}
+                          className={`px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                            editorViewMode === 'WRITE'
+                              ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                          title="Mode Rédaction seule"
+                        >
+                          <Edit3 size={11} />
+                          <span>Rédiger</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditorViewMode('SPLIT')}
+                          className={`px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                            editorViewMode === 'SPLIT'
+                              ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                          title="Mode Scindé : saisie à gauche, rendu en direct à droite"
+                        >
+                          <Columns size={11} />
+                          <span>Scindé (Direct)</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditorViewMode('PREVIEW')}
+                          className={`px-2 py-0.5 rounded-md transition-all flex items-center gap-1 cursor-pointer ${
+                            editorViewMode === 'PREVIEW'
+                              ? 'bg-white text-indigo-700 shadow-2xs font-bold'
+                              : 'text-slate-600 hover:text-slate-900'
+                          }`}
+                          title="Mode Aperçu Élève plein écran"
+                        >
+                          <Eye size={11} />
+                          <span>Aperçu Élève</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Toolbar Professionnelle de Mise en Forme Enrichie */}
+                    <div className="p-1 bg-slate-100 border border-slate-200 rounded-t-xl text-slate-700 flex items-center justify-between gap-1 flex-wrap">
+                      <div className="flex items-center gap-0.5 flex-wrap">
+                        {/* Titres */}
+                        <button
+                          type="button"
+                          onClick={() => insertHeading(1)}
+                          title="Titre H1 (# Titre)"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-xs font-black text-slate-800 transition-colors cursor-pointer flex items-center gap-0.5"
+                        >
+                          <Heading1 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertHeading(2)}
+                          title="Sous-titre H2 (## Titre)"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-xs font-black text-slate-800 transition-colors cursor-pointer flex items-center gap-0.5"
+                        >
+                          <Heading2 size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertHeading(3)}
+                          title="Section H3 (### Titre)"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-xs font-black text-slate-800 transition-colors cursor-pointer flex items-center gap-0.5"
+                        >
+                          <Heading3 size={13} />
+                        </button>
+
+                        <div className="w-[1px] h-3.5 bg-slate-300 mx-0.5" />
+
+                        {/* Styles en ligne */}
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('**', '**', 'texte en gras')}
+                          title="Gras (**texte**)"
+                          className="p-1 hover:bg-white rounded text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          <Bold size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('*', '*', 'texte en italique')}
+                          title="Italique (*texte*)"
+                          className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
+                        >
+                          <Italic size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('<u>', '</u>', 'texte souligné')}
+                          title="Souligné"
+                          className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
+                        >
+                          <Underline size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('<mark>', '</mark>', 'texte surligné')}
+                          title="Surligné (Marqueur)"
+                          className="p-1 hover:bg-white rounded text-xs text-amber-700 transition-colors cursor-pointer"
+                        >
+                          <Highlighter size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('~~', '~~', 'texte barré')}
+                          title="Barré"
+                          className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
+                        >
+                          <Strikethrough size={13} />
+                        </button>
+
+                        <div className="w-[1px] h-3.5 bg-slate-300 mx-0.5" />
+
+                        {/* Listes & Tableaux */}
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('\n- ', '', 'élément de liste')}
+                          title="Liste à puces"
+                          className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
+                        >
+                          <List size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('\n1. ', '', 'étape 1')}
+                          title="Liste numérotée"
+                          className="p-1 hover:bg-white rounded text-xs transition-colors cursor-pointer"
+                        >
+                          <ListOrdered size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={insertChecklist}
+                          title="Liste de tâches / Checklist"
+                          className="p-1 hover:bg-white rounded text-xs text-indigo-700 transition-colors cursor-pointer"
+                        >
+                          <CheckSquare size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={insertTable}
+                          title="Insérer un tableau de notation / barème"
+                          className="p-1 hover:bg-white rounded text-xs text-indigo-700 transition-colors cursor-pointer flex items-center gap-0.5"
+                        >
+                          <Table size={13} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertRichTag('\n---\n', '')}
+                          title="Ligne de séparation"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-[10.5px] font-mono text-slate-600 transition-colors cursor-pointer"
+                        >
+                          ―
+                        </button>
+
+                        <div className="w-[1px] h-3.5 bg-slate-300 mx-0.5" />
+
+                        {/* Encadrés pédagogiques ("Callouts") */}
+                        <button
+                          type="button"
+                          onClick={() => insertCallout('consigne')}
+                          title="Insérer un encadré Consigne"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-[10px] font-bold text-emerald-800 transition-colors cursor-pointer flex items-center gap-0.5 border border-emerald-200/60 bg-emerald-50/50"
+                        >
+                          📌 Consigne
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertCallout('conseil')}
+                          title="Insérer un conseil méthodologique"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-[10px] font-bold text-indigo-800 transition-colors cursor-pointer flex items-center gap-0.5 border border-indigo-200/60 bg-indigo-50/50"
+                        >
+                          💡 Conseil
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertCallout('attention')}
+                          title="Insérer un avertissement important"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-[10px] font-bold text-amber-800 transition-colors cursor-pointer flex items-center gap-0.5 border border-amber-200/60 bg-amber-50/50"
+                        >
+                          ⚠️ Attention
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => insertCallout('bareme')}
+                          title="Insérer une grille de barème"
+                          className="px-1.5 py-0.5 hover:bg-white rounded text-[10px] font-bold text-rose-800 transition-colors cursor-pointer flex items-center gap-0.5 border border-rose-200/60 bg-rose-50/50"
+                        >
+                          🏆 Barème
+                        </button>
+
+                        <div className="w-[1px] h-3.5 bg-slate-300 mx-0.5" />
+
+                        {/* Menu symboles mathématiques */}
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setShowMathSymbols(!showMathSymbols)}
+                            className="px-1.5 py-0.5 hover:bg-white rounded text-[10.5px] font-bold text-slate-700 transition-colors cursor-pointer flex items-center gap-0.5 border border-slate-200 bg-white"
+                            title="Symboles mathématiques et scientifiques"
+                          >
+                            <span>📐 Math</span>
+                            <ChevronDown size={10} />
+                          </button>
+                          {showMathSymbols && (
+                            <div className="absolute left-0 mt-1 p-1.5 bg-white border border-slate-200 rounded-xl shadow-xl z-30 flex gap-1 flex-wrap w-52 animate-in fade-in zoom-in-95 duration-100">
+                              <p className="w-full text-[9.5px] font-bold text-slate-400 px-1 pb-0.5 border-b border-slate-100">
+                                Symboles scientifiques rapides :
+                              </p>
+                              {QUICK_MATH_SYMBOLS.map((sym, sIdx) => (
+                                <button
+                                  key={sIdx}
+                                  type="button"
+                                  onClick={() => {
+                                    insertMathSymbol(sym);
+                                    setShowMathSymbols(false);
+                                  }}
+                                  className="w-7 h-7 hover:bg-indigo-50 text-slate-800 hover:text-indigo-700 rounded-lg font-bold text-xs flex items-center justify-center transition-colors cursor-pointer border border-transparent hover:border-indigo-200"
+                                >
+                                  {sym}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Zone de Contenu : Saisie seule / Scindé (Split) / Aperçu Élève */}
+                    {editorViewMode === 'SPLIT' ? (
+                      /* Mode Scindé : Écriture à gauche, Rendu élève synchrone à droite */
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 bg-slate-100/60 p-2 rounded-b-xl border border-t-0 border-slate-200">
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                            <span>Saisie & Balises Markdown</span>
+                            <span className="font-mono text-[9px] text-indigo-600 bg-indigo-50 px-1 rounded">Édition active</span>
+                          </span>
+                          <textarea
+                            id="homework-description-textarea"
+                            required={formAttachments.length === 0}
+                            rows={7}
+                            placeholder="Rédigez les consignes, questions, pages à lire ou critères de notation..."
+                            value={formDescription}
+                            onChange={e => setFormDescription(e.target.value)}
+                            className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs font-mono text-slate-900 focus:outline-indigo-500 transition-all leading-relaxed placeholder:text-slate-400 h-52 resize-y"
+                          />
+                        </div>
+
+                        <div className="flex flex-col space-y-1">
+                          <span className="text-[10px] font-bold text-indigo-700 uppercase tracking-wider flex items-center justify-between">
+                            <span>Rendu Élève en temps réel</span>
+                            <span className="text-[9px] font-bold text-emerald-700 bg-emerald-50 px-1 rounded">Synchrone</span>
+                          </span>
+                          <div className="w-full p-3 bg-white border border-slate-200 rounded-xl h-52 overflow-y-auto custom-scrollbar shadow-2xs">
+                            {formDescription.trim() ? (
+                              <FormattedHomeworkContent content={formDescription} />
+                            ) : (
+                              <p className="text-xs text-slate-400 italic">Le rendu mis en forme s'affichera ici instantanément au fur et à mesure de votre saisie.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : editorViewMode === 'PREVIEW' ? (
+                      /* Mode Aperçu Élève Plein Format */
+                      <div className="w-full p-3.5 bg-white border border-t-0 border-slate-200 rounded-b-xl min-h-[140px] max-h-72 overflow-y-auto custom-scrollbar">
+                        <div className="pb-1.5 mb-2.5 border-b border-slate-100 flex items-center justify-between text-[10.5px]">
+                          <span className="font-bold text-indigo-700 flex items-center gap-1">
+                            <Eye size={12} />
+                            <span>Rendu final exact tel que vu par les élèves et parents</span>
+                          </span>
+                          <span className="text-[9.5px] font-mono text-slate-400">Format enrichi actif</span>
+                        </div>
+                        {formDescription.trim() ? (
+                          <FormattedHomeworkContent content={formDescription} />
+                        ) : (
+                          <p className="text-xs text-slate-400 italic py-4 text-center">
+                            Aucune consigne rédigée pour le moment. Cliquez sur "Rédiger" pour saisir le devoir.
+                          </p>
+                        )}
+                      </div>
+                    ) : (
+                      /* Mode Saisie Standard */
+                      <textarea
+                        id="homework-description-textarea"
+                        required={formAttachments.length === 0}
+                        rows={5}
+                        placeholder="Rédigez les consignes, questions, pages à lire ou critères de notation..."
+                        value={formDescription}
+                        onChange={e => setFormDescription(e.target.value)}
+                        className="w-full p-3 bg-slate-50 border border-t-0 border-slate-200 rounded-b-xl text-xs font-medium text-slate-900 focus:bg-white focus:outline-indigo-500 transition-all leading-relaxed placeholder:text-slate-400"
+                      />
+                    )}
+
+                    {/* Footer de l'éditeur avec compteurs et astuce */}
+                    <div className="flex items-center justify-between text-[10.5px] text-slate-400 px-1 pt-0.5">
+                      <span className="font-medium">
+                        {formDescription.trim().length} caractères • {formDescription.trim().split(/\s+/).filter(Boolean).length} mots
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span>
+                          Lecture estimée : ~{Math.max(1, Math.ceil(formDescription.trim().split(/\s+/).filter(Boolean).length / 100))} min
+                        </span>
+                        <span className="hidden sm:inline text-slate-300">•</span>
+                        <span className="hidden sm:inline text-indigo-600 font-semibold cursor-pointer" onClick={() => setEditorViewMode('SPLIT')}>
+                          ⚡ Mode Scindé disponible
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SOUS-PANNEAU 2 : JOINDRE UN DOCUMENT DÉJÀ TAPÉ (AVEC PRÉVISUALISATION DIRECTE IMAGE & PDF) */}
+                {(formContentMode === 'ATTACH_DOC' || formContentMode === 'BOTH') && (
+                  <div className="space-y-2.5 animate-in fade-in duration-150 pt-1">
+                    
+                    {/* Drag and Drop Zone */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={(e) => {
+                        if (e.target.files) handleFilesUpload(e.target.files);
+                      }}
+                      multiple
+                      accept=".pdf,.doc,.docx,.odt,.ppt,.pptx,.xls,.xlsx,.png,.jpg,.jpeg,.webp,.svg"
+                      className="hidden"
+                    />
+
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => fileInputRef.current?.click()}
+                      className={`p-4 border-2 border-dashed rounded-xl text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-1.5 ${
+                        isDraggingFile
+                          ? 'border-indigo-500 bg-indigo-50/70 scale-[0.99]'
+                          : 'border-slate-200 bg-slate-50/60 hover:bg-indigo-50/30 hover:border-indigo-300'
+                      }`}
+                    >
+                      <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shrink-0">
+                        {uploadingFile ? <RefreshCw size={18} className="animate-spin text-indigo-600" /> : <FileUp size={18} />}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-bold text-slate-800">
+                          {isDraggingFile ? "Déposez votre document ici !" : "Glissez-déposez votre document de devoir ici"}
+                        </p>
+                        <p className="text-[11px] text-slate-500 mt-0.5">
+                          ou <span className="text-indigo-600 font-bold hover:underline">cliquez pour parcourir vos fichiers</span>
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-1 text-[10px] text-slate-400 font-medium pt-1 flex-wrap justify-center">
+                        <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-bold text-rose-700">PDF</span>
+                        <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded font-bold text-purple-700">Images (PNG/JPG)</span>
+                        <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded">Word (.docx)</span>
+                        <span className="px-1.5 py-0.5 bg-white border border-slate-200 rounded">LibreOffice</span>
+                        <span>(max 15 Mo • Prévisualisation intégrée)</span>
+                      </div>
+                    </div>
+
+                    {/* Liste des documents attachés avec vignettes et boutons d'aperçu direct */}
+                    {formAttachments.length > 0 && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                          <span className="flex items-center gap-1.5">
+                            <span>Documents joints aux élèves ({formAttachments.length})</span>
+                            <span className="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200/60">
+                              ✓ Prévisualisation disponible
+                            </span>
+                          </span>
+
+                          {/* Bouton pour afficher/masquer le panneau de prévisualisation intégrée */}
+                          <button
+                            type="button"
+                            onClick={() => setActiveInlinePreviewIdx(prev => prev === null ? 0 : null)}
+                            className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer bg-indigo-50/60 hover:bg-indigo-100 px-2 py-0.5 rounded-md border border-indigo-200/60 transition-colors"
+                          >
+                            <Eye size={12} />
+                            <span>{activeInlinePreviewIdx !== null ? "Masquer l'aperçu intégré" : "Afficher l'aperçu intégré"}</span>
+                          </button>
+                        </div>
+
+                        {/* Cartes de documents attachés */}
+                        <div className="space-y-1.5">
+                          {formAttachments.map((att, idx) => {
+                            const cat = getFileCategory(att.name, att.type);
+                            const sizeText = formatFileSize(att.size);
+                            const isImage = cat === 'image' || att.url?.startsWith('data:image/');
+                            const isPdf = cat === 'pdf' || att.url?.startsWith('data:application/pdf') || att.name.toLowerCase().endsWith('.pdf');
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`flex items-center justify-between p-2.5 bg-white border rounded-xl shadow-2xs transition-all ${
+                                  activeInlinePreviewIdx === idx
+                                    ? 'border-indigo-400 ring-2 ring-indigo-500/10 bg-indigo-50/10'
+                                    : 'border-slate-200/90 hover:border-indigo-200'
+                                }`}
+                              >
+                                <div className="flex items-center gap-2.5 min-w-0">
+                                  {/* Miniature d'image si c'est une image */}
+                                  {isImage ? (
+                                    <div
+                                      onClick={() => {
+                                        setPreviewAttachment(att);
+                                        setPreviewZoom(100);
+                                        setPreviewRotation(0);
+                                      }}
+                                      className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-200 cursor-pointer group/thumb shrink-0 bg-slate-100 shadow-2xs"
+                                      title="Cliquer pour prévisualiser l'image en grand format"
+                                    >
+                                      <img
+                                        src={att.url}
+                                        alt={att.name}
+                                        className="w-full h-full object-cover group-hover/thumb:scale-110 transition-transform"
+                                      />
+                                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center text-white transition-opacity">
+                                        <Eye size={13} />
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 font-bold text-[10.5px] ${
+                                      isPdf ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                                      cat === 'doc' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                                      cat === 'sheet' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                                      'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                    }`}>
+                                      {isPdf ? 'PDF' :
+                                       cat === 'doc' ? 'DOC' :
+                                       cat === 'sheet' ? 'XLS' :
+                                       <Paperclip size={14} />}
+                                    </div>
+                                  )}
+
+                                  <div className="min-w-0">
+                                    <p className="font-bold text-slate-900 truncate text-[11.5px]" title={att.name}>
+                                      {att.name}
+                                    </p>
+                                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                                      {sizeText && <span className="font-mono">{sizeText}</span>}
+                                      {sizeText && <span>•</span>}
+                                      <span className="font-semibold text-indigo-600">
+                                        {isImage ? 'Image prête' : isPdf ? 'PDF prêt' : 'Fichier joint'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Actions sur le document */}
+                                <div className="flex items-center gap-1.5 shrink-0">
+                                  {/* Bouton de Prévisualisation Pro */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPreviewAttachment(att);
+                                      setPreviewZoom(100);
+                                      setPreviewRotation(0);
+                                    }}
+                                    className={`px-2.5 py-1 rounded-lg text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs ${
+                                      isPdf
+                                        ? 'bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80'
+                                        : isImage
+                                        ? 'bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200/80'
+                                        : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80'
+                                    }`}
+                                    title="Prévisualiser ce document en haute résolution"
+                                  >
+                                    <Eye size={12} />
+                                    <span>{isPdf ? 'Aperçu PDF' : isImage ? 'Aperçu Image' : 'Aperçu'}</span>
+                                  </button>
+
+                                  {att.url && (
+                                    <a
+                                      href={att.url}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      download={att.name}
+                                      className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors"
+                                      title="Télécharger / Ouvrir"
+                                    >
+                                      <Download size={13} />
+                                    </a>
+                                  )}
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      removeAttachment(idx);
+                                      if (activeInlinePreviewIdx === idx) {
+                                        setActiveInlinePreviewIdx(null);
+                                      }
+                                    }}
+                                    className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                                    title="Retirer ce document"
+                                  >
+                                    <Trash2 size={13} />
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Tiroir / Accordéon de prévisualisation intégrée dans le formulaire */}
+                        {activeInlinePreviewIdx !== null && formAttachments[activeInlinePreviewIdx] && (
+                          <div className="mt-2 p-3 bg-slate-900 rounded-xl border border-slate-700 text-white space-y-2 animate-in fade-in zoom-in-95 duration-150 shadow-md">
+                            <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                              <div className="flex items-center gap-2 min-w-0">
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/40">
+                                  Aperçu direct
+                                </span>
+                                <span className="text-xs font-bold truncate text-slate-200" title={formAttachments[activeInlinePreviewIdx].name}>
+                                  {formAttachments[activeInlinePreviewIdx].name}
+                                </span>
+                              </div>
+
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setPreviewAttachment(formAttachments[activeInlinePreviewIdx]);
+                                    setPreviewZoom(100);
+                                    setPreviewRotation(0);
+                                  }}
+                                  className="px-2 py-0.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded text-[10.5px] font-bold flex items-center gap-1 cursor-pointer transition-colors"
+                                  title="Agrandir en plein écran"
+                                >
+                                  <Maximize2 size={11} />
+                                  <span>Plein écran</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setActiveInlinePreviewIdx(null)}
+                                  className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors cursor-pointer"
+                                  title="Fermer la prévisualisation"
+                                >
+                                  <X size={13} />
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* Contenu de la prévisualisation intégrée */}
+                            <div className="bg-slate-950 rounded-lg p-2 min-h-[180px] max-h-80 overflow-auto flex items-center justify-center custom-scrollbar">
+                              {getFileCategory(formAttachments[activeInlinePreviewIdx].name, formAttachments[activeInlinePreviewIdx].type) === 'image' ||
+                               formAttachments[activeInlinePreviewIdx].url?.startsWith('data:image/') ? (
+                                <img
+                                  src={formAttachments[activeInlinePreviewIdx].url}
+                                  alt={formAttachments[activeInlinePreviewIdx].name}
+                                  className="max-h-72 max-w-full object-contain rounded shadow-md"
+                                />
+                              ) : getFileCategory(formAttachments[activeInlinePreviewIdx].name, formAttachments[activeInlinePreviewIdx].type) === 'pdf' ||
+                                 formAttachments[activeInlinePreviewIdx].url?.startsWith('data:application/pdf') ||
+                                 formAttachments[activeInlinePreviewIdx].name.toLowerCase().endsWith('.pdf') ? (
+                                <div className="w-full h-72 rounded overflow-hidden">
+                                  <object
+                                    data={formAttachments[activeInlinePreviewIdx].url}
+                                    type="application/pdf"
+                                    className="w-full h-full rounded"
+                                  >
+                                    <iframe
+                                      src={formAttachments[activeInlinePreviewIdx].url}
+                                      title={formAttachments[activeInlinePreviewIdx].name}
+                                      className="w-full h-full border-0"
+                                    >
+                                      <div className="p-4 text-center text-xs text-slate-300">
+                                        Prévisualisation PDF prête. Cliquez sur Plein écran pour l'ouvrir.
+                                      </div>
+                                    </iframe>
+                                  </object>
+                                </div>
+                              ) : (
+                                <div className="text-center p-4 space-y-1">
+                                  <FileText size={32} className="mx-auto text-indigo-400" />
+                                  <p className="text-xs font-bold text-white">{formAttachments[activeInlinePreviewIdx].name}</p>
+                                  <p className="text-[10px] text-slate-400">Document prêt à être téléchargé par les élèves</p>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Option Lien Cloud direct (Google Drive / Docs, OneDrive, ENT) */}
+                    <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-200/70 space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[10.5px] font-bold text-slate-700 flex items-center gap-1">
+                          <Link size={11} className="text-indigo-600" />
+                          <span>Ou ajouter un lien Cloud (Google Docs / Drive, OneDrive, ENT)</span>
+                        </label>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Nom de la ressource"
+                          value={newAttachmentName}
+                          onChange={e => setNewAttachmentName(e.target.value)}
+                          className="sm:w-1/3 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800"
+                        />
+                        <input
+                          type="url"
+                          placeholder="Lien / URL (https://drive.google.com/...)"
+                          value={newAttachmentUrl}
+                          onChange={e => setNewAttachmentUrl(e.target.value)}
+                          className="flex-1 px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-medium text-slate-800"
+                        />
+                        <button
+                          type="button"
+                          onClick={addAttachment}
+                          className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition-colors cursor-pointer shrink-0"
+                        >
+                          Ajouter le lien
+                        </button>
+                      </div>
+                    </div>
+
+                  </div>
+                )}
+
+              </div>
+
+              {/* Row 4 : Échéances : Date limite, Heure limite, Durée estimée */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-2 border-t border-slate-100">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700">Date limite *</label>
+                  <label className="text-[11px] font-bold text-slate-800">Date limite *</label>
                   <input
                     type="date"
                     required
                     value={formDueDate}
                     onChange={e => setFormDueDate(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 cursor-pointer focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700">Heure limite</label>
+                  <label className="text-[11px] font-bold text-slate-800">Heure limite</label>
                   <input
                     type="time"
                     value={formDueTime}
                     onChange={e => setFormDueTime(e.target.value)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 cursor-pointer"
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 cursor-pointer focus:bg-white"
                   />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700">Durée estimée (min)</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-slate-800">Durée estimée (min)</label>
+                    <span className="text-[9.5px] font-mono text-slate-400 font-bold">{formDuration} min</span>
+                  </div>
                   <input
                     type="number"
                     min={5}
@@ -2230,29 +3578,33 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                     step={5}
                     value={formDuration}
                     onChange={e => setFormDuration(parseInt(e.target.value, 10) || 30)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900"
+                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 focus:bg-white"
                   />
                 </div>
               </div>
 
-              {/* Modalité & Barème compacts */}
+              {/* Row 5 : Modalité & Barème compacts */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 p-2.5 bg-slate-50/80 rounded-xl border border-slate-200">
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700">Modalité de rendu</label>
-                  <select
+                  <label className="text-[11px] font-bold text-slate-800">Modalité de rendu</label>
+                  <SelectPill
+                    options={[
+                      { value: 'IN_CLASS', label: 'Vérification en classe (Sur cahier)' },
+                      { value: 'ONLINE_FILE', label: 'Remise numérique (Photo / PDF)' },
+                      { value: 'ONLINE_TEXT', label: 'Réponse rédigée en ligne' },
+                      { value: 'NONE_READ_ONLY', label: 'Leçon à apprendre (Sans écrit)' },
+                    ]}
                     value={formSubmissionType}
-                    onChange={e => setFormSubmissionType(e.target.value as HomeworkSubmissionType)}
-                    className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 cursor-pointer"
-                  >
-                    <option value="IN_CLASS">Vérification en classe (Sur cahier)</option>
-                    <option value="ONLINE_FILE">Remise numérique (Photo / PDF)</option>
-                    <option value="ONLINE_TEXT">Réponse rédigée en ligne</option>
-                    <option value="NONE_READ_ONLY">Leçon à apprendre (Sans écrit)</option>
-                  </select>
+                    onChange={(val) => setFormSubmissionType(val as HomeworkSubmissionType)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
                 </div>
 
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1.5 cursor-pointer pt-0.5">
+                  <label className="text-[11px] font-bold text-slate-800 flex items-center gap-1.5 cursor-pointer pt-0.5">
                     <input
                       type="checkbox"
                       checked={formIsGraded}
@@ -2270,88 +3622,206 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                         max={100}
                         value={formMaxScore}
                         onChange={e => setFormMaxScore(parseFloat(e.target.value) || 20)}
-                        className="w-16 px-2 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-900"
+                        className="w-20 px-2.5 py-1 bg-white border border-slate-200 rounded-md text-xs font-bold text-slate-900"
                       />
+                      <span className="text-[10px] text-slate-400">points</span>
                     </div>
                   ) : (
-                    <span className="text-[10px] text-slate-400 block pt-1">Sans notation officielle</span>
+                    <span className="text-[10px] text-slate-400 block pt-1">Sans notation officielle (Exercice d'entraînement)</span>
                   )}
                 </div>
               </div>
 
-              {/* Pièces jointes compactes */}
-              <div className="space-y-1.5">
-                <label className="text-[11px] font-bold text-slate-700 flex items-center gap-1">
-                  <Paperclip size={12} className="text-indigo-600" />
-                  <span>Pièces jointes / Liens (Optionnel)</span>
-                </label>
-
-                {formAttachments.length > 0 && (
-                  <div className="space-y-1">
-                    {formAttachments.map((att, idx) => (
-                      <div key={idx} className="flex items-center justify-between px-2.5 py-1 bg-indigo-50/70 border border-indigo-100 rounded-lg text-xs">
-                        <span className="font-semibold text-indigo-900 truncate text-[11px]">{att.name}</span>
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <a href={att.url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
-                            <ExternalLink size={11} />
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => removeAttachment(idx)}
-                            className="text-rose-500 hover:text-rose-700 p-0.5 cursor-pointer"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row gap-1.5">
-                  <input
-                    type="text"
-                    placeholder="Nom du doc"
-                    value={newAttachmentName}
-                    onChange={e => setNewAttachmentName(e.target.value)}
-                    className="sm:w-1/3 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800"
-                  />
-                  <input
-                    type="url"
-                    placeholder="Lien / URL (https://...)"
-                    value={newAttachmentUrl}
-                    onChange={e => setNewAttachmentUrl(e.target.value)}
-                    className="flex-1 px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-medium text-slate-800"
-                  />
-                  <button
-                    type="button"
-                    onClick={addAttachment}
-                    className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-lg text-xs transition-colors cursor-pointer shrink-0"
-                  >
-                    Ajouter
-                  </button>
-                </div>
-              </div>
-
               {/* Actions Footer */}
-              <div className="pt-2.5 border-t border-slate-100 flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-slate-100 flex items-center justify-end gap-2.5">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-3 py-1.5 text-slate-600 hover:text-slate-800 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
+                  className="px-3.5 py-2 text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl text-xs font-bold transition-colors cursor-pointer"
                 >
                   Annuler
                 </button>
                 <button
                   type="submit"
                   disabled={submittingForm}
-                  className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-xs flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold shadow-xs flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-50 active:scale-95"
                 >
                   {submittingForm ? <RefreshCw className="animate-spin" size={13} /> : <Check size={13} />}
-                  <span>{editingAssignment ? 'Sauvegarder' : 'Publier le devoir'}</span>
+                  <span>{editingAssignment ? 'Sauvegarder les modifications' : 'Publier le devoir'}</span>
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* =========================================================================
+          MODAL : HIGH-FIDELITY DOCUMENT PREVIEW (IMAGES & PDFS)
+          ========================================================================= */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-60 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-2.5 sm:p-5 overflow-hidden animate-in fade-in duration-150">
+          <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-4xl h-[88vh] flex flex-col shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+            {/* Header */}
+            <div className="px-4 py-3 bg-slate-800/90 border-b border-slate-700 flex items-center justify-between gap-3 text-white">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-xs ${
+                  getFileCategory(previewAttachment.name, previewAttachment.type) === 'pdf' || previewAttachment.url?.startsWith('data:application/pdf') ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40' :
+                  getFileCategory(previewAttachment.name, previewAttachment.type) === 'image' || previewAttachment.url?.startsWith('data:image/') ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' :
+                  'bg-indigo-500/20 text-indigo-300 border border-indigo-500/40'
+                }`}>
+                  {getFileCategory(previewAttachment.name, previewAttachment.type) === 'pdf' || previewAttachment.url?.startsWith('data:application/pdf') ? 'PDF' :
+                   getFileCategory(previewAttachment.name, previewAttachment.type) === 'image' || previewAttachment.url?.startsWith('data:image/') ? 'IMG' : 'DOC'}
+                </div>
+                <div className="min-w-0">
+                  <h4 className="text-xs sm:text-sm font-bold truncate text-white" title={previewAttachment.name}>
+                    {previewAttachment.name}
+                  </h4>
+                  <p className="text-[10px] text-slate-400">
+                    {formatFileSize(previewAttachment.size) ? `${formatFileSize(previewAttachment.size)} • ` : ''}Prévisualisation du document
+                  </p>
+                </div>
+              </div>
+
+              {/* Toolbar Controls */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {(getFileCategory(previewAttachment.name, previewAttachment.type) === 'image' || previewAttachment.url?.startsWith('data:image/')) && (
+                  <div className="flex items-center gap-1 bg-slate-700/80 rounded-lg p-0.5 border border-slate-600 mr-2">
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(z => Math.max(50, z - 25))}
+                      className="p-1.5 hover:bg-slate-600 rounded text-slate-200 hover:text-white transition-colors cursor-pointer"
+                      title="Zoom arrière (-)"
+                    >
+                      <ZoomOut size={14} />
+                    </button>
+                    <span className="text-[10px] font-mono font-bold px-1 text-slate-300">{previewZoom}%</span>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewZoom(z => Math.min(300, z + 25))}
+                      className="p-1.5 hover:bg-slate-600 rounded text-slate-200 hover:text-white transition-colors cursor-pointer"
+                      title="Zoom avant (+)"
+                    >
+                      <ZoomIn size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPreviewRotation(r => (r + 90) % 360)}
+                      className="p-1.5 hover:bg-slate-600 rounded text-slate-200 hover:text-white transition-colors cursor-pointer"
+                      title="Faire pivoter de 90°"
+                    >
+                      <RotateCw size={14} />
+                    </button>
+                  </div>
+                )}
+
+                {previewAttachment.url && (
+                  <a
+                    href={previewAttachment.url}
+                    target="_blank"
+                    rel="noreferrer"
+                    download={previewAttachment.name}
+                    className="p-1.5 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors flex items-center gap-1 text-xs font-semibold"
+                    title="Télécharger / Ouvrir dans un nouvel onglet"
+                  >
+                    <Download size={14} />
+                    <span className="hidden sm:inline text-[11px]">Télécharger</span>
+                  </a>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setPreviewAttachment(null)}
+                  className="p-1.5 bg-slate-700/80 hover:bg-rose-600 text-slate-300 hover:text-white rounded-lg transition-colors cursor-pointer ml-1"
+                  title="Fermer la prévisualisation"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            </div>
+
+            {/* Preview Content Body */}
+            <div className="flex-1 bg-slate-950 p-2 sm:p-4 overflow-auto flex items-center justify-center relative custom-scrollbar">
+              {(getFileCategory(previewAttachment.name, previewAttachment.type) === 'image' || previewAttachment.url?.startsWith('data:image/')) ? (
+                <div className="overflow-auto max-w-full max-h-full flex items-center justify-center p-2">
+                  <img
+                    src={previewAttachment.url}
+                    alt={previewAttachment.name}
+                    style={{
+                      transform: `scale(${previewZoom / 100}) rotate(${previewRotation}deg)`,
+                      transformOrigin: 'center center',
+                      transition: 'transform 0.15s ease-out'
+                    }}
+                    className="max-w-full max-h-[75vh] object-contain rounded-lg shadow-2xl drop-shadow-md select-none"
+                  />
+                </div>
+              ) : (getFileCategory(previewAttachment.name, previewAttachment.type) === 'pdf' || previewAttachment.url?.startsWith('data:application/pdf') || previewAttachment.name.toLowerCase().endsWith('.pdf')) ? (
+                <div className="w-full h-full bg-slate-900 rounded-xl overflow-hidden flex flex-col">
+                  <object
+                    data={previewAttachment.url}
+                    type="application/pdf"
+                    className="w-full h-full rounded-xl"
+                  >
+                    <iframe
+                      src={previewAttachment.url}
+                      title={previewAttachment.name}
+                      className="w-full h-full border-0 rounded-xl"
+                    >
+                      <div className="p-8 text-center text-white flex flex-col items-center justify-center h-full gap-3">
+                        <FileText size={48} className="text-rose-400" />
+                        <p className="text-sm font-bold">Document PDF prêt à être consulté</p>
+                        <p className="text-xs text-slate-400">Le lecteur PDF intégré de votre navigateur n'a pas pu s'ouvrir automatiquement.</p>
+                        <a
+                          href={previewAttachment.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={previewAttachment.name}
+                          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs flex items-center gap-2"
+                        >
+                          <Download size={14} />
+                          <span>Télécharger / Ouvrir le fichier PDF</span>
+                        </a>
+                      </div>
+                    </iframe>
+                  </object>
+                </div>
+              ) : (
+                <div className="text-center p-8 bg-slate-900 border border-slate-800 rounded-2xl max-w-md space-y-4">
+                  <div className="w-16 h-16 rounded-2xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 flex items-center justify-center mx-auto">
+                    <FileText size={32} />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-white text-sm">{previewAttachment.name}</h5>
+                    <p className="text-xs text-slate-400 mt-1">
+                      {formatFileSize(previewAttachment.size)} • Document bureautique
+                    </p>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Ce format de fichier ({getFileCategory(previewAttachment.name, previewAttachment.type).toUpperCase()}) sera téléchargeable par les élèves.
+                  </p>
+                  <div className="flex items-center justify-center gap-2 pt-2">
+                    <a
+                      href={previewAttachment.url}
+                      download={previewAttachment.name}
+                      className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 transition-colors"
+                    >
+                      <Download size={13} />
+                      <span>Télécharger le fichier</span>
+                    </a>
+                    {previewAttachment.url.startsWith('http') && (
+                      <a
+                        href={`https://docs.google.com/viewer?url=${encodeURIComponent(previewAttachment.url)}&embedded=true`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold rounded-lg text-xs flex items-center gap-1.5 border border-slate-700"
+                      >
+                        <ExternalLink size={13} />
+                        <span>Aperçu Google Docs</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -2393,16 +3863,20 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div className="space-y-1">
                   <label className="text-[11px] font-bold text-slate-700">Période d'inactivité</label>
-                  <select
+                  <SelectPill
+                    options={[
+                      { value: 'ALL_UNREAD', label: 'Tous les non-lecteurs' },
+                      { value: '24H', label: 'Non ouvert après 24h' },
+                      { value: '48H', label: 'Non ouvert après 48h' },
+                      { value: 'EVE_OF_DUE', label: "Veille de l'échéance" },
+                    ]}
                     value={reminderPeriod}
-                    onChange={e => setReminderPeriod(e.target.value as any)}
-                    className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 cursor-pointer"
-                  >
-                    <option value="ALL_UNREAD">Tous les non-lecteurs</option>
-                    <option value="24H">Non ouvert après 24h</option>
-                    <option value="48H">Non ouvert après 48h</option>
-                    <option value="EVE_OF_DUE">Veille de l'échéance</option>
-                  </select>
+                    onChange={(val) => setReminderPeriod(val as any)}
+                    variant="field"
+                    size="sm"
+                    colorScheme="indigo"
+                    className="w-full"
+                  />
                 </div>
 
                 <div className="space-y-1">
@@ -2603,30 +4077,80 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               
               <div className="space-y-1">
                 <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Consignes & Énoncé</h4>
-                <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-800 leading-relaxed whitespace-pre-line font-medium">
-                  {activeDetailAssignment.description}
+                <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl">
+                  <FormattedHomeworkContent content={activeDetailAssignment.description} />
                 </div>
               </div>
 
               {activeDetailAssignment.attachments && activeDetailAssignment.attachments.length > 0 && (
-                <div className="space-y-1">
-                  <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Pièces jointes</h4>
-                  <div className="space-y-1">
-                    {activeDetailAssignment.attachments.map((file, idx) => (
-                      <a
-                        key={idx}
-                        href={file.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="flex items-center justify-between p-2 bg-indigo-50/60 hover:bg-indigo-50 border border-indigo-100 rounded-lg transition-colors text-xs font-semibold text-indigo-900 group"
-                      >
-                        <div className="flex items-center gap-1.5">
-                          <Paperclip size={13} className="text-indigo-600" />
-                          <span className="text-[11px]">{file.name}</span>
+                <div className="space-y-1.5">
+                  <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                    Documents joints ({activeDetailAssignment.attachments.length})
+                  </h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {activeDetailAssignment.attachments.map((file, idx) => {
+                      const cat = getFileCategory(file.name, file.type);
+                      const sizeText = formatFileSize(file.size);
+                      return (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2.5 bg-white border border-slate-200 rounded-xl hover:border-indigo-200 transition-colors shadow-2xs group"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 font-bold text-[10px] ${
+                              cat === 'pdf' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                              cat === 'doc' ? 'bg-blue-50 text-blue-700 border border-blue-200' :
+                              cat === 'sheet' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                              cat === 'image' ? 'bg-purple-50 text-purple-700 border border-purple-200' :
+                              'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                            }`}>
+                              {cat === 'pdf' ? 'PDF' :
+                               cat === 'doc' ? 'DOC' :
+                               cat === 'sheet' ? 'XLS' :
+                               cat === 'image' ? 'IMG' :
+                               <Paperclip size={13} />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="font-bold text-slate-900 truncate text-[11px]" title={file.name}>
+                                {file.name}
+                              </p>
+                              {sizeText && (
+                                <p className="text-[10px] text-slate-400 font-mono">
+                                  {sizeText}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setPreviewAttachment(file);
+                                setPreviewZoom(100);
+                                setPreviewRotation(0);
+                              }}
+                              className="p-1.5 text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold cursor-pointer"
+                              title="Aperçu instantané"
+                            >
+                              <Eye size={12} />
+                              <span>Aperçu</span>
+                            </button>
+                            <a
+                              href={file.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              download={file.name}
+                              className="p-1.5 text-slate-500 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors flex items-center gap-1 text-[11px] font-bold"
+                              title="Consulter ou télécharger"
+                            >
+                              <span>Ouvrir</span>
+                              <ExternalLink size={12} />
+                            </a>
+                          </div>
                         </div>
-                        <ExternalLink size={12} className="text-indigo-400 group-hover:text-indigo-600 transition-colors" />
-                      </a>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
