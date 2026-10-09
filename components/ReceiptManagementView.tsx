@@ -1572,28 +1572,80 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {/* MOTIF & PAIEMENT */}
-                <div className="w-full text-[9px] mb-3 space-y-1 border-b border-dashed border-gray-400 pb-2">
-                  <div className="flex justify-between items-center py-0.5">
-                    <span className="font-bold uppercase text-gray-600">Motif:</span>
-                    <span className="font-black text-[10px]">{printPreview.nature}</span>
+                <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
+                  <div className="flex justify-between items-start py-0.5">
+                    <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
+                    <span className="font-black text-[10.5px] text-right text-black uppercase pl-2">{printPreview.nature}</span>
                   </div>
                   <div className="flex justify-between items-center py-0.5">
-                    <span className="font-bold uppercase text-gray-600">Mode:</span>
-                    <span className="font-black text-[10px]">{printPreview.payment_method || 'Cash'}</span>
+                    <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
+                    <span className="font-black text-[10px] text-black">{printPreview.payment_method || 'Cash'}</span>
                   </div>
+                  {printPreview.description && printPreview.description !== printPreview.nature && (
+                    <div className="flex justify-between items-center py-0.5 text-[8px] text-gray-600">
+                      <span className="font-medium uppercase">Précision :</span>
+                      <span className="font-semibold italic text-right pl-2">{printPreview.description}</span>
+                    </div>
+                  )}
                 </div>
 
                 {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
-                <div className="w-full border-2 border-black rounded-lg p-2 mb-3 text-center bg-gray-50 text-black">
+                <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
                   <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Montant Certifié Payé</p>
-                  <p className="text-[16px] font-black tracking-tight leading-none mt-1 text-black">
+                  <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
                     {printPreview.amount?.toLocaleString()} <span className="text-[11px] font-bold">HTG</span>
                   </p>
-                  {printPreview.currency && printPreview.currency !== 'HTG' && (
-                    <p className="text-[9px] font-bold mt-1 pt-1 border-t border-black/20">
-                      Équivalent Origine: {printPreview.original_amount?.toLocaleString()} {printPreview.currency}
-                    </p>
-                  )}
+                  {/* BLOC CONVERSION DE TAUX DE CHANGE CLAIR ET TRANSPARENT */}
+                  {(() => {
+                    const rate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
+                    const isUSD = printPreview.currency === 'USD';
+                    const originalUSD = printPreview.original_amount;
+
+                    if (isUSD && rate) {
+                      return (
+                        <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                          <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                            <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                            <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                              1 USD = {rate} HTG
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                            <span>Montant versé d'origine (USD) :</span>
+                            <span className="font-mono font-black">${Number(originalUSD || 0).toLocaleString()} USD</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                            <span>Contre-valeur perçue (HTG) :</span>
+                            <span className="font-mono">{Number(printPreview.amount).toLocaleString()} HTG</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    if (rate) {
+                      const equivUSD = (Number(printPreview.amount) / Number(rate)).toFixed(2);
+                      return (
+                        <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                          <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                            <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                            <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                              1 USD = {rate} HTG
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                            <span>Valeur couverte en Dollars :</span>
+                            <span className="font-mono font-black">≈ ${equivUSD} USD</span>
+                          </div>
+                          <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                            <span>Montant scellé en Gourdes :</span>
+                            <span className="font-mono">{Number(printPreview.amount).toLocaleString()} HTG</span>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return null;
+                  })()}
                 </div>
 
                 {/* SIGNATURE & MENTION LÉGALE */}

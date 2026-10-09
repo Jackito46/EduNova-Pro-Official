@@ -28,6 +28,8 @@ export interface PaymentWhatsAppShareProps {
   transactionRef: string;
   remainingAmount?: number;
   paymentMethod?: string;
+  exchangeRateApplied?: number;
+  convertedAmountHTG?: number;
   isInline?: boolean;
   isOpen?: boolean;
   onClose?: () => void;
@@ -61,6 +63,8 @@ export const buildPaymentWhatsAppText = (params: {
   transactionRef: string;
   remainingAmount?: number;
   paymentMethod?: string;
+  exchangeRateApplied?: number;
+  convertedAmountHTG?: number;
 }): string => {
   const dateStr = new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeStr = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
@@ -68,6 +72,20 @@ export const buildPaymentWhatsAppText = (params: {
   const classStr = params.studentClass ? ` (${params.studentClass})` : '';
   const methodStr = params.paymentMethod ? `\n💳 *Mode de règlement :* ${params.paymentMethod}` : '';
   
+  let amountStr = `${params.amount.toLocaleString()} ${params.currency}`;
+  if (params.currency === 'USD') {
+    const equiv = params.convertedAmountHTG !== undefined 
+      ? params.convertedAmountHTG 
+      : (params.exchangeRateApplied ? Math.round(params.amount * params.exchangeRateApplied) : null);
+    const rateNote = params.exchangeRateApplied ? ` (Taux appliqué: 1 USD = ${params.exchangeRateApplied} HTG)` : '';
+    if (equiv !== null) {
+      amountStr = `$${params.amount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD ≈ ${equiv.toLocaleString()} HTG${rateNote}`;
+    }
+  } else if (params.exchangeRateApplied) {
+    const equivUSD = (params.amount / params.exchangeRateApplied).toFixed(2);
+    amountStr = `${params.amount.toLocaleString()} HTG (≈ $${equivUSD} USD au taux de 1 USD = ${params.exchangeRateApplied} HTG)`;
+  }
+
   let remainingStr = '';
   if (params.remainingAmount !== undefined) {
     if (params.remainingAmount > 0) {
@@ -85,7 +103,7 @@ ${salutation}
 Nous vous confirmons la bonne réception du versement effectué pour votre enfant :
 
 👤 *Élève :* ${params.studentName}${classStr}
-💰 *Montant versé :* ${params.amount.toLocaleString()} ${params.currency}
+💰 *Montant versé :* ${amountStr}
 🏷️ *Motif :* ${params.feeTypeLabel}${methodStr}
 🔢 *Reçu N° :* #${params.transactionRef}
 📅 *Date :* ${dateStr} à ${timeStr}${remainingStr}
@@ -107,6 +125,8 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
   transactionRef,
   remainingAmount,
   paymentMethod,
+  exchangeRateApplied,
+  convertedAmountHTG,
   isInline = false,
   isOpen = true,
   onClose
@@ -129,9 +149,11 @@ export const PaymentWhatsAppShare: React.FC<PaymentWhatsAppShareProps> = ({
       feeTypeLabel,
       transactionRef,
       remainingAmount,
-      paymentMethod
+      paymentMethod,
+      exchangeRateApplied,
+      convertedAmountHTG
     });
-  }, [schoolName, studentName, studentClass, parentName, amount, currency, feeTypeLabel, transactionRef, remainingAmount, paymentMethod]);
+  }, [schoolName, studentName, studentClass, parentName, amount, currency, feeTypeLabel, transactionRef, remainingAmount, paymentMethod, exchangeRateApplied, convertedAmountHTG]);
 
   const activeMessage = isCustomizingText && customText ? customText : defaultMessage;
   const cleanedPhone = useMemo(() => cleanPhoneForWhatsApp(phoneNumber), [phoneNumber]);

@@ -1786,8 +1786,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const adHocCampaign = isAdHoc ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === adHocCampaignId) : null;
         
         const mappedType = isAdHoc 
-          ? (adHocCampaign ? `Stage / Frais: ${adHocCampaign.name}` : 'Frais Ad Hoc')
-          : feeType === 'SCOLARITE' ? terminology.tuition : feeType === 'INSCRIPTION' ? 'Inscription' : 'Frais Divers';
+          ? (adHocCampaign ? `Campagne: ${adHocCampaign.name}` : 'Frais de Campagne')
+          : feeType === 'SCOLARITE' ? terminology.tuition 
+          : feeType === 'INSCRIPTION' ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription")
+          : feeType === 'CREDIT_PORTEFEUILLE' ? 'Recharge Portefeuille Élève'
+          : 'Frais Divers Obligatoires';
+
+        const isMiscUSD = feeType === 'DIVERS' && (selectedStudent?.miscUSD || 0) > 0;
+        const descriptionNote = isMiscUSD 
+          ? `Frais Divers Obligatoires (Barème: $${selectedStudent.miscUSD} USD @${currentExchangeRate} HTG)`
+          : mappedType;
 
         const paymentPayload: any = {
           school_id: user.school_id,
@@ -1796,6 +1804,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           amount: amount,
           type: mappedType,
           nature: mappedType,
+          description: descriptionNote,
           fee_type: isAdHoc ? 'DIVERS' : feeType,
           ad_hoc_campaign_id: adHocCampaignId,
           currency: currency,
@@ -2074,6 +2083,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   : undefined
             }
             paymentMethod={paymentMethod}
+            exchangeRateApplied={currentExchangeRate}
+            convertedAmountHTG={currency === 'USD' ? Math.round((parseFloat(montantReel || '0') * currentExchangeRate) * 100) / 100 : undefined}
             isInline={false}
           />
         )}
@@ -2117,6 +2128,15 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <img src={schoolDetails.logo_url} alt="Logo" className="h-12 mx-auto mb-1 object-contain" referrerPolicy="no-referrer" />
             )}
             <h1 className="text-[13px] font-black uppercase leading-tight">{schoolDetails?.name || 'ÉTABLISSEMENT UNIVERSITAIRE'}</h1>
+            {(() => {
+              const studentCampus = campuses?.find(c => c.id === (selectedStudent?.campus_id || currentCampusId));
+              const campusTitle = studentCampus?.name || schoolDetails?.campus_name;
+              return campusTitle ? (
+                <p className="text-[10px] font-black uppercase tracking-wider text-black mt-0.5">
+                  Annexe / Campus : {campusTitle}
+                </p>
+              ) : null;
+            })()}
             <div className="text-[9px] font-bold opacity-90 italic mt-0.5 space-y-0.5">
               {schoolDetails?.address && <p>{schoolDetails.address}</p>}
               {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
@@ -2150,21 +2170,49 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           </div>
 
-          {/* MOTIF & MODE DE PAIEMENT */}
-          <div className="w-full text-[9px] mb-3 space-y-1 border-b border-dashed border-gray-400 pb-2">
-            <div className="flex justify-between items-center py-0.5">
-              <span className="font-bold uppercase text-gray-600">Motif:</span>
-              <span className="font-black text-[10px]">
-                {feeType.startsWith('ADHOC_') 
-                  ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name
-                  : feeType === 'INSCRIPTION' 
-                  ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Réinscription' : 'Inscription') 
-                  : feeType === 'SCOLARITE' ? terminology.tuition : 'Frais Divers'}
-              </span>
+          {/* TYPE DE FRAIS & MODE DE PAIEMENT */}
+          <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
+            <div className="flex justify-between items-start py-0.5">
+              <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
+              <div className="text-right pl-2">
+                <span className="font-black text-[11px] block text-black uppercase">
+                  {feeType.startsWith('ADHOC_') 
+                    ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
+                    : feeType === 'INSCRIPTION' 
+                    ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription") 
+                    : feeType === 'SCOLARITE' 
+                    ? `Frais de Scolarité (${terminology.tuition})` 
+                    : feeType === 'DIVERS'
+                    ? 'Frais Divers Obligatoires'
+                    : feeType === 'CREDIT_PORTEFEUILLE'
+                    ? 'Recharge Portefeuille Élève'
+                    : 'Frais Divers'}
+                </span>
+                {/* Mention explicite si barème initialement fixé en USD */}
+                {(() => {
+                  let plannedUSD = 0;
+                  if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
+                  else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
+                  else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
+                  else if (feeType.startsWith('ADHOC_')) {
+                    const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
+                    if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                  }
+
+                  if (plannedUSD > 0) {
+                    return (
+                      <span className="inline-block mt-0.5 text-[8px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">
+                        Barème fixé en Dollars : ${plannedUSD} USD
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+              </div>
             </div>
             <div className="flex justify-between items-center py-0.5">
-              <span className="font-bold uppercase text-gray-600">Mode:</span>
-              <span className="font-black text-[10px]">{paymentMethod}</span>
+              <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
+              <span className="font-black text-[10px] text-black">{paymentMethod}</span>
             </div>
             {paymentMethod === 'MonCash' && (
               <>
@@ -2193,26 +2241,87 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* DÉTAILS FINANCIERS & SITUATION */}
           <div className="w-full space-y-1 text-[9px] mb-3 bg-gray-50 p-2 rounded border border-gray-200 print:bg-white print:border-black">
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-600">Total Dû (Engagement):</span>
+              <span className="font-semibold text-gray-600">Total Dû (Engagement) :</span>
               <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due')}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="font-semibold text-gray-600">Déjà Versé:</span>
+              <span className="font-semibold text-gray-600">Déjà Versé :</span>
               <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid')}</span>
             </div>
           </div>
 
           {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
-          <div className="w-full border-2 border-black rounded-lg p-2 mb-3 text-center bg-gray-50 text-black">
-            <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Net Perçu (Montant Payé)</p>
-            <p className="text-[16px] font-black tracking-tight leading-none mt-1 text-black">
-              {parseFloat(montantReel).toLocaleString()} <span className="text-[11px] font-bold">{currency}</span>
+          <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
+            <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Net Perçu (Montant Réglé)</p>
+            <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
+              {parseFloat(montantReel || '0').toLocaleString()} <span className="text-[11px] font-bold">{currency}</span>
             </p>
-            {currency === 'USD' && (
-              <p className="text-[9px] font-bold mt-1 pt-1 border-t border-black/20">
-                Équivalent: {((Math.round((parseFloat(montantReel) * currentExchangeRate) * 100)) / 100).toLocaleString()} HTG
-              </p>
-            )}
+
+            {/* BLOC CONVERSION DE TAUX DE CHANGE TRANSPARENT ET EXPLICITE */}
+            {(() => {
+              const paidAmount = parseFloat(montantReel || '0');
+              const isUSD = currency === 'USD';
+              let plannedUSD = 0;
+              if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
+              else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
+              else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
+              else if (feeType.startsWith('ADHOC_')) {
+                const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
+                if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+              }
+
+              if (isUSD) {
+                const equivHTG = Math.round((paidAmount * currentExchangeRate) * 100) / 100;
+                return (
+                  <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                    <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                      <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                      <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                        1 USD = {currentExchangeRate} HTG
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                      <span>Montant versé (Devise USD) :</span>
+                      <span className="font-mono font-black">${paidAmount.toLocaleString()} USD</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                      <span>Contre-valeur perçue (HTG) :</span>
+                      <span className="font-mono">{equivHTG.toLocaleString()} HTG</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              if (!isUSD && (plannedUSD > 0 || currentExchangeRate > 0)) {
+                const equivUSD = currentExchangeRate > 0 ? (paidAmount / currentExchangeRate).toFixed(2) : '0.00';
+                return (
+                  <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                    <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                      <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                      <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                        1 USD = {currentExchangeRate} HTG
+                      </span>
+                    </div>
+                    {plannedUSD > 0 && (
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Barème fixé en Dollars :</span>
+                        <span className="font-mono font-black">${plannedUSD} USD</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                      <span>Valeur équivalente couverte :</span>
+                      <span className="font-mono font-black">≈ ${equivUSD} USD</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                      <span>Montant effectif encaissé en Gourdes :</span>
+                      <span className="font-mono">{paidAmount.toLocaleString()} HTG</span>
+                    </div>
+                  </div>
+                );
+              }
+
+              return null;
+            })()}
           </div>
 
           {/* ENGAGEMENT ET RESTE */}

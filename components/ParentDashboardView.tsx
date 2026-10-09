@@ -762,20 +762,30 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                 {/* Détail du versement */}
                 <div className="border-b border-black pb-3 mb-3">
                   <div className="flex justify-between font-black text-xs pb-1 border-b border-gray-300 mb-1.5">
-                    <span>DÉSIGNATION</span>
+                    <span>TYPE DE FRAIS / DÉSIGNATION</span>
                     <span>MONTANT</span>
                   </div>
                   <div className="flex justify-between text-[11px] font-semibold py-1">
-                    <span>{p.fee_type || p.nature || p.type || p.description || 'Paiement scolarité'}</span>
-                    <span>
-                      {p.currency === 'USD'
-                        ? `$${Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD (${Number(p.amount_htg_equivalent || (Number(p.amount || 0) * (p.exchange_rate_applied || 140))).toLocaleString()} HTG)`
-                        : `${Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG`}
+                    <span className="font-bold text-black uppercase">{p.fee_type || p.nature || p.type || p.description || 'Paiement scolarité'}</span>
+                    <span className="text-right">
+                      {p.currency === 'USD' ? (
+                        <>
+                          <span className="font-bold">${Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD ({Number(p.amount_htg_equivalent || (Number(p.amount || 0) * (p.exchange_rate_applied || 140))).toLocaleString()} HTG)</span>
+                          <span className="block text-[9px] text-gray-700 font-mono font-bold">Taux de conversion : 1 USD = {p.exchange_rate_applied || 140} HTG</span>
+                        </>
+                      ) : p.exchange_rate_applied ? (
+                        <>
+                          <span className="font-bold">{Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG</span>
+                          <span className="block text-[9px] text-gray-700 font-mono font-bold">Taux de conversion : 1 USD = {p.exchange_rate_applied} HTG (≈ ${(Number(p.amount_htg_equivalent || p.amount || 0) / Number(p.exchange_rate_applied)).toFixed(2)} USD)</span>
+                        </>
+                      ) : (
+                        <span className="font-bold">{Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG</span>
+                      )}
                     </span>
                   </div>
                   {p.description && p.description !== p.fee_type && (
-                    <p className="text-[10px] text-gray-500 italic mt-0.5">
-                      Note : {p.description}
+                    <p className="text-[10px] text-gray-600 italic mt-0.5">
+                      Détails : {p.description}
                     </p>
                   )}
                 </div>
