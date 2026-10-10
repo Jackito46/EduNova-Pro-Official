@@ -2082,13 +2082,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     return (
       <div className="w-full max-w-5xl mx-auto space-y-5 sm:space-y-6 animate-in fade-in duration-300 pb-16 px-2 sm:px-4">
         {/* BANDEAU CONFIRMATION ULTRA-MODERNE & HUB D'IMPRESSION DIRECTE RESPONSIVE */}
-        <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 lg:p-5 rounded-2xl shadow-xl shadow-slate-900/5 border border-slate-200/90 flex flex-col xl:flex-row items-stretch xl:items-center justify-between gap-3.5 sm:gap-4 print:hidden transition-all">
+        <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 lg:p-4.5 rounded-2xl shadow-xl shadow-slate-900/5 border border-slate-200/90 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5 lg:gap-4 print:hidden transition-all">
           {/* Identité de la transaction scellée & Élève */}
-          <div className="flex items-center gap-3 sm:gap-3.5 text-left min-w-0">
+          <div className="flex items-center gap-3 sm:gap-3.5 text-left min-w-0 flex-1">
             {/* Badge de confirmation animé avec ping */}
             <div className="relative flex items-center justify-center shrink-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 ring-2 ring-white">
-                <CheckCircle2 size={22} className="stroke-[2.5] sm:w-6 sm:h-6" />
+              <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shadow-lg shadow-emerald-600/30 ring-2 ring-white">
+                <CheckCircle2 size={22} className="stroke-[2.5]" />
               </div>
               <span className="absolute -top-1 -right-1 flex h-3 w-3">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -2096,10 +2096,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               </span>
             </div>
 
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 space-y-1">
               <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
                 <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight whitespace-nowrap">Transaction Scellée</h2>
-                <span className="bg-emerald-50 text-emerald-700 text-[9.5px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200 flex items-center gap-1 shrink-0">
+                <span className="bg-emerald-50 text-emerald-700 text-[9.5px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 flex items-center gap-1 shrink-0">
                   <ShieldCheck size={11} className="text-emerald-600" />
                   Certifié Officiel
                 </span>
@@ -2120,33 +2120,33 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <span>#{transactionRef}</span>
                 </button>
               </div>
-              <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                <span className="font-bold text-slate-800">{selectedStudent.fullName}</span> • <span className="text-slate-600">{selectedStudent.classe || 'N/A'}</span> • <span className="font-mono font-bold text-emerald-700">{parseFloat(montantReel || '0').toLocaleString()} {currency}</span>
-              </p>
+
+              {/* Détails Élève, Classe & Montant sans coupure tronquée */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs text-slate-600 font-medium pt-0.5">
+                <span className="font-extrabold text-slate-900 tracking-tight">
+                  {selectedStudent.fullName}
+                </span>
+                <span className="text-slate-300 font-bold select-none">•</span>
+                <span className="bg-slate-100/90 text-slate-700 text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-200/70 shrink-0">
+                  {selectedStudent.classe || 'N/A'}
+                </span>
+                <span className="text-slate-300 font-bold select-none">•</span>
+                <span className="bg-emerald-50 text-emerald-800 font-mono font-black text-[11px] sm:text-xs px-2.5 py-0.5 rounded border border-emerald-200/80 shrink-0 shadow-2xs">
+                  {parseFloat(montantReel || '0').toLocaleString()} {currency}
+                </span>
+              </div>
             </div>
           </div>
 
-          {/* HUB D'ACTIONS : ADAPTATION PARFAITE MOBILE, TABLETTE, PC 14" & GRAND ÉCRAN */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full xl:w-auto shrink-0 justify-end">
-            {/* Groupe des actions secondaires (3 colonnes compactes sur mobile, inline sur tablette/PC 14"/desktop) */}
-            <div className="grid grid-cols-3 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
-              {/* Tester QR Code */}
-              <button
-                type="button"
-                onClick={() => setShowQrVerificationPreview(true)}
-                className="px-2.5 sm:px-3 lg:px-3.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 hover:text-indigo-800 border border-indigo-200/90 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
-                title="Tester et contrôler le QR Code d'authenticité"
-              >
-                <QrCode size={14} className="text-indigo-600 shrink-0" />
-                <span className="hidden md:inline">Tester </span>
-                <span>QR Code</span>
-              </button>
-
+          {/* HUB D'ACTIONS : ADAPTATION RESPONSIVE MOBILE, TABLETTE, ÉCRAN 14" & DESKTOP */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto shrink-0 justify-end">
+            {/* Actions secondaires WhatsApp & Nouveau (grille 2 colonnes sur mobile, flex inline sur tablette/PC 14"/desktop) */}
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
               {/* Partager WhatsApp */}
               <button
                 type="button"
                 onClick={() => setShowWhatsAppModal(true)}
-                className="px-2.5 sm:px-3 lg:px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-200/90 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                className="px-3 sm:px-3.5 py-2.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 hover:text-emerald-800 border border-emerald-200/90 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
                 title="Partager le reçu certifié via WhatsApp"
               >
                 <MessageSquare size={14} className="text-emerald-600 shrink-0" />
@@ -2157,7 +2157,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 type="button"
                 onClick={resetAllFields}
-                className="px-2.5 sm:px-3 lg:px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200/80 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
+                className="px-3 sm:px-3.5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 hover:text-slate-900 border border-slate-200/80 rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs whitespace-nowrap"
                 title="Réinitialiser pour un nouvel encaissement"
               >
                 <PlusCircle size={14} className="text-slate-500 shrink-0" />
@@ -2169,14 +2169,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={() => window.print()}
-              className="w-full sm:w-auto px-4 sm:px-5 lg:px-6 py-2.5 sm:py-2.5 lg:py-3 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 hover:from-slate-900 hover:to-indigo-900 text-white rounded-xl font-black text-xs sm:text-sm shadow-xl shadow-slate-950/25 hover:shadow-indigo-950/35 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer ring-2 ring-indigo-500/50 hover:ring-indigo-400 whitespace-nowrap shrink-0"
+              className="w-full sm:w-auto px-4 sm:px-5 lg:px-5.5 py-2.5 sm:py-2.5 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 hover:from-slate-900 hover:to-indigo-900 text-white rounded-xl font-black text-xs sm:text-sm shadow-xl shadow-slate-950/25 hover:shadow-indigo-950/35 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer ring-2 ring-indigo-500/50 hover:ring-indigo-400 whitespace-nowrap shrink-0"
               title="Lancer l'impression directe (Raccourci: Touche Entrée)"
             >
               <div className="w-5 h-5 rounded-md bg-white/15 flex items-center justify-center shrink-0">
                 <Printer size={13} className="text-white" />
               </div>
               <span className="tracking-wide uppercase">Imprimer le Reçu</span>
-              <kbd className="hidden lg:inline-flex items-center text-[9px] font-mono font-black bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/25 ml-1">
+              <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono font-black bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/25 ml-1">
                 Entrée ↵
               </kbd>
             </button>
