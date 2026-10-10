@@ -589,18 +589,23 @@
 
     function performAutoHeal(reason) {
       if (window.__edunovaAppReady) return;
+      // L'auto-guérison par rechargement forcé n'est justifiée QUE lors d'une rupture critique de chunk
+      if (!isChunkOrVersionError(reason)) {
+        logDiag('AUTO_HEAL_IGNORED', 'Auto-guérison non requise pour motif non critique: ' + reason);
+        return;
+      }
       var autoHealKey = 'edunova_auto_heal_timestamp';
       var lastHeal = sessionStorage.getItem(autoHealKey);
       var now = Date.now();
-      // Protection anti-boucle : 1 auto-guérison transparente toutes les 15 secondes max
-      if (lastHeal && (now - parseInt(lastHeal, 10)) < 15000) {
+      // Protection anti-boucle : 1 rechargement transparent toutes les 30 secondes max
+      if (lastHeal && (now - parseInt(lastHeal, 10)) < 30000) {
         logDiag('AUTO_HEAL_SKIP', 'Auto-guérison déjà exécutée récemment. Affichage boutons de secours.');
         showEmergencyButtons(reason);
         return;
       }
       sessionStorage.setItem(autoHealKey, String(now));
-      logDiag('AUTO_HEAL', 'Exécution de l’auto-guérison transparente pour: ' + reason);
-      console.warn('⚡ [EduNova Auto-Heal] Détection mise à jour / chunk obsolète (' + reason + '). Nettoyage immédiat et rechargement...');
+      logDiag('AUTO_HEAL', 'Exécution de l’auto-guérison pour: ' + reason);
+      console.warn('⚡ [EduNova Auto-Heal] Détection chunk obsolète (' + reason + '). Nettoyage immédiat et rechargement...');
 
       var unregisterPromise = ('serviceWorker' in navigator)
         ? navigator.serviceWorker.getRegistrations().then(function(regs) {
@@ -628,7 +633,7 @@
       performAutoHeal('Chunk Vite renouvelé');
     });
 
-    // Capture des erreurs de chargement de ressources (scripts, styles, polices) en phase de capture
+    // Capture des erreurs de chargement de ressources en phase de capture (pour diagnostic)
     window.addEventListener('error', function(event) {
       var target = event.target;
       if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK' || target.tagName === 'IMG')) {
@@ -640,19 +645,12 @@
           elapsedMs: Math.round(performance.now() - startTime)
         };
         window.__edunovaDiagnostics.resourceFailures.push(failure);
-        logDiag('RESOURCE_ERR', 'Échec de chargement de ressource', failure);
+        logDiag('RESOURCE_ERR', 'Avertissement ressource non bloquante', failure);
 
-        // Si un script /assets/*.js a échoué (404 après nouveau build), auto-guérison immédiate
+        // Seuls les scripts JS /assets/*.js en 404 justifient une auto-guérison (jamais les images ou liens)
         if (target.tagName === 'SCRIPT' && srcOrHref.indexOf('/assets/') !== -1) {
           performAutoHeal('Script compilé introuvable : ' + srcOrHref.split('/').pop());
-          return;
         }
-
-        setTimeout(function() {
-          if (!window.__edunovaAppReady) {
-            performAutoHeal('Échec de chargement : ' + (srcOrHref.split('/').pop() || target.tagName));
-          }
-        }, 2000);
       } else {
         var errMsg = event.message || '';
         var errInfo = {
@@ -663,23 +661,16 @@
           error: event.error ? (event.error.stack || event.error.message) : null
         };
         window.__edunovaDiagnostics.errors.push(errInfo);
-        logDiag('SCRIPT_ERR', 'Erreur script non capturée', errInfo);
+        logDiag('SCRIPT_ERR', 'Erreur script interceptée', errInfo);
 
         // Détection immédiate d'une désynchronisation de version (HTML reçu à la place d'un chunk JS)
         if (isChunkOrVersionError(errMsg) || (event.error && isChunkOrVersionError(event.error.message))) {
           performAutoHeal('Discordance de chunk détectée : ' + errMsg);
-          return;
         }
-
-        setTimeout(function() {
-          if (!window.__edunovaAppReady) {
-            performAutoHeal('Erreur : ' + (errMsg || 'Script bloqué'));
-          }
-        }, 2500);
       }
     }, true);
 
-    // Capture des rejets de Promesses non gérés
+    // Capture des rejets de Promesses non gérés (diagnostic uniquement, ne tue jamais l'appli)
     window.addEventListener('unhandledrejection', function(event) {
       var reason = event.reason;
       var reasonStr = reason ? (reason.stack || reason.message || String(reason)) : 'Raison inconnue';
@@ -687,21 +678,12 @@
         reason: reasonStr
       };
       window.__edunovaDiagnostics.errors.push(rejInfo);
-      logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté', rejInfo);
+      logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté (non bloquant)', rejInfo);
 
-      // Si l'erreur de promesse est liée à un import dynamique de module Vite
+      // Si l'erreur de promesse est liée à un import dynamique de module Vite périmé
       if (isChunkOrVersionError(reasonStr)) {
         event.preventDefault();
         performAutoHeal('Rejet import dynamique : ' + reasonStr);
-        return;
-      }
-
-      if (!window.__edunovaAppReady) {
-        setTimeout(function() {
-          if (!window.__edunovaAppReady) {
-            performAutoHeal('Erreur asynchrone : ' + (reason ? (reason.message || String(reason)) : 'Promesse non résolue'));
-          }
-        }, 2500);
       }
     });
 
@@ -710,9 +692,9 @@
       if (actions && !window.__edunovaAppReady) {
         actions.style.display = 'flex';
         var hint = document.getElementById('edunova-splash-hint');
-        if (hint && cause) {
-          hint.textContent = 'Incident détecté (' + cause + '). Cliquez ci-dessous pour débloquer.';
-          hint.style.color = '#f87171';
+        if (hint) {
+          hint.textContent = 'Chargement prolongé détecté. Vous pouvez forcer l’accès direct ci-dessous.';
+          hint.style.color = '#94a3b8';
         }
         var btnLogin = document.getElementById('edunova-emergency-login');
         if (btnLogin) btnLogin.onclick = clearStorageAndGoLogin;
@@ -721,9 +703,18 @@
       }
     }
 
-    // Gestionnaire de réinitialisation d'urgence manuelle
+    // Gestionnaire de déblocage direct immédiat
     function clearStorageAndGoLogin() {
-      logDiag('ACTION', 'Déclenchement réinitialisation complète du cache & session');
+      logDiag('ACTION', 'Déblocage direct manuel : retrait immédiat du splashscreen');
+      // Retirer le splashscreen sans délai
+      window.__dismissEduNovaSplash();
+      var splash = document.getElementById('edunova-pwa-splash');
+      if (splash) {
+        splash.style.display = 'none';
+        if (splash.parentNode) splash.parentNode.removeChild(splash);
+      }
+      window.__edunovaAppReady = true;
+
       try {
         localStorage.removeItem('edunova_user_profile');
         localStorage.removeItem('edunova-auth-token');
@@ -747,33 +738,19 @@
         });
       }
 
-      window.location.href = window.location.pathname + '#/';
-      setTimeout(function() {
-        window.location.reload();
-      }, 100);
+      // Rediriger vers l'accueil / login
+      window.location.hash = '#/';
     }
 
-    // Watchdog : inspection de l'état après 6000ms
+    // Watchdog de sécurité passif (25000ms au lieu de 6000ms) : n'interrompt pas le chargement en cours
     setTimeout(function() {
       if (!window.__edunovaAppReady) {
-        logDiag('WATCHDOG', 'Délai d’attente dépassé (6000ms). Déclenchement de l’auto-guérison...');
-        
-        // Audit des ressources réseau chargées
-        if (typeof performance !== 'undefined' && typeof performance.getEntriesByType === 'function') {
-          var resources = performance.getEntriesByType('resource');
-          var slowOrPending = resources.filter(function(r) { return r.duration > 1500; });
-          logDiag('PERF_AUDIT', 'Ressources lentes (>1.5s) ou chargées', {
-            totalResources: resources.length,
-            slowCount: slowOrPending.length,
-            slowList: slowOrPending.map(function(r) { return { name: r.name.split('/').pop(), durationMs: Math.round(r.duration) }; })
-          });
-        }
-
-        performAutoHeal('Délai d’attente dépassé');
+        logDiag('WATCHDOG', 'Délai passif atteint (25s). Proposition des options de secours sans rechargement forcé.');
+        showEmergencyButtons('Délai d’attente');
       } else {
         logDiag('WATCHDOG', 'Vérification terminée : Application montée avec succès');
       }
-    }, 6000);
+    }, 25000);
   })();
 </script>
 <script type="module" src="/index.tsx"></script>

@@ -9,11 +9,11 @@ import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { GoogleGenAI } from '@google/genai';
-import { BackupBackendService } from './services/backupBackendService';
-import { exportProjectToGitHub } from './services/githubExporterService';
-import { handleMonCashWebhook } from './src/utils/payment';
-import { sendMonCashPaymentPushNotification } from './services/moncashPushService';
-import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault';
+import { BackupBackendService } from './services/backupBackendService.ts';
+import { exportProjectToGitHub } from './services/githubExporterService.ts';
+import { handleMonCashWebhook } from './src/utils/payment.ts';
+import { sendMonCashPaymentPushNotification } from './services/moncashPushService.ts';
+import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault.ts';
 
 dotenv.config();
 

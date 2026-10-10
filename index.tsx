@@ -3,6 +3,11 @@ import { initConsoleSanitizer } from './utils/consoleSanitizer';
 
 declare const __DEPLOY_HASH__: string;
 
+// Signal immédiat au document que le bundle JS s'exécute avec succès
+if (typeof window !== 'undefined') {
+  (window as any).__edunovaAppReady = true;
+}
+
 // Initialisation précoce de l'interception et du nettoyage des logs de la console
 initConsoleSanitizer();
 

@@ -660,6 +660,24 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    // Retrait immédiat et garanti du splashscreen dès que le composant React racine est actif
+    if (typeof window !== 'undefined') {
+      (window as any).__edunovaAppReady = true;
+      if (typeof (window as any).__dismissEduNovaSplash === 'function') {
+        (window as any).__dismissEduNovaSplash();
+      }
+      const splash = document.getElementById('edunova-pwa-splash');
+      if (splash) {
+        splash.style.transition = 'opacity 0.2s ease-out';
+        splash.style.opacity = '0';
+        setTimeout(() => {
+          if (splash.parentNode) splash.parentNode.removeChild(splash);
+        }, 200);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
 
     // Failsafe timeout to prevent infinite loading - 1.2s max

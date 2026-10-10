@@ -1715,63 +1715,78 @@ export const DailyCashClosureModal: React.FC<DailyCashClosureModalProps> = ({
           <div className="bg-slate-900 border border-slate-700 w-full max-w-5xl rounded-2xl shadow-2xl flex flex-col max-h-[95vh] overflow-hidden">
             
             {/* Preview Modal Header */}
-            <div className="p-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 text-white shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30">
-                  <Printer size={20} />
+            <div className="p-3.5 sm:p-4 bg-slate-950 border-b border-slate-800 flex flex-col xl:flex-row xl:items-center justify-between gap-3 text-white shrink-0">
+              <div className="flex items-center justify-between gap-3 min-w-0">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="p-2 sm:p-2.5 rounded-xl bg-indigo-600/20 text-indigo-400 border border-indigo-500/30 shrink-0">
+                    <Printer size={18} className="sm:w-5 sm:h-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="text-sm sm:text-base font-black tracking-tight flex items-center gap-2 flex-wrap">
+                      <span className="truncate">Aperçu Avant Impression • Procès-Verbal</span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 uppercase shrink-0">
+                        Format A4
+                      </span>
+                    </h3>
+                    <p className="text-xs text-slate-400 truncate">
+                      Journée du {selectedDate} • {school?.name || 'Collège des Innovations'}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-base font-black tracking-tight flex items-center gap-2">
-                    <span>Aperçu Avant Impression • Procès-Verbal de Clôture</span>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 uppercase">
-                      Format A4
-                    </span>
-                  </h3>
-                  <p className="text-xs text-slate-400">
-                    Journée de caisse du {selectedDate} • {school?.name || 'Collège des Innovations'}
-                  </p>
-                </div>
+
+                {/* Mobile Close Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsPrintPreviewOpen(false)}
+                  className="xl:hidden p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer shrink-0"
+                  title="Fermer l'aperçu"
+                >
+                  <X size={18} />
+                </button>
               </div>
 
-              {/* Action Controls */}
-              <div className="flex items-center gap-2.5 flex-wrap">
-                <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 cursor-pointer select-none">
+              {/* Action Controls Responsive Toolbar */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full xl:w-auto shrink-0 justify-end">
+                <label className="flex items-center gap-2 text-xs font-semibold text-slate-300 bg-slate-800/80 px-3 py-2 rounded-xl border border-slate-700 cursor-pointer select-none whitespace-nowrap">
                   <input
                     type="checkbox"
                     checked={includeTransactionsInPrint}
                     onChange={(e) => setIncludeTransactionsInPrint(e.target.checked)}
                     className="w-3.5 h-3.5 text-indigo-600 rounded bg-slate-900 border-slate-700 focus:ring-0 cursor-pointer"
                   />
-                  <span>Inclure le journal détaillé ({rawTransactions.length} tx)</span>
+                  <span>Journal détaillé ({rawTransactions.length} tx)</span>
                 </label>
 
-                <button
-                  type="button"
-                  onClick={handleExportCSV}
-                  className="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 border border-slate-700 cursor-pointer shadow-2xs"
-                  title="Télécharger les données en CSV"
-                >
-                  <FileSpreadsheet size={15} />
-                  <span>Export CSV</span>
-                </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="flex-1 sm:flex-none px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-emerald-400 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 border border-slate-700 cursor-pointer shadow-2xs whitespace-nowrap"
+                    title="Télécharger les données en CSV"
+                  >
+                    <FileSpreadsheet size={15} />
+                    <span>CSV</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={handleDirectPrint}
-                  className="px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-98 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-lg shadow-indigo-900/40 cursor-pointer"
-                >
-                  <Printer size={15} />
-                  <span>Lancer l'Impression Directe (A4)</span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={handleDirectPrint}
+                    className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600 active:scale-98 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-indigo-900/40 cursor-pointer whitespace-nowrap"
+                  >
+                    <Printer size={15} />
+                    <span>Imprimer Direct (A4)</span>
+                  </button>
 
-                <button
-                  type="button"
-                  onClick={() => setIsPrintPreviewOpen(false)}
-                  className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
-                  title="Fermer l'aperçu"
-                >
-                  <X size={20} />
-                </button>
+                  {/* Desktop Close Button */}
+                  <button
+                    type="button"
+                    onClick={() => setIsPrintPreviewOpen(false)}
+                    className="hidden xl:inline-flex p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-all cursor-pointer"
+                    title="Fermer l'aperçu"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
               </div>
             </div>
 

@@ -23,7 +23,8 @@ function renderServiceWorkerHashPlugin(deployHash: string, buildTimestamp: strin
         .replace(/%BUILD_TIMESTAMP%/g, buildTimestamp);
     },
     closeBundle() {
-      const swDistPath = path.resolve(__dirname, 'dist', 'sw.js');
+      const distDir = path.resolve(__dirname, 'dist');
+      const swDistPath = path.resolve(distDir, 'sw.js');
       if (fs.existsSync(swDistPath)) {
         const originalContent = fs.readFileSync(swDistPath, 'utf-8');
         const header = `/**\n * EduNova Pro - Render Service Worker Cache Buster\n * Deployment Hash: ${deployHash}\n * Build Timestamp: ${buildTimestamp}\n */\n`;
@@ -31,6 +32,20 @@ function renderServiceWorkerHashPlugin(deployHash: string, buildTimestamp: strin
           fs.writeFileSync(swDistPath, header + originalContent, 'utf-8');
           console.log(`✨ [Render PWA] Hash unique injecté dans dist/sw.js : ${deployHash}`);
         }
+      }
+
+      // Synchronisation universelle des artefacts (dist -> build & .output/public)
+      try {
+        const buildDir = path.resolve(__dirname, 'build');
+        const outputPublicDir = path.resolve(__dirname, '.output', 'public');
+        if (fs.existsSync(distDir)) {
+          fs.cpSync(distDir, buildDir, { recursive: true });
+          fs.mkdirSync(outputPublicDir, { recursive: true });
+          fs.cpSync(distDir, outputPublicDir, { recursive: true });
+          console.log('✅ [Vite Build] Artefacts synchronisés vers dist/, build/ et .output/public');
+        }
+      } catch (err) {
+        console.warn('⚠️ [Vite Build] Notice synchronisation artefacts:', err);
       }
     }
   };
@@ -75,13 +90,33 @@ export default defineConfig(({ mode }) => {
         chunkSizeWarningLimit: 2500,
         rollupOptions: {
           output: {
-            manualChunks: {
-              'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-              'vendor-ui': ['lucide-react', 'framer-motion', 'sonner', 'clsx', 'tailwind-merge'],
-              'vendor-charts': ['recharts'],
-              'vendor-supabase': ['@supabase/supabase-js'],
-              'vendor-pdf': ['jspdf', 'html2canvas', 'jspdf-autotable'],
-              'vendor-xlsx': ['xlsx']
+            manualChunks(id) {
+              if (id.includes('node_modules')) {
+                if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router-dom')) {
+                  return 'vendor-react';
+                }
+                if (id.includes('jspdf') || id.includes('html2canvas') || id.includes('jspdf-autotable')) {
+                  return 'vendor-pdf';
+                }
+                if (id.includes('xlsx')) {
+                  return 'vendor-xlsx';
+                }
+                if (id.includes('recharts') || id.includes('d3-')) {
+                  return 'vendor-charts';
+                }
+                if (id.includes('@supabase')) {
+                  return 'vendor-supabase';
+                }
+                if (id.includes('lucide-react')) {
+                  return 'vendor-icons';
+                }
+                if (id.includes('framer-motion')) {
+                  return 'vendor-motion';
+                }
+                if (id.includes('date-fns') || id.includes('clsx') || id.includes('tailwind-merge') || id.includes('sonner')) {
+                  return 'vendor-ui';
+                }
+              }
             }
           }
         }
