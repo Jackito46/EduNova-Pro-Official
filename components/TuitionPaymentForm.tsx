@@ -1855,8 +1855,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           : 'Frais Divers Obligatoires';
 
         const isMiscUSD = feeType === 'DIVERS' && (selectedStudent?.miscUSD || 0) > 0;
+        const isAdHocUSD = isAdHoc && adHocCampaign?.currency === 'USD';
         const descriptionNote = isMiscUSD 
           ? `Frais Divers Obligatoires (Barème: $${selectedStudent.miscUSD} USD @${currentExchangeRate} HTG)`
+          : isAdHocUSD
+          ? `Campagne: ${adHocCampaign.name} (Barème: $${adHocCampaign.amount} USD @${currentExchangeRate} HTG)`
           : mappedType;
 
         const paymentPayload: any = {
@@ -1876,6 +1879,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           deposit_date: paymentMethod === 'Dépôt Bancaire' ? depositDate : null,
           status: isPending ? 'EN_ATTENTE' : 'VALIDE',
           amount_htg_equivalent: currency === 'USD' ? Math.round((amount * currentExchangeRate) * 100) / 100 : amount,
+          amount_usd_equivalent: currency === 'USD' ? amount : (currentExchangeRate > 0 ? Math.round((amount / currentExchangeRate) * 100) / 100 : 0),
           exchange_rate_applied: currentExchangeRate || 140,
           moncash_order_id: moncashOrderId,
           moncash_status: paymentMethod === 'MonCash' ? 'PENDING' : null

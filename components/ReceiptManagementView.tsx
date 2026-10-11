@@ -117,14 +117,17 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
 
     const appliedRate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
+    const paidAmt = Number(printPreview.paid_amount ?? printPreview.amount ?? 0);
+    const paidCurrency = printPreview.currency || 'HTG';
+
     generateReceiptQRCode({
-      ref: printPreview.receipt_number || printPreview.id || `RCP-${Date.now()}`,
-      studentName: printPreview.student_name || 'Élève',
-      studentClass: printPreview.class_name || '',
-      amount: Number(printPreview.amount || 0),
-      currency: printPreview.currency || 'HTG',
+      ref: printPreview.ref || printPreview.receipt_number || (printPreview.id ? `RCP-${printPreview.id.substring(0,8).toUpperCase()}` : `RCP-${Date.now()}`),
+      studentName: printPreview.studentName || printPreview.student_name || 'Élève',
+      studentClass: printPreview.classe || printPreview.class_name || '',
+      amount: paidAmt,
+      currency: paidCurrency,
       feeType: printPreview.nature || printPreview.fee_type || 'Frais Scolaires',
-      date: new Date(printPreview.created_at || Date.now()).toLocaleDateString('fr-FR'),
+      date: (printPreview.date ? `${printPreview.date} ${printPreview.time || ''}` : new Date(printPreview.created_at || Date.now()).toLocaleDateString('fr-FR')).trim(),
       cashierName: cashierName || 'Comptabilité',
       schoolName: schoolDetails?.name || school?.name || 'Établissement Scolaire',
       exchangeRate: appliedRate,
@@ -145,7 +148,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const { data: profile } = await supabase.from('profiles').select('full_name').eq('id', user.id).single();
         if (profile) setCashierName(profile.full_name || '');
 
-        const { data: schoolData } = await supabase.from('schools').select('name, address, phone, logo_url').eq('id', effectiveSchoolId).maybeSingle();
+        const { data: schoolData } = await supabase.from('schools').select('name, address, phone, logo_url, exchange_rate').eq('id', effectiveSchoolId).maybeSingle();
         
         const cachedLogo = localStorage.getItem(`school_logo_${effectiveSchoolId}`);
         const cachedName = localStorage.getItem(`school_name_${effectiveSchoolId}`);
@@ -177,28 +180,45 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
-        let classesQuery = supabase.from('classes').select('*').eq('school_id', effectiveSchoolId).order('name');
-        if (currentCampusId) classesQuery = classesQuery.eq('campus_id', currentCampusId);
-        const { data: classesData } = await classesQuery;
-        
+        const { data: classesData } = await supabase.from('classes').select('*').eq('school_id', effectiveSchoolId).order('name');
         if (classesData) {
           setClasses(classesData);
           if (classesData.length > 0) setGenClass(classesData[0].id);
         }
 
-        let studentsQuery = supabase.from('students').select('id, first_name, last_name, class_id, code, phone, parent_phone').eq('school_id', effectiveSchoolId);
-        if (currentCampusId) studentsQuery = studentsQuery.eq('campus_id', currentCampusId);
-        const { data: studentsData } = await studentsQuery;
+        // Chargement fiable des élèves sans colonne inexistante 'code' (qui causait l'erreur 42703)
+        const { data: studentsData, error: stErr } = await supabase
+          .from('students')
+          .select('id, first_name, last_name, class_id, reference_number, phone, parent_phone, campus_id')
+          .eq('school_id', effectiveSchoolId);
+        
+        if (stErr) console.warn("Avertissement chargement élèves:", stErr);
         if (studentsData) setStudents(studentsData);
 
-        let paymentsQuery = supabase.from('payments').select('*, campaign:ad_hoc_campaigns(id, name)').eq('school_id', effectiveSchoolId).order('created_at', { ascending: false });
-        if (currentCampusId) paymentsQuery = paymentsQuery.eq('campus_id', currentCampusId);
-        const { data: paymentsData } = await paymentsQuery;
+        // Paiements scellés avec jointure enrichie directe (student, class, campaign)
+        const { data: paymentsData, error: payErr } = await supabase
+          .from('payments')
+          .select(`
+            *,
+            campaign:ad_hoc_campaigns(id, name, amount, currency),
+            student:students(id, first_name, last_name, reference_number, class_id, campus_id, class:classes(id, name))
+          `)
+          .eq('school_id', effectiveSchoolId)
+          .order('created_at', { ascending: false });
+        
+        if (payErr) console.warn("Avertissement chargement paiements:", payErr);
 
-        // Récupération et harmonisation des reçus de fournitures scolaires
-        let suppliesQuery = supabase.from('school_supplies').select('*').eq('school_id', effectiveSchoolId).order('created_at', { ascending: false });
-        if (currentCampusId) suppliesQuery = suppliesQuery.eq('campus_id', currentCampusId);
-        const { data: suppliesData } = await suppliesQuery;
+        // Récupération et harmonisation des reçus de fournitures scolaires avec jointure élève
+        const { data: suppliesData, error: supErr } = await supabase
+          .from('school_supplies')
+          .select(`
+            *,
+            student:students(id, first_name, last_name, reference_number, class_id, campus_id, class:classes(id, name))
+          `)
+          .eq('school_id', effectiveSchoolId)
+          .order('created_at', { ascending: false });
+
+        if (supErr) console.warn("Avertissement chargement fournitures:", supErr);
 
         const groupedHistorySupplies = new Map<string, any>();
         (suppliesData || []).forEach((s: any) => {
@@ -207,22 +227,40 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             const existing = groupedHistorySupplies.get(txId);
             existing.total_amount = Number(existing.total_amount || 0) + Number(s.total_amount || 0);
             existing.amount_htg_equivalent = Number(existing.amount_htg_equivalent || 0) + Number(s.amount_htg_equivalent || s.total_amount || 0);
+            if (!existing.student && s.student) existing.student = s.student;
+            if (s.description) {
+              existing.items_list = existing.items_list || [existing.description];
+              existing.items_list.push(s.description);
+            }
           } else {
-            groupedHistorySupplies.set(txId, { ...s });
+            groupedHistorySupplies.set(txId, { 
+              ...s,
+              items_list: [s.description || 'Article de fourniture']
+            });
           }
         });
 
-        const suppliesPayments = Array.from(groupedHistorySupplies.values()).map((s: any) => ({
-          ...s,
-          id: s.transaction_id || s.id,
-          source: 'school_supplies',
-          amount: s.amount_htg_equivalent || s.total_amount,
-          original_amount: s.total_amount,
-          currency: s.currency || 'HTG',
-          payment_method: s.payment_method?.replace(' (EN ATTENTE)', '')?.replace(' (REJETÉ)', '') || 'Cash',
-          nature: 'Fournitures',
-          receipt_number: s.receipt_number || `FOU-${(s.transaction_id || s.id).substring(0, 8).toUpperCase()}`,
-        }));
+        const suppliesPayments = Array.from(groupedHistorySupplies.values()).map((s: any) => {
+          const isUSD = s.currency === 'USD';
+          const totalAmt = Number(s.total_amount || 0);
+          const equivHTG = Number(s.amount_htg_equivalent || (isUSD && s.exchange_rate_applied ? totalAmt * s.exchange_rate_applied : totalAmt));
+          return {
+            ...s,
+            id: s.transaction_id || s.id,
+            source: 'school_supplies',
+            amount: isUSD ? totalAmt : equivHTG,
+            paid_amount: isUSD ? totalAmt : equivHTG,
+            original_amount: totalAmt,
+            amount_htg_equivalent: equivHTG,
+            currency: s.currency || 'HTG',
+            is_foreign_currency: isUSD,
+            exchange_rate_applied: s.exchange_rate_applied || 1,
+            payment_method: s.payment_method?.replace(' (EN ATTENTE)', '')?.replace(' (REJETÉ)', '') || 'Cash',
+            nature: 'Fournitures Scolaires',
+            description: s.items_list ? s.items_list.join(', ') : (s.description || 'Fournitures Scolaires'),
+            receipt_number: s.receipt_number || (s.transaction_id ? (s.transaction_id.startsWith('POS-') ? s.transaction_id : `FOU-${s.transaction_id.substring(0, 8).toUpperCase()}`) : `FOU-${s.id.substring(0, 8).toUpperCase()}`),
+          };
+        });
 
         const allPayments = [...(paymentsData || []), ...suppliesPayments];
         setPayments(allPayments);
@@ -234,7 +272,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     };
     fetchContext();
-  }, [user, effectiveSchoolId, currentCampusId]);
+  }, [user, effectiveSchoolId]);
 
   const getMethodBadge = (method?: string) => {
     const m = (method || 'Cash').toUpperCase();
@@ -282,47 +320,72 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const isUSD = p.currency === 'USD';
     const rawAmount = Number(p.amount || 0);
     const rawOriginal = Number(p.original_amount || p.amount || 0);
-    const rawEquiv = Number(p.amount_htg_equivalent || 0);
+    const rawEquivHTG = Number(p.amount_htg_equivalent || 0);
+    const rawEquivUSD = Number(p.amount_usd_equivalent || 0);
 
-    let originalAmount = rawOriginal;
-    let equivHTG = rawEquiv;
-    let appliedRate = p.exchange_rate_applied ? Number(p.exchange_rate_applied) : null;
+    let appliedRate = p.exchange_rate_applied ? Number(p.exchange_rate_applied) : (schoolDetails?.exchange_rate ? Number(schoolDetails.exchange_rate) : 145);
+
+    let paidAmount = rawAmount;
+    let equivHTG = rawEquivHTG;
+    let equivUSD = rawEquivUSD;
 
     if (isUSD) {
-      if (rawEquiv > 0) {
-        equivHTG = rawEquiv;
-        originalAmount = rawOriginal > 0 ? rawOriginal : (rawAmount > 0 && rawAmount !== rawEquiv ? rawAmount : (appliedRate ? Math.round(rawEquiv / appliedRate) : rawAmount));
-      } else if (rawAmount > 0 && appliedRate) {
-        equivHTG = Math.round(rawAmount * appliedRate);
-        originalAmount = rawAmount;
-      } else if (rawAmount > 0) {
-        appliedRate = 145;
-        equivHTG = Math.round(rawAmount * appliedRate);
-        originalAmount = rawAmount;
+      paidAmount = rawOriginal > 0 && rawOriginal !== rawEquivHTG ? rawOriginal : rawAmount;
+      if (equivHTG <= 0 && appliedRate > 0) {
+        equivHTG = Math.round(paidAmount * appliedRate);
+      } else if (equivHTG <= 0) {
+        equivHTG = paidAmount;
       }
-      if (!appliedRate && originalAmount > 0 && equivHTG > 0) {
-        appliedRate = Math.round(equivHTG / originalAmount);
-      }
+      equivUSD = paidAmount;
     } else {
-      equivHTG = rawAmount > 0 ? rawAmount : rawOriginal;
-      originalAmount = equivHTG;
+      paidAmount = rawAmount > 0 ? rawAmount : rawOriginal;
+      equivHTG = paidAmount;
+      if (equivUSD <= 0 && appliedRate > 0) {
+        equivUSD = Math.round((paidAmount / appliedRate) * 100) / 100;
+      }
     }
+
+    // Détection du barème fixé en USD (campagne USD, mention dans description, etc.)
+    let plannedUSD = 0;
+    if (p.campaign?.currency === 'USD') {
+      plannedUSD = Number(p.campaign.amount || 0);
+    } else if (p.description) {
+      const match = p.description.match(/Barème:\s*\$?(\d+(?:\.\d+)?)\s*USD/i);
+      if (match && match[1]) {
+        plannedUSD = Number(match[1]);
+      }
+    }
+    if (plannedUSD === 0 && !isUSD && p.amount_usd_equivalent > 0 && (p.fee_type === 'DIVERS' || p.ad_hoc_campaign_id || p.description?.includes('USD'))) {
+      plannedUSD = Number(p.amount_usd_equivalent);
+    }
+
+    const effectiveStudent = studentObj || p.student;
+    const effectiveClass = studentClassName || effectiveStudent?.class?.name || (classes.find(c => c.id === effectiveStudent?.class_id)?.name) || (classes.find(c => c.id === p.class_id)?.name) || p.classe || p.className || 'N/A';
+    const effectiveStudentName = effectiveStudent 
+      ? formatStudentName(effectiveStudent.last_name, effectiveStudent.first_name).fullName 
+      : (p.studentName || p.student_name || 'Inconnu');
 
     const createdDate = p.created_at ? new Date(p.created_at) : new Date();
 
     const idPrefix = (p.id || '').substring(0, 8).toUpperCase();
     const formattedRef = p.receipt_number
-      ? (p.receipt_number.toUpperCase().startsWith('RCP-') || p.receipt_number.toUpperCase().startsWith('FOU-') 
+      ? (p.receipt_number.toUpperCase().startsWith('RCP-') || p.receipt_number.toUpperCase().startsWith('FOU-') || p.receipt_number.toUpperCase().startsWith('POS-')
           ? p.receipt_number.toUpperCase() 
           : `RCP-${p.receipt_number.toUpperCase()}`)
       : (p.source === 'school_supplies' ? `FOU-${idPrefix}` : `RCP-${idPrefix}`);
+
+    const studentCampus = campuses?.find((c: any) => c.id === (p.campus_id || effectiveStudent?.campus_id));
 
     return {
       ...p,
       ref: formattedRef,
       receipt_code: idPrefix,
-      studentName: studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : (p.studentName || 'Inconnu'),
-      classe: studentClassName || p.className || 'N/A',
+      student: effectiveStudent,
+      student_id: p.student_id || effectiveStudent?.id,
+      studentName: effectiveStudentName,
+      classe: effectiveClass,
+      matricule: effectiveStudent?.reference_number || p.reference_number || p.student?.reference_number || null,
+      campus_name: studentCampus?.name || null,
       date: createdDate.toLocaleDateString('fr-FR'),
       time: createdDate.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
       nature: p.nature || (p.campaign?.name 
@@ -333,12 +396,16 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         ? 'Scolarité' 
         : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
           ? 'Inscription' 
-          : (p.nature || p.type || p.fee_type || 'Frais Divers'))),
-      amount: equivHTG,
-      original_amount: originalAmount,
+          : (p.source === 'school_supplies' ? 'Fournitures Scolaires' : (p.nature || p.type || p.fee_type || 'Frais Divers')))),
+      paid_amount: paidAmount,
+      amount: paidAmount,
+      original_amount: isUSD ? paidAmount : (plannedUSD > 0 ? plannedUSD : paidAmount),
+      equiv_amount_htg: equivHTG,
+      equiv_amount_usd: equivUSD,
       currency: p.currency || 'HTG',
       is_foreign_currency: isUSD,
       exchange_rate_applied: appliedRate,
+      planned_usd_bareme: plannedUSD,
       payment_method: p.payment_method || 'Cash'
     };
   };
@@ -353,13 +420,13 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Détection si la requête cible spécifiquement un reçu ou si recherche approfondie
   const cleanSearchCode = useMemo(() => {
-    return activeSearchQuery.replace(/^(rcp|rec|fou)[\s-_]*/i, '').trim().toLowerCase();
+    return activeSearchQuery.replace(/^(rcp|rec|fou|pos)[\s-_]*/i, '').trim().toLowerCase();
   }, [activeSearchQuery]);
 
   const isReceiptLookup = useMemo(() => {
     if (!activeSearchQuery) return false;
     const lower = activeSearchQuery.toLowerCase();
-    return rcpAutoMode || lower.startsWith('rcp') || lower.startsWith('fou') || (cleanSearchCode.length >= 3 && /^[0-9a-fA-F]+$/.test(cleanSearchCode));
+    return rcpAutoMode || lower.startsWith('rcp') || lower.startsWith('fou') || lower.startsWith('pos') || (cleanSearchCode.length >= 3 && /^[0-9a-fA-F\-]+$/.test(cleanSearchCode));
   }, [activeSearchQuery, rcpAutoMode, cleanSearchCode]);
 
   const isDeepSearchEffective = useMemo(() => {
@@ -373,13 +440,14 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     const fullTerm = rawQuery.toLowerCase();
 
     return payments.filter(p => {
-      const student = students.find(s => s.id === p.student_id);
+      const student = p.student || students.find(s => s.id === p.student_id);
       const studentName = student ? formatStudentName(student.last_name, student.first_name).fullName : (p.studentName || 'Inconnu');
-      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : (p.classe || 'N/A');
+      const studentClass = student?.class?.name || (classes.find(c => c.id === student?.class_id)?.name) || (classes.find(c => c.id === p.class_id)?.name) || (p.classe || 'N/A');
 
       // Clés de correspondance pour reçus
       const idPrefix = (p.id || '').substring(0, 8).toLowerCase();
       const fullId = (p.id || '').toLowerCase();
+      const studentId = (p.student_id || student?.id || '').toLowerCase();
       const pRef = (p.ref || `rcp-${idPrefix}`).toLowerCase();
       const pReceiptNum = (p.receipt_number || '').toLowerCase();
       const pReference = (p.reference_number || '').toLowerCase();
@@ -387,6 +455,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       const studentFullName = studentName.toLowerCase();
 
       const matchesSearch = !rawQuery ? true : (
+        studentId.includes(fullTerm) ||
+        studentId.includes(cleanCode) ||
         pRef.includes(fullTerm) ||
         pRef.includes(cleanCode) ||
         idPrefix.includes(cleanCode) ||
@@ -398,7 +468,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         pReference.includes(cleanCode) ||
         pTxId.includes(cleanCode) ||
         studentFullName.includes(fullTerm) ||
-        (student?.code || '').toLowerCase().includes(fullTerm) ||
+        (student?.reference_number || '').toLowerCase().includes(fullTerm) ||
         (student?.phone || '').includes(rawQuery) ||
         (student?.parent_phone || '').includes(rawQuery) ||
         studentClass.toLowerCase().includes(fullTerm)
@@ -406,8 +476,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       if (!matchesSearch) return false;
 
-      // Si recherche approfondie active ou recherche par numéro de reçu précis, on ignore les restrictions de date et de session
-      if (isDeepSearchEffective) return true;
+      // Si recherche approfondie active ou recherche ciblée (ID précis, ID élève, N° reçu), on ignore les restrictions de date et de session
+      const isTargetedSearch = isDeepSearchEffective || (rawQuery.length >= 6 && (studentId.includes(fullTerm) || fullId.includes(fullTerm) || studentFullName.includes(fullTerm)));
+      if (isTargetedSearch) return true;
 
       // Filtres standard
       const matchesYear = !selectedYear || selectedYear === 'all' || !p.academic_year_id || p.academic_year_id === selectedYear;
@@ -442,8 +513,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       return matchesYear && matchesClass && matchesDate;
     }).map(p => {
-      const student = students.find(s => s.id === p.student_id);
-      const studentClass = student ? (classes.find(c => c.id === student.class_id)?.name || 'N/A') : (p.classe || 'N/A');
+      const student = p.student || students.find(s => s.id === p.student_id);
+      const studentClass = student?.class?.name || (classes.find(c => c.id === student?.class_id)?.name) || (classes.find(c => c.id === p.class_id)?.name) || (p.classe || 'N/A');
       return normalizeReceiptPayment(p, student, studentClass);
     });
   }, [payments, selectedYear, selectedClass, activeSearchQuery, cleanSearchCode, isDeepSearchEffective, dateFilter, customDate, students, classes]);
@@ -462,11 +533,11 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         p.moncash_status === 'PENDING'
       ) return;
 
-      totalEquivHTG += Number(p.amount || 0);
+      totalEquivHTG += Number(p.equiv_amount_htg || p.amount || 0);
       if (p.currency === 'USD' || p.is_foreign_currency) {
-        foreignUSD += Number(p.original_amount || 0);
+        foreignUSD += Number(p.paid_amount || p.amount || 0);
       } else {
-        localHTG += Number(p.original_amount || p.amount || 0);
+        localHTG += Number(p.paid_amount || p.amount || 0);
       }
     });
 
@@ -510,11 +581,11 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         p.moncash_status === 'PENDING'
       ) return;
 
-      totalEquivHTG += Number(p.amount || 0);
+      totalEquivHTG += Number(p.equiv_amount_htg || p.amount || 0);
       if (p.currency === 'USD' || p.is_foreign_currency) {
-        foreignUSD += Number(p.original_amount || 0);
+        foreignUSD += Number(p.paid_amount || p.amount || 0);
       } else {
-        localHTG += Number(p.original_amount || p.amount || 0);
+        localHTG += Number(p.paid_amount || p.amount || 0);
       }
     });
 
@@ -546,9 +617,9 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const studentPaymentsHistory = useMemo(() => {
     if (!selectedGenStudent) return [];
     return payments
-      .filter(p => p.student_id === selectedGenStudent.id && p.academic_year_id === genYear)
+      .filter(p => p.student_id === selectedGenStudent.id && (!genYear || genYear === 'all' || !p.academic_year_id || p.academic_year_id === genYear))
       .map(p => {
-        const studentClass = classes.find(c => c.id === selectedGenStudent.class_id)?.name || 'N/A';
+        const studentClass = classes.find(c => c.id === selectedGenStudent.class_id)?.name || selectedGenStudent.class?.name || 'N/A';
         return normalizeReceiptPayment(p, selectedGenStudent, studentClass);
       });
   }, [payments, selectedGenStudent, genYear, classes]);
@@ -561,11 +632,11 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     studentPaymentsHistory.forEach(p => {
       if (p.status === 'ANNULE' || p.payment_method?.includes('EN ATTENTE')) return;
-      totalEquivHTG += Number(p.amount || 0);
+      totalEquivHTG += Number(p.equiv_amount_htg || p.amount || 0);
       if (p.currency === 'USD' || p.is_foreign_currency) {
-        foreignUSD += Number(p.original_amount || 0);
+        foreignUSD += Number(p.paid_amount || p.amount || 0);
       } else {
-        localHTG += Number(p.original_amount || p.amount || 0);
+        localHTG += Number(p.paid_amount || p.amount || 0);
       }
     });
 
@@ -1002,21 +1073,28 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 USD
                               </span>
                               <span className="text-xs font-black text-teal-900 font-mono">
-                                {p.original_amount?.toLocaleString('fr-FR')} USD
+                                {(p.paid_amount ?? p.amount)?.toLocaleString('fr-FR')} USD
                               </span>
                             </div>
                             <span className="text-[10px] text-slate-500 font-bold block font-mono">
-                              Eq: {p.amount?.toLocaleString('fr-FR')} HTG {p.exchange_rate_applied ? `(@${p.exchange_rate_applied})` : ''}
+                              Eq: {p.equiv_amount_htg?.toLocaleString('fr-FR')} HTG {p.exchange_rate_applied ? `(@${p.exchange_rate_applied})` : ''}
                             </span>
                           </div>
                         ) : (
-                          <div className="flex items-center justify-end gap-1.5">
-                            <span className="px-1.5 py-0.5 rounded bg-emerald-100/80 text-emerald-900 text-[10px] font-black border border-emerald-300/70">
-                              HTG
-                            </span>
-                            <span className="text-xs font-black text-emerald-900 font-mono">
-                              {p.amount?.toLocaleString('fr-FR')} HTG
-                            </span>
+                          <div className="space-y-0.5">
+                            <div className="flex items-center justify-end gap-1.5">
+                              <span className="px-1.5 py-0.5 rounded bg-emerald-100/80 text-emerald-900 text-[10px] font-black border border-emerald-300/70">
+                                HTG
+                              </span>
+                              <span className="text-xs font-black text-emerald-900 font-mono">
+                                {(p.paid_amount ?? p.amount)?.toLocaleString('fr-FR')} HTG
+                              </span>
+                            </div>
+                            {p.planned_usd_bareme > 0 && (
+                              <span className="text-[10px] text-amber-700 font-bold block font-mono">
+                                Barème: ${p.planned_usd_bareme} USD {p.exchange_rate_applied ? `(@${p.exchange_rate_applied})` : ''}
+                              </span>
+                            )}
                           </div>
                         )}
                       </td>
@@ -1553,179 +1631,219 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         onPrint={executePrint}
       >
         {printPreview && (
-              <div id="thermal-reprint-receipt" className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl rounded-xl border border-gray-200 text-black font-sans leading-tight flex flex-col print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm]">
-                {/* HEADER SCOLAIRE */}
-                <div className="w-full text-center border-b-2 border-black pb-2 mb-3">
-                  {schoolDetails?.logo_url ? (
-                    <img src={schoolDetails.logo_url} alt="Logo" className="h-12 mx-auto mb-1 object-contain" referrerPolicy="no-referrer" />
-                  ) : (
-                    <img src="/logo.png" alt="Logo" className="h-12 mx-auto mb-1 object-contain grayscale" />
-                  )}
-                  <h1 className="text-[13px] font-black uppercase leading-tight">{schoolDetails?.name || 'INSTITUTION SCOLAIRE'}</h1>
-                  {activeCampusName && activeCampusName !== 'Tous les campus (Vue globale)' && (
-                    <p className="text-[10px] font-extrabold text-gray-800 uppercase tracking-wider">{activeCampusName}</p>
-                  )}
-                  <div className="text-[9px] font-bold opacity-90 italic mt-0.5 space-y-0.5">
-                    {schoolDetails?.address && <p>{schoolDetails.address}</p>}
-                    {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
-                  </div>
-                </div>
+          <div id="thermal-reprint-receipt" className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl rounded-xl border border-gray-200 text-black font-sans leading-tight flex flex-col print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm]">
+            {/* LIGNE DE DÉCOUPE SUPÉRIEURE STYLISÉE */}
+            <div className="w-full flex justify-between items-center opacity-30 text-[6px] tracking-[0.25em] mb-2 font-mono print:hidden select-none" aria-hidden="true">
+              <span>• • • • • • • • • • • • • • • • • • • • • • • • • •</span>
+            </div>
 
-                {/* TITRE DU DOCUMENT */}
-                <div className="w-full text-center mb-3 py-1.5 bg-gray-100 rounded border border-gray-200 print:bg-gray-100">
-                  <h2 className="text-[12px] font-black tracking-widest uppercase">REÇU OFFICIEL (DUPLICATA)</h2>
-                  <p className="text-[9px] font-bold opacity-80 mt-0.5">#RCP-{printPreview.id?.substring(0,8)}</p>
-                  {printPreview.payment_method?.includes('EN ATTENTE') && (
-                    <span className="inline-block mt-1 px-2 py-0.5 text-[7px] font-black bg-gray-100 text-black border border-black uppercase tracking-widest rounded">
-                      Paiement En Attente
+            {/* HEADER SCOLAIRE */}
+            <div className="w-full text-center border-b-2 border-black pb-2 mb-3">
+              {schoolDetails?.logo_url ? (
+                <img src={schoolDetails.logo_url} alt="Logo" className="h-12 mx-auto mb-1 object-contain" referrerPolicy="no-referrer" />
+              ) : (
+                <img src="/logo.png" alt="Logo" className="h-12 mx-auto mb-1 object-contain grayscale" />
+              )}
+              <h1 className="text-[13px] font-black uppercase leading-tight">{schoolDetails?.name || 'INSTITUTION SCOLAIRE'}</h1>
+              {(() => {
+                const campusDisplay = printPreview.campus_name || (activeCampusName && activeCampusName !== 'Tous les campus (Vue globale)' ? activeCampusName : null);
+                return campusDisplay ? (
+                  <p className="text-[9.5px] font-black uppercase tracking-wider text-black mt-0.5">
+                    Annexe / Campus : {campusDisplay}
+                  </p>
+                ) : null;
+              })()}
+              <div className="text-[9px] font-bold opacity-90 italic mt-0.5 space-y-0.5">
+                {schoolDetails?.address && <p>{schoolDetails.address}</p>}
+                {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
+              </div>
+            </div>
+
+            {/* TITRE DU DOCUMENT */}
+            <div className="w-full text-center mb-3 py-1.5 bg-gray-100 rounded border border-gray-200 print:bg-gray-100">
+              <h2 className="text-[12px] font-black tracking-widest uppercase">REÇU OFFICIEL (DUPLICATA)</h2>
+              <p className="text-[9px] font-black font-mono mt-0.5">#{printPreview.ref || `RCP-${printPreview.id?.substring(0,8).toUpperCase()}`}</p>
+              {printPreview.payment_method?.includes('EN ATTENTE') && (
+                <span className="inline-block mt-1 px-2 py-0.5 text-[7px] font-black bg-gray-100 text-black border border-black uppercase tracking-widest rounded">
+                  Paiement En Attente
+                </span>
+              )}
+              {/* Pattern simulation code-barres thermique propre */}
+              <div className="w-32 mx-auto my-1 flex justify-center items-center gap-[1.5px] opacity-80 h-3 overflow-hidden select-none" aria-hidden="true">
+                {[1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2].map((w, idx) => (
+                  <span
+                    key={idx}
+                    className="h-full bg-black block"
+                    style={{ width: `${w}px` }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* GRID DETAILS (2 COLONNES COMPACTES) */}
+            <div className="w-full grid grid-cols-2 gap-2 text-[9px] mb-3 border-b border-black pb-2">
+              <div className="space-y-1">
+                <div>
+                  <p className="text-[7px] uppercase font-black text-gray-500">Date & Heure</p>
+                  <p className="font-bold leading-none">{printPreview.date} {printPreview.time ? `à ${printPreview.time}` : ''}</p>
+                </div>
+                <div>
+                  <p className="text-[7px] uppercase font-black text-gray-500">Caissier</p>
+                  <p className="font-bold leading-none">{cashierName || 'Comptabilité'}</p>
+                </div>
+              </div>
+              <div className="space-y-1 text-right border-l border-gray-200 pl-2">
+                <div>
+                  <p className="text-[7px] uppercase font-black text-gray-500">Élève</p>
+                  <p className="font-black text-[10px] leading-tight">{printPreview.studentName}</p>
+                  <p className="text-[8px] font-bold text-gray-600 italic">{printPreview.classe || 'Non assignée'}</p>
+                  {printPreview.matricule && (
+                    <p className="text-[7px] font-mono text-gray-500">Mat: {printPreview.matricule}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* MOTIF & PAIEMENT */}
+            <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
+              <div className="flex justify-between items-start py-0.5">
+                <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
+                <div className="text-right pl-2">
+                  <span className="font-black text-[10.5px] block text-black uppercase">{printPreview.nature}</span>
+                  {printPreview.planned_usd_bareme > 0 && (
+                    <span className="inline-block mt-0.5 text-[8px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">
+                      Barème fixé en Dollars : ${printPreview.planned_usd_bareme} USD
                     </span>
                   )}
                 </div>
-
-                {/* GRID DETAILS (2 COLONNES COMPACTES) */}
-                <div className="w-full grid grid-cols-2 gap-2 text-[9px] mb-3 border-b border-black pb-2">
-                  <div className="space-y-1">
-                    <div>
-                      <p className="text-[7px] uppercase font-black text-gray-500">Date & Heure</p>
-                      <p className="font-bold leading-none">{printPreview.date || new Date().toLocaleDateString('fr-FR')}</p>
-                    </div>
-                    <div>
-                      <p className="text-[7px] uppercase font-black text-gray-500">Caissier</p>
-                      <p className="font-bold leading-none">{cashierName || 'Comptabilité'}</p>
-                    </div>
-                  </div>
-                  <div className="space-y-1 text-right border-l border-gray-200 pl-2">
-                    <div>
-                      <p className="text-[7px] uppercase font-black text-gray-500">Élève</p>
-                      <p className="font-black text-[10px] leading-tight">{printPreview.studentName}</p>
-                      <p className="text-[8px] font-bold text-gray-600 italic">{printPreview.classe || 'N/A'}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* MOTIF & PAIEMENT */}
-                <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
-                  <div className="flex justify-between items-start py-0.5">
-                    <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
-                    <span className="font-black text-[10.5px] text-right text-black uppercase pl-2">{printPreview.nature}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-0.5">
-                    <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
-                    <span className="font-black text-[10px] text-black">{printPreview.payment_method || 'Cash'}</span>
-                  </div>
-                  {printPreview.description && printPreview.description !== printPreview.nature && (
-                    <div className="flex justify-between items-center py-0.5 text-[8px] text-gray-600">
-                      <span className="font-medium uppercase">Précision :</span>
-                      <span className="font-semibold italic text-right pl-2">{printPreview.description}</span>
-                    </div>
-                  )}
-                </div>
-
-                {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
-                <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
-                  <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Montant Certifié Payé</p>
-                  <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
-                    {printPreview.amount?.toLocaleString()} <span className="text-[11px] font-bold">HTG</span>
-                  </p>
-                  {/* BLOC CONVERSION DE TAUX DE CHANGE CLAIR ET TRANSPARENT */}
-                  {(() => {
-                    const rate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
-                    const isUSD = printPreview.currency === 'USD';
-                    const originalUSD = printPreview.original_amount;
-
-                    if (isUSD && rate) {
-                      return (
-                        <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
-                          <div className="flex justify-between items-center text-[8.5px] font-black text-black">
-                            <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
-                            <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                              1 USD = {rate} HTG
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                            <span>Montant versé d'origine (USD) :</span>
-                            <span className="font-mono font-black">${Number(originalUSD || 0).toLocaleString()} USD</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
-                            <span>Contre-valeur perçue (HTG) :</span>
-                            <span className="font-mono">{Number(printPreview.amount).toLocaleString()} HTG</span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const isFeeInUSD = printPreview.original_currency === 'USD' || (originalUSD && Number(originalUSD) > 0 && printPreview.currency !== 'USD');
-
-                    if (!isUSD && isFeeInUSD && rate) {
-                      const equivUSD = Number(originalUSD) > 0 ? Number(originalUSD).toFixed(2) : (Number(printPreview.amount) / Number(rate)).toFixed(2);
-                      return (
-                        <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
-                          <div className="flex justify-between items-center text-[8.5px] font-black text-black">
-                            <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
-                            <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                              1 USD = {rate} HTG
-                            </span>
-                          </div>
-                          <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                            <span>Barème fixé en Dollars :</span>
-                            <span className="font-mono font-black">${equivUSD} USD</span>
-                          </div>
-                          <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
-                            <span>Montant scellé en Gourdes :</span>
-                            <span className="font-mono">{Number(printPreview.amount).toLocaleString()} HTG</span>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    return null;
-                  })()}
-                </div>
-
-                {/* BLOC QR CODE UNIQUE D'AUTHENTICITÉ (SCAN RAPIDE SMARTPHONE) */}
-                <div className="w-full my-2.5 p-2 bg-gray-50 rounded border border-black/30 text-center flex flex-col items-center justify-center print:bg-white print:border-black">
-                  <div className="bg-white p-1 rounded border border-black/40 mb-1 inline-block">
-                    {reprintQrDataUrl ? (
-                      <img
-                        src={reprintQrDataUrl}
-                        alt="QR Code d'Authenticité"
-                        className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto block"
-                      />
-                    ) : (
-                      <div className="w-24 h-24 flex items-center justify-center bg-gray-100">
-                        <QrCode size={30} className="text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-                  <p className="text-[7.5px] font-black uppercase tracking-wider text-black">
-                    Scan Rapide • Vérification d'Authenticité
-                  </p>
-                  <p className="text-[7px] font-mono font-bold text-gray-800 mt-0.5">
-                    Scellé : {reprintQrSignature || `EDN-${printPreview.receipt_number || printPreview.id}`}
-                  </p>
-                  <p className="text-[6.5px] text-gray-600 italic mt-0.5">
-                    Scannez avec votre smartphone pour attester la validité de ce duplicata
-                  </p>
-                </div>
-
-                {/* SIGNATURE & MENTION LÉGALE */}
-                <div className="w-full text-center space-y-3 mt-2">
-                  <div className="w-3/4 mx-auto space-y-1 pt-2">
-                    <div className="h-7 border-b border-black"></div>
-                    <p className="text-[7px] font-black uppercase tracking-widest">Sign. Caissier: {cashierName || 'Direction'}</p>
-                  </div>
-
-                  <p className="text-[8px] font-bold italic pt-2 border-t border-black text-center">
-                    Merci de votre confiance ! Duplicata officiel EduNova Pro.
-                  </p>
-                </div>
-
-                {/* BUFFER MARGE DE COUPE (AUTO-CUTTER EPSON PRINTER) */}
-                <div className="w-full pt-3 mt-2 border-t border-dashed border-gray-400 text-center">
-                  <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black">- - - MARGE DE COUPE EPSON - - -</p>
-                  <div className="h-6 print:h-12"></div>
-                </div>
               </div>
+              <div className="flex justify-between items-center py-0.5">
+                <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
+                <span className="font-black text-[10px] text-black">{printPreview.payment_method || 'Cash'}</span>
+              </div>
+              {printPreview.reference_number && (
+                <div className="flex justify-between items-center py-0.5 text-[8px]">
+                  <span className="font-bold uppercase text-gray-500">Réf. Transaction / Pièce :</span>
+                  <span className="font-mono font-black">{printPreview.reference_number}</span>
+                </div>
+              )}
+              {printPreview.description && printPreview.description !== printPreview.nature && (
+                <div className="flex justify-between items-center py-0.5 text-[8px] text-gray-600">
+                  <span className="font-medium uppercase">Précision :</span>
+                  <span className="font-semibold italic text-right pl-2">{printPreview.description}</span>
+                </div>
+              )}
+            </div>
+
+            {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
+            <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
+              <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Montant Certifié Payé</p>
+              <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
+                {(printPreview.paid_amount ?? printPreview.amount)?.toLocaleString('fr-FR')} <span className="text-[11px] font-bold">{printPreview.currency || 'HTG'}</span>
+              </p>
+              {/* BLOC CONVERSION DE TAUX DE CHANGE CLAIR ET TRANSPARENT */}
+              {(() => {
+                const rate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
+                const isUSD = printPreview.currency === 'USD';
+                const paidAmt = Number(printPreview.paid_amount ?? printPreview.amount ?? 0);
+
+                if (isUSD && rate) {
+                  const equivHTG = printPreview.equiv_amount_htg || Math.round(paidAmt * rate);
+                  return (
+                    <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                        <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                        <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                          1 USD = {rate} HTG
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Montant versé (Devise USD) :</span>
+                        <span className="font-mono font-black">${paidAmt.toLocaleString()} USD</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                        <span>Contre-valeur perçue (HTG) :</span>
+                        <span className="font-mono font-black">{equivHTG.toLocaleString()} HTG</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                const plannedUSD = printPreview.planned_usd_bareme;
+                if (!isUSD && plannedUSD > 0 && rate > 0) {
+                  const equivCoveredUSD = (paidAmt / rate).toFixed(2);
+                  return (
+                    <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black">
+                        <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
+                        <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
+                          1 USD = {rate} HTG
+                        </span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Barème fixé en Dollars :</span>
+                        <span className="font-mono font-black">${plannedUSD} USD</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Valeur équivalente couverte :</span>
+                        <span className="font-mono font-black">≈ ${equivCoveredUSD} USD</span>
+                      </div>
+                      <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
+                        <span>Montant effectif encaissé en Gourdes :</span>
+                        <span className="font-mono font-black">{paidAmt.toLocaleString()} HTG</span>
+                      </div>
+                    </div>
+                  );
+                }
+
+                return null;
+              })()}
+            </div>
+
+            {/* BLOC QR CODE UNIQUE D'AUTHENTICITÉ (SCAN RAPIDE SMARTPHONE) */}
+            <div className="w-full my-2.5 p-2 bg-gray-50 rounded border border-black/30 text-center flex flex-col items-center justify-center print:bg-white print:border-black">
+              <div className="bg-white p-1 rounded border border-black/40 mb-1 inline-block">
+                {reprintQrDataUrl ? (
+                  <img
+                    src={reprintQrDataUrl}
+                    alt="QR Code d'Authenticité"
+                    className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto block"
+                  />
+                ) : (
+                  <div className="w-24 h-24 flex items-center justify-center bg-gray-100">
+                    <QrCode size={30} className="text-gray-400" />
+                  </div>
+                )}
+              </div>
+              <p className="text-[7.5px] font-black uppercase tracking-wider text-black">
+                Scan Rapide • Vérification d'Authenticité
+              </p>
+              <p className="text-[7px] font-mono font-bold text-gray-800 mt-0.5">
+                Scellé : {reprintQrSignature || `EDN-${printPreview.ref || printPreview.id}`}
+              </p>
+              <p className="text-[6.5px] text-gray-600 italic mt-0.5">
+                Scannez avec votre smartphone pour attester la validité de ce duplicata
+              </p>
+            </div>
+
+            {/* SIGNATURE & MENTION LÉGALE */}
+            <div className="w-full text-center space-y-3 mt-2">
+              <div className="w-3/4 mx-auto space-y-1 pt-2">
+                <div className="h-7 border-b border-black"></div>
+                <p className="text-[7px] font-black uppercase tracking-widest">Sign. Caissier: {cashierName || 'Direction'}</p>
+              </div>
+
+              <p className="text-[8px] font-bold italic pt-2 border-t border-black text-center">
+                Merci de votre confiance ! Duplicata officiel EduNova Pro.
+              </p>
+            </div>
+
+            {/* BUFFER MARGE DE COUPE (AUTO-CUTTER EPSON PRINTER) */}
+            <div className="w-full pt-3 mt-2 border-t border-dashed border-gray-400 text-center">
+              <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black">- - - MARGE DE COUPE EPSON - - -</p>
+              <div className="h-6 print:h-12"></div>
+            </div>
+          </div>
         )}
       </PrintPreviewModal>
 
