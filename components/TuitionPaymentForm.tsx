@@ -2081,9 +2081,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   if (showReceipt) {
     return (
       <div className="w-full max-w-5xl mx-auto space-y-5 sm:space-y-6 animate-in fade-in duration-300 pb-16 px-2 sm:px-4">
-        {/* BANDEAU CONFIRMATION ULTRA-MODERNE & HUB D'IMPRESSION DIRECTE RESPONSIVE */}
-        <div className="bg-white/95 backdrop-blur-md p-3.5 sm:p-4 lg:p-4.5 rounded-2xl shadow-xl shadow-slate-900/5 border border-slate-200/90 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3.5 lg:gap-4 print:hidden transition-all">
-          {/* Identité de la transaction scellée & Élève */}
+        {/* BANDEAU CONFIRMATION ULTRA-MODERNE FIXE EN DÉFILEMENT (STICKY) & HUB D'IMPRESSION DIRECTE RESPONSIVE */}
+        <div className="sticky top-0 sm:top-2 z-30 bg-white/95 backdrop-blur-md p-3 sm:p-3.5 lg:p-4 rounded-2xl shadow-xl shadow-slate-900/10 border border-slate-200/90 flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 lg:gap-4 print:hidden transition-all">
+          {/* Identité de la transaction scellée & Élève sur 2 lignes nettes et ergonomiques */}
           <div className="flex items-center gap-3 sm:gap-3.5 text-left min-w-0 flex-1">
             {/* Badge de confirmation animé avec ping */}
             <div className="relative flex items-center justify-center shrink-0">
@@ -2096,12 +2096,15 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               </span>
             </div>
 
-            <div className="min-w-0 flex-1 space-y-1">
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight whitespace-nowrap">Transaction Scellée</h2>
-                <span className="bg-emerald-50 text-emerald-700 text-[9.5px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/80 flex items-center gap-1 shrink-0">
-                  <ShieldCheck size={11} className="text-emerald-600" />
-                  Certifié Officiel
+            <div className="min-w-0 flex-1 space-y-0.5 sm:space-y-1">
+              {/* LIGNE 1 : Statut, Certification & Référence scellée (strictly single row) */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto no-scrollbar py-0.5">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight whitespace-nowrap shrink-0">
+                  Transaction Scellée
+                </h2>
+                <span className="bg-emerald-50 text-emerald-700 text-[9.5px] sm:text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-200/90 inline-flex items-center gap-1 shrink-0 whitespace-nowrap shadow-2xs">
+                  <ShieldCheck size={11} className="text-emerald-600 shrink-0" />
+                  <span>Certifié Officiel</span>
                 </span>
                 <button
                   type="button"
@@ -2113,7 +2116,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       setTimeout(() => setCopiedRef(false), 2000);
                     }
                   }}
-                  className="bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[9.5px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                  className="bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-mono text-[9.5px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md border border-slate-200 inline-flex items-center gap-1 transition-all cursor-pointer shrink-0 whitespace-nowrap shadow-2xs"
                   title="Copier la référence du reçu"
                 >
                   {copiedRef ? <Check size={10} className="text-emerald-600" /> : <Copy size={10} />}
@@ -2121,17 +2124,17 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </button>
               </div>
 
-              {/* Détails Élève, Classe & Montant sans coupure tronquée */}
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs text-slate-600 font-medium pt-0.5">
-                <span className="font-extrabold text-slate-900 tracking-tight">
+              {/* LIGNE 2 : Élève, Classe & Montant versé (strictly second row, clean badges) */}
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-nowrap overflow-x-auto no-scrollbar text-xs text-slate-600 font-medium py-0.5">
+                <span className="font-extrabold text-slate-900 tracking-tight text-xs sm:text-[13px] whitespace-nowrap shrink-0">
                   {selectedStudent.fullName}
                 </span>
-                <span className="text-slate-300 font-bold select-none">•</span>
-                <span className="bg-slate-100/90 text-slate-700 text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-200/70 shrink-0">
+                <span className="text-slate-300 font-bold select-none shrink-0">•</span>
+                <span className="bg-slate-100/90 text-slate-700 text-[10px] sm:text-[11px] font-bold px-1.5 py-0.5 rounded border border-slate-200/80 shrink-0 whitespace-nowrap">
                   {selectedStudent.classe || 'N/A'}
                 </span>
-                <span className="text-slate-300 font-bold select-none">•</span>
-                <span className="bg-emerald-50 text-emerald-800 font-mono font-black text-[11px] sm:text-xs px-2.5 py-0.5 rounded border border-emerald-200/80 shrink-0 shadow-2xs">
+                <span className="text-slate-300 font-bold select-none shrink-0">•</span>
+                <span className="bg-emerald-50 text-emerald-800 font-mono font-black text-[11px] sm:text-xs px-2.5 py-0.5 rounded border border-emerald-200/90 shrink-0 whitespace-nowrap shadow-2xs">
                   {parseFloat(montantReel || '0').toLocaleString()} {currency}
                 </span>
               </div>

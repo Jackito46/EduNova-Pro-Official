@@ -80,6 +80,14 @@ select:disabled, option:disabled {
   border-radius: 10px;
 }
 
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
 @media (hover: hover) and (pointer: fine) {
   ::-webkit-scrollbar-thumb:hover, .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background: #64748b;
