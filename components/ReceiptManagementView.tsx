@@ -1654,8 +1654,10 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       );
                     }
 
-                    if (rate) {
-                      const equivUSD = (Number(printPreview.amount) / Number(rate)).toFixed(2);
+                    const isFeeInUSD = printPreview.original_currency === 'USD' || (originalUSD && Number(originalUSD) > 0 && printPreview.currency !== 'USD');
+
+                    if (!isUSD && isFeeInUSD && rate) {
+                      const equivUSD = Number(originalUSD) > 0 ? Number(originalUSD).toFixed(2) : (Number(printPreview.amount) / Number(rate)).toFixed(2);
                       return (
                         <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
                           <div className="flex justify-between items-center text-[8.5px] font-black text-black">
@@ -1665,8 +1667,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </span>
                           </div>
                           <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                            <span>Valeur couverte en Dollars :</span>
-                            <span className="font-mono font-black">≈ ${equivUSD} USD</span>
+                            <span>Barème fixé en Dollars :</span>
+                            <span className="font-mono font-black">${equivUSD} USD</span>
                           </div>
                           <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
                             <span>Montant scellé en Gourdes :</span>

@@ -25,6 +25,7 @@ export const PublicReceiptVerificationView: React.FC<PublicReceiptVerificationVi
 
   const amount = parseFloat(amountStr) || 0;
   const rate = parseFloat(rateStr) || null;
+  const origCurr = params.get('orig_currency') || params.get('orig_curr');
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-indigo-950 text-slate-100 flex flex-col justify-between p-4 sm:p-6 md:p-8 font-sans">
@@ -98,7 +99,7 @@ export const PublicReceiptVerificationView: React.FC<PublicReceiptVerificationVi
               </div>
               
               {/* TAUX DE CONVERSION SI APPLICABLE */}
-              {rate && (
+              {rate && (currency === 'USD' || origCurr === 'USD') && (
                 <div className="mt-3 inline-flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-emerald-300 text-xs font-bold text-slate-800 shadow-2xs">
                   <span className="text-[10px] uppercase text-slate-500">Taux appliqué :</span>
                   <span className="font-mono font-black text-emerald-800">1 USD = {rate} HTG</span>

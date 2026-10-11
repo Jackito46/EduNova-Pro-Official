@@ -2531,8 +2531,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   );
                 }
 
-                if (!isUSD && (plannedUSD > 0 || currentExchangeRate > 0)) {
-                  const equivUSD = currentExchangeRate > 0 ? (paidAmount / currentExchangeRate).toFixed(2) : '0.00';
+                if (!isUSD && plannedUSD > 0 && currentExchangeRate > 0) {
+                  const equivUSD = (paidAmount / currentExchangeRate).toFixed(2);
                   return (
                     <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
                       <div className="flex justify-between items-center text-[8.5px] font-black text-black">
@@ -2541,12 +2541,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           1 USD = {currentExchangeRate} HTG
                         </span>
                       </div>
-                      {plannedUSD > 0 && (
-                        <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                          <span>Barème fixé en Dollars :</span>
-                          <span className="font-mono font-black">${plannedUSD} USD</span>
-                        </div>
-                      )}
+                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
+                        <span>Barème fixé en Dollars :</span>
+                        <span className="font-mono font-black">${plannedUSD} USD</span>
+                      </div>
                       <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
                         <span>Valeur équivalente couverte :</span>
                         <span className="font-mono font-black">≈ ${equivUSD} USD</span>

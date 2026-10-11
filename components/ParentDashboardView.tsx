@@ -773,7 +773,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                           <span className="font-bold">${Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD ({Number(p.amount_htg_equivalent || (Number(p.amount || 0) * (p.exchange_rate_applied || 140))).toLocaleString()} HTG)</span>
                           <span className="block text-[9px] text-gray-700 font-mono font-bold">Taux de conversion : 1 USD = {p.exchange_rate_applied || 140} HTG</span>
                         </>
-                      ) : p.exchange_rate_applied ? (
+                      ) : (p.currency === 'USD' || p.original_currency === 'USD' || (p as any).fee_currency === 'USD') && p.exchange_rate_applied ? (
                         <>
                           <span className="font-bold">{Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG</span>
                           <span className="block text-[9px] text-gray-700 font-mono font-bold">Taux de conversion : 1 USD = {p.exchange_rate_applied} HTG (≈ ${(Number(p.amount_htg_equivalent || p.amount || 0) / Number(p.exchange_rate_applied)).toFixed(2)} USD)</span>
