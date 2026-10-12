@@ -46,6 +46,7 @@ import StaffAssignmentView from './components/StaffAssignmentView';
 import StaffAttendanceView from './components/StaffAttendanceView';
 import DisciplinaryView from './components/DisciplinaryView';
 import FinancialAuditView from './components/FinancialAuditView';
+import StudentCurrencyDiagnosticView from './components/StudentCurrencyDiagnosticView';
 import BudgetPlanningView from './components/BudgetPlanningView';
 import DebtorsListView from './components/DebtorsListView';
 import UserManagementView from './components/UserManagementView';
@@ -340,6 +341,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/economat/paie" element={<ModuleGuard moduleId="finance" moduleName="Gestion Payroll" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><PayrollManagementView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/budget" element={<ModuleGuard moduleId="finance" moduleName="Planification Budgétaire" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Planification Budgétaire & Arbitrages"><BudgetPlanningView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
               <Route path="/economat/audit" element={<ModuleGuard moduleId="finance" moduleName="Audit Financier" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Audit Financier & Clôtures"><FinancialAuditView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/diagnostic" element={<ModuleGuard moduleId="finance" moduleName="Diagnostic Barème vs Engagement" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><StudentCurrencyDiagnosticView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/diagnostic-bareme" element={<ModuleGuard moduleId="finance" moduleName="Diagnostic Barème vs Engagement" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><StudentCurrencyDiagnosticView user={user} /></RoleGuard></ModuleGuard>} />
               
               {/* Reports Routes */}
               <Route path="/rapports" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY]}><ReportsView user={user} /></RoleGuard>} />

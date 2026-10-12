@@ -18,9 +18,11 @@ import {
   CheckCircle2,
   Wallet,
   ShieldCheck,
-  Coins
+  Coins,
+  Activity
 } from 'lucide-react';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
+import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
 
 interface StudentFinanceViewProps {
   user: UserProfile;
@@ -28,6 +30,7 @@ interface StudentFinanceViewProps {
 
 export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) => {
   const { school } = useSchool();
+  const isMultiCurrency = Boolean(school?.global_settings?.multi_currency_enabled);
   const { studentData, activeYear, loading: studentLoading } = useStudent(user);
   const [payments, setPayments] = useState<any[]>([]);
   const [feePlan, setFeePlan] = useState<any>(null);
@@ -35,6 +38,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [exchangeRate, setExchangeRate] = useState<number>(135.0);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns'>('all');
+  const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
 
   useEffect(() => {
     const fetchFinances = async () => {
@@ -324,13 +328,28 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             <h1 className="text-2xl font-black text-slate-900 tracking-tight">Mon Économat</h1>
             <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
               <span>Situation financière pour l'année académique <strong className="text-slate-800">{activeYear?.label || '--'}</strong></span>
-              <span className="text-slate-300">•</span>
-              <span className="text-indigo-600 font-mono font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                Taux du jour : 1 USD = {exchangeRate} HTG
-              </span>
+              {isMultiCurrency && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-indigo-600 font-mono font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                    Taux du jour : 1 USD = {exchangeRate} HTG
+                  </span>
+                </>
+              )}
             </p>
           </div>
         </div>
+
+        {isMultiCurrency && (
+          <button
+            type="button"
+            onClick={() => setIsDiagnosticOpen(true)}
+            className="self-start md:self-center px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-200 transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+          >
+            <Activity size={15} />
+            <span>Diagnostic Barème USD vs Engagement</span>
+          </button>
+        )}
       </div>
 
       {/* Tabs Selector */}
@@ -834,6 +853,17 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           </div>
         )}
       </div>
+
+      {isDiagnosticOpen && (
+        <StudentCurrencyDiagnosticModal
+          isOpen={isDiagnosticOpen}
+          onClose={() => setIsDiagnosticOpen(false)}
+          studentId={studentData?.id || '9f18c76c-7592-4549-82c4-d1fcc2ee8b0d'}
+          studentName={studentData ? `${studentData.last_name} ${studentData.first_name}` : 'DESROSIERS Christelle'}
+          studentClass="NS II"
+          currentExchangeRate={exchangeRate}
+        />
+      )}
     </div>
   );
 };

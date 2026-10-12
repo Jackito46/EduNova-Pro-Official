@@ -30,7 +30,8 @@ import {
   X,
   Sliders,
   Radio,
-  Building2
+  Building2,
+  Activity
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { toast } from 'sonner';
@@ -38,6 +39,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ReevaluationModal, ReevaluatedStudentItem } from './ReevaluationModal';
 import { GatewayWebhookSimulatorModal } from './GatewayWebhookSimulatorModal';
+import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
 
 const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
@@ -60,6 +62,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [totalReductionsUSD, setTotalReductionsUSD] = useState(0);
   const [reevaluatedStudents, setReevaluatedStudents] = useState<ReevaluatedStudentItem[]>([]);
   const [isReevaluationModalOpen, setIsReevaluationModalOpen] = useState(false);
+  const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
+  const isMultiCurrency = Boolean(school?.global_settings?.multi_currency_enabled);
   const [isTargetReevaluated, setIsTargetReevaluated] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(`edunova_target_reevaluated_${user?.school_id || 'default'}`);
@@ -1122,6 +1126,19 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               <span className="whitespace-nowrap">Clôture Caisse</span>
             </button>
 
+            {/* Button: Diagnostic Barème USD (Visible uniquement pour écoles avec 2 devises activées) */}
+            {isMultiCurrency && (
+              <button
+                type="button"
+                onClick={() => setIsDiagnosticModalOpen(true)}
+                className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-indigo-500/30 hover:bg-indigo-500/50 text-white font-bold text-xs sm:text-xs md:text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-400/40 whitespace-nowrap cursor-pointer backdrop-blur-md"
+                title="Diagnostic comparatif du Total Dû théorique (barème USD) vs montant réellement enregistré dans l'engagement"
+              >
+                <Activity size={15} className="shrink-0 text-indigo-300" />
+                <span className="whitespace-nowrap">Diagnostic Barème USD</span>
+              </button>
+            )}
+
             {/* Button 3: Encaisser un Frais */}
             <button
               type="button"
@@ -1435,6 +1452,52 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
+      {/* BANDEAU DIAGNOSTIC FINANCIER : BARÈME USD THÉORIQUE VS ENGAGEMENT RÉEL (Uniquement écoles multi-devises) */}
+      {isMultiCurrency && (
+        <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white rounded-2xl p-3 sm:p-3.5 border border-indigo-500/30 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center justify-center shrink-0">
+              <Activity size={18} className="stroke-[2.5]" />
+            </div>
+            <div className="min-w-0 space-y-0.5">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="px-2 py-0.2 rounded-full bg-indigo-500/25 text-indigo-300 text-[9px] font-black uppercase tracking-wider border border-indigo-400/30">
+                  Audit Devise
+                </span>
+                <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded border border-amber-400/30">
+                  Christelle (NS II) • ID: 9f18c76c...
+                </span>
+                <span className="text-[9.5px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded-full font-bold border border-emerald-400/30">
+                  Écart Amorti (+640 G)
+                </span>
+              </div>
+              <h4 className="text-xs sm:text-sm font-black text-white truncate">
+                Diagnostic Multi-Devises : Barème USD (99 600 G) vs Engagement Scellé (98 960 G)
+              </h4>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+            <button
+              type="button"
+              onClick={() => setIsDiagnosticModalOpen(true)}
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            >
+              <Activity size={13} />
+              <span>Diagnostic Rapide</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/economat/diagnostic?student_id=9f18c76c-7592-4549-82c4-d1fcc2ee8b0d')}
+              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/20 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+            >
+              <span>Plein Écran</span>
+              <ArrowRight size={13} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* DASHBOARD PREVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 items-start">
         <div className={`bg-white p-3.5 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/80 space-y-3 sm:space-y-3.5 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>
@@ -1710,6 +1773,17 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         user={user}
         onClosureUpdated={fetchFinanceData}
       />
+
+      {isDiagnosticModalOpen && (
+        <StudentCurrencyDiagnosticModal
+          isOpen={isDiagnosticModalOpen}
+          onClose={() => setIsDiagnosticModalOpen(false)}
+          studentId="9f18c76c-7592-4549-82c4-d1fcc2ee8b0d"
+          studentName="DESROSIERS Christelle"
+          studentClass="NS II"
+          currentExchangeRate={148}
+        />
+      )}
 
       {user?.school_id && (
         <GatewayWebhookSimulatorModal

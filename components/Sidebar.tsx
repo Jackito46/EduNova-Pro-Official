@@ -202,6 +202,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   }, [sidebarMode]);
 
   const isNarrow = sidebarMode === 'collapsed' || (sidebarMode === 'hover' && !isHovered);
+  const isMultiCurrency = Boolean(school?.global_settings?.multi_currency_enabled);
 
   // Role-based access control for sidebar
   const adminRoles = [UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR];
@@ -510,6 +511,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Gestion Payroll', path: '/economat/paie' }, true, Wallet)}
                   {isInventoryEnabled && renderNavLink({ name: 'Fournitures & Stocks', path: '/economat/fournitures' }, true, Package)}
                   {hasAccess(adminRoles) && renderNavLink({ name: 'Réévaluations', path: '/economat/derogations' }, true, RefreshCcw)}
+                  {isMultiCurrency && hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Diagnostic Barème USD', path: '/economat/diagnostic' }, true, Activity)}
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Campagnes & Événements', path: '/economat/frais-occasionnels' }, true, Rocket)}
                 </div>
               )}

@@ -1925,20 +1925,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        <p className="text-slate-600 mt-1 font-medium text-xs sm:text-sm tracking-tight">Paramètres généraux et préférences de votre établissement</p>
       </div>
       <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
-       <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs">
-        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-        <span>Synchro Cloud Automatique</span>
-       </div>
-
        {isSuperAdmin && (
-         <Link
-          to="/super-admin/system-health?tab=database"
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 shadow-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200/80"
-          title="Ouvrir la Console Santé Système & Diagnostic de Latence Supabase"
-         >
-          <Activity size={14} className="text-indigo-600" />
-          <span>Diagnostic Latence BD</span>
-         </Link>
+         <>
+           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200/80 text-emerald-700 rounded-xl text-xs font-semibold shadow-xs" title="Synchronisation temps réel Supabase Cloud active">
+            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            <span>Synchro Cloud Automatique</span>
+           </div>
+
+           <Link
+            to="/super-admin/system-health?tab=database"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer active:scale-95 shadow-xs bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200/80"
+            title="Ouvrir la Console Santé Système & Diagnostic de Latence Supabase (Super Admin)"
+           >
+            <Activity size={14} className="text-indigo-600" />
+            <span>Diagnostic Latence BD</span>
+           </Link>
+         </>
        )}
 
        <button 
@@ -3440,8 +3442,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                      <h3 className="text-xs sm:text-sm font-bold tracking-tight text-slate-900">
                        Finance & Devises
                      </h3>
-                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80 font-mono">
-                       {schoolData.global_settings?.primary_currency || 'HTG'} ↔ {schoolData.global_settings?.secondary_currency || 'USD'}
+                     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
+                       schoolData.global_settings?.multi_currency_enabled
+                         ? "bg-indigo-50 text-indigo-700 border-indigo-200/80"
+                         : "bg-emerald-50 text-emerald-700 border-emerald-200/80"
+                     }`}>
+                       {schoolData.global_settings?.multi_currency_enabled
+                         ? `${schoolData.global_settings?.primary_currency || "HTG"} ↔ ${schoolData.global_settings?.secondary_currency || "USD"}`
+                         : `${schoolData.global_settings?.primary_currency || "HTG"} (Mono-devise)`}
                      </span>
                    </div>
                    <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
@@ -3486,6 +3494,53 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
              </div>
 
              <div className="p-3 sm:p-3.5 space-y-3 sm:space-y-3.5">
+               {/* Régime Monétaire : Mono-Devise vs Multi-Devises */}
+               <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200/80 space-y-2">
+                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                   <div className="space-y-0.5">
+                     <div className="text-xs font-bold text-slate-900 flex items-center gap-2 flex-wrap">
+                       <span>Régime Monétaire de l'Établissement</span>
+                       <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                         schoolData.global_settings?.multi_currency_enabled 
+                           ? "bg-indigo-50 text-indigo-700 border border-indigo-200" 
+                           : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                       }`}>
+                         {schoolData.global_settings?.multi_currency_enabled ? "Double Devise (USD / HTG)" : "Mono-Devise (Devise Unique)"}
+                       </span>
+                     </div>
+                     <p className="text-[11px] text-slate-500">
+                       {schoolData.global_settings?.multi_currency_enabled 
+                         ? "Barèmes en USD et conversions au taux du jour activés. Les outils de diagnostic et conciliation USD sont disponibles."
+                         : "L'établissement facture et encaisse exclusivement en monnaie unique. Les diagnostics et conversions USD sont masqués du système."}
+                     </p>
+                   </div>
+
+                   <label className="relative inline-flex items-center cursor-pointer shrink-0 self-start sm:self-center">
+                     <input 
+                       type="checkbox" 
+                       className="sr-only peer"
+                       checked={Boolean(schoolData.global_settings?.multi_currency_enabled)}
+                       disabled={!canManageAllCampuses}
+                       onChange={(e) => {
+                         const isEnabled = e.target.checked;
+                         setSchoolData({
+                           ...schoolData,
+                           global_settings: {
+                             ...(schoolData.global_settings || {}),
+                             multi_currency_enabled: isEnabled
+                           }
+                         });
+                         toast.info(isEnabled 
+                           ? "Mode Multi-devises activé (Barème USD et taux de change disponibles)" 
+                           : "Mode Mono-devise activé (Diagnostics et conversions USD masqués)"
+                         );
+                       }}
+                     />
+                     <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-600"></div>
+                   </label>
+                 </div>
+               </div>
+
                {/* Sélecteurs des Devises */}
                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50/80 p-2.5 sm:p-3 rounded-lg border border-slate-200/80">
                  <div className="space-y-1">
