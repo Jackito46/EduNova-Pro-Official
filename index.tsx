@@ -6,6 +6,22 @@ declare const __DEPLOY_HASH__: string;
 // Signal immédiat au document que le bundle JS s'exécute avec succès
 if (typeof window !== 'undefined') {
   (window as any).__edunovaAppReady = true;
+
+  // Interception des notifications bénignes de ResizeObserver (ex: Recharts ResponsiveContainer / grilles flex)
+  window.addEventListener(
+    'error',
+    (event: ErrorEvent) => {
+      const msg = event?.message || '';
+      if (
+        msg.includes('ResizeObserver loop completed with undelivered notifications') ||
+        msg.includes('ResizeObserver loop limit exceeded')
+      ) {
+        event.stopImmediatePropagation();
+        event.preventDefault();
+      }
+    },
+    true
+  );
 }
 
 // Initialisation précoce de l'interception et du nettoyage des logs de la console

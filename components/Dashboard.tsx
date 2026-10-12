@@ -284,22 +284,29 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
   }, []);
 
-  // Scroll detection to dynamically update header background color when scrolling down
+  // Détection du défilement pour modifier dynamiquement la couleur de fond et l'élévation de l'en-tête
   const [isScrolled, setIsScrolled] = useState(false);
 
   useEffect(() => {
     const scrollContainer = document.getElementById('main-content-scroll') || document.querySelector('main');
-    if (!scrollContainer) return;
 
     const handleScroll = () => {
-      setIsScrolled(scrollContainer.scrollTop > 10);
+      const scrollY = scrollContainer ? scrollContainer.scrollTop : 0;
+      const windowY = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+      setIsScrolled(scrollY > 12 || windowY > 12);
     };
 
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    if (scrollContainer) {
+      scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    }
+    window.addEventListener('scroll', handleScroll, { passive: true });
     handleScroll();
 
     return () => {
-      scrollContainer.removeEventListener('scroll', handleScroll);
+      if (scrollContainer) {
+        scrollContainer.removeEventListener('scroll', handleScroll);
+      }
+      window.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -1631,27 +1638,33 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     const sidebarInner = document.getElementById('sidebar-brand-header-inner');
     const dashInner = document.getElementById('dashboard-sticky-header-inner');
-    const sidebarHeader = document.getElementById('sidebar-brand-header');
-    const dashHeader = document.getElementById('dashboard-sticky-header');
+
+    let rafId: number | null = null;
+    const scheduleSync = () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        syncHeaderAlignment();
+      });
+    };
 
     let ro: ResizeObserver | null = null;
     if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver(() => {
-        syncHeaderAlignment();
+        scheduleSync();
       });
       if (sidebarInner) ro.observe(sidebarInner);
       if (dashInner) ro.observe(dashInner);
-      if (sidebarHeader) ro.observe(sidebarHeader);
-      if (dashHeader) ro.observe(dashHeader);
     }
 
-    window.addEventListener('resize', syncHeaderAlignment);
-    window.addEventListener('sidebarModeChanged', syncHeaderAlignment as EventListener);
+    window.addEventListener('resize', scheduleSync);
+    window.addEventListener('sidebarModeChanged', scheduleSync as EventListener);
 
     return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
       if (ro) ro.disconnect();
-      window.removeEventListener('resize', syncHeaderAlignment);
-      window.removeEventListener('sidebarModeChanged', syncHeaderAlignment as EventListener);
+      window.removeEventListener('resize', scheduleSync);
+      window.removeEventListener('sidebarModeChanged', scheduleSync as EventListener);
       const sh = document.getElementById('sidebar-brand-header');
       if (sh) sh.style.height = '';
     };
@@ -1826,10 +1839,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       {/* Header Section - Relatif sur mobile/tablette pour libérer l'espace visuel, fixé à top: 0 sur desktop (lg:) et aligné au dixième de pixel près avec l'en-tête Sidebar */}
       <header 
         id="dashboard-sticky-header"
-        className={`relative lg:sticky lg:top-0 z-30 w-full box-border flex items-center min-h-[78px] transition-colors duration-200 ease-out pl-16 sm:pl-16 lg:pl-6 2xl:pl-8 pr-4 sm:pr-5 lg:pr-6 2xl:pr-8 py-2.5 border-b border-slate-200 ${
+        className={`relative lg:sticky lg:top-0 z-30 w-full box-border flex items-center min-h-[78px] transition-all duration-300 ease-in-out pl-16 sm:pl-16 lg:pl-6 2xl:pl-8 pr-4 sm:pr-5 lg:pr-6 2xl:pr-8 py-2.5 border-b ${
           isScrolled 
-            ? 'bg-white/85 lg:bg-white/95 dark:bg-slate-900/95 backdrop-blur-md lg:shadow-xs' 
-            : 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-none'
+            ? 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-slate-200 shadow-md shadow-slate-200/60 dark:shadow-slate-950/40' 
+            : 'bg-slate-100/80 dark:bg-slate-900/70 backdrop-blur-md border-slate-200/80 shadow-none'
         }`}
       >
         <div

@@ -308,7 +308,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         {/* LOGO & SCHOOL IDENTITY HEADER */}
         <div
           id="sidebar-brand-header"
-          className={`relative box-border border-b border-slate-200 bg-white/80 backdrop-blur-md text-left transition-colors duration-200 flex items-center ${
+          className={`relative box-border border-b border-slate-200 bg-slate-100/90 backdrop-blur-md text-left transition-colors duration-200 flex items-center ${
             isNarrow ? 'px-2 py-1.5 min-h-[78px] justify-center' : 'px-3.5 py-2.5 min-h-[78px]'
           }`}
         >
