@@ -1724,52 +1724,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-8 pb-12 animate-in fade-in duration-500">
-      {/* Security Recommendation Banner */}
-      {showSecurityBanner && (
-        <motion.div 
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group"
-        >
-          <div className="absolute top-0 right-0 p-2">
-            <button 
-              onClick={handleCloseSecurityBanner}
-              className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-xl transition-colors"
-            >
-              <X size={18} />
-            </button>
-          </div>
-
-          <div className="flex flex-col md:flex-row items-center gap-6">
-            <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform duration-500">
-              <ShieldCheck size={32} />
-            </div>
-            <div className="text-center md:text-left space-y-1">
-              <h3 className="text-lg font-black text-amber-900 tracking-tight flex items-center justify-center md:justify-start gap-2">
-                Sécurité Recommandée
-                <span className="px-2 py-0.5 bg-amber-200 text-amber-700 text-[10px] uppercase font-bold rounded-full">Haute Priorité</span>
-              </h3>
-              <p className="text-amber-700 font-medium text-sm max-w-xl leading-relaxed">
-                En tant qu'utilisateur avec un rôle sensible, nous vous recommandons fortement d'activer l'authentification à double facteur (2FA) pour protéger l'accès à vos données financières et institutionnelles.
-              </p>
-            </div>
-          </div>
-          
-          <div className="shrink-0 w-full md:w-auto">
-            <button 
-              onClick={() => navigate('/settings/ecole')}
-              className="w-full md:w-auto px-6 py-3 bg-amber-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-amber-600/20 hover:bg-amber-700 hover:shadow-xl transition-all active:scale-95"
-            >
-              Sécuriser mon compte
-            </button>
-          </div>
-
-          {/* Decorative elements */}
-          <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-amber-200/20 rounded-full blur-2xl pointer-events-none" />
-        </motion.div>
-      )}
-
+    <div className="-mt-4 sm:-mt-5 lg:-mt-6 2xl:-mt-8 -mx-4 sm:-mx-5 lg:-mx-6 2xl:-mx-8 pb-12 animate-in fade-in duration-500">
       {/* Revenue Breakdown Modal - Dense, Ergonomique et Responsive */}
       <ClassRevenueModal
         isOpen={showRevenueModal}
@@ -1781,156 +1736,205 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         terminology={terminology}
       />
 
-      {/* Header Section */}
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 lg:gap-3.5 xl:gap-5">
-        <div className="flex items-center gap-2.5 sm:gap-3.5 flex-1 min-w-0">
-          <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
-            {schoolInfo.logo_url ? (
-              <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5" />
-            ) : (
-              <School size={22} className="text-slate-400" />
-            )}
-          </div>
-          <div className="flex-1 min-w-0">
-            <h1 
-              className={`${schoolNameTypography} text-slate-900 truncate whitespace-nowrap block transition-all`} 
-              title={schoolInfo.name}
-            >
-              {schoolInfo.name}
-            </h1>
-            
-            <div className="flex items-center gap-2 mt-1 flex-wrap">
-              {/* User Identity Pill */}
-              <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl transition-all shadow-2xs shrink-0">
-                <span className="relative flex h-2 w-2">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                </span>
-                <span 
-                  id="dashboard-user-name-display"
-                  className="text-[11px] sm:text-xs font-bold text-slate-800 truncate max-w-[130px] sm:max-w-[220px]"
-                  title={user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
-                >
-                  {user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
-                </span> 
-                <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
-                  {roleLabels[user.role] || user.role.replace(/_/g, ' ')}
-                </span>
-                {user.role === UserRole.STUDENT && studentStats.className && (
-                  <span className="hidden sm:inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">
-                    {studentStats.className}
-                  </span>
-                )}
-              </div>
-
-              {/* Modern Academic Session Dropdown Selector */}
-              {academicYears.length > 0 && (
-                <AcademicSessionPill
-                  academicYears={academicYears}
-                  selectedYearId={selectedYearId}
-                  onSelectYear={(yearId) => setSelectedYearId(yearId)}
-                  size="sm"
-                  colorScheme="indigo"
-                />
+      {/* Header Section - Fixé tout en haut, aligné pixel-perfect avec le header du sidebar, fond blanc solide et bordure continue */}
+      <header className="sticky top-0 z-30 w-full bg-white dark:bg-slate-900 border-b border-slate-200/90 shadow-2xs px-4 sm:px-5 lg:px-6 2xl:px-8 py-2.5 sm:py-3 transition-colors">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3 lg:gap-3.5 xl:gap-5">
+          <div className="flex items-center gap-2.5 sm:gap-3.5 flex-1 min-w-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
+              {schoolInfo.logo_url ? (
+                <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5" />
+              ) : (
+                <School size={22} className="text-slate-400" />
               )}
             </div>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto shrink-0">
-          {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR, UserRole.ACCOUNTANT].includes(user.role) && (
-            <>
-              <div className="relative flex-1 lg:w-40 xl:w-52 2xl:w-64 group shrink-0">
-                <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
-                  {isSearching ? <Loader2 className="h-4 w-4 text-gray-400 animate-spin" /> : <Search className="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />}
+            <div className="flex-1 min-w-0">
+              <h1 
+                className={`${schoolNameTypography} text-slate-900 truncate whitespace-nowrap block transition-all`} 
+                title={schoolInfo.name}
+              >
+                {schoolInfo.name}
+              </h1>
+              
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {/* User Identity Pill */}
+                <div className="inline-flex items-center gap-1.5 sm:gap-2 bg-slate-50 hover:bg-slate-100/80 border border-slate-200/80 px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-xl transition-all shadow-2xs shrink-0">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span 
+                    id="dashboard-user-name-display"
+                    className="text-[11px] sm:text-xs font-bold text-slate-800 truncate max-w-[130px] sm:max-w-[220px]"
+                    title={user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
+                  >
+                    {user.role === UserRole.STUDENT ? studentFormattedFullName : user.full_name}
+                  </span> 
+                  <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
+                    {roleLabels[user.role] || user.role.replace(/_/g, ' ')}
+                  </span>
+                  {user.role === UserRole.STUDENT && studentStats.className && (
+                    <span className="hidden sm:inline-block text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-100">
+                      {studentStats.className}
+                    </span>
+                  )}
                 </div>
-                <input 
-                  type="text"
-                  placeholder={`Rechercher...`}
-                  className="block w-full pl-8 pr-2.5 py-2 min-h-[38px] sm:min-h-[40px] text-gray-900 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs sm:text-sm"
-                  value={globalSearch}
-                  onChange={(e) => {
-                    setGlobalSearch(e.target.value);
-                    setShowResults(true);
-                  }}
-                  onFocus={() => setShowResults(true)}
-                />
-                {showResults && globalSearch.length >= 2 && (
-                  <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50 max-h-[300px] overflow-y-auto custom-scrollbar">
-                    {isSearching ? (
-                      <div className="p-8 text-center">
-                        <RefreshCcw className="animate-spin text-blue-500 mx-auto mb-2" size={24} />
-                        <p className="text-sm text-gray-500">Recherche en cours...</p>
-                      </div>
-                    ) : searchResults.length === 0 ? (
-                      <div className="p-8 text-center space-y-2">
-                        <p className="text-sm text-gray-500 italic">Aucun {terminology.student.toLowerCase()} trouvé pour "{globalSearch}"</p>
-                        <p className="text-[10px] text-gray-400">Vérifiez l'orthographe ou essayez une partie du nom</p>
-                      </div>
-                    ) : (
-                      <div className="py-2">
-                        {searchResults.map(s => (
-                          <button 
-                            key={s.id} 
-                            onClick={() => { 
-                              setShowResults(false); 
-                              if (canViewFinances) {
-                                navigate('/economat/suivi', { state: { studentId: s.id, academicYearId: s.academic_year_id } }); 
-                              } else {
-                                navigate(`/eleves/detail/${s.id}`);
-                              }
-                            }} 
-                            className="w-full flex items-center justify-between px-4 py-3 min-h-[44px] hover:bg-gray-50 transition-colors text-left group"
-                          >
-                            <div>
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{formatStudentName(s.last_name, s.first_name).fullName}</p>
-                                {s.academic_year_label && (
-                                  <span className={`inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-md border ${
-                                    s.academic_year_status === 'ACTIVE' 
-                                      ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
-                                      : s.academic_year_status === 'FUTURE'
-                                      ? 'bg-amber-50 text-amber-700 border-amber-100'
-                                      : 'bg-slate-50 text-slate-500 border-slate-200'
-                                  }`}>
-                                    {s.academic_year_label}
-                                    {s.academic_year_type === 'INTENSIVE' ? ' (Intensive)' : s.academic_year_type === 'SPECIAL' ? ' (Spéciale)' : ''}
-                                  </span>
-                                )}
-                              </div>
-                              <p className="text-xs text-gray-500 mt-0.5">{s.class?.name || 'Non assigné'} <span className="ml-2 font-mono text-[10px] text-gray-400">Matricule: {s.reference_number || s.id?.substring(0, 8) || ''}</span></p>
-                            </div>
-                            <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-600 transition-colors" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
+
+                {/* Modern Academic Session Dropdown Selector */}
+                {academicYears.length > 0 && (
+                  <AcademicSessionPill
+                    academicYears={academicYears}
+                    selectedYearId={selectedYearId}
+                    onSelectYear={(yearId) => setSelectedYearId(yearId)}
+                    size="sm"
+                    colorScheme="indigo"
+                  />
                 )}
               </div>
+            </div>
+          </div>
 
-              {/* Bouton Rafraîchir Moderne & Fluide */}
-              <button 
-                onClick={() => fetchDashboardStats()}
-                disabled={loading}
-                className="inline-flex items-center justify-center px-2.5 sm:px-3 py-2 min-h-[38px] sm:min-h-[40px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none group shrink-0 active:scale-95 cursor-pointer"
-                title="Rafraîchir les données et statistiques du tableau de bord"
-              >
-                <RefreshCcw size={15} className={`stroke-[2.2] transition-transform duration-500 ${loading ? 'animate-spin text-indigo-600' : 'group-hover:rotate-180'}`} />
-                <span className="hidden 2xl:inline-block ml-1.5 text-xs font-bold text-slate-700 group-hover:text-indigo-600">Actualiser</span>
-              </button>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-2.5 w-full lg:w-auto shrink-0">
+            {[UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.SECRETARY, UserRole.SUPERVISOR, UserRole.ACCOUNTANT].includes(user.role) && (
+              <>
+                <div className="relative flex-1 lg:w-40 xl:w-52 2xl:w-64 group shrink-0">
+                  <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+                    {isSearching ? <Loader2 className="h-4 w-4 text-gray-400 animate-spin" /> : <Search className="h-4 w-4 text-gray-400 group-focus-within:text-blue-500 transition-colors" />}
+                  </div>
+                  <input 
+                    type="text"
+                    placeholder={`Rechercher...`}
+                    className="block w-full pl-8 pr-2.5 py-2 min-h-[38px] sm:min-h-[40px] text-gray-900 border border-gray-200 rounded-xl leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all text-xs sm:text-sm"
+                    value={globalSearch}
+                    onChange={(e) => {
+                      setGlobalSearch(e.target.value);
+                      setShowResults(true);
+                    }}
+                    onFocus={() => setShowResults(true)}
+                  />
+                  {showResults && globalSearch.length >= 2 && (
+                    <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden z-50 max-h-[300px] overflow-y-auto custom-scrollbar">
+                      {isSearching ? (
+                        <div className="p-8 text-center">
+                          <RefreshCcw className="animate-spin text-blue-500 mx-auto mb-2" size={24} />
+                          <p className="text-sm text-gray-500">Recherche en cours...</p>
+                        </div>
+                      ) : searchResults.length === 0 ? (
+                        <div className="p-8 text-center space-y-2">
+                          <p className="text-sm text-gray-500 italic">Aucun {terminology.student.toLowerCase()} trouvé pour "{globalSearch}"</p>
+                          <p className="text-[10px] text-gray-400">Vérifiez l'orthographe ou essayez une partie du nom</p>
+                        </div>
+                      ) : (
+                        <div className="py-2">
+                          {searchResults.map(s => (
+                            <button 
+                              key={s.id} 
+                              onClick={() => { 
+                                setShowResults(false); 
+                                if (canViewFinances) {
+                                  navigate('/economat/suivi', { state: { studentId: s.id, academicYearId: s.academic_year_id } }); 
+                                } else {
+                                  navigate(`/eleves/detail/${s.id}`);
+                                }
+                              }} 
+                              className="w-full flex items-center justify-between px-4 py-3 min-h-[44px] hover:bg-gray-50 transition-colors text-left group"
+                            >
+                              <div>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <p className="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{formatStudentName(s.last_name, s.first_name).fullName}</p>
+                                  {s.academic_year_label && (
+                                    <span className={`inline-flex items-center px-1.5 py-0.5 text-[9px] font-bold rounded-md border ${
+                                      s.academic_year_status === 'ACTIVE' 
+                                        ? 'bg-emerald-50 text-emerald-700 border-emerald-100' 
+                                        : s.academic_year_status === 'FUTURE'
+                                        ? 'bg-amber-50 text-amber-700 border-amber-100'
+                                        : 'bg-slate-50 text-slate-500 border-slate-200'
+                                    }`}>
+                                      {s.academic_year_label}
+                                      {s.academic_year_type === 'INTENSIVE' ? ' (Intensive)' : s.academic_year_type === 'SPECIAL' ? ' (Spéciale)' : ''}
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-0.5">{s.class?.name || 'Non assigné'} <span className="ml-2 font-mono text-[10px] text-gray-400">Matricule: {s.reference_number || s.id?.substring(0, 8) || ''}</span></p>
+                              </div>
+                              <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-600 transition-colors" />
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
 
-              <button 
-                onClick={() => navigate('/eleves/ajouter')}
-                className="inline-flex items-center justify-center px-3 sm:px-3.5 py-2 min-h-[38px] sm:min-h-[40px] border border-transparent text-xs sm:text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap shrink-0"
-              >
-                <UserPlus size={16} className="mr-1.5" />
-                {terminology.enrollment}
-              </button>
-            </>
-          )}
+                {/* Bouton Rafraîchir Moderne & Fluide */}
+                <button 
+                  onClick={() => fetchDashboardStats()}
+                  disabled={loading}
+                  className="inline-flex items-center justify-center px-2.5 sm:px-3 py-2 min-h-[38px] sm:min-h-[40px] bg-white hover:bg-slate-50 border border-slate-200/90 hover:border-indigo-200 hover:text-indigo-600 text-slate-600 rounded-xl shadow-2xs hover:shadow-lg hover:scale-105 transition-all duration-200 disabled:opacity-50 disabled:hover:scale-100 disabled:hover:shadow-none group shrink-0 active:scale-95 cursor-pointer"
+                  title="Rafraîchir les données et statistiques du tableau de bord"
+                >
+                  <RefreshCcw size={15} className={`stroke-[2.2] transition-transform duration-500 ${loading ? 'animate-spin text-indigo-600' : 'group-hover:rotate-180'}`} />
+                  <span className="hidden 2xl:inline-block ml-1.5 text-xs font-bold text-slate-700 group-hover:text-indigo-600">Actualiser</span>
+                </button>
+
+                <button 
+                  onClick={() => navigate('/eleves/ajouter')}
+                  className="inline-flex items-center justify-center px-3 sm:px-3.5 py-2 min-h-[38px] sm:min-h-[40px] border border-transparent text-xs sm:text-sm font-semibold rounded-xl text-white bg-blue-600 hover:bg-blue-700 shadow-sm transition-all active:scale-95 whitespace-nowrap shrink-0"
+                >
+                  <UserPlus size={16} className="mr-1.5" />
+                  {terminology.enrollment}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </header>
+
+      {/* Main Content Area - Encart max-w-7xl avec espacement propre */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 2xl:px-8 pt-5 sm:pt-6 space-y-6 sm:space-y-8">
+        {/* Security Recommendation Banner */}
+        {showSecurityBanner && (
+          <motion.div 
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row items-center justify-between gap-6 relative overflow-hidden group"
+          >
+            <div className="absolute top-0 right-0 p-2">
+              <button 
+                onClick={handleCloseSecurityBanner}
+                className="p-1.5 text-amber-400 hover:text-amber-600 hover:bg-amber-100 rounded-xl transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center gap-6">
+              <div className="w-16 h-16 bg-amber-100 text-amber-600 rounded-2xl flex items-center justify-center shrink-0 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                <ShieldCheck size={32} />
+              </div>
+              <div className="text-center md:text-left space-y-1">
+                <h3 className="text-lg font-black text-amber-900 tracking-tight flex items-center justify-center md:justify-start gap-2">
+                  Sécurité Recommandée
+                  <span className="px-2 py-0.5 bg-amber-200 text-amber-700 text-[10px] uppercase font-bold rounded-full">Haute Priorité</span>
+                </h3>
+                <p className="text-amber-700 font-medium text-sm max-w-xl leading-relaxed">
+                  En tant qu'utilisateur avec un rôle sensible, nous vous recommandons fortement d'activer l'authentification à double facteur (2FA) pour protéger l'accès à vos données financières et institutionnelles.
+                </p>
+              </div>
+            </div>
+            
+            <div className="shrink-0 w-full md:w-auto">
+              <button 
+                onClick={() => navigate('/settings/ecole')}
+                className="w-full md:w-auto px-6 py-3 bg-amber-600 text-white rounded-xl font-bold text-sm shadow-lg shadow-amber-600/20 hover:bg-amber-700 hover:shadow-xl transition-all active:scale-95"
+              >
+                Sécuriser mon compte
+              </button>
+            </div>
+
+            {/* Decorative elements */}
+            <div className="absolute -bottom-6 -right-6 w-24 h-24 bg-amber-200/20 rounded-full blur-2xl pointer-events-none" />
+          </motion.div>
+        )}
 
       {/* Stats Grid */}
       {canViewFinances ? (
@@ -3610,6 +3614,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           }}
         />
       )}
+      </div>
     </div>
   );
 };

@@ -9,8 +9,8 @@ export const AddressBarInstallHint: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Check if dismissed previously in localStorage/sessionStorage
-    const isDismissed = localStorage.getItem('edunova_address_bar_hint_dismissed') === 'true';
+    // Check if dismissed previously in sessionStorage
+    const isDismissed = sessionStorage.getItem('edunova_address_bar_hint_dismissed') === 'true';
     if (isDismissed) {
       setDismissed(true);
       return;
@@ -21,7 +21,7 @@ export const AddressBarInstallHint: React.FC = () => {
     if (!isInstalled && !isStandalone && !isInIframe && isDesktop) {
       const timer = setTimeout(() => {
         setIsVisible(true);
-      }, 1200);
+      }, 1000);
       return () => clearTimeout(timer);
     }
   }, [isInstalled, isStandalone, isInIframe]);

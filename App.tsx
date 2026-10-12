@@ -1332,6 +1332,8 @@ const App: React.FC = () => {
               window.location.hash = '#/';
             }
           }} onReset={purgeSystemState} />
+          <PwaInstallBanner />
+          <AddressBarInstallHint />
           <PwaInstallModal />
         </HashRouter>
       </ErrorBoundary>
@@ -1498,6 +1500,7 @@ const App: React.FC = () => {
       <SubscriptionGuard user={user} onLogout={purgeSystemState}>
         <AnimatedRoutes user={user} purgeSystemState={purgeSystemState} maintenanceMode={maintenanceMode} />
       </SubscriptionGuard>
+      <PwaInstallBanner />
       <PwaInstallModal />
     </HashRouter>
     </ErrorBoundary>

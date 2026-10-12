@@ -3,11 +3,12 @@ import { UserRole, UserProfile } from '../types';
 import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorage } from '../supabase';
 import { AuditLogger } from '../utils/auditLogger';
 import { normalizeIdentifier, containsSuspiciousPattern, validateCredentialsSanity } from '../utils/authHelpers';
-import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X, Download, MonitorDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
 import { toast } from 'sonner';
+import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -34,6 +35,15 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'failed'>('idle');
   const [securitySettings, setSecuritySettings] = useState({ maxFailedAttempts: 3, lockoutDurationMinutes: 10 });
   const [maintenanceMode, setMaintenanceMode] = useState(false);
+
+  const { 
+    isInstalled, 
+    isStandalone, 
+    isInIframe, 
+    installPwa, 
+    platformName, 
+    canPromptDirectly 
+  } = usePwaInstall();
 
   // Helper to distinguish normal security inactivity timeout from actual account lockout
   const isInactivityNotice = (msg?: string | null): boolean => {
@@ -571,6 +581,48 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                 {isForgotPassword ? "Réinitialisation" : "Gestion Académique & Universitaire"}
               </p>
             </motion.div>
+
+            {/* Auto-Détection Installation Système (si pas encore installé sur cet appareil) */}
+            {!isInstalled && !isStandalone && !isInIframe && (
+              <motion.div 
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-5 p-3 sm:p-3.5 bg-gradient-to-r from-blue-50/95 via-indigo-50/80 to-slate-50 border border-blue-200/90 rounded-2xl flex items-center justify-between gap-3 shadow-2xs"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm shadow-blue-500/25">
+                    <Download size={16} className="stroke-[2.5]" />
+                  </div>
+                  <div className="min-w-0 text-left">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <p className="text-slate-900 text-xs font-bold tracking-tight">Système non installé sur cet appareil</p>
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.2 bg-blue-100 text-blue-700 rounded-md">
+                        App PWA
+                      </span>
+                    </div>
+                    <p className="text-slate-500 text-[11px] leading-tight mt-0.5 truncate sm:whitespace-normal font-medium">
+                      Accès 100% hors-ligne, alertes et fluidité sur {platformName}.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={installPwa}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-xs font-bold rounded-xl transition-all shadow-sm shadow-blue-500/20 shrink-0 flex items-center gap-1 cursor-pointer"
+                  title="Installer l'application sur cet appareil"
+                >
+                  <Sparkles size={12} />
+                  <span>{canPromptDirectly ? 'Installer' : 'Installer'}</span>
+                </button>
+              </motion.div>
+            )}
+
+            {isStandalone && (
+              <div className="mb-4 py-1.5 px-3 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-center gap-1.5 text-emerald-700 text-[11px] font-semibold">
+                <CheckCircle2 size={13} className="text-emerald-600" />
+                <span>Application EduNova Pro installée ({platformName})</span>
+              </div>
+            )}
 
             {/* Maintenance Mode Banner */}
             {maintenanceMode && (

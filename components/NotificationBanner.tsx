@@ -23,11 +23,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   });
   const [pwaDismissed, setPwaDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return (
-      window.localStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
-      window.sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
-      window.localStorage.getItem('edunova_pwa_installed') === 'true'
-    );
+    return window.sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true';
   });
 
   const { isInstalled, installPwa, platformName, canPromptDirectly, isInIframe } = usePwaInstall();
@@ -152,7 +148,6 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   const handleDismissPwa = () => {
     setPwaDismissed(true);
     try {
-      window.localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
       window.sessionStorage.setItem('edunova_pwa_banner_dismissed', 'true');
     } catch (e) {}
   };
