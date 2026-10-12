@@ -3459,27 +3459,29 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                </div>
 
                <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
-                 <button
-                   type="button"
-                   disabled={!canManageAllCampuses}
-                   onClick={() => {
-                     const p = schoolData.global_settings?.primary_currency || 'HTG';
-                     const s = schoolData.global_settings?.secondary_currency || 'USD';
-                     const updatedSettings = {
-                       ...(schoolData.global_settings || {}),
-                       primary_currency: s,
-                       secondary_currency: p
-                     };
-                     setSchoolData({...schoolData, global_settings: updatedSettings});
-                     toast.info(`Devises inversées : ${s} ↔ ${p}`);
-                   }}
-                   className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
-                   title="Inverser les devises principale et secondaire"
-                 >
-                   <RefreshCw size={12} className="text-emerald-600" />
-                   <span className="hidden sm:inline">Inverser devises</span>
-                   <span className="sm:hidden">Inverser</span>
-                 </button>
+                  {schoolData.global_settings?.multi_currency_enabled && (
+                   <button
+                     type="button"
+                     disabled={!canManageAllCampuses}
+                     onClick={() => {
+                       const p = schoolData.global_settings?.primary_currency || 'HTG';
+                       const s = schoolData.global_settings?.secondary_currency || 'USD';
+                       const updatedSettings = {
+                         ...(schoolData.global_settings || {}),
+                         primary_currency: s,
+                         secondary_currency: p
+                       };
+                       setSchoolData({...schoolData, global_settings: updatedSettings});
+                       toast.info(`Devises inversées : ${s} ↔ ${p}`);
+                     }}
+                     className="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-2xs active:scale-95 disabled:opacity-50 cursor-pointer"
+                     title="Inverser les devises principale et secondaire"
+                   >
+                     <RefreshCw size={12} className="text-emerald-600" />
+                     <span className="hidden sm:inline">Inverser devises</span>
+                     <span className="sm:hidden">Inverser</span>
+                   </button>
+                  )}
 
                  <button 
                    type="button"
@@ -3541,55 +3543,60 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                  </div>
                </div>
 
-               {/* Sélecteurs des Devises */}
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-50/80 p-2.5 sm:p-3 rounded-lg border border-slate-200/80">
-                 <div className="space-y-1">
-                   <label className="text-[11px] font-bold text-slate-700 tracking-tight ml-0.5">Devise Principale (Affichage)</label>
-                   <select 
-                     className="w-full px-2.5 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 shadow-2xs transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
-                     value={schoolData.global_settings?.primary_currency || 'HTG'}
-                     disabled={!canManageAllCampuses}
-                     onChange={e => {
-                       const selectedPrimary = e.target.value;
-                       const currentSecondary = schoolData.global_settings?.secondary_currency || (selectedPrimary === 'HTG' ? 'USD' : 'HTG');
-                       const newSecondary = selectedPrimary === currentSecondary ? (selectedPrimary === 'HTG' ? 'USD' : 'HTG') : currentSecondary;
-                       const updatedSettings = {
-                         ...(schoolData.global_settings || {}),
-                         primary_currency: selectedPrimary,
-                         secondary_currency: newSecondary
-                       };
-                       setSchoolData({...schoolData, global_settings: updatedSettings});
-                     }}
-                   >
-                     <option value="HTG">Gourde Haïtienne (HTG)</option>
-                     <option value="USD">Dollar Américain (USD)</option>
-                   </select>
-                 </div>
+                {/* Sélecteurs des Devises */}
+                <div className={`grid grid-cols-1 ${schoolData.global_settings?.multi_currency_enabled ? "sm:grid-cols-2" : ""} gap-2.5 sm:gap-3 bg-slate-50/80 p-2.5 sm:p-3 rounded-lg border border-slate-200/80`}>
+                  <div className="space-y-1">
+                    <label className="text-[11px] font-bold text-slate-700 tracking-tight ml-0.5">
+                      {schoolData.global_settings?.multi_currency_enabled ? "Devise Principale (Affichage)" : "Devise Officielle Unique de l'Établissement"}
+                    </label>
+                    <select 
+                      className="w-full px-2.5 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 shadow-2xs transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
+                      value={schoolData.global_settings?.primary_currency || "HTG"}
+                      disabled={!canManageAllCampuses}
+                      onChange={e => {
+                        const selectedPrimary = e.target.value;
+                        const currentSecondary = schoolData.global_settings?.secondary_currency || (selectedPrimary === "HTG" ? "USD" : "HTG");
+                        const newSecondary = selectedPrimary === currentSecondary ? (selectedPrimary === "HTG" ? "USD" : "HTG") : currentSecondary;
+                        const updatedSettings = {
+                          ...(schoolData.global_settings || {}),
+                          primary_currency: selectedPrimary,
+                          secondary_currency: newSecondary
+                        };
+                        setSchoolData({...schoolData, global_settings: updatedSettings});
+                      }}
+                    >
+                      <option value="HTG">Gourde Haïtienne (HTG)</option>
+                      <option value="USD">Dollar Américain (USD)</option>
+                    </select>
+                  </div>
 
-                 <div className="space-y-1">
-                   <label className="text-[11px] font-bold text-slate-700 tracking-tight ml-0.5">Devise Secondaire (Référence)</label>
-                   <select 
-                     className="w-full px-2.5 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 shadow-2xs transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
-                     value={schoolData.global_settings?.secondary_currency || 'USD'}
-                     disabled={!canManageAllCampuses}
-                     onChange={e => {
-                       const selectedSecondary = e.target.value;
-                       const currentPrimary = schoolData.global_settings?.primary_currency || (selectedSecondary === 'USD' ? 'HTG' : 'USD');
-                       const newPrimary = selectedSecondary === currentPrimary ? (selectedSecondary === 'USD' ? 'HTG' : 'USD') : currentPrimary;
-                       const updatedSettings = {
-                         ...(schoolData.global_settings || {}),
-                         primary_currency: newPrimary,
-                         secondary_currency: selectedSecondary
-                       };
-                       setSchoolData({...schoolData, global_settings: updatedSettings});
-                     }}
-                   >
-                     <option value="USD">Dollar Américain (USD)</option>
-                     <option value="HTG">Gourde Haïtienne (HTG)</option>
-                   </select>
-                 </div>
-               </div>
-
+                  {schoolData.global_settings?.multi_currency_enabled && (
+                    <div className="space-y-1">
+                      <label className="text-[11px] font-bold text-slate-700 tracking-tight ml-0.5">Devise Secondaire (Référence)</label>
+                      <select 
+                        className="w-full px-2.5 py-1.5 sm:py-2 bg-white text-slate-900 border border-slate-200 rounded-lg text-xs font-bold outline-none focus:border-emerald-600 focus:ring-2 focus:ring-emerald-500/10 shadow-2xs transition-all cursor-pointer disabled:opacity-75 disabled:bg-slate-100 disabled:text-slate-500"
+                        value={schoolData.global_settings?.secondary_currency || "USD"}
+                        disabled={!canManageAllCampuses}
+                        onChange={e => {
+                          const selectedSecondary = e.target.value;
+                          const currentPrimary = schoolData.global_settings?.primary_currency || (selectedSecondary === "USD" ? "HTG" : "USD");
+                          const newPrimary = selectedSecondary === currentPrimary ? (selectedSecondary === "USD" ? "HTG" : "USD") : currentPrimary;
+                          const updatedSettings = {
+                            ...(schoolData.global_settings || {}),
+                            primary_currency: newPrimary,
+                            secondary_currency: selectedSecondary
+                          };
+                          setSchoolData({...schoolData, global_settings: updatedSettings});
+                        }}
+                      >
+                        <option value="USD">Dollar Américain (USD)</option>
+                        <option value="HTG">Gourde Haïtienne (HTG)</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+                {schoolData.global_settings?.multi_currency_enabled ? (
+                  <>
                {/* Bloc Taux de Référence Actuel & Mise à jour rapide (Unifié) */}
                <div className="bg-slate-900 rounded-xl p-3 sm:p-3.5 text-white shadow-md border border-slate-800 flex flex-col md:flex-row md:items-center justify-between gap-3 relative overflow-hidden">
                  <div className="absolute -right-4 -bottom-4 text-white/[0.04] pointer-events-none">
@@ -3736,10 +3743,29 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                      </div>
                    )}
                  </div>
+                </div>
+                  </>
+                ) : (
+                  <div className="p-3.5 bg-emerald-50/60 border border-emerald-200/70 rounded-xl flex items-start sm:items-center gap-3 text-xs text-slate-700">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200 shadow-2xs">
+                      <CheckCircle2 size={16} />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-bold text-slate-900 flex items-center gap-1.5 flex-wrap">
+                        <span>Mode Mono-Devise Actif :</span>
+                        <span className="font-mono text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded font-black">
+                          {schoolData.global_settings?.primary_currency || "HTG"}
+                        </span>
+                      </p>
+                      <p className="text-[11px] text-slate-600 mt-0.5">
+                        Tous les frais de scolarité, encaissements de caisse, factures et salaires sont gérés exclusivement dans cette monnaie officielle unique. Aucun calcul de conversion, aucun barème en devises étrangères ni aucun taux de change n'est requis.
+                      </p>
+                    </div>
+                  </div>
+                )}
                </div>
              </div>
            </div>
-         </div>
        )}
         {activeTab === 'payment_methods' && (
           <PaymentMethodManager
