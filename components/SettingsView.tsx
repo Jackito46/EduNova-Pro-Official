@@ -1774,6 +1774,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               const payload = JSON.parse(trimmed);
               if (payload.type === 'progress') {
                 setGithubExportProgress({ step: payload.step, percent: payload.percent });
+              } else if (payload.type === 'heartbeat') {
+                // Keep-alive heartbeat from server, keep stream flowing
               } else if (payload.type === 'result' || payload.success) {
                 exportFinalResult = payload;
               } else if (payload.type === 'error' || payload.error) {
@@ -1836,8 +1838,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
         }
       });
     } catch (err: any) {
-      console.error("GitHub Export Error:", err);
-      toast.error(err.message || "Erreur lors de l'exportation vers GitHub");
+      console.warn("GitHub Export notice:", err);
+      const isNetworkError = err?.name === 'TypeError' || (err?.message && (err.message.includes('network') || err.message.includes('fetch') || err.message.includes('Failed to fetch')));
+      const errorMsg = isNetworkError
+        ? "La connexion au serveur a été momentanément interrompue. Veuillez vérifier votre jeton PAT ou retenter l'opération."
+        : (err.message || "Erreur lors de l'exportation vers GitHub");
+      toast.error(errorMsg);
       setGithubExportProgress(null);
     } finally {
       setIsExportingGitHub(false);
@@ -4820,16 +4826,27 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
           </div>
 
           {/* Action Buttons - Compact */}
-          <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
-            <button
-              type="button"
-              id="btn-github-modal-close"
-              onClick={() => setIsGitHubModalOpen(false)}
-              disabled={isExportingGitHub}
-              className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 flex-wrap">
+            <a
+              href="/api/export-zip"
+              download
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
+              title="Télécharger une archive ZIP complète des sources du projet"
             >
-              Fermer
-            </button>
+              <Download size={13} className="text-indigo-600" />
+              <span>Télécharger ZIP Sources</span>
+            </a>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                id="btn-github-modal-close"
+                onClick={() => setIsGitHubModalOpen(false)}
+                disabled={isExportingGitHub}
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-lg transition-all disabled:opacity-50 cursor-pointer"
+              >
+                Fermer
+              </button>
             <button
               type="button"
               id="btn-github-export-modal"
@@ -4863,7 +4880,8 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             </button>
           </div>
         </div>
-      </Modal>
+      </div>
+    </Modal>
 
       <Modal
         isOpen={!!sessionToDelete}

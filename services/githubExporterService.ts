@@ -248,7 +248,7 @@ export async function exportProjectToGitHub(
   if (filesToUpload.length > 0) {
     onProgress?.(`Transfert rapide des deltas (${filesToUpload.length} fichier(s) à synchroniser)...`, 30);
 
-    const BATCH_SIZE = 6;
+    const BATCH_SIZE = 12;
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     for (let i = 0; i < filesToUpload.length; i += BATCH_SIZE) {

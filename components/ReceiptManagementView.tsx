@@ -32,7 +32,11 @@ import {
   Check,
   Globe,
   Zap,
-  QrCode
+  QrCode,
+  MoveHorizontal,
+  Maximize2,
+  Minimize2,
+  SlidersHorizontal
 } from 'lucide-react';
 import { generateReceiptQRCode } from '../utils/receiptVerification';
 import { toast } from 'sonner';
@@ -73,7 +77,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [selectedYear, setSelectedYear] = useState('');
   const [selectedClass, setSelectedClass] = useState('all');
-  const [dateFilter, setDateFilter] = useState("Aujourd'hui");
+  const [dateFilter, setDateFilter] = useState("Toutes les dates");
   
   const todayStr = useMemo(() => {
     const d = new Date();
@@ -90,6 +94,29 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   // Pagination pour le tableau du Journal des Reçus
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [itemsPerPage, setItemsPerPage] = useState<number>(15);
+  
+  // Ascenseurs et navigation responsive (écrans 13"-15" pouces avec sidebar ouverte)
+  const tableContainerRef = React.useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(false);
+  const [isScrollable, setIsScrollable] = useState<boolean>(false);
+  const [isScrollHeightMode, setIsScrollHeightMode] = useState<boolean>(false);
+
+  const checkScroll = () => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 5;
+    setIsScrollable(hasOverflow);
+    setCanScrollLeft(el.scrollLeft > 15);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 15);
+  };
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    const delta = direction === 'left' ? -350 : 350;
+    el.scrollBy({ left: delta, behavior: 'smooth' });
+  };
   
   // Options de filtrage de dates harmonisées (SelectPill)
   const dateFilterOptions: SelectOption[] = useMemo(() => [
@@ -359,11 +386,11 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       plannedUSD = Number(p.amount_usd_equivalent);
     }
 
-    const effectiveStudent = studentObj || p.student;
+    const effectiveStudent = studentObj || p.student || students.find((s: any) => s.id === (p.student_id || p.student?.id));
     const effectiveClass = studentClassName || effectiveStudent?.class?.name || (classes.find(c => c.id === effectiveStudent?.class_id)?.name) || (classes.find(c => c.id === p.class_id)?.name) || p.classe || p.className || 'N/A';
     const effectiveStudentName = effectiveStudent 
       ? formatStudentName(effectiveStudent.last_name, effectiveStudent.first_name).fullName 
-      : (p.studentName || p.student_name || 'Inconnu');
+      : (p.studentName || p.student_name || 'Élève Inconnu');
 
     const createdDate = p.created_at ? new Date(p.created_at) : new Date();
 
@@ -551,6 +578,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Nombre total de pages pour la pagination du journal
   const totalPages = useMemo(() => {
+    if (itemsPerPage >= 9999) return 1;
     return Math.max(1, Math.ceil(filteredPayments.length / itemsPerPage));
   }, [filteredPayments.length, itemsPerPage]);
 
@@ -563,9 +591,31 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Découpage des paiements pour la page courante
   const paginatedPayments = useMemo(() => {
+    if (itemsPerPage >= 9999) return filteredPayments;
     const startIndex = (currentPage - 1) * itemsPerPage;
     return filteredPayments.slice(startIndex, startIndex + itemsPerPage);
   }, [filteredPayments, currentPage, itemsPerPage]);
+
+  // Actualisation dynamique de l'état de l'ascenseur responsive (ResizeObserver + window resize)
+  useEffect(() => {
+    checkScroll();
+    const el = tableContainerRef.current;
+    let observer: ResizeObserver | null = null;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        checkScroll();
+      });
+      observer.observe(el);
+    }
+    const handleResize = () => checkScroll();
+    window.addEventListener('resize', handleResize);
+    const timeout = setTimeout(checkScroll, 100);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeout);
+    };
+  }, [itemsPerPage, currentPage, isScrollHeightMode, filteredPayments.length]);
 
   // Sous-total de la page affichée
   const receiptsPageSubtotals = useMemo(() => {
@@ -653,7 +703,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   return (
     <>
-      <div className={`max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 ${printPreview ? 'print:hidden' : 'print:p-0'}`}>
+      <div className={`w-full max-w-7xl 2xl:max-w-[1600px] 3xl:max-w-none mx-auto space-y-6 animate-in fade-in duration-500 pb-20 ${printPreview ? 'print:hidden' : 'print:p-0'}`}>
         
         {/* NAVIGATION HAUTE */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 print:hidden bg-white p-5 sm:p-6 rounded-2xl shadow-xs border border-slate-200/80">
@@ -991,18 +1041,98 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </button>
               </div>
             </div>
-            <div className="w-full overflow-x-auto print:overflow-visible">
-              <table className="w-full text-left border-collapse min-w-[760px] xl:min-w-0">
-                <thead>
-                  <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
-                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[130px]">Date & Heure</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 min-w-[170px]">{terminology.student} & {terminology.class}</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Référence</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Nature</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[110px]">Mode</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[140px]">Montant</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 text-center whitespace-nowrap w-[95px]">Statut</th>
-                    <th className="px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[115px] print:hidden">Action</th>
+            {/* BARRE D'ASCENSEUR & NAVIGATION ERGONOMIQUE (ADAPTATIVE SELON LA TAILLE D'ÉCRAN : MOBILE, TABLETTE, LAPTOP, GRAND ÉCRAN) */}
+            <div className="px-3 sm:px-6 py-2 sm:py-2.5 bg-slate-800 text-slate-300 border-b border-slate-700/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 text-xs print:hidden">
+              <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+                {isScrollable ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-bold text-[10.5px] sm:text-[11px] border border-indigo-500/30 whitespace-nowrap animate-in fade-in duration-200">
+                      <MoveHorizontal size={13} className="text-indigo-400 shrink-0" />
+                      <span>Ascenseur horizontal actif ↔</span>
+                    </span>
+                    <span className="text-slate-400 text-[10.5px] sm:text-[11px] sm:hidden">
+                      (Glissez pour naviguer)
+                    </span>
+                    <span className="text-slate-400 text-[11px] hidden lg:inline">
+                      (Colonnes étendues : défilez avec l'ascenseur ou les flèches sans devoir réduire la barre latérale)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 font-bold text-[10.5px] sm:text-[11px] border border-emerald-500/25 whitespace-nowrap animate-in fade-in duration-200">
+                      <Check size={13} className="text-emerald-400 shrink-0" />
+                      <span>Vue intégrale (Grand écran)</span>
+                    </span>
+                    <span className="text-slate-400 text-[10.5px] sm:text-[11px] hidden sm:inline">
+                      (Toutes les colonnes sont directement visibles sans défilement horizontal)
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end gap-2">
+                {/* Bascule mode hauteur déroulante avec ascenseur vertical */}
+                <button
+                  type="button"
+                  onClick={() => setIsScrollHeightMode(!isScrollHeightMode)}
+                  className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-[10.5px] sm:text-[11px] transition-all cursor-pointer border flex-1 sm:flex-none whitespace-nowrap ${
+                    isScrollHeightMode || itemsPerPage >= 9999
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                      : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/10'
+                  }`}
+                  title={isScrollHeightMode ? "Revenir à la hauteur normale par page" : "Activer la vue déroulante avec ascenseur vertical et en-tête figé"}
+                >
+                  {isScrollHeightMode || itemsPerPage >= 9999 ? <Minimize2 size={12} className="shrink-0" /> : <Maximize2 size={12} className="shrink-0" />}
+                  <span>{isScrollHeightMode || itemsPerPage >= 9999 ? 'Ascenseur vertical actif' : 'Mode Déroulant'}</span>
+                </button>
+
+                {/* Boutons de défilement horizontal rapide ◄ ► (affichés UNIQUEMENT si l'écran a besoin de défiler) */}
+                {isScrollable && (
+                  <div className="flex items-center gap-0.5 sm:gap-1 bg-white/10 p-0.5 rounded-lg border border-white/10 shrink-0 animate-in fade-in duration-200">
+                    <button
+                      type="button"
+                      onClick={() => scrollTable('left')}
+                      disabled={!canScrollLeft}
+                      className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/20 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Défiler le tableau vers la gauche"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-[10px] font-mono px-0.5 sm:px-1 text-slate-400 font-bold select-none">◄ ►</span>
+                    <button
+                      type="button"
+                      onClick={() => scrollTable('right')}
+                      disabled={!canScrollRight}
+                      className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/20 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Défiler le tableau vers la droite"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div 
+              ref={tableContainerRef}
+              onScroll={checkScroll}
+              className={`w-full overflow-x-auto ${isScrollable ? 'table-scrollbar' : 'custom-scrollbar'} print:overflow-visible transition-all overscroll-x-contain touch-pan-x ${
+                isScrollHeightMode || itemsPerPage >= 9999 
+                  ? 'max-h-[58vh] sm:max-h-[68vh] lg:max-h-[70vh] 2xl:max-h-[750px] overflow-y-auto relative overscroll-contain' 
+                  : ''
+              }`}
+            >
+              <table className="w-full text-left border-collapse min-w-[980px] xl:min-w-[1040px] 2xl:min-w-0">
+                <thead className={isScrollHeightMode || itemsPerPage >= 9999 ? 'sticky top-0 z-20 shadow-2xs' : ''}>
+                  <tr className="bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-widest border-b border-slate-200">
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[130px]">Date & Heure</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 min-w-[200px]">{terminology.student} & {terminology.class}</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[140px]">Référence</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[125px]">Nature</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 whitespace-nowrap w-[115px]">Mode</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[160px]">Montant</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 text-center whitespace-nowrap w-[95px]">Statut</th>
+                    <th className="bg-slate-100 px-3.5 sm:px-4 py-3.5 text-right whitespace-nowrap w-[115px] print:hidden">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
@@ -1158,15 +1288,17 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                 {/* PIED DE TABLEAU COMPTABLE RIGOUREUX */}
                 {!loading && filteredPayments.length > 0 && (
-                  <tfoot>
+                  <tfoot className={isScrollHeightMode || itemsPerPage >= 9999 ? 'sticky bottom-0 z-20 shadow-md' : ''}>
                     {/* Ligne 1 : Sous-total de la page affichée */}
-                    <tr className="bg-slate-100/90 border-t-2 border-slate-200 text-slate-700 font-extrabold text-xs">
-                      <td colSpan={5} className="px-4 py-3 text-right">
+                    <tr className="bg-slate-100 border-t-2 border-slate-200 text-slate-700 font-extrabold text-xs">
+                      <td colSpan={5} className="bg-slate-100 px-4 py-3 text-right">
                         <span className="text-[11px] uppercase tracking-wider text-slate-500 font-black">
-                          Sous-total Page {currentPage} ({paginatedPayments.length} reçu{paginatedPayments.length > 1 ? 's' : ''}) :
+                          {itemsPerPage >= 9999 
+                            ? `Total Liste Complète (${paginatedPayments.length} reçu${paginatedPayments.length > 1 ? 's' : ''}) :`
+                            : `Sous-total Page ${currentPage} (${paginatedPayments.length} reçu${paginatedPayments.length > 1 ? 's' : ''}) :`}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right whitespace-nowrap font-mono font-black text-xs">
+                      <td className="bg-slate-100 px-4 py-3 text-right whitespace-nowrap font-mono font-black text-xs">
                         {receiptsPageSubtotals.foreignUSD > 0 && receiptsPageSubtotals.localHTG === 0 ? (
                           <>
                             <span className="text-teal-800 text-xs font-black">{receiptsPageSubtotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
@@ -1185,17 +1317,17 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <span className="text-emerald-800 text-xs font-black">{receiptsPageSubtotals.localHTG.toLocaleString('fr-FR')} HTG</span>
                         )}
                       </td>
-                      <td colSpan={2} className="px-4 py-3"></td>
+                      <td colSpan={2} className="bg-slate-100 px-4 py-3"></td>
                     </tr>
 
                     {/* Ligne 2 : Total de la sélection / période filtrée */}
-                    <tr className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-950 text-white font-extrabold text-xs border-t border-indigo-900/60">
-                      <td colSpan={5} className="px-4 py-3.5 text-right">
+                    <tr className="bg-slate-950 text-white font-extrabold text-xs border-t border-indigo-900/60">
+                      <td colSpan={5} className="bg-slate-950 px-4 py-3.5 text-right">
                         <span className="text-[11px] uppercase tracking-wider text-indigo-300 font-black">
                           Total Sélection ({filteredPayments.length} reçu{filteredPayments.length > 1 ? 's' : ''}) :
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-right whitespace-nowrap font-mono font-black text-xs text-white">
+                      <td className="bg-slate-950 px-4 py-3.5 text-right whitespace-nowrap font-mono font-black text-xs text-white">
                         {receiptsFilteredTotals.foreignUSD > 0 && receiptsFilteredTotals.localHTG === 0 ? (
                           <>
                             <span className="text-teal-300 text-sm font-black">{receiptsFilteredTotals.foreignUSD.toLocaleString('fr-FR')} USD</span>
@@ -1214,7 +1346,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <span className="text-emerald-300 text-sm font-black">{receiptsFilteredTotals.localHTG.toLocaleString('fr-FR')} HTG</span>
                         )}
                       </td>
-                      <td colSpan={2} className="px-4 py-3.5"></td>
+                      <td colSpan={2} className="bg-slate-950 px-4 py-3.5"></td>
                     </tr>
                   </tfoot>
                 )}
@@ -1226,7 +1358,18 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-slate-50/80 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs print:hidden">
                 <div className="flex flex-wrap items-center justify-between sm:justify-start gap-3 w-full sm:w-auto text-slate-600 font-medium">
                   <span>
-                    Affichage de <span className="font-bold text-slate-900">{filteredPayments.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> à <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredPayments.length)}</span> sur <span className="font-bold text-slate-900">{filteredPayments.length}</span> reçu{filteredPayments.length > 1 ? 's' : ''}
+                    {itemsPerPage >= 9999 ? (
+                      <>
+                        Affichage des <span className="font-bold text-slate-900">{filteredPayments.length}</span> reçu{filteredPayments.length > 1 ? 's' : ''}
+                        <span className="ml-2 text-indigo-600 font-bold bg-indigo-50 px-2 py-0.5 rounded text-[11px] border border-indigo-100">
+                          (Liste complète défilable avec ascenseur)
+                        </span>
+                      </>
+                    ) : (
+                      <>
+                        Affichage de <span className="font-bold text-slate-900">{filteredPayments.length === 0 ? 0 : (currentPage - 1) * itemsPerPage + 1}</span> à <span className="font-bold text-slate-900">{Math.min(currentPage * itemsPerPage, filteredPayments.length)}</span> sur <span className="font-bold text-slate-900">{filteredPayments.length}</span> reçu{filteredPayments.length > 1 ? 's' : ''}
+                      </>
+                    )}
                   </span>
 
                   {/* Sélecteur de pagination par page */}
@@ -1235,8 +1378,12 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     <select
                       value={itemsPerPage}
                       onChange={(e) => {
-                        setItemsPerPage(Number(e.target.value));
+                        const val = Number(e.target.value);
+                        setItemsPerPage(val);
                         setCurrentPage(1);
+                        if (val >= 9999) {
+                          setIsScrollHeightMode(true);
+                        }
                       }}
                       className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-xs font-bold text-slate-700 outline-none focus:border-indigo-500 cursor-pointer shadow-2xs transition-colors"
                     >
@@ -1245,6 +1392,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <option value={25}>25 / page</option>
                       <option value={50}>50 / page</option>
                       <option value={100}>100 / page</option>
+                      <option value={200}>200 / page</option>
+                      <option value={99999}>Tous (Liste complète avec ascenseur)</option>
                     </select>
                   </div>
                 </div>
@@ -1483,8 +1632,8 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
 
                 {studentPaymentsHistory.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[680px] sm:min-w-0">
+                  <div className="w-full overflow-x-auto table-scrollbar touch-pan-x overscroll-x-contain">
+                    <table className="w-full text-left border-collapse min-w-[720px]">
                       <thead>
                         <tr className="bg-slate-50 text-slate-500 text-[10px] font-bold uppercase tracking-widest border-b border-slate-100">
                           <th className="px-4 py-3.5 whitespace-nowrap w-[130px]">Date & Heure</th>

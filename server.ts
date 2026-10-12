@@ -10,7 +10,8 @@ import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
 import { GoogleGenAI } from '@google/genai';
 import { BackupBackendService } from './services/backupBackendService.ts';
-import { exportProjectToGitHub } from './services/githubExporterService.ts';
+import { exportProjectToGitHub, getProjectFiles } from './services/githubExporterService.ts';
+import AdmZip from 'adm-zip';
 import { handleMonCashWebhook } from './src/utils/payment.ts';
 import { sendMonCashPaymentPushNotification } from './services/moncashPushService.ts';
 import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault.ts';
@@ -122,7 +123,7 @@ async function startServer() {
 
   app.use('/api', (req, res, next) => {
     // Whitelist des routes d'export ou endpoints techniques nécessitant des formats spécifiques
-    if (req.path === '/export-github' || req.path.startsWith('/backups')) {
+    if (req.path === '/export-github' || req.path === '/export-zip' || req.path.startsWith('/backups')) {
       return next();
     }
 
@@ -3532,7 +3533,7 @@ async function startServer() {
 
   // API Endpoint for Exporting Project to GitHub with Real-time Progress Streaming
   app.post('/api/export-github', async (req, res) => {
-    const { token, owner, repo, branch, commitMessage } = req.body;
+    const { token, owner, repo, branch, commitMessage } = req.body || {};
 
     if (!token) {
       return res.status(400).json({ error: 'Le token GitHub personnel est requis.' });
@@ -3543,56 +3544,72 @@ async function startServer() {
     const targetBranch = (branch || 'main').trim();
     const targetMessage = commitMessage || `Exportation synchronisée depuis EduNova Pro (${new Date().toLocaleString('fr-FR')})`;
 
-    // Check if client prefers NDJSON streaming
-    const acceptsStreaming = req.headers['accept']?.includes('application/x-ndjson') || req.headers['accept']?.includes('text/event-stream') || true;
+    res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no');
 
-    if (acceptsStreaming) {
-      res.setHeader('Content-Type', 'application/x-ndjson; charset=utf-8');
-      res.setHeader('Cache-Control', 'no-cache, no-transform');
-      res.setHeader('Connection', 'keep-alive');
+    // Prevent connection drop during long operations
+    req.socket?.setTimeout(0);
 
-      const sendChunk = (data: any) => {
-        try {
-          res.write(JSON.stringify(data) + '\n');
-        } catch (e) {}
-      };
-
+    const sendChunk = (data: any) => {
       try {
-        console.log(`[GitHub Export] Starting export to ${targetOwner}/${targetRepo} on branch ${targetBranch}...`);
-        sendChunk({ type: 'progress', step: "Initialisation de l'exportation des sources...", percent: 5 });
+        res.write(JSON.stringify(data) + '\n');
+      } catch (e) {}
+    };
 
-        const result = await exportProjectToGitHub(
-          token,
-          targetOwner,
-          targetRepo,
-          targetBranch,
-          targetMessage,
-          (step, percent) => {
-            sendChunk({ type: 'progress', step, percent });
-            console.log(`[GitHub Export Progress] ${percent}% - ${step}`);
-          }
-        );
+    // Heartbeat every 2.5 seconds to keep connection alive through all reverse proxies
+    const heartbeatTimer = setInterval(() => {
+      sendChunk({ type: 'heartbeat', ts: Date.now() });
+    }, 2500);
 
-        sendChunk({ type: 'result', success: true, ...result });
-        res.end();
-      } catch (error: any) {
-        console.error('[GitHub Export Error]:', error);
-        sendChunk({ type: 'error', error: error.message || 'Échec de l\'exportation vers GitHub' });
-        res.end();
+    try {
+      console.log(`[GitHub Export] Starting export to ${targetOwner}/${targetRepo} on branch ${targetBranch}...`);
+      sendChunk({ type: 'progress', step: "Initialisation de l'exportation des sources...", percent: 5 });
+
+      const result = await exportProjectToGitHub(
+        token,
+        targetOwner,
+        targetRepo,
+        targetBranch,
+        targetMessage,
+        (step, percent) => {
+          sendChunk({ type: 'progress', step, percent });
+          console.log(`[GitHub Export Progress] ${percent}% - ${step}`);
+        }
+      );
+
+      sendChunk({ type: 'result', success: true, ...result });
+    } catch (error: any) {
+      console.warn('[GitHub Export notice]:', error?.message || error);
+      sendChunk({ type: 'error', error: error.message || 'Échec de l\'exportation vers GitHub' });
+    } finally {
+      clearInterval(heartbeatTimer);
+      try { res.end(); } catch (e) {}
+    }
+  });
+
+  // API Endpoint for Instant Project ZIP Download
+  app.get('/api/export-zip', async (req, res) => {
+    try {
+      const zip = new AdmZip();
+      const files = getProjectFiles(process.cwd());
+
+      for (const file of files) {
+        const fileContent = fs.readFileSync(file.fullPath);
+        zip.addFile(file.relPath, fileContent);
       }
-    } else {
-      try {
-        const result = await exportProjectToGitHub(
-          token,
-          targetOwner,
-          targetRepo,
-          targetBranch,
-          targetMessage
-        );
-        res.json(result);
-      } catch (error: any) {
-        res.status(500).json({ error: error.message || 'Échec de l\'exportation vers GitHub' });
-      }
+
+      const zipBuffer = zip.toBuffer();
+      const fileName = `EduNova-Pro-Sources-${new Date().toISOString().slice(0, 10)}.zip`;
+
+      res.setHeader('Content-Type', 'application/zip');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Length', zipBuffer.length.toString());
+      res.send(zipBuffer);
+    } catch (err: any) {
+      console.error('Error generating project ZIP:', err);
+      res.status(500).json({ error: 'Échec de la génération de l\'archive ZIP' });
     }
   });
 
