@@ -290,10 +290,15 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   useEffect(() => {
     const scrollContainer = document.getElementById('main-content-scroll') || document.querySelector('main');
 
+    let rafId: number | null = null;
     const handleScroll = () => {
-      const scrollY = scrollContainer ? scrollContainer.scrollTop : 0;
-      const windowY = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
-      setIsScrolled(scrollY > 12 || windowY > 12);
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const scrollY = scrollContainer ? scrollContainer.scrollTop : 0;
+        const windowY = typeof window !== 'undefined' ? (window.scrollY || document.documentElement.scrollTop || 0) : 0;
+        setIsScrolled(scrollY > 12 || windowY > 12);
+      });
     };
 
     if (scrollContainer) {
@@ -307,6 +312,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         scrollContainer.removeEventListener('scroll', handleScroll);
       }
       window.removeEventListener('scroll', handleScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
     };
   }, []);
 

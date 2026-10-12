@@ -172,6 +172,40 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
   const restrictedAcademicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.SUPERVISOR];
   const allStaffRoles = [...academicRoles, UserRole.ACCOUNTANT, UserRole.LIBRARIAN];
 
+  // Listener scroll sur '#main-content-scroll' pour calculer dynamiquement une couleur de fond
+  // (ex: transition fluide entre slate-50 et slate-100 en fonction de la position du défilement)
+  const [mainContentBg, setMainContentBg] = useState<string>('rgb(248, 250, 252)'); // slate-50 au repos
+
+  useEffect(() => {
+    const scrollContainer = document.getElementById('main-content-scroll');
+    if (!scrollContainer) return;
+
+    let rafId: number | null = null;
+    const handleScroll = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        const scrollTop = scrollContainer.scrollTop || 0;
+        // Progression linéaire calculée sur les 200 premiers pixels de défilement (0 -> 1)
+        const progress = Math.min(1, Math.max(0, scrollTop / 200));
+        // Interpolation exacte RGB :
+        // slate-50 : rgb(248, 250, 252) -> slate-100 : rgb(241, 245, 249)
+        const r = Math.round(248 - (248 - 241) * progress);
+        const g = Math.round(250 - (250 - 245) * progress);
+        const b = Math.round(252 - (252 - 249) * progress);
+        setMainContentBg(`rgb(${r}, ${g}, ${b})`);
+      });
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, [location.pathname]);
+
   if (maintenanceMode && user.role !== 'SUPER_ADMIN') {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50 p-4">
@@ -236,7 +270,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
         </ErrorBoundary>
         <main 
           id="main-content-scroll"
-          className={`flex-1 min-w-0 overflow-y-auto custom-scrollbar relative print:p-0 print:overflow-visible ${
+          style={{ backgroundColor: mainContentBg }}
+          className={`flex-1 min-w-0 overflow-y-auto custom-scrollbar relative print:p-0 print:overflow-visible transition-colors duration-150 ease-out ${
             isDashboard ? 'p-0' : 'p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8'
           }`}
         >
