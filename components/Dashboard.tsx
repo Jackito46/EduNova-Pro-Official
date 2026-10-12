@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import React, { useMemo, useState, useEffect, useLayoutEffect, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { 
@@ -1595,6 +1595,68 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     return "text-sm sm:text-base md:text-base lg:text-base xl:text-lg 2xl:text-xl font-black tracking-tight";
   }, [schoolInfo.name]);
 
+  // Synchronisation géométrique au dixième de pixel près (0.1px) entre l'en-tête Sidebar et l'en-tête Dashboard sur Desktop (lg >= 1024px)
+  useLayoutEffect(() => {
+    const syncHeaderAlignment = () => {
+      const sidebarHeader = document.getElementById('sidebar-brand-header');
+      const sidebarInner = document.getElementById('sidebar-brand-header-inner');
+      const dashHeader = document.getElementById('dashboard-sticky-header');
+      const dashInner = document.getElementById('dashboard-sticky-header-inner');
+
+      if (!sidebarHeader || !dashHeader) return;
+
+      // Sur mobile et tablette (< 1024px), pas de hauteur forcée ni de fixation
+      if (window.innerWidth < 1024) {
+        sidebarHeader.style.height = '';
+        dashHeader.style.height = '';
+        return;
+      }
+
+      const sidebarContentH = sidebarInner ? sidebarInner.getBoundingClientRect().height : 0;
+      const dashContentH = dashInner ? dashInner.getBoundingClientRect().height : 0;
+
+      // 20px correspond au padding vertical (py-2.5 = 10px haut + 10px bas) + 1px de border-b en box-border
+      const requiredHeight = Math.max(78, sidebarContentH + 21, dashContentH + 21);
+      const exactHeightPx = `${Math.round(requiredHeight * 10) / 10}px`;
+
+      if (sidebarHeader.style.height !== exactHeightPx) {
+        sidebarHeader.style.height = exactHeightPx;
+      }
+      if (dashHeader.style.height !== exactHeightPx) {
+        dashHeader.style.height = exactHeightPx;
+      }
+    };
+
+    syncHeaderAlignment();
+
+    const sidebarInner = document.getElementById('sidebar-brand-header-inner');
+    const dashInner = document.getElementById('dashboard-sticky-header-inner');
+    const sidebarHeader = document.getElementById('sidebar-brand-header');
+    const dashHeader = document.getElementById('dashboard-sticky-header');
+
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(() => {
+        syncHeaderAlignment();
+      });
+      if (sidebarInner) ro.observe(sidebarInner);
+      if (dashInner) ro.observe(dashInner);
+      if (sidebarHeader) ro.observe(sidebarHeader);
+      if (dashHeader) ro.observe(dashHeader);
+    }
+
+    window.addEventListener('resize', syncHeaderAlignment);
+    window.addEventListener('sidebarModeChanged', syncHeaderAlignment as EventListener);
+
+    return () => {
+      if (ro) ro.disconnect();
+      window.removeEventListener('resize', syncHeaderAlignment);
+      window.removeEventListener('sidebarModeChanged', syncHeaderAlignment as EventListener);
+      const sh = document.getElementById('sidebar-brand-header');
+      if (sh) sh.style.height = '';
+    };
+  }, [loading, schoolInfo.name, schoolInfo.logo_url, sidebarMode, windowWidth, academicYears.length]);
+
   useEffect(() => {
     const fetchSchoolInfo = async () => {
       if (!user.school_id) return;
@@ -1761,18 +1823,21 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         terminology={terminology}
       />
 
-      {/* Header Section - Fixé tout en haut, aligné pixel-perfect avec le header du sidebar, couleur dynamique sur défilement */}
+      {/* Header Section - Relatif sur mobile/tablette pour libérer l'espace visuel, fixé à top: 0 sur desktop (lg:) et aligné au dixième de pixel près avec l'en-tête Sidebar */}
       <header 
         id="dashboard-sticky-header"
-        className={`sticky top-0 z-30 w-full transition-all duration-300 ease-out pl-16 sm:pl-16 lg:pl-6 2xl:pl-8 pr-4 sm:pr-5 lg:pr-6 2xl:pr-8 py-2.5 sm:py-3 border-b ${
+        className={`relative lg:sticky lg:top-0 z-30 w-full box-border flex items-center min-h-[78px] transition-colors duration-200 ease-out pl-16 sm:pl-16 lg:pl-6 2xl:pl-8 pr-4 sm:pr-5 lg:pr-6 2xl:pr-8 py-2.5 border-b border-slate-200 ${
           isScrolled 
-            ? 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-sm border-slate-200/90' 
-            : 'bg-slate-100/70 dark:bg-slate-900/70 backdrop-blur-xs shadow-none border-slate-200/60'
+            ? 'bg-white/85 lg:bg-white/95 dark:bg-slate-900/95 backdrop-blur-md lg:shadow-xs' 
+            : 'bg-white/80 dark:bg-slate-900/80 backdrop-blur-md shadow-none'
         }`}
       >
-        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3 lg:gap-3.5 xl:gap-5">
+        <div
+          id="dashboard-sticky-header-inner"
+          className="w-full max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3 lg:gap-3.5 xl:gap-5"
+        >
           <div className="flex items-center gap-2.5 sm:gap-3.5 flex-1 min-w-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
+            <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/90 flex items-center justify-center overflow-hidden shrink-0">
               {schoolInfo.logo_url ? (
                 <img src={schoolInfo.logo_url} alt="Logo" className="w-full h-full object-contain p-1.5" />
               ) : (

@@ -240,7 +240,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
             isDashboard ? 'p-0' : 'p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8'
           }`}
         >
-          {user.role === UserRole.STUDENT && <StudentHeader user={user} />}
+          {user.role === UserRole.STUDENT && !isDashboard && <StudentHeader user={user} />}
           {!isDashboard && (
             <>
               <ConnectivityBanner />

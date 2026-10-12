@@ -225,15 +225,15 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   const schoolNameLen = (schoolInfo.name || '').length;
   const sidebarSchoolNameClasses = React.useMemo(() => {
     if (schoolNameLen > 55) {
-      return "text-[11px] leading-[1.25]";
+      return "text-[10.5px] leading-[1.2]";
     }
     if (schoolNameLen > 35) {
-      return "text-[11.5px] leading-[1.3]";
+      return "text-[11px] leading-[1.25]";
     }
     if (schoolNameLen > 20) {
-      return "text-[12.5px] leading-snug";
+      return "text-[12px] leading-tight";
     }
-    return "text-[13.5px] leading-snug";
+    return "text-[13px] leading-tight";
   }, [schoolNameLen]);
 
   const handleToggleMenu = React.useCallback((menuId: string) => {
@@ -306,96 +306,106 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
         onMouseLeave={() => setIsHovered(false)}
       >
         {/* LOGO & SCHOOL IDENTITY HEADER */}
-        <div className={`relative border-b border-slate-200/80 bg-white/50 backdrop-blur-xs text-left transition-all duration-200 ${
-          isNarrow ? 'p-2.5 flex flex-col items-center justify-center gap-2' : 'px-3.5 py-3 flex items-start justify-between gap-2.5'
-        }`}>
-          <div className={`flex items-start gap-2.5 min-w-0 flex-1 ${isNarrow ? 'justify-center w-full' : ''}`}>
-            {/* Logo with rounded squircle badge and active ping */}
-            <div 
-              className="relative shrink-0 flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105 mt-0.5"
-              onClick={() => isNarrow && setSidebarMode('expanded')}
-              title={isNarrow ? `${schoolInfo.name} - Cliquer pour agrandir le menu` : schoolInfo.name}
-            >
-              <div className="p-1 rounded-2xl bg-white shadow-xs border border-slate-200/90 flex items-center justify-center">
-                <Logo src={schoolInfo.logo_url || "/logo.png"} size="sm" className="w-9 h-9 object-contain rounded-xl" />
+        <div
+          id="sidebar-brand-header"
+          className={`relative box-border border-b border-slate-200 bg-white/80 backdrop-blur-md text-left transition-colors duration-200 flex items-center ${
+            isNarrow ? 'px-2 py-1.5 min-h-[78px] justify-center' : 'px-3.5 py-2.5 min-h-[78px]'
+          }`}
+        >
+          <div
+            id="sidebar-brand-header-inner"
+            className={`w-full flex ${
+              isNarrow ? 'flex-col items-center justify-center gap-1' : 'items-center justify-between gap-2.5'
+            }`}
+          >
+            <div className={`flex items-center gap-2.5 min-w-0 flex-1 ${isNarrow ? 'justify-center w-full' : ''}`}>
+              {/* Logo with rounded squircle badge and active ping */}
+              <div 
+                className="relative shrink-0 flex items-center justify-center cursor-pointer transition-transform duration-200 hover:scale-105"
+                onClick={() => isNarrow && setSidebarMode('expanded')}
+                title={isNarrow ? `${schoolInfo.name} - Cliquer pour agrandir le menu` : schoolInfo.name}
+              >
+                <div className={`${isNarrow ? 'w-9 h-9 p-1 rounded-xl' : 'w-10 h-10 sm:w-11 sm:h-11 p-1.5 rounded-2xl'} bg-white shadow-xs border border-slate-200/90 flex items-center justify-center overflow-hidden`}>
+                  <Logo src={schoolInfo.logo_url || "/logo.png"} size="sm" className="w-full h-full object-contain rounded-xl" />
+                </div>
+                <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-2 border-white"></span>
+                </span>
               </div>
-              <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60"></span>
-                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 border-2 border-white"></span>
-              </span>
-            </div>
 
-            {/* School Name & Campus / Connecté Status Badges */}
-            {!isNarrow && (
-              <div className="flex-1 min-w-0 flex flex-col justify-center">
-                <h1 
-                  className={`${sidebarSchoolNameClasses} font-black tracking-tight text-slate-900 break-normal [overflow-wrap:anywhere] hover:text-blue-600 transition-colors cursor-default select-text`} 
-                  title={schoolInfo.name}
-                >
-                  {schoolInfo.name}
-                </h1>
+              {/* School Name & Campus / Connecté Status Badges */}
+              {!isNarrow && (
+                <div className="flex-1 min-w-0 flex flex-col justify-center">
+                  <h1 
+                    className={`${sidebarSchoolNameClasses} font-black tracking-tight text-slate-900 break-normal [overflow-wrap:anywhere] hover:text-blue-600 transition-colors cursor-default select-text`} 
+                    title={schoolInfo.name}
+                  >
+                    {schoolInfo.name}
+                  </h1>
 
-                {/* Status / Campus pill */}
-                <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-                  {(() => {
-                    if (school?.has_multi_campus && campuses && campuses.length > 1) {
-                      const activeCampus = campuses.find(c => c.id === currentCampusId);
-                      if (activeCampus) {
-                        const isSiege = activeCampus.name.toLowerCase().includes('siège') || activeCampus.id === '3dd425c2-2e23-4e3c-a02a-c67ed85ca490';
+                  {/* Status / Campus pill */}
+                  <div className="mt-1 flex items-center gap-1.5 flex-wrap">
+                    {(() => {
+                      if (school?.has_multi_campus && campuses && campuses.length > 1) {
+                        const activeCampus = campuses.find(c => c.id === currentCampusId);
+                        if (activeCampus) {
+                          const isSiege = activeCampus.name.toLowerCase().includes('siège') || activeCampus.id === '3dd425c2-2e23-4e3c-a02a-c67ed85ca490';
+                          return (
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold tracking-wide uppercase ${
+                              isSiege 
+                                ? 'bg-blue-50 text-blue-700 border border-blue-200/70' 
+                                : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
+                            }`}>
+                              <MapPin size={10} className={isSiege ? 'text-blue-500' : 'text-emerald-500'} />
+                              <span className="truncate max-w-[130px]">{isSiege ? 'Siège Central' : activeCampus.name}</span>
+                            </span>
+                          );
+                        }
                         return (
-                          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9.5px] font-extrabold tracking-wide uppercase ${
-                            isSiege 
-                              ? 'bg-blue-50 text-blue-700 border border-blue-200/70' 
-                              : 'bg-emerald-50 text-emerald-700 border border-emerald-200/70'
-                          }`}>
-                            <MapPin size={10} className={isSiege ? 'text-blue-500' : 'text-emerald-500'} />
-                            <span className="truncate max-w-[130px]">{isSiege ? 'Siège Central' : activeCampus.name}</span>
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[9.5px] font-extrabold tracking-wide uppercase">
+                            <Building2 size={10} className="text-slate-500" />
+                            Vue Globale
                           </span>
                         );
                       }
+                      
+                      const isUniversity = school?.school_type === 'UNIVERSITY' || /universit|faculté|institut sup/i.test(schoolInfo.name);
                       return (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200 text-[9.5px] font-extrabold tracking-wide uppercase">
-                          <Building2 size={10} className="text-slate-500" />
-                          Vue Globale
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                          <Sparkles size={11} className={isUniversity ? "text-indigo-500" : "text-amber-500"} />
+                          <span>{isUniversity ? 'Enseignement Supérieur' : 'Système de Gestion'}</span>
                         </span>
                       );
-                    }
-                    
-                    const isUniversity = school?.school_type === 'UNIVERSITY' || /universit|faculté|institut sup/i.test(schoolInfo.name);
-                    return (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                        <Sparkles size={11} className={isUniversity ? "text-indigo-500" : "text-amber-500"} />
-                        <span>{isUniversity ? 'Enseignement Supérieur' : 'Système de Gestion'}</span>
-                      </span>
-                    );
-                  })()}
+                    })()}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          {/* Header Action Buttons (Quick Collapse/Expand Toggle on Desktop, Close on Mobile) */}
-          <div className={`flex items-center shrink-0 ${isNarrow ? 'w-full justify-center' : ''}`}>
-            {/* Desktop Quick Collapse/Expand Toggle */}
-            <button
-              type="button"
-              onClick={() => setSidebarMode(isNarrow ? 'expanded' : 'collapsed')}
-              className="hidden lg:flex items-center justify-center w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
-              title={isNarrow ? "Développer le menu latéral" : "Réduire le menu latéral"}
-              aria-label="Basculer l'affichage du menu"
-            >
-              {isNarrow ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
-            </button>
+            {/* Header Action Buttons (Quick Collapse/Expand Toggle on Desktop, Close on Mobile) */}
+            <div className={`flex items-center shrink-0 ${isNarrow ? 'w-full justify-center' : ''}`}>
+              {/* Desktop Quick Collapse/Expand Toggle */}
+              <button
+                type="button"
+                onClick={() => setSidebarMode(isNarrow ? 'expanded' : 'collapsed')}
+                className={`hidden lg:flex items-center justify-center ${isNarrow ? 'w-7 h-6 rounded-lg' : 'w-8 h-8 rounded-xl'} text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors`}
+                title={isNarrow ? "Développer le menu latéral" : "Réduire le menu latéral"}
+                aria-label="Basculer l'affichage du menu"
+              >
+                {isNarrow ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={16} />}
+              </button>
 
-            {/* Mobile Drawer Close Button */}
-            <button
-              type="button"
-              onClick={() => setMobileOpen(false)}
-              className="lg:hidden flex items-center justify-center w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
-              aria-label="Fermer le menu"
-            >
-              <X size={18} />
-            </button>
+              {/* Mobile Drawer Close Button */}
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="lg:hidden flex items-center justify-center w-8 h-8 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-200/70 transition-colors"
+                aria-label="Fermer le menu"
+              >
+                <X size={18} />
+              </button>
+            </div>
           </div>
         </div>
 
