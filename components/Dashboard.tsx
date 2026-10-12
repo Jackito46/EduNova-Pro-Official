@@ -63,6 +63,12 @@ import { RetryableError } from './RetryableError';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatStudentName, formatFullName } from '../utils/formatters';
 import { displayIdentifier, normalizeIdentifier } from '../utils/authHelpers';
+import ConnectivityBanner from './ConnectivityBanner';
+import { NotificationBanner } from './NotificationBanner';
+import { AutonomousAdminWarningBanner } from './AutonomousAdminWarningBanner';
+import { PayrollSensitiveNotificationListener } from './PayrollSensitiveNotificationListener';
+import { AiQuotaAlertBanner } from './AiQuotaAlertBanner';
+import { AddressBarInstallHint } from './AddressBarInstallHint';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ParentDashboardView } from './ParentDashboardView';
 import { StudentDashboardGrid } from './StudentDashboardGrid';
@@ -275,6 +281,25 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
     return () => {
       window.removeEventListener('sidebarModeChanged', handleSidebarChange as any);
       window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Scroll detection to dynamically update header background color when scrolling down
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const scrollContainer = document.getElementById('main-content-scroll') || document.querySelector('main');
+    if (!scrollContainer) return;
+
+    const handleScroll = () => {
+      setIsScrolled(scrollContainer.scrollTop > 10);
+    };
+
+    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
+    handleScroll();
+
+    return () => {
+      scrollContainer.removeEventListener('scroll', handleScroll);
     };
   }, []);
 
@@ -1724,7 +1749,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   return (
-    <div className="-mt-4 sm:-mt-5 lg:-mt-6 2xl:-mt-8 -mx-4 sm:-mx-5 lg:-mx-6 2xl:-mx-8 pb-12 animate-in fade-in duration-500">
+    <div className="w-full min-w-0 pb-12 animate-in fade-in duration-500">
       {/* Revenue Breakdown Modal - Dense, Ergonomique et Responsive */}
       <ClassRevenueModal
         isOpen={showRevenueModal}
@@ -1736,8 +1761,15 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         terminology={terminology}
       />
 
-      {/* Header Section - Fixé tout en haut, aligné pixel-perfect avec le header du sidebar, fond blanc solide et bordure continue */}
-      <header className="sticky top-0 z-30 w-full bg-white dark:bg-slate-900 border-b border-slate-200/90 shadow-2xs px-4 sm:px-5 lg:px-6 2xl:px-8 py-2.5 sm:py-3 transition-colors">
+      {/* Header Section - Fixé tout en haut, aligné pixel-perfect avec le header du sidebar, couleur dynamique sur défilement */}
+      <header 
+        id="dashboard-sticky-header"
+        className={`sticky top-0 z-30 w-full transition-all duration-300 ease-out pl-16 sm:pl-16 lg:pl-6 2xl:pl-8 pr-4 sm:pr-5 lg:pr-6 2xl:pr-8 py-2.5 sm:py-3 border-b ${
+          isScrolled 
+            ? 'bg-white/95 dark:bg-slate-900/95 backdrop-blur-md shadow-sm border-slate-200/90' 
+            : 'bg-slate-100/70 dark:bg-slate-900/70 backdrop-blur-xs shadow-none border-slate-200/60'
+        }`}
+      >
         <div className="max-w-7xl mx-auto flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3 lg:gap-3.5 xl:gap-5">
           <div className="flex items-center gap-2.5 sm:gap-3.5 flex-1 min-w-0">
             <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white rounded-2xl shadow-xs border border-slate-200/80 flex items-center justify-center overflow-hidden shrink-0">
@@ -1890,7 +1922,17 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
       </header>
 
       {/* Main Content Area - Encart max-w-7xl avec espacement propre */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 2xl:px-8 pt-5 sm:pt-6 space-y-6 sm:space-y-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 2xl:px-8 pt-4 sm:pt-5 space-y-6 sm:space-y-8">
+        {/* System & Notification Banners within scrollable feed */}
+        <div className="space-y-3">
+          <ConnectivityBanner />
+          <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
+          <AutonomousAdminWarningBanner user={user} />
+          <PayrollSensitiveNotificationListener user={user} />
+          <AiQuotaAlertBanner user={user} />
+          <AddressBarInstallHint />
+        </div>
+
         {/* Security Recommendation Banner */}
         {showSecurityBanner && (
           <motion.div 

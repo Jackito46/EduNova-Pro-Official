@@ -159,6 +159,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
       document.referrer.includes('android-app://')
     );
   }, []);
+
+  const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   
   // Define role groups for easier management
   const adminRoles = [UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR];
@@ -232,21 +234,30 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
         <ErrorBoundary>
           <Sidebar user={user} onLogout={purgeSystemState} />
         </ErrorBoundary>
-        <main className="flex-1 min-w-0 overflow-y-auto p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8 custom-scrollbar relative print:p-0 print:overflow-visible">
+        <main 
+          id="main-content-scroll"
+          className={`flex-1 min-w-0 overflow-y-auto custom-scrollbar relative print:p-0 print:overflow-visible ${
+            isDashboard ? 'p-0' : 'p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8'
+          }`}
+        >
           {user.role === UserRole.STUDENT && <StudentHeader user={user} />}
-          <ConnectivityBanner />
-          <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
-          <AutonomousAdminWarningBanner user={user} />
-          <PayrollSensitiveNotificationListener user={user} />
-          <AiQuotaAlertBanner user={user} />
-          <AddressBarInstallHint />
+          {!isDashboard && (
+            <>
+              <ConnectivityBanner />
+              <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
+              <AutonomousAdminWarningBanner user={user} />
+              <PayrollSensitiveNotificationListener user={user} />
+              <AiQuotaAlertBanner user={user} />
+              <AddressBarInstallHint />
+            </>
+          )}
           <ErrorBoundary key={location.pathname}>
             <AnimatePresence mode="wait" initial={false}>
               <motion.div
                 key={location.pathname}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -6 }}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
                 transition={{ duration: 0.12, ease: 'easeOut' }}
                 className="w-full min-w-0"
               >
