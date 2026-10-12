@@ -31,6 +31,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import StudentSolvencySummary from './StudentSolvencySummary';
+import { isWalletPaymentActive, isMonCashPaymentActive } from '../lib/paymentMethods';
 import { 
   getDocumentDefinitionsForSchoolType, 
   normalizeStudentDocuments,
@@ -1103,64 +1104,68 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* Wallet & Historique des Versements */}
           <div className="bg-white rounded-2xl shadow-xs p-5 sm:p-6 border border-slate-200 space-y-5">
             {/* Wallet / Portefeuille credits */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
-                    <Wallet size={16} />
+            {isWalletPaymentActive(school) && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100 shrink-0">
+                      <Wallet size={16} />
+                    </div>
+                    <div>
+                      <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
+                        Portefeuille {terminology.student}
+                      </h4>
+                      <p className="text-[10px] text-slate-400 font-medium">Crédits électroniques</p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-bold text-slate-900 text-xs uppercase tracking-wider">
-                      Portefeuille {terminology.student}
-                    </h4>
-                    <p className="text-[10px] text-slate-400 font-medium">Crédits électroniques</p>
+
+                  <button 
+                    type="button"
+                    onClick={() => {
+                      const targetYear = enrollments[0]?.academic_year_id || student.academic_year_id || '';
+                      navigate(`/economat/releves?studentId=${student.id}&tab=generator${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
+                        state: {
+                          studentId: student.id,
+                          academicYearId: targetYear
+                        }
+                      });
+                    }}
+                    className="text-[10px] font-black text-indigo-600 uppercase hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
+                    title="Consulter le Relevé de Compte & Audit Financier certifié"
+                  >
+                    <span>Relevé de Compte</span>
+                    <ChevronRight size={12} />
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
+                    <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde HTG</p>
+                    <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">
+                      {(student.wallet_balance_htg || 0).toLocaleString()} <span className="text-[10px] font-normal">G</span>
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
+                    <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde USD</p>
+                    <p className="text-sm font-black text-indigo-700 font-mono mt-0.5">
+                      {(student.wallet_balance_usd || 0).toLocaleString()} <span className="text-[10px] font-normal">$</span>
+                    </p>
                   </div>
                 </div>
 
-                <button 
-                  type="button"
-                  onClick={() => {
-                    const targetYear = enrollments[0]?.academic_year_id || student.academic_year_id || '';
-                    navigate(`/economat/releves?studentId=${student.id}&tab=generator${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
-                      state: {
-                        studentId: student.id,
-                        academicYearId: targetYear
-                      }
-                    });
-                  }}
-                  className="text-[10px] font-black text-indigo-600 uppercase hover:text-indigo-800 transition-colors flex items-center gap-1 cursor-pointer"
-                  title="Consulter le Relevé de Compte & Audit Financier certifié"
-                >
-                  <span>Relevé de Compte</span>
-                  <ChevronRight size={12} />
-                </button>
+                {/* Bouton de recharge express MonCash */}
+                {isMonCashPaymentActive(school) && (
+                  <button
+                    type="button"
+                    onClick={() => setIsWalletTopUpOpen(true)}
+                    className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
+                  >
+                    <Smartphone size={13} />
+                    <span>Recharger via MonCash</span>
+                  </button>
+                )}
               </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
-                  <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde HTG</p>
-                  <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">
-                    {(student.wallet_balance_htg || 0).toLocaleString()} <span className="text-[10px] font-normal">G</span>
-                  </p>
-                </div>
-                <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
-                  <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde USD</p>
-                  <p className="text-sm font-black text-indigo-700 font-mono mt-0.5">
-                    {(student.wallet_balance_usd || 0).toLocaleString()} <span className="text-[10px] font-normal">$</span>
-                  </p>
-                </div>
-              </div>
-
-              {/* Bouton de recharge express MonCash */}
-              <button
-                type="button"
-                onClick={() => setIsWalletTopUpOpen(true)}
-                className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
-              >
-                <Smartphone size={13} />
-                <span>Recharger via MonCash</span>
-              </button>
-            </div>
+            )}
 
             {/* Historique des Versements */}
             <div className="pt-4 border-t border-slate-100 space-y-3">

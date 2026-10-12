@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { UserProfile } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
 import { formatFullName } from '../utils/formatters';
+import { isWalletPaymentActive, isMonCashPaymentActive } from '../lib/paymentMethods';
 import { 
   BookOpen, 
   TrendingUp, 
@@ -68,7 +69,7 @@ export const StudentDashboardGrid: React.FC<StudentDashboardGridProps> = ({
   academicYearLabel
 }) => {
   const navigate = useNavigate();
-  const { terminology } = useSchool();
+  const { terminology, school } = useSchool();
 
   // Interactive filters
   const [courseSearch, setCourseSearch] = useState('');
@@ -599,25 +600,29 @@ export const StudentDashboardGrid: React.FC<StudentDashboardGridProps> = ({
               )}
 
               {/* Portefeuille MonCash / Natcash */}
-              <div className="p-3.5 rounded-2xl bg-cyan-50/50 border border-cyan-200/70 flex flex-col gap-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5">
-                    <Smartphone size={15} className="text-cyan-600" />
-                    <span className="font-bold text-xs text-slate-800">Portefeuille Étudiant</span>
+              {isWalletPaymentActive(school) && (
+                <div className="p-3.5 rounded-2xl bg-cyan-50/50 border border-cyan-200/70 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Smartphone size={15} className="text-cyan-600" />
+                      <span className="font-bold text-xs text-slate-800">Portefeuille Étudiant</span>
+                    </div>
+                    <span className="text-xs font-black text-cyan-800 font-mono">
+                      {studentStats.wallet_balance_htg?.toLocaleString()} HTG
+                    </span>
                   </div>
-                  <span className="text-xs font-black text-cyan-800 font-mono">
-                    {studentStats.wallet_balance_htg?.toLocaleString()} HTG
-                  </span>
+                  {isMonCashPaymentActive(school) && (
+                    <button
+                      type="button"
+                      onClick={onOpenWalletTopUp}
+                      className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                    >
+                      <Smartphone size={13} />
+                      <span>Recharger via MonCash</span>
+                    </button>
+                  )}
                 </div>
-                <button
-                  type="button"
-                  onClick={onOpenWalletTopUp}
-                  className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-95 text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <Smartphone size={13} />
-                  <span>Recharger via MonCash</span>
-                </button>
-              </div>
+              )}
             </div>
           </div>
 

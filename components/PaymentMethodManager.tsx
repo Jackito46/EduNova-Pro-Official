@@ -649,8 +649,24 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                           </div>
                         </div>
 
-                        {/* ACTIONS DROPDOWN */}
-                        <div className="relative shrink-0" data-dropdown-box>
+                        {/* ACTIONS & QUICK TOGGLE */}
+                        <div className="flex items-center gap-1.5 shrink-0" data-dropdown-box>
+                          {canManageAllCampuses && (
+                            <button
+                              type="button"
+                              onClick={() => toggleMethodActive(method.id)}
+                              className={`px-2 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                                method.enabled
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
+                                  : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
+                              }`}
+                              title={method.enabled ? "Cliquer pour désactiver ce moyen de paiement partout" : "Cliquer pour activer ce moyen de paiement"}
+                            >
+                              {method.enabled ? <Eye size={12} className="text-emerald-600" /> : <EyeOff size={12} className="text-slate-400" />}
+                              <span>{method.enabled ? 'Actif' : 'Inactif'}</span>
+                            </button>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => setOpenMethodMenuId(isMenuOpen ? null : method.id)}
@@ -660,7 +676,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
                             }`}
                           >
-                            <span>Actions</span>
+                            <span>Options</span>
                             <ChevronDown size={12} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
                           </button>
 

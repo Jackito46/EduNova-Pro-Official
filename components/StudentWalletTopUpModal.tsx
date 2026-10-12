@@ -22,6 +22,7 @@ import { MonCashWaitingModal } from './MonCashWaitingModal';
 import { MonCashSummaryModal } from './MonCashSummaryModal';
 import { useSchool } from '../contexts/SchoolContext';
 import { getTerminology } from '../lib/terminology';
+import { isWalletPaymentActive, isMonCashPaymentActive } from '../lib/paymentMethods';
 
 export interface StudentWalletTopUpModalProps {
   isOpen: boolean;
@@ -53,9 +54,11 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   onSuccess
 }) => {
   let contextTerminology = null;
+  let contextSchool: any = null;
   try {
     const schoolCtx = useSchool();
     contextTerminology = schoolCtx?.terminology;
+    contextSchool = schoolCtx?.school;
   } catch {
     // Graceful fallback
   }
@@ -80,7 +83,11 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const [completedBalance, setCompletedBalance] = useState<number | null>(null);
   const [copiedRef, setCopiedRef] = useState(false);
 
-  if (!isOpen) return null;
+  // Sécurité absolue : si le portefeuille ou MonCash est désactivé par l'administration, le modal ne s'ouvre pas
+  const isWalletActive = isWalletPaymentActive(contextSchool);
+  const isMonCashActive = isMonCashPaymentActive(contextSchool);
+
+  if (!isOpen || !isWalletActive || !isMonCashActive) return null;
 
   const effectiveAmount = isCustom ? (parseFloat(customAmount) || 0) : selectedAmount;
   const currentBalance = student.wallet_balance_htg || 0;

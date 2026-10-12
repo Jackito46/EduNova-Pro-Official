@@ -19,7 +19,12 @@ import { MonCashService } from '../services/moncashService';
 import { useSchool } from '../contexts/SchoolContext';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { ModernSaleReceiptModal } from './ModernSaleReceiptModal';
-import { getActiveSchoolPaymentMethods, getPaymentMethodConfig } from '../lib/paymentMethods';
+import { 
+  getActiveSchoolPaymentMethods, 
+  getPaymentMethodConfig, 
+  isWalletPaymentActive,
+  isMonCashPaymentActive 
+} from '../lib/paymentMethods';
 import { SelectPill, SelectOption } from './SelectPill';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import { MonCashSummaryModal } from './MonCashSummaryModal';
@@ -1094,7 +1099,9 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">{terminology.student}</th>
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Matricule</th>
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">{terminology.class}</th>
-                                      <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Portefeuille</th>
+                                      {isWalletPaymentActive(schoolDetails || school) && (
+                                        <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider">Portefeuille</th>
+                                      )}
                                       <th className="py-2.5 px-3 text-[10px] font-black uppercase text-slate-500 tracking-wider text-right">Action</th>
                                     </tr>
                                   </thead>
@@ -1132,18 +1139,20 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                                           <td className="py-2.5 px-3 text-slate-700 font-bold text-xs">
                                             {className}
                                           </td>
-                                          <td className="py-2.5 px-3">
-                                            <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
-                                              <span className={htgBal > 0 ? 'text-emerald-700 font-black' : 'text-slate-400'}>
-                                                {htgBal.toLocaleString()} HTG
-                                              </span>
-                                              {usdBal > 0 && (
-                                                <span className="text-teal-700 font-black text-[10px]">
-                                                  • {usdBal.toLocaleString()} $
+                                          {isWalletPaymentActive(schoolDetails || school) && (
+                                            <td className="py-2.5 px-3">
+                                              <div className="flex items-center gap-1.5 font-mono text-[11px] font-bold">
+                                                <span className={htgBal > 0 ? 'text-emerald-700 font-black' : 'text-slate-400'}>
+                                                  {htgBal.toLocaleString()} HTG
                                                 </span>
-                                              )}
-                                            </div>
-                                          </td>
+                                                {usdBal > 0 && (
+                                                  <span className="text-teal-700 font-black text-[10px]">
+                                                    • {usdBal.toLocaleString()} $
+                                                  </span>
+                                                )}
+                                              </div>
+                                            </td>
+                                          )}
                                           <td className="py-2.5 px-3 text-right">
                                             <button
                                               type="button"
@@ -1252,49 +1261,53 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                 </div>
 
                 {/* WALLET BALANCE BADGES & STATUS */}
-                <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
-                  {/* HTG Wallet Badge */}
-                  <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-black transition-all ${
-                    (Number(selectedStudent.wallet_balance_htg) || 0) > 0 
-                      ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-2xs' 
-                      : 'bg-slate-100/90 text-slate-500 border-slate-200'
-                  }`}>
-                    <Wallet size={14} className={(Number(selectedStudent.wallet_balance_htg) || 0) > 0 ? 'text-emerald-600' : 'text-slate-400'} />
-                    <span>Portefeuille G:</span>
-                    <span className="font-mono font-black">{(Number(selectedStudent.wallet_balance_htg) || 0).toLocaleString()} HTG</span>
+                {isWalletPaymentActive(schoolDetails || school) && (
+                  <div className="flex flex-wrap items-center gap-2 self-start md:self-center">
+                    {/* HTG Wallet Badge */}
+                    <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-black transition-all ${
+                      (Number(selectedStudent.wallet_balance_htg) || 0) > 0 
+                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 shadow-2xs' 
+                        : 'bg-slate-100/90 text-slate-500 border-slate-200'
+                    }`}>
+                      <Wallet size={14} className={(Number(selectedStudent.wallet_balance_htg) || 0) > 0 ? 'text-emerald-600' : 'text-slate-400'} />
+                      <span>Portefeuille G:</span>
+                      <span className="font-mono font-black">{(Number(selectedStudent.wallet_balance_htg) || 0).toLocaleString()} HTG</span>
+                    </div>
+
+                    {/* USD Wallet Badge */}
+                    <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-black transition-all ${
+                      (Number(selectedStudent.wallet_balance_usd) || 0) > 0 
+                        ? 'bg-blue-50 text-blue-800 border-blue-200 shadow-2xs' 
+                        : 'bg-slate-100/90 text-slate-500 border-slate-200'
+                    }`}>
+                      <DollarSign size={14} className={(Number(selectedStudent.wallet_balance_usd) || 0) > 0 ? 'text-blue-600' : 'text-slate-400'} />
+                      <span>Portefeuille $:</span>
+                      <span className="font-mono font-black">{(Number(selectedStudent.wallet_balance_usd) || 0).toLocaleString()} USD</span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={refreshStudentWallet}
+                      title="Actualiser le solde portefeuille"
+                      className="p-2 bg-white hover:bg-slate-100 text-slate-600 hover:text-indigo-600 rounded-xl border border-slate-200 shadow-2xs transition-colors"
+                    >
+                      <RefreshCw size={13} />
+                    </button>
+
+                    {/* Bouton recharge express MonCash */}
+                    {isMonCashPaymentActive(schoolDetails || school) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowWalletTopUpModal(true)}
+                        title="Recharger le portefeuille via MonCash"
+                        className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl border border-red-600 shadow-2xs transition-all flex items-center gap-1.5 text-xs font-black cursor-pointer"
+                      >
+                        <Smartphone size={13} />
+                        <span>Recharger MonCash</span>
+                      </button>
+                    )}
                   </div>
-
-                  {/* USD Wallet Badge */}
-                  <div className={`px-3 py-1.5 rounded-xl border flex items-center gap-2 text-xs font-black transition-all ${
-                    (Number(selectedStudent.wallet_balance_usd) || 0) > 0 
-                      ? 'bg-blue-50 text-blue-800 border-blue-200 shadow-2xs' 
-                      : 'bg-slate-100/90 text-slate-500 border-slate-200'
-                  }`}>
-                    <DollarSign size={14} className={(Number(selectedStudent.wallet_balance_usd) || 0) > 0 ? 'text-blue-600' : 'text-slate-400'} />
-                    <span>Portefeuille $:</span>
-                    <span className="font-mono font-black">{(Number(selectedStudent.wallet_balance_usd) || 0).toLocaleString()} USD</span>
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={refreshStudentWallet}
-                    title="Actualiser le solde portefeuille"
-                    className="p-2 bg-white hover:bg-slate-100 text-slate-600 hover:text-indigo-600 rounded-xl border border-slate-200 shadow-2xs transition-colors"
-                  >
-                    <RefreshCw size={13} />
-                  </button>
-
-                  {/* Bouton recharge express MonCash */}
-                  <button
-                    type="button"
-                    onClick={() => setShowWalletTopUpModal(true)}
-                    title="Recharger le portefeuille via MonCash"
-                    className="px-2.5 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl border border-red-600 shadow-2xs transition-all flex items-center gap-1.5 text-xs font-black cursor-pointer"
-                  >
-                    <Smartphone size={13} />
-                    <span>Recharger MonCash</span>
-                  </button>
-                </div>
+                )}
               </div>
             )}
           </section>
@@ -1957,14 +1970,16 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
                           Solde insuffisant pour finaliser cette transaction.
                         </span>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setShowWalletTopUpModal(true)}
-                        className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-md shadow-red-950/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Smartphone size={13} />
-                        <span>Recharger le portefeuille via MonCash</span>
-                      </button>
+                      {isMonCashPaymentActive(schoolDetails || school) && (
+                        <button
+                          type="button"
+                          onClick={() => setShowWalletTopUpModal(true)}
+                          className="w-full py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-black shadow-md shadow-red-950/40 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Smartphone size={13} />
+                          <span>Recharger le portefeuille via MonCash</span>
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <div className="flex items-center gap-2 bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20 text-emerald-300 text-[11px] font-bold">

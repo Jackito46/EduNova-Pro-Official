@@ -32,6 +32,7 @@ import {
 import { UserProfile, SchoolType } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { PrintPreviewModal } from './PrintPreviewModal';
+import { isWalletPaymentActive, isMonCashPaymentActive } from '../lib/paymentMethods';
 
 interface ParentDashboardViewProps {
   user: UserProfile;
@@ -330,9 +331,11 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                           Matr: {child.reference_number}
                         </span>
                       )}
-                      <span className="text-[11px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 flex items-center gap-1">
-                        👛 {(child.wallet_balance_htg || 0).toLocaleString()} HTG
-                      </span>
+                      {isWalletPaymentActive(school) && (
+                        <span className="text-[11px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 flex items-center gap-1">
+                          👛 {(child.wallet_balance_htg || 0).toLocaleString()} HTG
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -340,16 +343,18 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                 {/* Individual Action Buttons */}
                 <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
                   {/* Top-up MonCash */}
-                  <button
-                    type="button"
-                    id={`btn-topup-${child.id}`}
-                    onClick={() => onTopUpStudentWallet(child)}
-                    className="px-2.5 sm:px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-lg sm:rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Recharger le portefeuille de l'élève par MonCash"
-                  >
-                    <Smartphone size={13} />
-                    <span>MonCash</span>
-                  </button>
+                  {isWalletPaymentActive(school) && isMonCashPaymentActive(school) && (
+                    <button
+                      type="button"
+                      id={`btn-topup-${child.id}`}
+                      onClick={() => onTopUpStudentWallet(child)}
+                      className="px-2.5 sm:px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-lg sm:rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+                      title="Recharger le portefeuille de l'élève par MonCash"
+                    >
+                      <Smartphone size={13} />
+                      <span>MonCash</span>
+                    </button>
+                  )}
 
                   {/* Relevé financier de l'enfant */}
                   <button 
@@ -472,17 +477,19 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
           </div>
 
           {/* Assistance card */}
-          <div className="mt-3.5 sm:mt-4 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-indigo-50/60 border border-indigo-100">
-            <div className="flex items-start gap-2.5">
-              <ShieldCheck className="text-indigo-600 shrink-0 mt-0.5" size={16} />
-              <div className="text-xs text-indigo-950">
-                <p className="font-bold">Paiement Mobile Sécurisé</p>
-                <p className="text-indigo-800/80 mt-0.5 text-[11px] leading-relaxed">
-                  Rechargez le portefeuille par MonCash avec validation instantanée.
-                </p>
+          {isMonCashPaymentActive(school) && isWalletPaymentActive(school) && (
+            <div className="mt-3.5 sm:mt-4 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-indigo-50/60 border border-indigo-100">
+              <div className="flex items-start gap-2.5">
+                <ShieldCheck className="text-indigo-600 shrink-0 mt-0.5" size={16} />
+                <div className="text-xs text-indigo-950">
+                  <p className="font-bold">Paiement Mobile Sécurisé</p>
+                  <p className="text-indigo-800/80 mt-0.5 text-[11px] leading-relaxed">
+                    Rechargez le portefeuille par MonCash avec validation instantanée.
+                  </p>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -843,7 +850,7 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
             {/* Content: Summary & Payments of this child */}
             <div className="overflow-y-auto py-4 space-y-4 flex-1 pr-1">
               {/* Financial summary pills */}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <div className={`grid gap-2.5 ${isWalletPaymentActive(school) ? 'grid-cols-2 sm:grid-cols-3' : 'grid-cols-2'}`}>
                 <div className="p-3 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100">
                   <p className="text-[10px] font-black uppercase tracking-wider text-emerald-700">Total Versé</p>
                   <p className="text-base sm:text-lg font-black text-emerald-800 mt-0.5">
@@ -851,13 +858,15 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                       .reduce((acc, p) => acc + Number(p.amount_htg_equivalent || p.amount || 0), 0) || 0).toLocaleString()} G
                   </p>
                 </div>
-                <div className="p-3 rounded-xl sm:rounded-2xl bg-indigo-50 border border-indigo-100">
-                  <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Portefeuille</p>
-                  <p className="text-base sm:text-lg font-black text-indigo-800 mt-0.5">
-                    {(selectedChildForStatement.wallet_balance_htg || 0).toLocaleString()} HTG
-                  </p>
-                </div>
-                <div className="p-3 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 col-span-2 sm:col-span-1">
+                {isWalletPaymentActive(school) && (
+                  <div className="p-3 rounded-xl sm:rounded-2xl bg-indigo-50 border border-indigo-100">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-indigo-700">Portefeuille</p>
+                    <p className="text-base sm:text-lg font-black text-indigo-800 mt-0.5">
+                      {(selectedChildForStatement.wallet_balance_htg || 0).toLocaleString()} HTG
+                    </p>
+                  </div>
+                )}
+                <div className={`p-3 rounded-xl sm:rounded-2xl bg-slate-50 border border-slate-200 ${isWalletPaymentActive(school) ? 'col-span-2 sm:col-span-1' : ''}`}>
                   <p className="text-[10px] font-black uppercase tracking-wider text-slate-600">Nb de Reçus</p>
                   <p className="text-base sm:text-lg font-black text-slate-800 mt-0.5">
                     {parentStats.payments?.filter(p => p.student_id === selectedChildForStatement.id).length || 0}
@@ -929,21 +938,23 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
             </div>
 
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between">
-              <button
-                type="button"
-                onClick={() => {
-                  onTopUpStudentWallet(selectedChildForStatement);
-                  setSelectedChildForStatement(null);
-                }}
-                className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
-              >
-                <Smartphone size={13} />
-                <span>Recharger MonCash</span>
-              </button>
+              {isWalletPaymentActive(school) && isMonCashPaymentActive(school) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onTopUpStudentWallet(selectedChildForStatement);
+                    setSelectedChildForStatement(null);
+                  }}
+                  className="px-3.5 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg sm:rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Smartphone size={13} />
+                  <span>Recharger MonCash</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSelectedChildForStatement(null)}
-                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer"
+                className="px-3.5 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg sm:rounded-xl text-xs font-bold transition-all cursor-pointer ml-auto"
               >
                 Fermer
               </button>
@@ -1000,12 +1011,14 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                     {selectedChildForDetail.status || 'Actif'}
                   </p>
                 </div>
-                <div className="p-2.5 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100">
-                  <p className="text-[10px] font-black uppercase text-emerald-700">Portefeuille Électronique</p>
-                  <p className="text-xs font-bold text-emerald-900 mt-0.5">
-                    {(selectedChildForDetail.wallet_balance_htg || 0).toLocaleString()} HTG
-                  </p>
-                </div>
+                {isWalletPaymentActive(school) && (
+                  <div className="p-2.5 rounded-xl sm:rounded-2xl bg-emerald-50 border border-emerald-100">
+                    <p className="text-[10px] font-black uppercase text-emerald-700">Portefeuille Électronique</p>
+                    <p className="text-xs font-bold text-emerald-900 mt-0.5">
+                      {(selectedChildForDetail.wallet_balance_htg || 0).toLocaleString()} HTG
+                    </p>
+                  </div>
+                )}
               </div>
 
               {selectedChildForDetail.date_of_birth && (

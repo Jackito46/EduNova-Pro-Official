@@ -68,7 +68,12 @@ import { tuitionPaymentSchema } from '../utils/validation';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { SelectPill, SelectOption } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
-import { getActiveSchoolPaymentMethods, getPaymentMethodConfig, PaymentMethodConfig } from '../lib/paymentMethods';
+import { 
+  getActiveSchoolPaymentMethods, 
+  getPaymentMethodConfig, 
+  PaymentMethodConfig,
+  isWalletPaymentActive
+} from '../lib/paymentMethods';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
 
 const getReceiptFeeText = (
@@ -281,14 +286,18 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         label: 'Frais Divers',
         badge: 'Obligatoire',
         icon: Tags
-      },
-      {
+      }
+    ];
+
+    const isWalletActive = isWalletPaymentActive(schoolDetails || school);
+    if (isWalletActive) {
+      opts.push({
         value: 'CREDIT_PORTEFEUILLE',
         label: 'Alimenter Portefeuille',
         badge: 'Réserve',
         icon: Wallet
-      }
-    ];
+      });
+    }
 
     if (selectedStudent?.adHocCampaigns && Array.isArray(selectedStudent.adHocCampaigns)) {
       selectedStudent.adHocCampaigns.forEach((c: any) => {
@@ -302,16 +311,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
 
     return opts;
-  }, [selectedStudent, terminology.tuition]);
+  }, [selectedStudent, terminology.tuition, schoolDetails, school]);
 
   const paymentMethodOptions: SelectOption[] = useMemo(() => {
-    const opts: SelectOption[] = activePaymentMethods.map(m => ({
-      value: m.code,
-      label: m.name,
-      icon: m.code === 'MonCash' ? Zap : m.code === 'Chèque' || m.code === 'Dépôt Bancaire' ? Building2 : CreditCard
-    }));
+    const isWalletActive = isWalletPaymentActive(schoolDetails || school);
+    const opts: SelectOption[] = activePaymentMethods
+      .filter(m => isWalletActive || (m.code !== 'Portefeuille' && m.id !== 'PORTEFEUILLE'))
+      .map(m => ({
+        value: m.code,
+        label: m.name,
+        icon: m.code === 'MonCash' ? Zap : m.code === 'Chèque' || m.code === 'Dépôt Bancaire' ? Building2 : CreditCard
+      }));
 
-    if (feeType !== 'CREDIT_PORTEFEUILLE' && ((currency === 'USD' ? selectedStudent?.wallet_balance_usd : selectedStudent?.wallet_balance_htg) || 0) > 0) {
+    if (isWalletActive && feeType !== 'CREDIT_PORTEFEUILLE' && !opts.some(o => o.value === 'Portefeuille') && ((currency === 'USD' ? selectedStudent?.wallet_balance_usd : selectedStudent?.wallet_balance_htg) || 0) > 0) {
       const bal = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
       opts.push({
         value: 'Portefeuille',
@@ -322,7 +334,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
 
     return opts;
-  }, [activePaymentMethods, feeType, currency, selectedStudent]);
+  }, [activePaymentMethods, feeType, currency, selectedStudent, schoolDetails, school]);
 
   const hasUSDFees = useMemo(() => {
     if (!selectedStudent || !selectedStudent.plan) return false;
@@ -3051,7 +3063,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                    </div>
                  )}
 
-                 {selectedStudent && (
+                 {selectedStudent && isWalletPaymentActive(schoolDetails || school) && (
                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
                      <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                        <Wallet size={12} className="text-emerald-600" /> Portefeuille :

@@ -164,3 +164,27 @@ export function getPaymentMethodConfig(codeOrId: string, school: any): PaymentMe
   const methods = getSchoolPaymentMethods(school);
   return methods.find(m => m.code === codeOrId || m.id === codeOrId || m.name === codeOrId);
 }
+
+/**
+ * Vérifie formellement si un mode de règlement précis est activé pour l'établissement.
+ * Supporte la recherche par ID (ex: 'MONCASH', 'PORTEFEUILLE', 'CASH') ou par code (ex: 'MonCash', 'Portefeuille').
+ */
+export function isPaymentMethodActive(codeOrId: string, school: any): boolean {
+  if (!codeOrId) return false;
+  const config = getPaymentMethodConfig(codeOrId, school);
+  return Boolean(config && config.enabled);
+}
+
+/**
+ * Vérifie si le Portefeuille / Avoir élève est actif dans les paramètres de l'école.
+ */
+export function isWalletPaymentActive(school: any): boolean {
+  return isPaymentMethodActive('PORTEFEUILLE', school) || isPaymentMethodActive('Portefeuille', school);
+}
+
+/**
+ * Vérifie si MonCash est actif dans les paramètres de l'école.
+ */
+export function isMonCashPaymentActive(school: any): boolean {
+  return isPaymentMethodActive('MONCASH', school) || isPaymentMethodActive('MonCash', school);
+}
