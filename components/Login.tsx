@@ -617,13 +617,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
               </motion.div>
             )}
 
-            {isStandalone && (
-              <div className="mb-4 py-1.5 px-3 bg-emerald-50 border border-emerald-200/80 rounded-xl flex items-center justify-center gap-1.5 text-emerald-700 text-[11px] font-semibold">
-                <CheckCircle2 size={13} className="text-emerald-600" />
-                <span>Application EduNova Pro installée ({platformName})</span>
-              </div>
-            )}
-
             {/* Maintenance Mode Banner */}
             {maintenanceMode && (
               <motion.div 
