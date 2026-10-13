@@ -101,7 +101,7 @@ export default defineConfig(({ mode }) => {
                 if (id.includes('xlsx')) {
                   return 'vendor-xlsx';
                 }
-                if (id.includes('recharts') || id.includes('d3-')) {
+                if (id.includes('recharts') || id.includes('d3-') || id.includes('react-is')) {
                   return 'vendor-charts';
                 }
                 if (id.includes('@supabase')) {
