@@ -159,7 +159,15 @@ export function isPwaInstalled(): boolean {
     document.referrer.includes('android-app://')
   );
 
-  return isStandalone;
+  if (isStandalone) return true;
+
+  try {
+    if (localStorage.getItem('edunova_pwa_installed') === 'true') {
+      return true;
+    }
+  } catch (e) {}
+
+  return false;
 }
 
 // Alias for backwards compatibility
@@ -223,8 +231,11 @@ export const usePwaInstall = () => {
     if (typeof navigator !== 'undefined' && 'getInstalledRelatedApps' in navigator) {
       try {
         (navigator as any).getInstalledRelatedApps().then((relatedApps: any[]) => {
-          if (Array.isArray(relatedApps) && relatedApps.length > 0 && checkIsStandalone()) {
+          if (Array.isArray(relatedApps) && relatedApps.length > 0) {
             setIsInstalled(true);
+            try {
+              localStorage.setItem('edunova_pwa_installed', 'true');
+            } catch (err) {}
           }
         }).catch(() => {});
       } catch (e) {}

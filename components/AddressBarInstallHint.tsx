@@ -9,31 +9,34 @@ export const AddressBarInstallHint: React.FC = () => {
   const [isVisible, setIsVisible] = useState(false);
 
   useEffect(() => {
-    // Check if dismissed previously in sessionStorage
-    const isDismissed = sessionStorage.getItem('edunova_address_bar_hint_dismissed') === 'true';
+    // Check if dismissed previously in localStorage, sessionStorage, or if PWA already marked installed
+    const isDismissed = (
+      localStorage.getItem('edunova_address_bar_hint_dismissed') === 'true' ||
+      sessionStorage.getItem('edunova_address_bar_hint_dismissed') === 'true' ||
+      localStorage.getItem('edunova_pwa_installed') === 'true'
+    );
     if (isDismissed) {
       setDismissed(true);
       return;
     }
 
-    // Only show on desktop devices when not in standalone mode and not inside iframe
+    // Only show on desktop devices when not in standalone mode, not installed, and not inside iframe
     const isDesktop = !/Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     if (!isInstalled && !isStandalone && !isInIframe && isDesktop) {
       const timer = setTimeout(() => {
         setIsVisible(true);
-      }, 1000);
+      }, 1500);
       return () => clearTimeout(timer);
     }
   }, [isInstalled, isStandalone, isInIframe]);
 
-  const handleDismiss = (permanent = false) => {
+  const handleDismiss = (permanent = true) => {
     setIsVisible(false);
     setDismissed(true);
-    if (permanent) {
+    try {
       localStorage.setItem('edunova_address_bar_hint_dismissed', 'true');
-    } else {
       sessionStorage.setItem('edunova_address_bar_hint_dismissed', 'true');
-    }
+    } catch (e) {}
   };
 
   if (dismissed || !isVisible || isInstalled || isStandalone || isInIframe) {

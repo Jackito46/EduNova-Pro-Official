@@ -22,9 +22,12 @@ export const PwaInstallBanner: React.FC = () => {
     }
 
     try {
-      // Session-based dismissal so launching fresh on Render properly auto-detects
-      const dismissed = sessionStorage.getItem('edunova_pwa_banner_dismissed');
-      if (dismissed === 'true') {
+      const dismissed = (
+        localStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
+        sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
+        localStorage.getItem('edunova_pwa_installed') === 'true'
+      );
+      if (dismissed) {
         setIsVisible(false);
         return;
       }
@@ -35,7 +38,7 @@ export const PwaInstallBanner: React.FC = () => {
     // Delay banner appearance slightly so page loads gracefully first
     const timer = setTimeout(() => {
       setIsVisible(true);
-    }, 800);
+    }, 2000);
 
     const handleShow = () => setIsVisible(true);
     window.addEventListener('open-pwa-install-banner', handleShow);
@@ -49,6 +52,7 @@ export const PwaInstallBanner: React.FC = () => {
   const handleDismiss = () => {
     setIsVisible(false);
     try {
+      localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
       sessionStorage.setItem('edunova_pwa_banner_dismissed', 'true');
     } catch (e) {}
   };

@@ -2018,7 +2018,6 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
           <AutonomousAdminWarningBanner user={user} />
           <AiQuotaAlertBanner user={user} />
-          <AddressBarInstallHint />
         </div>
 
         {/* Security Recommendation Banner */}

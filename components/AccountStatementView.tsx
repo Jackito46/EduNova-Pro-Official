@@ -1248,7 +1248,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       {/* NAVIGATION & HEADER MULTI-CAMPUS */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 print:hidden bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80">
-        <div className="space-y-1">
+        <div className="space-y-1 min-w-0 shrink-0">
           <div className="flex items-center gap-2 text-indigo-600 font-extrabold text-[10px] uppercase tracking-[0.2em]">
             <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
             <span>ÉCONOMAT • AUDIT FINANCIER</span>
@@ -1262,7 +1262,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </>
             )}
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight leading-tight">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight sm:whitespace-nowrap">
             Relevé de Compte & Audit Financier
           </h2>
         </div>

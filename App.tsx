@@ -1378,9 +1378,6 @@ const App: React.FC = () => {
               window.location.hash = '#/';
             }
           }} onReset={purgeSystemState} />
-          <PwaInstallBanner />
-          <AddressBarInstallHint />
-          <PwaInstallModal />
         </HashRouter>
       </ErrorBoundary>
     );
