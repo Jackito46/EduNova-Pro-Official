@@ -1842,6 +1842,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         terminology={terminology}
       />
 
+      {/* Floating Connectivity Banner (Fixed en bas à droite) */}
+      <ConnectivityBanner />
+
+      {/* Auditeur d'alertes paie sensibles en temps réel (invisible, retourne null) */}
+      <PayrollSensitiveNotificationListener user={user} />
+
       {/* Header Section - Relatif sur mobile/tablette pour libérer l'espace visuel, fixé à top: 0 sur desktop (lg:) et aligné au dixième de pixel près avec l'en-tête Sidebar */}
       <header 
         id="dashboard-sticky-header"
@@ -2005,14 +2011,12 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       </header>
 
-      {/* Main Content Area - Encart max-w-7xl avec espacement propre */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 2xl:px-8 pt-4 sm:pt-5 space-y-6 sm:space-y-8">
-        {/* System & Notification Banners within scrollable feed */}
-        <div className="space-y-3">
-          <ConnectivityBanner />
+      {/* Main Content Area - Encart max-w-7xl avec espacement standard international optimisé */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-5 lg:px-6 2xl:px-8 pt-3 sm:pt-3.5 lg:pt-4 flex flex-col gap-4 sm:gap-5 lg:gap-6">
+        {/* System & Notification Banners - Masqué automatiquement sans espace fantôme si aucun bandeau actif */}
+        <div className="flex flex-col gap-3 empty:hidden [&:not(:has(>*))]:hidden">
           <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
           <AutonomousAdminWarningBanner user={user} />
-          <PayrollSensitiveNotificationListener user={user} />
           <AiQuotaAlertBanner user={user} />
           <AddressBarInstallHint />
         </div>
