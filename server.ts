@@ -51,8 +51,11 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Masquer la signature serveur Express pour empêcher le profilage de vulnérabilités
+  app.disable('x-powered-by');
+
   // =========================================================================
-  // MIDDLEWARE CORS & PREFLIGHT OPTIONS POUR TOUS LES ENDPOINTS /api ET ASSETS
+  // MIDDLEWARE CORS & EN-TÊTES DE SÉCURITÉ HTTP
   // =========================================================================
   app.use((req, res, next) => {
     const origin = req.headers.origin;
@@ -67,11 +70,95 @@ async function startServer() {
     res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400');
 
+    // En-têtes de durcissement défensif (Anti-MIME Sniffing, Anti-XSS, Isolation)
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    res.setHeader('X-XSS-Protection', '1; mode=block');
+    res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+
     if (req.method === 'OPTIONS') {
       return res.status(204).end();
     }
     next();
   });
+
+  // =========================================================================
+  // MOTEUR DE RATE LIMITING EN MÉMOIRE (PROTECTION ANTI-BRUTE FORCE & ANTI-DOS)
+  // =========================================================================
+  interface RateLimitRecord {
+    count: number;
+    resetAt: number;
+  }
+
+  function createRateLimiter(options: { windowMs: number; max: number; message: string }) {
+    const ipMap = new Map<string, RateLimitRecord>();
+
+    // Nettoyage automatique des entrées expirées toutes les 5 minutes
+    const cleanupTimer = setInterval(() => {
+      const now = Date.now();
+      for (const [ip, record] of ipMap.entries()) {
+        if (now > record.resetAt) {
+          ipMap.delete(ip);
+        }
+      }
+    }, 5 * 60 * 1000);
+    cleanupTimer.unref();
+
+    return (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      if (req.method === 'OPTIONS') return next();
+
+      const forwarded = req.headers['x-forwarded-for'];
+      const ip = (typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : '') || req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+
+      let record = ipMap.get(ip);
+      if (!record || now > record.resetAt) {
+        record = { count: 1, resetAt: now + options.windowMs };
+        ipMap.set(ip, record);
+      } else {
+        record.count++;
+      }
+
+      res.setHeader('X-RateLimit-Limit', options.max);
+      res.setHeader('X-RateLimit-Remaining', Math.max(0, options.max - record.count));
+      res.setHeader('X-RateLimit-Reset', Math.ceil(record.resetAt / 1000));
+
+      if (record.count > options.max) {
+        const retryAfterSeconds = Math.max(1, Math.ceil((record.resetAt - now) / 1000));
+        res.setHeader('Retry-After', retryAfterSeconds);
+        return res.status(429).json({
+          success: false,
+          error: options.message,
+          retryAfterSeconds
+        });
+      }
+
+      next();
+    };
+  }
+
+  // 1. Limiteur global API (200 requêtes / minute par IP)
+  const apiGeneralLimiter = createRateLimiter({
+    windowMs: 60 * 1000,
+    max: 200,
+    message: 'Trop de requêtes détectées depuis cette adresse IP. Veuillez patienter une minute.'
+  });
+
+  // 2. Limiteur strict anti-brute force (12 tentatives / 5 minutes par IP)
+  const authStrictLimiter = createRateLimiter({
+    windowMs: 5 * 60 * 1000,
+    max: 12,
+    message: 'Trop de tentatives de validation de mot de passe. Compte temporairement protégé pour 5 minutes.'
+  });
+
+  // 3. Limiteur d'appels IA Gemini (35 requêtes / minute par IP)
+  const geminiAiLimiter = createRateLimiter({
+    windowMs: 60 * 1000,
+    max: 35,
+    message: 'Limite de requêtes IA atteinte pour cette minute. Veuillez patienter un instant.'
+  });
+
+  // Application du rate limiter global sur l'ensemble des routes API
+  app.use('/api', apiGeneralLimiter);
 
   app.use(express.json({ limit: '50mb' }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
@@ -2881,8 +2968,8 @@ async function startServer() {
     }
   });
 
-  // API Route to verify an admin or campus director password
-  app.post('/api/verify-admin-password', async (req, res) => {
+  // API Route to verify an admin or campus director password (protégée contre les attaques par force brute)
+  app.post('/api/verify-admin-password', authStrictLimiter, async (req, res) => {
     const { email, password, school_id } = req.body;
 
     if (!email || !password || typeof email !== 'string' || typeof password !== 'string') {
@@ -3150,7 +3237,15 @@ async function startServer() {
     res.json({ success: true, message: "Journal d'audit IA réinitialisé sur le serveur." });
   });
 
+  // Rate limiting dédié aux services IA (35 req/min par IP)
+  app.use('/api/gemini', geminiAiLimiter);
+
   app.post('/api/gemini/generate-student-report', async (req, res) => {
+    const auth = await authenticateRequest(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
     const { studentName, grades } = req.body;
     try {
       const prompt = `En tant qu'expert pédagogique EduNova Pro, analysez les performances de l'élève ${studentName} : ${JSON.stringify(grades)}. Rédigez un commentaire professionnel, nuancé et constructif (3 phrases maximum) pour le bulletin scolaire.`;
@@ -3167,6 +3262,11 @@ async function startServer() {
   });
 
   app.post('/api/gemini/analyze-financial-health', async (req, res) => {
+    const auth = await authenticateRequest(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
     const { stats } = req.body;
     try {
       const prompt = `En tant qu'analyste financier expert, examinez ces données scolaires : ${JSON.stringify(stats)}. Identifiez 3 leviers stratégiques pour optimiser la gestion de l'établissement. Réponse en français, ton professionnel.`;
@@ -3183,6 +3283,11 @@ async function startServer() {
   });
 
   app.post('/api/gemini/generate-text', async (req, res) => {
+    const auth = await authenticateRequest(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
     const { prompt, type } = req.body;
     const cleanPrompt = prompt || 'Bonjour';
     const taskType = type || 'Diagnostic & Test IA';

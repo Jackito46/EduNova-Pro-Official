@@ -1,5 +1,16 @@
 import { aiLocalCache, AI_CACHE_TTL } from '../utils/aiLocalCache';
 import { aiCreditTrackingService } from './aiCreditTrackingService';
+import { supabase } from '../supabase';
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    const token = data?.session?.access_token;
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  } catch {
+    return {};
+  }
+}
 
 export interface GeminiRequestOptions {
   forceRefresh?: boolean;
@@ -33,9 +44,13 @@ export const geminiService = {
     // 2. Appel API serveur si non présent en cache ou rafraîchissement forcé
     try {
       const startTime = performance.now();
+      const authHeader = await getAuthHeader();
       const response = await fetch('/api/gemini/generate-student-report', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeader
+        },
         body: JSON.stringify({ studentName, grades }),
       });
       if (!response.ok) {
@@ -104,9 +119,13 @@ export const geminiService = {
     // 2. Appel API serveur
     try {
       const startTime = performance.now();
+      const authHeader = await getAuthHeader();
       const response = await fetch('/api/gemini/analyze-financial-health', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeader
+        },
         body: JSON.stringify({ stats }),
       });
       if (!response.ok) {
@@ -173,9 +192,13 @@ export const geminiService = {
     // 2. Appel API serveur
     try {
       const startTime = performance.now();
+      const authHeader = await getAuthHeader();
       const response = await fetch('/api/gemini/generate-text', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeader
+        },
         body: JSON.stringify({ prompt, type: options?.type }),
       });
       if (!response.ok) {
