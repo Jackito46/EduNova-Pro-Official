@@ -1850,6 +1850,40 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     }
   };
 
+  const handleDownloadZip = async () => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (!token) {
+        toast.error('Session expirée. Veuillez vous reconnecter.');
+        return;
+      }
+      toast.info('Génération et téléchargement sécurisé du ZIP...');
+      const res = await fetch('/api/export-zip', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Accès refusé' }));
+        toast.error(err.error || 'Erreur lors du téléchargement du ZIP');
+        return;
+      }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `EduNova-Pro-Sources-${new Date().toISOString().slice(0, 10)}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success('Téléchargement de l\'archive source réussi.');
+    } catch (err: any) {
+      toast.error('Erreur réseau lors du téléchargement du ZIP');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[60vh] items-center justify-center">
@@ -4908,15 +4942,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
           {/* Action Buttons - Compact */}
           <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 flex-wrap">
-            <a
-              href="/api/export-zip"
-              download
+            <button
+              type="button"
+              onClick={handleDownloadZip}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200/80 rounded-lg text-xs font-bold transition-all shadow-xs cursor-pointer"
-              title="Télécharger une archive ZIP complète des sources du projet"
+              title="Télécharger une archive ZIP complète des sources du projet (authentifié)"
             >
               <Download size={13} className="text-indigo-600" />
               <span>Télécharger ZIP Sources</span>
-            </a>
+            </button>
 
             <div className="flex items-center gap-2">
               <button

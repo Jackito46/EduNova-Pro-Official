@@ -114,12 +114,25 @@ export const GatewayWebhookSimulatorModal: React.FC<GatewayWebhookSimulatorModal
   const [auditLogs, setAuditLogs] = useState<WebhookAuditLog[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  const getAuthHeaders = async (): Promise<Record<string, string>> => {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      return token ? { 'Authorization': `Bearer ${token}` } : {};
+    } catch {
+      return {};
+    }
+  };
+
   // Fetch gateway configuration for school
   const fetchGatewayConfig = useCallback(async () => {
     if (!schoolId) return;
     setLoadingConfig(true);
     try {
-      const res = await fetch(`/api/settings/api-credentials?school_id=${schoolId}`);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/settings/api-credentials?school_id=${schoolId}`, {
+        headers: { ...authHeaders }
+      });
       const data = await res.json();
       if (data.success && data.credentials?.kobara) {
         setGatewayConfig(data.credentials.kobara);
@@ -136,7 +149,10 @@ export const GatewayWebhookSimulatorModal: React.FC<GatewayWebhookSimulatorModal
     if (!schoolId) return;
     setLoadingLogs(true);
     try {
-      const res = await fetch(`/api/webhooks/logs?school_id=${schoolId}`);
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch(`/api/webhooks/logs?school_id=${schoolId}`, {
+        headers: { ...authHeaders }
+      });
       const data = await res.json();
       if (data.success && Array.isArray(data.logs)) {
         setAuditLogs(data.logs);
@@ -219,9 +235,13 @@ export const GatewayWebhookSimulatorModal: React.FC<GatewayWebhookSimulatorModal
         description: `Simulation Webhook Économat • ${operator === 'natcash' ? 'Natcash' : 'MonCash'}`
       };
 
+      const authHeaders = await getAuthHeaders();
       const res = await fetch('/api/webhooks/simulate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify(payload)
       });
 
@@ -263,9 +283,13 @@ export const GatewayWebhookSimulatorModal: React.FC<GatewayWebhookSimulatorModal
   const handleClearLogs = async () => {
     if (!confirm('Êtes-vous sûr de vouloir réinitialiser l\'historique des simulations ?')) return;
     try {
+      const authHeaders = await getAuthHeaders();
       await fetch('/api/webhooks/logs/clear', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
         body: JSON.stringify({ school_id: schoolId })
       });
       setAuditLogs([]);

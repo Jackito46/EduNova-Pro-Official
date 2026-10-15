@@ -569,8 +569,131 @@ async function startServer() {
     }
   });
 
+  // =========================================================================
+  // GESTIONNAIRES D'AUTHENTIFICATION & CONTRÔLE D'ACCÈS RBAC SERVEUR
+  // =========================================================================
+  interface ServerAuthUser {
+    userId: string;
+    role: string;
+    schoolId: string | null;
+    isSuperAdmin: boolean;
+  }
+
+  interface ServerAuthResult {
+    authorized: boolean;
+    status: number;
+    user?: ServerAuthUser;
+    error?: string;
+  }
+
+  async function authenticateRequest(req: express.Request): Promise<ServerAuthResult> {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.startsWith('Bearer ') 
+      ? authHeader.slice(7).trim() 
+      : ((req.query.token as string)?.trim() || '');
+
+    if (!token) {
+      return { 
+        authorized: false, 
+        status: 401, 
+        error: 'Accès non autorisé : Jeton d\'authentification (Bearer Token) manquant.' 
+      };
+    }
+
+    if (!supabaseUrl || !supabaseAnonKey) {
+      return { 
+        authorized: false, 
+        status: 500, 
+        error: 'Configuration Supabase indisponible sur le serveur hôte.' 
+      };
+    }
+
+    try {
+      const authClient = createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: `Bearer ${token}` } }
+      });
+
+      const { data: userData, error: userErr } = await authClient.auth.getUser(token);
+      if (userErr || !userData?.user) {
+        return { 
+          authorized: false, 
+          status: 401, 
+          error: 'Session expirée ou jeton d\'accès invalide. Veuillez vous reconnecter.' 
+        };
+      }
+
+      const { data: profile } = await authClient
+        .from('profiles')
+        .select('id, role, school_id')
+        .eq('id', userData.user.id)
+        .maybeSingle();
+
+      const rawRole = (profile?.role || '').toUpperCase();
+      const isSuperAdmin = rawRole === 'SUPER_ADMIN';
+
+      return {
+        authorized: true,
+        status: 200,
+        user: {
+          userId: userData.user.id,
+          role: rawRole,
+          schoolId: profile?.school_id || null,
+          isSuperAdmin
+        }
+      };
+    } catch (err: any) {
+      return { 
+        authorized: false, 
+        status: 401, 
+        error: `Erreur d'authentification du jeton : ${err.message || 'Jeton corrompu'}` 
+      };
+    }
+  }
+
+  async function authorizeSchoolAdmin(req: express.Request, targetSchoolId?: string): Promise<ServerAuthResult> {
+    const authRes = await authenticateRequest(req);
+    if (!authRes.authorized || !authRes.user) return authRes;
+
+    const { user } = authRes;
+    if (user.isSuperAdmin) {
+      return authRes;
+    }
+
+    const adminRoles = ['SCHOOL_ADMIN', 'ADMIN', 'DIRECTION', 'PRINCIPAL', 'DIRECTEUR'];
+    const hasAdminRole = adminRoles.includes(user.role);
+
+    if (hasAdminRole && (!targetSchoolId || user.schoolId === targetSchoolId)) {
+      return authRes;
+    }
+
+    return {
+      authorized: false,
+      status: 403,
+      error: 'Accès refusé : Privilèges d\'administration insuffisants pour cet établissement.'
+    };
+  }
+
+  async function authorizeSuperAdmin(req: express.Request): Promise<ServerAuthResult> {
+    const authRes = await authenticateRequest(req);
+    if (!authRes.authorized || !authRes.user) return authRes;
+
+    if (authRes.user.isSuperAdmin) {
+      return authRes;
+    }
+
+    return {
+      authorized: false,
+      status: 403,
+      error: 'Accès refusé : Cette opération sensible requiert les privilèges Super Administrateur.'
+    };
+  }
+
   // API Route for testing Digicel MonCash credentials & endpoint connection
   app.post('/api/moncash/test-connection', async (req, res) => {
+    const auth = await authenticateRequest(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
     const { client_id, client_secret, business_key, mode } = req.body;
 
     const effectiveClientId = (client_id || process.env.MONCASH_CLIENT_ID || '').trim();
@@ -762,6 +885,11 @@ async function startServer() {
     const schoolId = req.query.school_id as string;
     if (!schoolId) {
       return res.status(400).json({ success: false, error: 'school_id requis' });
+    }
+
+    const auth = await authorizeSchoolAdmin(req, schoolId);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
     }
 
     try {
@@ -1053,6 +1181,11 @@ async function startServer() {
         success: false, 
         error: 'Paramètres school_id, service_name et credentials obligatoires' 
       });
+    }
+
+    const auth = await authorizeSchoolAdmin(req, school_id);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
     }
 
     try {
@@ -1526,6 +1659,11 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'service_name requis' });
     }
 
+    const auth = await authorizeSchoolAdmin(req, school_id);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
     try {
       if (service_name === 'moncash') {
         let clientId = (credentials?.client_id || credentials?.MONCASH_CLIENT_ID || '').trim();
@@ -1724,36 +1862,10 @@ async function startServer() {
       return res.status(400).json({ success: false, error: 'Paramètres manquants' });
     }
 
-    // Contrôle d'authentification et d'habilitation administrateur
-    const authHeader = req.headers.authorization;
-    if (authHeader) {
-      const token = authHeader.split(' ')[1];
-      if (token && supabaseUrl && supabaseAnonKey) {
-        try {
-          const authClient = createClient(supabaseUrl, supabaseAnonKey, {
-            global: { headers: { Authorization: `Bearer ${token}` } }
-          });
-          const { data: userData, error: userErr } = await authClient.auth.getUser(token);
-          if (userErr || !userData?.user) {
-            return res.status(401).json({ success: false, error: 'Session non authentifiée ou expirée' });
-          }
-          
-          const { data: profile } = await authClient
-            .from('profiles')
-            .select('role, school_id')
-            .eq('id', userData.user.id)
-            .maybeSingle();
-            
-          const isSuperAdmin = profile?.role === 'SUPER_ADMIN' || profile?.role === 'super_admin';
-          const isSchoolAdmin = (profile?.role === 'SCHOOL_ADMIN' || profile?.role === 'school_admin' || profile?.role === 'ADMIN' || profile?.role === 'admin') && profile?.school_id === school_id;
-          
-          if (!isSuperAdmin && !isSchoolAdmin) {
-            return res.status(403).json({ success: false, error: 'Accès refusé : privilèges administrateur requis pour révéler une clé secrète.' });
-          }
-        } catch (authEx) {
-          console.warn('Erreur vérification token reveal:', authEx);
-        }
-      }
+    // Contrôle d'authentification et d'habilitation administrateur obligatoire
+    const auth = await authorizeSchoolAdmin(req, school_id);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
     }
 
     try {
@@ -1919,6 +2031,11 @@ async function startServer() {
         }
       }
 
+      if (signatureStatus === 'invalid') {
+        console.warn(`[Kobara Webhook] Rejet de la requête : Signature HMAC invalide pour l'établissement ${schoolId}`);
+        return res.status(401).json({ received: false, error: 'Signature de webhook invalide.' });
+      }
+
       const isSuccess = 
         eventType === 'payment.succeeded' || 
         eventType.includes('success') || 
@@ -2026,6 +2143,11 @@ async function startServer() {
 
       if (!school_id) {
         return res.status(400).json({ success: false, error: 'school_id requis pour la simulation' });
+      }
+
+      const auth = await authorizeSchoolAdmin(req, school_id);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
       }
 
       const effectiveOperator: 'moncash' | 'natcash' = operator === 'natcash' ? 'natcash' : 'moncash';
@@ -2208,8 +2330,20 @@ async function startServer() {
   });
 
   // API Route pour consulter les logs d'audit Webhook récents
-  app.get('/api/webhooks/logs', (req, res) => {
+  app.get('/api/webhooks/logs', async (req, res) => {
     const schoolId = req.query.school_id as string;
+    if (schoolId) {
+      const auth = await authorizeSchoolAdmin(req, schoolId);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+    } else {
+      const auth = await authorizeSuperAdmin(req);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+    }
+
     const filtered = schoolId 
       ? webhookAuditLogs.filter(l => !l.school_id || l.school_id === schoolId)
       : webhookAuditLogs;
@@ -2221,15 +2355,23 @@ async function startServer() {
   });
 
   // API Route pour vider les logs d'audit Webhook
-  app.post('/api/webhooks/logs/clear', (req, res) => {
+  app.post('/api/webhooks/logs/clear', async (req, res) => {
     const { school_id } = req.body;
     if (school_id) {
+      const auth = await authorizeSchoolAdmin(req, school_id);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
       for (let i = webhookAuditLogs.length - 1; i >= 0; i--) {
         if (webhookAuditLogs[i].school_id === school_id) {
           webhookAuditLogs.splice(i, 1);
         }
       }
     } else {
+      const auth = await authorizeSuperAdmin(req);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
       webhookAuditLogs.length = 0;
     }
     res.json({ success: true, message: 'Logs de simulation réinitialisés.' });
@@ -2310,6 +2452,11 @@ async function startServer() {
 
   // API Route for testing SMTP settings
   app.post('/api/test-smtp', async (req, res) => {
+    const auth = await authenticateRequest(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+
     const { smtp_host, smtp_port, smtp_user, smtp_pass, email_from_address, email_from_name } = req.body;
 
     if (!smtp_host || !smtp_pass || !email_from_address) {
@@ -2349,10 +2496,14 @@ async function startServer() {
   // API Route for sending emails
   app.post('/api/send-email', async (req, res) => {
     const { schoolId, recipients, subject, content } = req.body;
-    const authHeader = req.headers.authorization;
 
     if (!schoolId || !recipients || !subject || !content) {
       return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    const auth = await authorizeSchoolAdmin(req, schoolId);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
     }
 
     try {
@@ -2361,7 +2512,7 @@ async function startServer() {
       }
 
       // Create a scoped Supabase client using the user's token
-      const token = authHeader?.split(' ')[1];
+      const token = req.headers.authorization?.split(' ')[1];
       const scopedSupabase = token ? createClient(supabaseUrl, supabaseAnonKey, {
         global: { headers: { Authorization: `Bearer ${token}` } }
       }) : supabase;
@@ -3259,6 +3410,15 @@ async function startServer() {
   // ----------------------------------------------------
   const backupService = new BackupBackendService(supabase);
 
+  // Protection RBAC stricte : Seul un Super Administrateur peut interagir avec les sauvegardes
+  app.use('/api/backups', async (req, res, next) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+    next();
+  });
+
   // 1. List backups & get current settings
   app.get('/api/backups', async (req, res) => {
     try {
@@ -3533,6 +3693,11 @@ async function startServer() {
 
   // API Endpoint for Exporting Project to GitHub with Real-time Progress Streaming
   app.post('/api/export-github', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+
     const { token, owner, repo, branch, commitMessage } = req.body || {};
 
     if (!token) {
@@ -3591,6 +3756,11 @@ async function startServer() {
 
   // API Endpoint for Instant Project ZIP Download
   app.get('/api/export-zip', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+
     try {
       const zip = new AdmZip();
       const files = getProjectFiles(process.cwd());
@@ -3618,6 +3788,11 @@ async function startServer() {
   // Multi-Tenant & Annexes (école par école + school_campuses)
   // =========================================================================
   app.post('/api/migrate-logos-to-storage', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
     try {
       console.log('[Logo Migration Server] Démarrage de la migration globale des logos...');
       if (!supabase) {

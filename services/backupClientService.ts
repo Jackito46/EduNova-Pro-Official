@@ -111,13 +111,29 @@ const DEFAULT_SETTINGS: BackupSettings = {
   last_auto_backup_status: 'SUCCESS'
 };
 
-// Helper to safely check if an HTTP response is valid JSON with built-in timeout guard
+// Helper to safely check if an HTTP response is valid JSON with built-in timeout guard and auth token
 async function safeFetchJson(url: string, options?: RequestInit): Promise<any | null> {
   try {
+    let authHeader: Record<string, string> = {};
+    try {
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token;
+      if (token) {
+        authHeader = { 'Authorization': `Bearer ${token}` };
+      }
+    } catch {}
+
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3500);
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
     const signal = options?.signal || controller.signal;
-    const res = await fetch(url, { ...options, signal });
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        ...authHeader,
+        ...(options?.headers || {})
+      },
+      signal
+    });
     clearTimeout(timeoutId);
     const contentType = res.headers.get('content-type') || '';
     if (res.ok && contentType.includes('application/json')) {
@@ -762,8 +778,9 @@ export const BackupClientService = {
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err: any) {
-      console.error('[DownloadBackup] Error generating download:', err);
-      window.open(`/api/backups/download/${backup.id}`, '_blank');
+      const { data } = await supabase.auth.getSession();
+      const token = data?.session?.access_token || '';
+      window.open(`/api/backups/download/${backup.id}?token=${encodeURIComponent(token)}`, '_blank');
     }
   },
 

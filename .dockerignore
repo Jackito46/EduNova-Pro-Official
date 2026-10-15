@@ -9,4 +9,16 @@ test-results
 playwright-report
 *.log
 .env
-.env.local
+.env.*
+.env*.local
+*.env
+*.env.*
+data/backups
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
+*.p12
+*.sqlite
+*.db

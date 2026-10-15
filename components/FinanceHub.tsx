@@ -40,6 +40,7 @@ import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ReevaluationModal, ReevaluatedStudentItem } from './ReevaluationModal';
 import { GatewayWebhookSimulatorModal } from './GatewayWebhookSimulatorModal';
 import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
+import { ApiVaultService } from '../services/apiVaultService';
 
 const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
@@ -205,9 +206,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const fetchGatewayStatus = useCallback(async () => {
     if (!user?.school_id) return;
     try {
-      const res = await fetch(`/api/settings/api-credentials?school_id=${user.school_id}`);
-      const data = await res.json();
-      if (data.success && data.credentials) {
+      const data = await ApiVaultService.getCredentials(user.school_id);
+      if (data && data.credentials) {
         const kobara = data.credentials.kobara || {};
         const moncash = data.credentials.moncash || {};
         const natcash = data.credentials.natcash || {};

@@ -6,8 +6,19 @@ import crypto from 'crypto';
  * avant enregistrement dans Supabase.
  */
 
+let hasWarnedMissingEncryptionKey = false;
+
 // Dérivation d'une clé de 256 bits (32 octets) à partir de la configuration serveur
 function getMasterKey(): Buffer {
+  if (!process.env.ENCRYPTION_KEY && !process.env.APP_ENCRYPTION_KEY && !hasWarnedMissingEncryptionKey) {
+    hasWarnedMissingEncryptionKey = true;
+    console.warn(
+      '🔒 [SÉCURITÉ VAULT] AVERTISSEMENT : La variable ENCRYPTION_KEY n\'est pas définie dans votre .env.\n' +
+      '   Une clé de dérivation de secours est utilisée. Pour une sécurité bancaire maximale en production sur Coolify,\n' +
+      '   veuillez définir ENCRYPTION_KEY (ex: openssl rand -hex 32) dans vos variables d\'environnement.'
+    );
+  }
+
   const baseSeed = 
     process.env.ENCRYPTION_KEY || 
     process.env.APP_ENCRYPTION_KEY || 

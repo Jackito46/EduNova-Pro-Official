@@ -8,9 +8,17 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
-*.local
 .env
 .env.*
+.env*.local
+*.env
+*.env.*
+!.env.example
+*.pem
+*.key
+*.crt
+*.cert
+*.pfx
 
 # Editor directories and files
 .vscode/*
