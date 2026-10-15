@@ -3,12 +3,11 @@ import { UserRole, UserProfile } from '../types';
 import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorage } from '../supabase';
 import { AuditLogger } from '../utils/auditLogger';
 import { normalizeIdentifier, containsSuspiciousPattern, validateCredentialsSanity } from '../utils/authHelpers';
-import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X, Download, MonitorDown } from 'lucide-react';
+import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
 import { toast } from 'sonner';
-import { usePwaInstall } from '../hooks/usePwaInstall';
 
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
@@ -36,14 +35,6 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
   const [securitySettings, setSecuritySettings] = useState({ maxFailedAttempts: 3, lockoutDurationMinutes: 10 });
   const [maintenanceMode, setMaintenanceMode] = useState(false);
 
-  const { 
-    isInstalled, 
-    isStandalone, 
-    isInIframe, 
-    installPwa, 
-    platformName, 
-    canPromptDirectly 
-  } = usePwaInstall();
 
   // Helper to distinguish normal security inactivity timeout from actual account lockout
   const isInactivityNotice = (msg?: string | null): boolean => {
@@ -581,6 +572,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                 {isForgotPassword ? "Réinitialisation" : "Gestion Académique & Universitaire"}
               </p>
             </motion.div>
+
 
 
             {/* Maintenance Mode Banner */}

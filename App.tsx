@@ -57,8 +57,6 @@ import { AuditLogsView } from './components/AuditLogsView';
 import ValidationList from './components/ValidationList';
 import { ForcePasswordChange } from './components/ForcePasswordChange';
 import ConnectivityBanner from './components/ConnectivityBanner';
-import { AddressBarInstallHint } from './components/AddressBarInstallHint';
-import { PwaInstallBanner } from './components/PwaInstallBanner';
 import { PwaInstallModal } from './components/PwaInstallModal';
 import { OfflineDashboard } from './components/OfflineDashboard';
 import Login from './components/Login';
@@ -283,7 +281,6 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <AutonomousAdminWarningBanner user={user} />
               <PayrollSensitiveNotificationListener user={user} />
               <AiQuotaAlertBanner user={user} />
-              <AddressBarInstallHint />
             </>
           )}
           <ErrorBoundary key={location.pathname}>
@@ -1543,7 +1540,6 @@ const App: React.FC = () => {
       <SubscriptionGuard user={user} onLogout={purgeSystemState}>
         <AnimatedRoutes user={user} purgeSystemState={purgeSystemState} maintenanceMode={maintenanceMode} />
       </SubscriptionGuard>
-      <PwaInstallBanner />
       <PwaInstallModal />
     </HashRouter>
     </ErrorBoundary>

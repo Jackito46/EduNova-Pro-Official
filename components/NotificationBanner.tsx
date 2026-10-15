@@ -13,7 +13,7 @@ interface NotificationBannerProps {
 export const NotificationBanner: React.FC<NotificationBannerProps> = ({ 
   userId, 
   schoolId,
-  showPwaInstall = true 
+  showPwaInstall = false 
 }) => {
   const [show, setShow] = useState(false);
   const [denied, setDenied] = useState(false);
@@ -23,7 +23,8 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   });
   const [pwaDismissed, setPwaDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
-    return window.sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true';
+    return window.localStorage.getItem('edunova_pwa_banner_dismissed') === 'true' ||
+           window.sessionStorage.getItem('edunova_pwa_banner_dismissed') === 'true';
   });
 
   const { isInstalled, installPwa, platformName, canPromptDirectly, isInIframe } = usePwaInstall();
@@ -34,22 +35,11 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
       const promptObj = (window as any).__edunova_deferred_prompt;
       const inIframe = isRunningInIframe();
       console.log(
-        `%c[PWA Debug - ${eventSource}]%c window.__edunova_deferred_prompt =`,
+        `%c[PWA - ${eventSource}]%c prompt =`,
         'background: #2563eb; color: #fff; font-weight: bold; padding: 2px 6px; border-radius: 4px;',
         'font-weight: bold;',
         promptObj
       );
-      console.table({
-        'Deferred Prompt Exists': !!promptObj,
-        'Is In Iframe': inIframe,
-        'Display Mode Standalone': window.matchMedia('(display-mode: standalone)').matches,
-        'Platform': platformName,
-        'User Agent': navigator.userAgent
-      });
-
-      if (inIframe) {
-        console.warn('[PWA Debug] Note: Chromium/Safari bloquent systématiquement le déclenchement de "beforeinstallprompt" dans les balises <iframe> pour des raisons de sécurité.');
-      }
     };
 
     // Initial check
@@ -58,10 +48,6 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
     const handlePromptCaptured = () => {
       setHasCapturedPrompt(true);
       logPromptState('pwa-prompt-captured event');
-      toast.success("🎉 Événement 'beforeinstallprompt' capturé ! L'installation native 1-clic est prête.", {
-        id: 'pwa-captured-toast',
-        duration: 5000
-      });
     };
 
     const handleBeforeInstall = (e: Event) => {
@@ -148,6 +134,7 @@ export const NotificationBanner: React.FC<NotificationBannerProps> = ({
   const handleDismissPwa = () => {
     setPwaDismissed(true);
     try {
+      window.localStorage.setItem('edunova_pwa_banner_dismissed', 'true');
       window.sessionStorage.setItem('edunova_pwa_banner_dismissed', 'true');
     } catch (e) {}
   };
