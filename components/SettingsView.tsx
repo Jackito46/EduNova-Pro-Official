@@ -67,7 +67,8 @@ import {
   Wrench,
   X,
   Search,
-  Activity
+  Activity,
+  Printer
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, Link } from 'react-router-dom';
@@ -101,8 +102,9 @@ import { PaymentMethodManager } from './PaymentMethodManager';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { ApiCredentialsVault } from './ApiCredentialsVault';
 import { KobaraSettingsTab } from './KobaraSettingsTab';
+import { PrinterSettingsTab } from './PrinterSettingsTab';
 
-type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'kobara' | 'gateways' | 'security' | 'diagnostic';
+type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'printer' | 'kobara' | 'gateways' | 'security' | 'diagnostic';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -147,7 +149,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['school', 'campuses', 'academic', 'finance', 'payment_methods', 'kobara', 'gateways', 'security', 'diagnostic'].includes(tabParam)) {
+    if (tabParam && ['school', 'campuses', 'academic', 'finance', 'payment_methods', 'printer', 'kobara', 'gateways', 'security', 'diagnostic'].includes(tabParam)) {
       setActiveTab(tabParam as SettingsTab);
     }
   }, [searchParams]);
@@ -1932,6 +1934,14 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       labelTablet: 'Modes de Règlement',
       labelMobile: 'Règlements',
       icon: Wallet 
+    },
+    { 
+      id: 'printer', 
+      label: 'Imprimante & Tickets Reçus', 
+      labelDesktopCompact: 'Imprimante & Reçus',
+      labelTablet: 'Imprimante',
+      labelMobile: 'Imprimante',
+      icon: Printer 
     },
     { 
       id: 'gateways', 
@@ -3803,6 +3813,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        )}
         {activeTab === 'payment_methods' && (
           <PaymentMethodManager
+            schoolData={schoolData}
+            setSchoolData={setSchoolData}
+            handleUpdateSchool={handleUpdateSchool}
+            saving={saving}
+            canManageAllCampuses={canManageAllCampuses}
+          />
+        )}
+
+        {activeTab === 'printer' && (
+          <PrinterSettingsTab
             schoolData={schoolData}
             setSchoolData={setSchoolData}
             handleUpdateSchool={handleUpdateSchool}

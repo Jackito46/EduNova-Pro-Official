@@ -46,6 +46,14 @@ import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile } from '../types';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { AcademicSessionPill } from './AcademicSessionPill';
+import Modal from './Modal';
+import { 
+  canUserApproveCancellation, 
+  parseCancellationInfo, 
+  requestPaymentCancellation, 
+  approvePaymentCancellation, 
+  rejectPaymentCancellation 
+} from '../services/cancellationWorkflowService';
 
 const getFeeRowDetails = (
   nativeHTG: number,

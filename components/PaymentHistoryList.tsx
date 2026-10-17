@@ -48,10 +48,17 @@ import { DatePickerPill } from './DatePickerPill';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { ThermalReceiptModal, ThermalReceiptData } from './ThermalReceiptModal';
+import { 
+  canUserApproveCancellation, 
+  parseCancellationInfo, 
+  requestPaymentCancellation, 
+  approvePaymentCancellation, 
+  rejectPaymentCancellation 
+} from '../services/cancellationWorkflowService';
 
 import { useLocation } from 'react-router-dom';
 
-const STATUSES = ['Tous', 'Validé', 'En attente', 'Annulé'];
+const STATUSES = ['Tous', 'Validé', 'En attente', 'Annulations à valider', 'Annulé'];
 
 const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { terminology, currentCampusId, activeAcademicYear, school } = useSchool();
@@ -159,13 +166,21 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [refundToWallet, setRefundToWallet] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
+  // Mode de saisie pour l'annulation : WORKFLOW (agent soumet à Direction) ou IMMEDIATE (Admin/Direction ou Superviseur présent)
+  const [cancellationMode, setCancellationMode] = useState<'WORKFLOW' | 'IMMEDIATE'>('WORKFLOW');
+  // Modal de révision d'une annulation en attente par la Direction
+  const [reviewingCancellation, setReviewingCancellation] = useState<any | null>(null);
+  const [adminRejectionReason, setAdminRejectionReason] = useState<string>('');
+  const [isRejectingModalOpen, setIsRejectingModalOpen] = useState<boolean>(false);
+
   const [validatorEmail, setValidatorEmail] = useState('');
   const [validatorPassword, setValidatorPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   const openCancelModal = (transaction: { id: string; ref: string; source: string; originalMethod?: string; amount?: number; currency?: string; studentId?: string; dateObj?: Date; }) => {
-    const isCapable = user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.is_super_admin;
-    setValidatorEmail(isCapable ? user.email : '');
+    const isCapable = canUserApproveCancellation(user);
+    setCancellationMode(isCapable ? 'IMMEDIATE' : 'WORKFLOW');
+    setValidatorEmail(isCapable ? (user.email || '') : '');
     setValidatorPassword('');
     setShowPassword(false);
     setCancelReason('');
@@ -285,10 +300,13 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       (paymentsData || []).forEach(p => {
         const isPending = p.payment_method?.includes('EN ATTENTE') || p.status === 'EN_ATTENTE' || p.moncash_status === 'PENDING';
         const baseMethod = p.payment_method?.replace(' (EN ATTENTE)', '')?.replace(' (REJETÉ)', '') || (p.moncash_status === 'PENDING' ? 'MonCash' : 'Cash');
-        
+        const cancelInfo = parseCancellationInfo(p);
+
         let status = 'Validé';
-        if (p.status === 'ANNULE') {
+        if (p.status === 'ANNULE' || cancelInfo.isCancelled) {
           status = 'Annulé';
+        } else if (cancelInfo.isPending) {
+          status = 'Annulations à valider';
         } else if (isPending) {
           status = 'En attente';
         }
@@ -329,7 +347,12 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           date: new Date(p.created_at).toLocaleDateString('fr-FR'),
           time: new Date(p.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           status: status,
-          cancelReason: p.cancel_reason,
+          cancelInfo,
+          cancelReason: cancelInfo.reason || p.cancel_reason,
+          cancelRequestedByName: cancelInfo.requestedByName,
+          cancelRequestedAt: cancelInfo.requestedAt,
+          cancellationStatus: p.cancellation_status,
+          rawItem: p,
           originalMethod: p.payment_method
         });
       });
@@ -351,10 +374,13 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       Array.from(groupedHistorySupplies.values()).forEach(s => {
         const isPending = s.payment_method?.includes('EN ATTENTE') || s.status === 'EN_ATTENTE' || s.moncash_status === 'PENDING';
         const baseMethod = s.payment_method?.replace(' (EN ATTENTE)', '')?.replace(' (REJETÉ)', '') || (s.moncash_status === 'PENDING' ? 'MonCash' : 'Cash');
-        
+        const cancelInfo = parseCancellationInfo(s);
+
         let status = 'Validé';
-        if (s.status === 'ANNULE') {
+        if (s.status === 'ANNULE' || cancelInfo.isCancelled) {
           status = 'Annulé';
+        } else if (cancelInfo.isPending) {
+          status = 'Annulations à valider';
         } else if (isPending) {
           status = 'En attente';
         }
@@ -387,7 +413,12 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           date: new Date(s.created_at).toLocaleDateString('fr-FR'),
           time: new Date(s.created_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
           status: status,
-          cancelReason: s.cancel_reason,
+          cancelInfo,
+          cancelReason: cancelInfo.reason || s.cancel_reason,
+          cancelRequestedByName: cancelInfo.requestedByName,
+          cancelRequestedAt: cancelInfo.requestedAt,
+          cancellationStatus: s.cancellation_status,
+          rawItem: s,
           originalMethod: s.payment_method
         });
       });
@@ -505,10 +536,6 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleCancelTransaction = async () => {
     if (!cancellingTransaction || !cancelReason.trim()) return;
-    if (!validatorEmail.trim() || !validatorPassword.trim()) {
-      toast.error("Veuillez saisir l'adresse email et le mot de passe de validation.");
-      return;
-    }
 
     // Lock check
     const txDate = cancellingTransaction.dateObj ? cancellingTransaction.dateObj.toISOString().split('T')[0] : getLocalTodayString();
@@ -518,79 +545,91 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       return;
     }
 
+    // MODE 1 : L'agent soumet une demande d'annulation au workflow (Le solde élève reste INTACT)
+    if (cancellationMode === 'WORKFLOW') {
+      setIsProcessing(true);
+      try {
+        const res = await requestPaymentCancellation({
+          paymentId: cancellingTransaction.id,
+          sourceTable: cancellingTransaction.source as any,
+          reason: cancelReason,
+          user,
+          studentId: cancellingTransaction.studentId,
+          paymentRef: cancellingTransaction.ref,
+          amount: cancellingTransaction.amount,
+          currency: cancellingTransaction.currency
+        });
+
+        if (!res.success) {
+          throw new Error(res.message);
+        }
+
+        toast.success(res.message);
+        fetchPayments();
+        setCancellingTransaction(null);
+        setCancelReason('');
+        setRefundToWallet(false);
+      } catch (err: any) {
+        toast.error(err.message || "Erreur lors de la soumission de la demande d'annulation");
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
+    // MODE 2 : Validation immédiate (Par un Admin/Direction connecté OU avec mot de passe superviseur)
+    const isDirectAdmin = canUserApproveCancellation(user);
+
+    if (!isDirectAdmin && (!validatorEmail.trim() || !validatorPassword.trim())) {
+      toast.error("Veuillez saisir l'adresse email et le mot de passe de validation du superviseur.");
+      return;
+    }
+
     setIsProcessing(true);
     
     try {
-      // 1. Double-validation request via backend
-      const checkRes = await fetch('/api/verify-admin-password', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: validatorEmail,
-          password: validatorPassword,
-          school_id: user.school_id
-        })
-      });
-      
-      const checkData = await checkRes.json();
-      if (!checkRes.ok || !checkData.success) {
-        throw new Error(checkData.error || "La validation par mot de passe a échoué.");
-      }
+      let approverProfile = user;
 
-      const authorizer = checkData.profile;
-
-      // 2. Perform cancellation
-      const { error } = await supabase
-        .from(cancellingTransaction.source)
-        .update({ 
-          status: 'ANNULE',
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: user.id,
-          cancel_reason: cancelReason
-        })
-        .eq('id', cancellingTransaction.id);
+      // Si l'utilisateur actuel n'est pas Admin/Direction, on vérifie les identifiants du superviseur présent
+      if (!isDirectAdmin) {
+        const checkRes = await fetch('/api/verify-admin-password', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            email: validatorEmail,
+            password: validatorPassword,
+            school_id: user.school_id
+          })
+        });
         
-      if (error) throw error;
-      
-            // Auto-refund Wallet if the payment was made with Portefeuille OR if user opted to refund to wallet
-      if ((cancellingTransaction.originalMethod === 'Portefeuille' || refundToWallet) && cancellingTransaction.studentId && cancellingTransaction.amount) {
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('wallet_balance_htg, wallet_balance_usd')
-          .eq('id', cancellingTransaction.studentId)
-          .single();
-          
-        if (!studentError && studentData) {
-          const updateField = cancellingTransaction.currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
-          const currentBalance = Number(cancellingTransaction.currency === 'USD' ? (studentData.wallet_balance_usd || 0) : (studentData.wallet_balance_htg || 0));
-          const newBalance = currentBalance + Number(cancellingTransaction.amount);
-          
-          await supabase.from('students').update({ [updateField]: newBalance }).eq('id', cancellingTransaction.studentId);
+        const checkData = await checkRes.json();
+        if (!checkRes.ok || !checkData.success) {
+          throw new Error(checkData.error || "La validation par mot de passe du superviseur a échoué.");
         }
+        approverProfile = checkData.profile;
       }
 
-      // Log audit
-
-      await AuditLogger.log({
-        school_id: user.school_id || '',
-        user_id: user.id,
-        action: 'PAYMENT_CANCELLED',
-        entity_type: 'payment',
-        entity_id: cancellingTransaction.id,
-        details: {
-          reason: cancelReason,
-          ref: cancellingTransaction.ref,
-          source: cancellingTransaction.source,
-          authorized_by_email: authorizer.email,
-          authorized_by_name: authorizer.full_name,
-          authorized_by_id: authorizer.id,
-          authorized_by_role: authorizer.role
-        }
+      // Exécution de l'annulation via le service de workflow (Met à jour le statut et le solde élève)
+      const res = await approvePaymentCancellation({
+        paymentId: cancellingTransaction.id,
+        sourceTable: cancellingTransaction.source as any,
+        approverUser: approverProfile,
+        studentId: cancellingTransaction.studentId,
+        amount: cancellingTransaction.amount,
+        currency: cancellingTransaction.currency,
+        paymentMethod: cancellingTransaction.originalMethod,
+        refundToWallet,
+        paymentRef: cancellingTransaction.ref,
+        existingReason: cancelReason
       });
 
-      toast.success("Transaction annulée avec succès");
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      toast.success(res.message);
       
       // Refresh list
       fetchPayments();
@@ -602,6 +641,77 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
     } catch (error: any) {
       console.error("Erreur annulation transaction:", error);
       toast.error(error.message || "Erreur lors de l'annulation");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Validation d'une annulation en attente par un Admin / Directeur
+  const handleApprovePendingCancellation = async (tx: any) => {
+    if (!canUserApproveCancellation(user)) {
+      toast.error("Action non autorisée : Seul un utilisateur de niveau 'Admin' ou 'Direction' peut approuver cette annulation.");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const res = await approvePaymentCancellation({
+        paymentId: tx.id,
+        sourceTable: tx.source as any,
+        approverUser: user,
+        studentId: tx.studentId,
+        amount: tx.amount,
+        currency: tx.currency,
+        paymentMethod: tx.originalMethod,
+        refundToWallet,
+        paymentRef: tx.ref,
+        existingReason: tx.cancelReason
+      });
+
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      toast.success(res.message);
+      fetchPayments();
+      setReviewingCancellation(null);
+      setRefundToWallet(false);
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors de la validation de l'annulation");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  // Rejet d'une annulation en attente par un Admin / Directeur
+  const handleRejectPendingCancellation = async () => {
+    if (!reviewingCancellation) return;
+    if (!canUserApproveCancellation(user)) {
+      toast.error("Action non autorisée : Seul un utilisateur de niveau 'Admin' ou 'Direction' peut rejeter une annulation.");
+      return;
+    }
+
+    setIsProcessing(true);
+    try {
+      const res = await rejectPaymentCancellation({
+        paymentId: reviewingCancellation.id,
+        sourceTable: reviewingCancellation.source as any,
+        rejecterUser: user,
+        rejectionReason: adminRejectionReason.trim() || 'Demande rejetée par la Direction après examen',
+        paymentRef: reviewingCancellation.ref
+      });
+
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      toast.success(res.message);
+      fetchPayments();
+      setReviewingCancellation(null);
+      setIsRejectingModalOpen(false);
+      setAdminRejectionReason('');
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors du rejet");
     } finally {
       setIsProcessing(false);
     }
@@ -738,10 +848,15 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
     return { localHTG, foreignUSD, totalEquivHTG };
   }, [filteredPayments]);
 
+  const pendingCancellationsCount = useMemo(() => {
+    return payments.filter(p => p.status === 'Annulations à valider').length;
+  }, [payments]);
+
   const getStatusStyle = (status: string) => {
     switch (status) {
       case 'Validé': return 'bg-emerald-50 text-emerald-700 border-emerald-100';
       case 'En attente': return 'bg-amber-50 text-amber-700 border-amber-100';
+      case 'Annulations à valider': return 'bg-orange-50 text-orange-800 border-orange-200';
       case 'Annulé': return 'bg-rose-50 text-rose-700 border-rose-100';
       default: return 'bg-gray-50 text-gray-700 border-gray-100';
     }
@@ -870,6 +985,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                 let activeColor = 'bg-slate-900 text-white border-slate-900 shadow-2xs';
                 if (s === 'Validé') activeColor = 'bg-emerald-600 text-white border-emerald-600 shadow-2xs';
                 if (s === 'En attente') activeColor = 'bg-amber-500 text-white border-amber-500 shadow-2xs';
+                if (s === 'Annulations à valider') activeColor = 'bg-orange-600 text-white border-orange-600 shadow-2xs';
                 if (s === 'Annulé') activeColor = 'bg-rose-600 text-white border-rose-600 shadow-2xs';
 
                 return (
@@ -883,6 +999,13 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                     }`}
                   >
                     <span>{s === 'Tous' ? 'Tous les Statuts' : s}</span>
+                    {s === 'Annulations à valider' && pendingCancellationsCount > 0 && (
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
+                        isActive ? 'bg-white text-orange-700' : 'bg-orange-100 text-orange-700 border border-orange-200'
+                      }`}>
+                        {pendingCancellationsCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -1161,6 +1284,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${getStatusStyle(p.status)}`}>
                           {p.status === 'Validé' && <CheckCircle2 size={11} />}
                           {p.status === 'En attente' && <Clock size={11} />}
+                          {p.status === 'Annulations à valider' && <Clock size={11} className="animate-pulse text-orange-600" />}
                           {p.status === 'Annulé' && <XCircle size={11} />}
                           {p.status}
                         </div>
@@ -1203,6 +1327,11 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                         {p.method}
                       </span>
                     </div>
+                    {p.status === 'Annulations à valider' && p.cancelReason && (
+                      <div className="pt-1 border-t border-orange-200 text-orange-800 text-[10px] font-medium bg-orange-50/60 p-1.5 rounded-lg">
+                        <strong>Demande d'annulation ({p.cancelRequestedByName || 'Agent'}) :</strong> {p.cancelReason}
+                      </div>
+                    )}
                     {p.status === 'Annulé' && p.cancelReason && (
                       <div className="pt-1 border-t border-rose-100 text-rose-600 text-[10px] italic">
                         Motif d'annulation : {p.cancelReason}
@@ -1212,7 +1341,29 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Actions mobile */}
                     <div className="flex items-center justify-end gap-2 pt-1">
-                      {p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
+                      {p.status === 'Annulations à valider' ? (
+                        canUserApproveCancellation(user) ? (
+                          <div className="flex items-center gap-2 w-full">
+                            <button 
+                              onClick={() => { setReviewingCancellation(p); setRefundToWallet(p.originalMethod === 'Portefeuille'); }}
+                              className="flex-1 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer"
+                            >
+                              <ShieldCheck size={14} /> Valider l'annulation
+                            </button>
+                            <button 
+                              onClick={() => { setReviewingCancellation(p); setIsRejectingModalOpen(true); }}
+                              className="px-3 py-2 bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 rounded-xl text-xs font-bold transition-all border border-slate-300 cursor-pointer"
+                              title="Rejeter la demande"
+                            >
+                              <X size={16} /> Rejeter
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="w-full text-center py-1.5 text-[11px] font-bold text-orange-700 bg-orange-50 border border-orange-200 rounded-lg">
+                            Demande d'annulation transmise à la Direction
+                          </span>
+                        )
+                      ) : p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
                         <div className="flex items-center gap-2 w-full">
                           <button 
                             onClick={() => setConfirmingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
@@ -1401,9 +1552,15 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                       <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-bold border ${getStatusStyle(p.status)}`}>
                         {p.status === 'Validé' && <CheckCircle2 size={13} />}
                         {p.status === 'En attente' && <Clock size={13} />}
+                        {p.status === 'Annulations à valider' && <Clock size={13} className="animate-pulse text-orange-600" />}
                         {p.status === 'Annulé' && <XCircle size={13} />}
                         {p.status}
                       </div>
+                      {p.status === 'Annulations à valider' && p.cancelReason && (
+                        <p className="text-[10px] text-orange-700 mt-1 italic max-w-[150px] mx-auto truncate" title={`Demandé par ${p.cancelRequestedByName || 'un agent'}: ${p.cancelReason}`}>
+                          {p.cancelRequestedByName ? `Par ${p.cancelRequestedByName}` : 'Demande agent'} : {p.cancelReason}
+                        </p>
+                      )}
                       {p.status === 'Annulé' && p.cancelReason && (
                         <p className="text-[10px] text-rose-500 mt-1 italic max-w-[130px] mx-auto truncate" title={p.cancelReason}>
                           {p.cancelReason}
@@ -1413,7 +1570,31 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {/* Actions */}
                     <td className="px-4 py-3.5 whitespace-nowrap text-center">
-                      {p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
+                      {p.status === 'Annulations à valider' ? (
+                        canUserApproveCancellation(user) ? (
+                          <div className="flex items-center justify-center gap-1.5">
+                            <button 
+                              onClick={() => { setReviewingCancellation(p); setRefundToWallet(p.originalMethod === 'Portefeuille'); }}
+                              className="px-2.5 py-1 bg-orange-600 hover:bg-orange-700 text-white font-bold text-[11px] rounded-lg transition-all inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Examiner et valider l'annulation (Mise à jour effective du solde)"
+                            >
+                              <ShieldCheck size={13} />
+                              <span>Valider</span>
+                            </button>
+                            <button 
+                              onClick={() => { setReviewingCancellation(p); setIsRejectingModalOpen(true); }}
+                              className="p-1 bg-slate-100 text-slate-700 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all border border-slate-200 cursor-pointer shadow-2xs"
+                              title="Rejeter la demande d'annulation"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-[11px] font-bold text-orange-700 bg-orange-50 px-2 py-0.5 rounded border border-orange-200">
+                            En attente Direction
+                          </span>
+                        )
+                      ) : p.status === 'En attente' && (user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.role === UserRole.ACCOUNTANT || user.is_super_admin) ? (
                         <div className="flex items-center justify-center gap-1.5">
                           <button 
                             onClick={() => setConfirmingPayment({ id: p.id, method: p.method, source: p.source, dateObj: p.dateObj })}
@@ -1436,7 +1617,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <button 
                               onClick={() => openCancelModal({ id: p.id, ref: p.ref, source: p.source, originalMethod: p.originalMethod, amount: p.amount, currency: p.currency, studentId: p.studentId, dateObj: p.dateObj })}
                               className="px-2.5 py-1 bg-rose-50 hover:bg-rose-100 text-rose-600 font-bold text-[11px] rounded-lg border border-rose-200/60 transition-all inline-flex items-center gap-1 cursor-pointer"
-                              title="Annuler cette transaction (Superviseur sur place)"
+                              title="Annuler cette transaction (Workflow Direction / Superviseur)"
                             >
                               <AlertTriangle size={12} />
                               <span>Annuler</span>
@@ -1638,29 +1819,86 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       </Modal>
 
-      {/* MODAL D'ANNULATION (MANAGER UNIQUEMENT) */}
+      {/* MODAL DE SAISIE D'ANNULATION (AGENT OU DIRECTION) */}
       <Modal
         isOpen={!!cancellingTransaction}
         onClose={() => !isProcessing && setCancellingTransaction(null)}
-        title="Annulation de Transaction (Sécurisée)"
+        title={canUserApproveCancellation(user) ? "Annulation de Transaction (Validation Direction)" : "Saisie d'une Demande d'Annulation"}
         hideDefaultActions
       >
         <div className="space-y-6">
-          <div className="bg-rose-50 border border-rose-200 p-4 rounded-xl flex items-start gap-3 text-rose-800">
-            <AlertTriangle className="shrink-0 mt-0.5 text-rose-600" size={20} />
-            <div className="text-sm">
-              <p className="font-bold mb-1 text-rose-900">Action hautement sensible : {cancellingTransaction?.ref}</p>
-              <p className="opacity-90">
-                L'annulation d'une transaction validée nécessite une justification obligatoire et une double validation par mot de passe administrateur pour éviter toute fraude interne.
-              </p>
+          {/* SÉLECTEUR DE MODE POUR LES AGENTS */}
+          {!canUserApproveCancellation(user) ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-2 p-1 bg-slate-100 rounded-xl border border-slate-200">
+                <button
+                  type="button"
+                  onClick={() => setCancellationMode('WORKFLOW')}
+                  className={`py-2 px-3 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    cancellationMode === 'WORKFLOW'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  1. Transmettre à la Direction
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCancellationMode('IMMEDIATE')}
+                  className={`py-2 px-3 text-xs font-black rounded-lg transition-all cursor-pointer ${
+                    cancellationMode === 'IMMEDIATE'
+                      ? 'bg-white text-slate-900 shadow-2xs border border-slate-200'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  2. Superviseur sur place
+                </button>
+              </div>
+
+              {cancellationMode === 'WORKFLOW' ? (
+                <div className="bg-amber-50 border border-amber-200 p-3.5 rounded-xl flex items-start gap-3 text-amber-900 text-xs">
+                  <Clock className="shrink-0 mt-0.5 text-amber-600" size={18} />
+                  <div>
+                    <p className="font-bold mb-0.5">Workflow de double-validation actif</p>
+                    <p className="text-amber-800 leading-relaxed">
+                      En tant qu'agent, votre saisie transmet une demande officielle à la Direction. 
+                      <strong className="text-amber-950 font-bold block mt-1">
+                        Le solde de l'élève reste intact et inchangé tant que la Direction n'a pas validé cette demande.
+                      </strong>
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-rose-50 border border-rose-200 p-3.5 rounded-xl flex items-start gap-3 text-rose-900 text-xs">
+                  <Lock className="shrink-0 mt-0.5 text-rose-600" size={18} />
+                  <div>
+                    <p className="font-bold mb-0.5">Validation sur place par mot de passe</p>
+                    <p className="text-rose-800 leading-relaxed">
+                      Si un Administrateur ou un membre de la Direction est présent à vos côtés, il peut saisir ses identifiants pour valider immédiatement l'annulation sans fermer votre session.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-xl flex items-start gap-3 text-emerald-900">
+              <ShieldCheck className="shrink-0 mt-0.5 text-emerald-600" size={20} />
+              <div className="text-xs leading-relaxed">
+                <p className="font-bold text-sm mb-1 text-emerald-950">Habilitation Direction / Administration</p>
+                <p className="text-emerald-800">
+                  Vous disposez des prérogatives pour signer et valider directement cette annulation. Le solde financier de l'élève sera automatiquement recalculé et la transaction sera archivée dans le journal d'audit.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="space-y-2">
-            <label className="text-sm font-semibold text-gray-700">Motif de l'annulation</label>
+            <label className="text-xs font-bold text-gray-700 uppercase tracking-wider block">
+              Motif obligatoire de l'annulation *
+            </label>
             <textarea 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all min-h-[80px]"
-              placeholder="Ex: Erreur de saisie du montant, doublon, chèque sans provision..."
+              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-xs text-gray-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all min-h-[80px]"
+              placeholder="Ex: Erreur de saisie du montant par le caissier, versement en double, chèque sans provision..."
               value={cancelReason}
               onChange={(e) => setCancelReason(e.target.value)}
               disabled={isProcessing}
@@ -1668,122 +1906,291 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
 
           {cancellingTransaction?.originalMethod !== 'Portefeuille' && (
-            <label className="flex items-center gap-3 p-4 border border-gray-200 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+            <label className="flex items-center gap-3 p-3.5 border border-gray-200 rounded-xl bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
               <input
                 type="checkbox"
-                className="w-5 h-5 text-rose-600 rounded focus:ring-rose-500 border-gray-300"
+                className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-gray-300"
                 checked={refundToWallet}
                 onChange={(e) => setRefundToWallet(e.target.checked)}
                 disabled={isProcessing}
               />
               <div className="flex flex-col">
-                <span className="text-sm font-bold text-gray-900 flex items-center gap-2">
-                  <Wallet size={16} className="text-blue-600" />
-                  Rembourser sous forme de crédit Portefeuille
+                <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <Wallet size={14} className="text-blue-600" />
+                  Rembourser sous forme d'avoir / Portefeuille élève
                 </span>
-                <span className="text-xs text-gray-500">
-                  Forcer l'argent à aller dans le Wallet de l'étudiant plutôt que de simplement annuler la transaction.
+                <span className="text-[11px] text-gray-500">
+                  Crédite automatiquement le portefeuille de l'élève au lieu d'une restitution en espèces.
                 </span>
               </div>
             </label>
           )}
 
-          {cancellingTransaction?.originalMethod === 'Portefeuille' && (
-            <div className="flex items-start gap-3 p-4 border border-blue-200 rounded-xl bg-blue-50">
-              <Wallet size={18} className="text-blue-600 mt-0.5 shrink-0" />
-              <div className="flex flex-col">
-                <span className="text-sm font-bold text-blue-900">
-                  Remboursement automatique vers le Portefeuille
+          {/* SECTION IDENTIFIANTS SUPERVISEUR SI MODE IMMEDIATE PAR UN AGENT */}
+          {!canUserApproveCancellation(user) && cancellationMode === 'IMMEDIATE' && (
+            <div className="border-t border-slate-100 pt-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2 text-slate-900 font-bold text-xs">
+                  <Lock size={15} className="text-rose-600" />
+                  <span>Signature Superviseur (Admin / Directeur sur place)</span>
+                </div>
+                <span className="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-bold">
+                  Sans déconnexion
                 </span>
-                <span className="text-xs text-blue-700/80">
-                  Comme ce paiement a été effectué via le Portefeuille de l'étudiant, le montant sera automatiquement re-crédité.
-                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-600">Email du superviseur autorisé</label>
+                  <input 
+                    type="email"
+                    className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900 outline-none focus:border-rose-500 font-mono"
+                    placeholder="directeur@edunova.pro"
+                    value={validatorEmail}
+                    onChange={(e) => setValidatorEmail(e.target.value)}
+                    disabled={isProcessing}
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-[11px] font-semibold text-slate-600">Mot de passe du superviseur</label>
+                  <div className="relative">
+                    <input 
+                      type={showPassword ? "text" : "password"}
+                      className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl text-xs text-gray-900 outline-none focus:border-rose-500 font-mono pr-10"
+                      placeholder="••••••••"
+                      value={validatorPassword}
+                      onChange={(e) => setValidatorPassword(e.target.value)}
+                      disabled={isProcessing}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                    >
+                      {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
 
-          <div className="border-t border-slate-100 pt-5 space-y-4">
-
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-slate-900 font-bold text-sm">
-                <Lock size={16} className="text-rose-600 animate-pulse" />
-                <span>Autorisation Superviseur / Administrateur</span>
-              </div>
-              <span className="text-[10px] px-2 py-0.5 bg-amber-50 text-amber-800 border border-amber-200 rounded-full font-bold">
-                Sans déconnexion
-              </span>
-            </div>
-
-            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-600 leading-relaxed">
-              {user.role === UserRole.SUPER_ADMIN || user.role === UserRole.SCHOOL_ADMIN || user.role === UserRole.DIRECTOR || user.is_super_admin ? (
-                <span>Confirmez vos identifiants administrateur pour authentifier et signer cette annulation de transaction.</span>
-              ) : (
-                <span>
-                  <strong className="text-slate-900">Guichetier connecté :</strong> {user.full_name || user.email}<br/>
-                  L'administrateur ou directeur présent à vos côtés saisit son email et mot de passe ci-dessous pour valider immédiatement l'annulation, <strong className="text-slate-900">sans fermer votre session</strong>.
-                </span>
-              )}
-            </div>
-
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Email du validateur autorisé (Admin / Directeur)</label>
-                <input 
-                  type="email"
-                  className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all font-mono"
-                  placeholder="admin@edunova.pro"
-                  value={validatorEmail}
-                  onChange={(e) => setValidatorEmail(e.target.value)}
-                  disabled={isProcessing}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Mot de passe du validateur</label>
-                <div className="relative">
-                  <input 
-                    type={showPassword ? "text" : "password"}
-                    className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm text-gray-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all font-mono pr-10"
-                    placeholder="••••••••"
-                    value={validatorPassword}
-                    onChange={(e) => setValidatorPassword(e.target.value)}
-                    disabled={isProcessing}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
           <div className="flex gap-3 pt-2">
             <button
-              onClick={() => { setCancellingTransaction(null); setCancelReason('');
-    setRefundToWallet(false); setValidatorEmail(''); setValidatorPassword(''); }}
+              onClick={() => { 
+                setCancellingTransaction(null); 
+                setCancelReason('');
+                setRefundToWallet(false); 
+                setValidatorEmail(''); 
+                setValidatorPassword(''); 
+              }}
               disabled={isProcessing}
-              className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-medium text-sm hover:bg-gray-200 transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-bold text-xs hover:bg-gray-200 transition-colors disabled:opacity-50 cursor-pointer"
             >
               Fermer
             </button>
             <button
               onClick={handleCancelTransaction}
-              disabled={isProcessing || !cancelReason.trim() || !validatorEmail.trim() || !validatorPassword.trim()}
-              className="flex-1 px-4 py-2.5 bg-rose-600 text-white rounded-xl font-medium text-sm hover:bg-rose-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 shadow-sm shadow-rose-200"
+              disabled={
+                isProcessing || 
+                !cancelReason.trim() || 
+                (!canUserApproveCancellation(user) && cancellationMode === 'IMMEDIATE' && (!validatorEmail.trim() || !validatorPassword.trim()))
+              }
+              className={`flex-1 px-4 py-2.5 text-white rounded-xl font-bold text-xs transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-xs cursor-pointer ${
+                !canUserApproveCancellation(user) && cancellationMode === 'WORKFLOW'
+                  ? 'bg-amber-600 hover:bg-amber-700'
+                  : 'bg-rose-600 hover:bg-rose-700'
+              }`}
             >
               {isProcessing ? (
                 <>
-                  <Loader2 size={18} className="animate-spin" />
-                  Validation...
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Traitement...</span>
+                </>
+              ) : !canUserApproveCancellation(user) && cancellationMode === 'WORKFLOW' ? (
+                <>
+                  <Clock size={16} />
+                  <span>Transmettre à la Direction</span>
                 </>
               ) : (
                 <>
-                  <ShieldCheck size={18} />
-                  Valider & Annuler
+                  <ShieldCheck size={16} />
+                  <span>Valider & Mettre à jour le solde</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL DE RÉVISION D'UNE DEMANDE D'ANNULATION EN ATTENTE (DIRECTION / ADMIN) */}
+      <Modal
+        isOpen={!!reviewingCancellation && !isRejectingModalOpen}
+        onClose={() => !isProcessing && setReviewingCancellation(null)}
+        title="Validation d'Annulation — Décision Direction"
+        hideDefaultActions
+      >
+        <div className="space-y-5">
+          <div className="bg-amber-50 border border-amber-200 p-4 rounded-xl flex items-start gap-3 text-amber-900">
+            <Clock className="shrink-0 mt-0.5 text-orange-600 animate-pulse" size={20} />
+            <div className="text-xs">
+              <p className="font-bold text-sm text-amber-950 mb-0.5">Demande d'annulation soumise par un agent</p>
+              <p className="text-amber-800 leading-relaxed">
+                Cette transaction a été saisie en demande d'annulation. Le solde de l'élève est actuellement 
+                <strong> intact</strong>. Votre décision va confirmer l'annulation effective ou rejeter la demande.
+              </p>
+            </div>
+          </div>
+
+          {/* DÉTAILS DE LA TRANSACTION */}
+          <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-4 space-y-2 text-xs">
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+              <span className="text-slate-500 font-semibold">Référence reçu :</span>
+              <span className="font-mono font-black text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                {reviewingCancellation?.ref}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+              <span className="text-slate-500 font-semibold">{terminology.student} :</span>
+              <span className="font-bold text-slate-900">{reviewingCancellation?.studentName}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+              <span className="text-slate-500 font-semibold">Classe / Option :</span>
+              <span className="font-semibold text-slate-700">{reviewingCancellation?.className}</span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+              <span className="text-slate-500 font-semibold">Montant payé :</span>
+              <span className="font-mono font-black text-slate-900 text-sm">
+                {Number(reviewingCancellation?.amount || 0).toLocaleString()} {reviewingCancellation?.currency || 'HTG'}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-1 border-b border-slate-200/60">
+              <span className="text-slate-500 font-semibold">Agent demandeur :</span>
+              <span className="font-bold text-slate-800">
+                {reviewingCancellation?.cancelRequestedByName || 'Agent de caisse'}
+              </span>
+            </div>
+            <div className="pt-2">
+              <span className="text-slate-500 font-bold block mb-1">Motif invoqué par l'agent :</span>
+              <div className="p-2.5 bg-white border border-amber-200 rounded-lg text-amber-950 font-medium italic text-xs">
+                "{reviewingCancellation?.cancelReason || 'Aucun motif renseigné'}"
+              </div>
+            </div>
+          </div>
+
+          {/* OPTION DE REMBOURSEMENT AU PORTEFEUILLE */}
+          {reviewingCancellation?.originalMethod !== 'Portefeuille' && (
+            <label className="flex items-center gap-3 p-3.5 border border-slate-200 rounded-xl bg-slate-50 cursor-pointer hover:bg-slate-100 transition-colors">
+              <input
+                type="checkbox"
+                className="w-4 h-4 text-rose-600 rounded focus:ring-rose-500 border-gray-300"
+                checked={refundToWallet}
+                onChange={(e) => setRefundToWallet(e.target.checked)}
+                disabled={isProcessing}
+              />
+              <div className="flex flex-col">
+                <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
+                  <Wallet size={14} className="text-blue-600" />
+                  Rembourser sous forme d'avoir sur le Portefeuille élève
+                </span>
+                <span className="text-[11px] text-gray-500">
+                  Crédite le montant sur le portefeuille au lieu d'une sortie de caisse physique.
+                </span>
+              </div>
+            </label>
+          )}
+
+          <div className="flex items-center gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => { setReviewingCancellation(null); setRefundToWallet(false); }}
+              disabled={isProcessing}
+              className="px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+            >
+              Fermer
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsRejectingModalOpen(true)}
+              disabled={isProcessing}
+              className="px-4 py-2.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-bold rounded-xl transition-all cursor-pointer flex items-center gap-1.5"
+            >
+              <X size={15} />
+              <span>Rejeter la demande</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleApprovePendingCancellation(reviewingCancellation)}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Validation en cours...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={16} />
+                  <span>Approuver & Recalculer le solde</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* MODAL DE REJET DE LA DEMANDE D'ANNULATION (DIRECTION / ADMIN) */}
+      <Modal
+        isOpen={isRejectingModalOpen && !!reviewingCancellation}
+        onClose={() => !isProcessing && setIsRejectingModalOpen(false)}
+        title="Rejet de la demande d'annulation"
+        hideDefaultActions
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-slate-600">
+            Veuillez indiquer la raison pour laquelle cette demande d'annulation est refusée. 
+            Le paiement demeurera <strong>VALIDE</strong> et son montant continuera de couvrir la scolarité de l'élève.
+          </p>
+
+          <div className="space-y-1">
+            <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">
+              Motif du rejet par la Direction
+            </label>
+            <textarea
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20 transition-all min-h-[70px]"
+              placeholder="Ex: Reçu déjà remis aux parents, versement vérifié sur le relevé bancaire, justification insuffisante..."
+              value={adminRejectionReason}
+              onChange={(e) => setAdminRejectionReason(e.target.value)}
+              disabled={isProcessing}
+            />
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsRejectingModalOpen(false)}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold rounded-xl transition-all cursor-pointer"
+            >
+              Retour
+            </button>
+            <button
+              type="button"
+              onClick={handleRejectPendingCancellation}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer flex items-center justify-center gap-2"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  <span>Rejet en cours...</span>
+                </>
+              ) : (
+                <>
+                  <X size={16} />
+                  <span>Confirmer le rejet</span>
                 </>
               )}
             </button>

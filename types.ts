@@ -365,6 +365,21 @@ export interface School {
   motto?: string;
 }
 
+export type PrinterConnectionType = 'USB' | 'Bluetooth' | 'Network';
+export type ReceiptPaperWidth = '58mm' | '80mm';
+
+export interface PrinterSettings {
+  printer_type: PrinterConnectionType;
+  paper_width: ReceiptPaperWidth;
+  printer_name?: string;
+  network_ip?: string;
+  network_port?: string;
+  auto_cut?: boolean;
+  header_message?: string;
+  footer_message?: string;
+  feed_lines?: number;
+}
+
 export interface CourseEvaluation {
   id: string;
   school_id: string;

@@ -79,14 +79,30 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
   const { school, currentCampusId, campuses, terminology } = useSchool();
   
   // Format thermique : 80mm (Standard POS) ou 58mm (Compact Mobile)
+  const configuredPaperWidth = school?.global_settings?.printer_settings?.paper_width;
+  const configuredPrinterType = school?.global_settings?.printer_settings?.printer_type || 'USB';
+  const configuredPrinterName = school?.global_settings?.printer_settings?.printer_name;
+  const configuredFooterMessage = school?.global_settings?.printer_settings?.footer_message;
+
   const [thermalFormat, setThermalFormat] = useState<'80mm' | '58mm'>(() => {
     try {
       const saved = localStorage.getItem('edunova_pos_receipt_format');
-      return saved === '58mm' ? '58mm' : '80mm';
+      if (saved === '58mm' || saved === '80mm') return saved;
+      return (configuredPaperWidth === '58mm' ? '58mm' : '80mm');
     } catch {
-      return '80mm';
+      return (configuredPaperWidth === '58mm' ? '58mm' : '80mm');
     }
   });
+
+  // Mettre à jour si les paramètres de l'école changent
+  useEffect(() => {
+    if (configuredPaperWidth && (configuredPaperWidth === '58mm' || configuredPaperWidth === '80mm')) {
+      const saved = localStorage.getItem('edunova_pos_receipt_format');
+      if (!saved) {
+        setThermalFormat(configuredPaperWidth);
+      }
+    }
+  }, [configuredPaperWidth]);
 
   const [copiedRef, setCopiedRef] = useState(false);
   const [copiedText, setCopiedText] = useState(false);
@@ -283,7 +299,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                 <div className="flex items-center gap-2">
                   <h2 className="text-base font-black text-white tracking-tight">Reçu de Caisse Thermique</h2>
                   <span className="bg-emerald-500/20 text-emerald-300 text-[10px] font-black px-2 py-0.5 rounded-full border border-emerald-500/30">
-                    POS Ready
+                    POS • {configuredPrinterType}
                   </span>
                 </div>
                 <p className="text-xs text-slate-300 font-medium">
