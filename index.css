@@ -229,18 +229,16 @@ select:disabled, option:disabled {
     page-break-inside: avoid !important;
   }
 
-  #thermal-pos-receipt, #thermal-supply-receipt {
-    display: block !important;
+  #thermal-pos-receipt, #thermal-supply-receipt, #thermal-receipt, #thermal-pos-modal-receipt {
+    display: flex !important;
+    flex-direction: column !important;
     position: relative !important;
-    width: 76mm !important;
-    max-width: 76mm !important;
     margin: 0 auto !important;
-    padding: 2mm !important;
     background: #ffffff !important;
     color: #000000 !important;
     box-shadow: none !important;
     border: none !important;
-    font-family: monospace, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    font-family: 'Courier New', Courier, monospace, sans-serif !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
@@ -261,8 +259,11 @@ select:disabled, option:disabled {
     print-color-adjust: exact !important;
   }
 
-  /* When printing thermal POS receipt or cash closure sheet, hide everything else cleanly */
+  /* When printing thermal POS receipt or cash closure sheet, reset body margins cleanly */
   body:has(#thermal-pos-receipt),
+  body:has(#thermal-supply-receipt),
+  body:has(#thermal-receipt),
+  body:has(#thermal-pos-modal-receipt),
   body:has(#cash-closure-printable-sheet) {
     margin: 0 !important;
     padding: 0 !important;

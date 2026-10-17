@@ -44,7 +44,7 @@ import { UserProfile } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ModernRegistrySkeleton, FluidLoadingState, SkeletonTable } from './SkeletonLoader';
-import { PrintPreviewModal } from './PrintPreviewModal';
+import { ThermalReceiptModal, ThermalReceiptData } from './ThermalReceiptModal';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
 import { SelectPill, SelectOption } from './SelectPill';
@@ -133,39 +133,37 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [selectedGenStudent, setSelectedGenStudent] = useState<any | null>(null);
 
   const [printPreview, setPrintPreview] = useState<any | null>(null);
-  const [reprintQrDataUrl, setReprintQrDataUrl] = useState<string>('');
-  const [reprintQrSignature, setReprintQrSignature] = useState<string>('');
 
-  useEffect(() => {
-    if (!printPreview) {
-      setReprintQrDataUrl('');
-      setReprintQrSignature('');
-      return;
-    }
-
-    const appliedRate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
+  const thermalReceiptData = useMemo<ThermalReceiptData | null>(() => {
+    if (!printPreview) return null;
     const paidAmt = Number(printPreview.paid_amount ?? printPreview.amount ?? 0);
-    const paidCurrency = printPreview.currency || 'HTG';
-
-    generateReceiptQRCode({
-      ref: printPreview.ref || printPreview.receipt_number || (printPreview.id ? `RCP-${printPreview.id.substring(0,8).toUpperCase()}` : `RCP-${Date.now()}`),
+    const equivHTG = printPreview.equiv_amount_htg || (printPreview.exchange_rate_applied ? Math.round(paidAmt * printPreview.exchange_rate_applied) : undefined);
+    
+    return {
+      id: printPreview.id,
+      reference: printPreview.ref || printPreview.reference_number,
+      receipt_number: printPreview.ref || printPreview.receipt_number || (printPreview.id ? `RCP-${printPreview.id.substring(0, 8).toUpperCase()}` : undefined),
+      created_at: printPreview.created_at || printPreview.date,
+      date: printPreview.date,
       studentName: printPreview.studentName || printPreview.student_name || 'Élève',
-      studentClass: printPreview.classe || printPreview.class_name || '',
+      studentCode: printPreview.matricule || printPreview.student_code,
+      studentClass: printPreview.classe || printPreview.class_name,
+      parentName: printPreview.parent_name,
+      parentPhone: printPreview.parent_phone,
       amount: paidAmt,
-      currency: paidCurrency,
+      currency: printPreview.currency || 'HTG',
       feeType: printPreview.nature || printPreview.fee_type || 'Frais Scolaires',
-      date: (printPreview.date ? `${printPreview.date} ${printPreview.time || ''}` : new Date(printPreview.created_at || Date.now()).toLocaleDateString('fr-FR')).trim(),
-      cashierName: cashierName || 'Comptabilité',
-      schoolName: schoolDetails?.name || school?.name || 'Établissement Scolaire',
-      exchangeRate: appliedRate,
-      schoolId: effectiveSchoolId
-    }).then(res => {
-      setReprintQrDataUrl(res.dataUrl);
-      setReprintQrSignature(res.signature);
-    }).catch(err => {
-      console.error('Erreur génération QR duplicata:', err);
-    });
-  }, [printPreview, cashierName, schoolDetails, school, effectiveSchoolId]);
+      feeTypeLabel: printPreview.nature || printPreview.fee_type || 'Frais Scolaires',
+      paymentMethod: printPreview.payment_method || 'Cash',
+      cashierName: printPreview.cashier_name || cashierName || 'Comptabilité',
+      campusName: printPreview.campus_name || (activeCampusName && activeCampusName !== 'Tous les campus (Vue globale)' ? activeCampusName : undefined),
+      notes: printPreview.description,
+      status: printPreview.status,
+      exchangeRateApplied: printPreview.exchange_rate_applied || schoolDetails?.exchange_rate,
+      convertedAmountHTG: equivHTG,
+      originalAmountUSD: printPreview.planned_usd_bareme || (printPreview.currency === 'USD' ? paidAmt : undefined)
+    };
+  }, [printPreview, cashierName, schoolDetails, activeCampusName]);
 
   useEffect(() => {
     const fetchContext = async () => {
@@ -1771,264 +1769,13 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
       </div>
 
-      {/* MODAL APERÇU (SLIM) */}
-      <PrintPreviewModal
+      {/* MODAL DE RÉIMPRESSION THERMIQUE CERTIFIÉE AVEC SUPPORT DU DOUBLE FORMAT POS 58MM & 80MM */}
+      <ThermalReceiptModal
         isOpen={!!printPreview}
         onClose={() => setPrintPreview(null)}
-        title="Réimpression de Reçu"
-        subtitle="Transaction certifiée • EduNova Pro"
-        onPrint={executePrint}
-      >
-        {printPreview && (
-          <div id="thermal-reprint-receipt" className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl rounded-xl border border-gray-200 text-black font-sans leading-tight flex flex-col print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm]">
-            {/* LIGNE DE DÉCOUPE SUPÉRIEURE STYLISÉE */}
-            <div className="w-full flex justify-between items-center opacity-30 text-[6px] tracking-[0.25em] mb-2 font-mono print:hidden select-none" aria-hidden="true">
-              <span>• • • • • • • • • • • • • • • • • • • • • • • • • •</span>
-            </div>
-
-            {/* HEADER SCOLAIRE */}
-            <div className="w-full text-center border-b-2 border-black pb-2 mb-3">
-              {schoolDetails?.logo_url ? (
-                <img src={schoolDetails.logo_url} alt="Logo" className="h-12 mx-auto mb-1 object-contain" referrerPolicy="no-referrer" />
-              ) : (
-                <img src="/logo.png" alt="Logo" className="h-12 mx-auto mb-1 object-contain grayscale" />
-              )}
-              <h1 className="text-[13px] font-black uppercase leading-tight">{schoolDetails?.name || 'INSTITUTION SCOLAIRE'}</h1>
-              {(() => {
-                const campusDisplay = printPreview.campus_name || (activeCampusName && activeCampusName !== 'Tous les campus (Vue globale)' ? activeCampusName : null);
-                return campusDisplay ? (
-                  <p className="text-[9.5px] font-black uppercase tracking-wider text-black mt-0.5">
-                    Annexe / Campus : {campusDisplay}
-                  </p>
-                ) : null;
-              })()}
-              <div className="text-[9px] font-bold opacity-90 italic mt-0.5 space-y-0.5">
-                {schoolDetails?.address && <p>{schoolDetails.address}</p>}
-                {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
-              </div>
-            </div>
-
-            {/* TITRE DU DOCUMENT */}
-            <div className="w-full text-center mb-3 py-1.5 bg-gray-100 rounded border border-gray-200 print:bg-gray-100">
-              <h2 className="text-[12px] font-black tracking-widest uppercase">REÇU OFFICIEL (DUPLICATA)</h2>
-              <p className="text-[9px] font-black font-mono mt-0.5">#{printPreview.ref || `RCP-${printPreview.id?.substring(0,8).toUpperCase()}`}</p>
-              {printPreview.payment_method?.includes('EN ATTENTE') && (
-                <span className="inline-block mt-1 px-2 py-0.5 text-[7px] font-black bg-gray-100 text-black border border-black uppercase tracking-widest rounded">
-                  Paiement En Attente
-                </span>
-              )}
-              {/* Pattern simulation code-barres thermique propre */}
-              <div className="w-32 mx-auto my-1 flex justify-center items-center gap-[1.5px] opacity-80 h-3 overflow-hidden select-none" aria-hidden="true">
-                {[1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2].map((w, idx) => (
-                  <span
-                    key={idx}
-                    className="h-full bg-black block"
-                    style={{ width: `${w}px` }}
-                  />
-                ))}
-              </div>
-            </div>
-
-            {/* GRID DETAILS (2 COLONNES COMPACTES) */}
-            <div className="w-full grid grid-cols-2 gap-2 text-[9px] mb-3 border-b border-black pb-2">
-              <div className="space-y-1">
-                <div>
-                  <p className="text-[7px] uppercase font-black text-gray-500">Date & Heure</p>
-                  <p className="font-bold leading-none">{printPreview.date} {printPreview.time ? `à ${printPreview.time}` : ''}</p>
-                </div>
-                <div>
-                  <p className="text-[7px] uppercase font-black text-gray-500">Caissier</p>
-                  <p className="font-bold leading-none">{cashierName || 'Comptabilité'}</p>
-                </div>
-              </div>
-              <div className="space-y-1 text-right border-l border-gray-200 pl-2">
-                <div>
-                  <p className="text-[7px] uppercase font-black text-gray-500">Élève</p>
-                  <p className="font-black text-[10px] leading-tight">{printPreview.studentName}</p>
-                  <p className="text-[8px] font-bold text-gray-600 italic">{printPreview.classe || 'Non assignée'}</p>
-                  {printPreview.matricule && (
-                    <p className="text-[7px] font-mono text-gray-500">Mat: {printPreview.matricule}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* MOTIF & PAIEMENT */}
-            <div className="w-full text-[9px] mb-3 space-y-1.5 border-b border-dashed border-gray-400 pb-2">
-              <div className="flex justify-between items-start py-0.5">
-                <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
-                <div className="text-right pl-2">
-                  <span className="font-black text-[10.5px] block text-black uppercase">{printPreview.nature}</span>
-                  {printPreview.planned_usd_bareme > 0 && (
-                    <span className="inline-block mt-0.5 text-[8px] font-black text-amber-900 bg-amber-50 border border-amber-300 px-1.5 py-0.5 rounded">
-                      Barème fixé en Dollars : ${printPreview.planned_usd_bareme} USD
-                    </span>
-                  )}
-                </div>
-              </div>
-              <div className="flex justify-between items-center py-0.5">
-                <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
-                <span className="font-black text-[10px] text-black">{printPreview.payment_method || 'Cash'}</span>
-              </div>
-              {printPreview.reference_number && (
-                <div className="flex justify-between items-center py-0.5 text-[8px]">
-                  <span className="font-bold uppercase text-gray-500">Réf. Transaction / Pièce :</span>
-                  <span className="font-mono font-black">{printPreview.reference_number}</span>
-                </div>
-              )}
-              {printPreview.description && printPreview.description !== printPreview.nature && (
-                <div className="flex justify-between items-center py-0.5 text-[8px] text-gray-600">
-                  <span className="font-medium uppercase">Précision :</span>
-                  <span className="font-semibold italic text-right pl-2">{printPreview.description}</span>
-                </div>
-              )}
-            </div>
-
-            {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
-            <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
-              <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Montant Certifié Payé</p>
-              <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
-                {(printPreview.paid_amount ?? printPreview.amount)?.toLocaleString('fr-FR')} <span className="text-[11px] font-bold">{printPreview.currency || 'HTG'}</span>
-              </p>
-              {/* BLOC CONVERSION DE TAUX DE CHANGE CLAIR ET TRANSPARENT */}
-              {(() => {
-                const rate = printPreview.exchange_rate_applied || schoolDetails?.exchange_rate;
-                const isUSD = printPreview.currency === 'USD';
-                const paidAmt = Number(printPreview.paid_amount ?? printPreview.amount ?? 0);
-
-                if (isUSD && rate) {
-                  const equivHTG = printPreview.equiv_amount_htg || Math.round(paidAmt * rate);
-                  return (
-                    <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
-                      <div className="flex justify-between items-center text-[8.5px] font-black text-black">
-                        <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
-                        <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                          1 USD = {rate} HTG
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                        <span>Montant versé (Devise USD) :</span>
-                        <span className="font-mono font-black">${paidAmt.toLocaleString()} USD</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
-                        <span>Contre-valeur perçue (HTG) :</span>
-                        <span className="font-mono font-black">{equivHTG.toLocaleString()} HTG</span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                const plannedUSD = printPreview.planned_usd_bareme;
-                if (!isUSD && plannedUSD > 0 && rate > 0) {
-                  const equivCoveredUSD = (paidAmt / rate).toFixed(2);
-                  return (
-                    <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
-                      <div className="flex justify-between items-center text-[8.5px] font-black text-black">
-                        <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
-                        <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                          1 USD = {rate} HTG
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                        <span>Barème fixé en Dollars :</span>
-                        <span className="font-mono font-black">${plannedUSD} USD</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
-                        <span>Valeur équivalente couverte :</span>
-                        <span className="font-mono font-black">≈ ${equivCoveredUSD} USD</span>
-                      </div>
-                      <div className="flex justify-between items-center text-[8.5px] font-black text-black border-t border-dashed border-gray-300 pt-0.5">
-                        <span>Montant effectif encaissé en Gourdes :</span>
-                        <span className="font-mono font-black">{paidAmt.toLocaleString()} HTG</span>
-                      </div>
-                    </div>
-                  );
-                }
-
-                return null;
-              })()}
-            </div>
-
-            {/* BLOC QR CODE UNIQUE D'AUTHENTICITÉ (SCAN RAPIDE SMARTPHONE) */}
-            <div className="w-full my-2.5 p-2 bg-gray-50 rounded border border-black/30 text-center flex flex-col items-center justify-center print:bg-white print:border-black">
-              <div className="bg-white p-1 rounded border border-black/40 mb-1 inline-block">
-                {reprintQrDataUrl ? (
-                  <img
-                    src={reprintQrDataUrl}
-                    alt="QR Code d'Authenticité"
-                    className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto block"
-                  />
-                ) : (
-                  <div className="w-24 h-24 flex items-center justify-center bg-gray-100">
-                    <QrCode size={30} className="text-gray-400" />
-                  </div>
-                )}
-              </div>
-              <p className="text-[7.5px] font-black uppercase tracking-wider text-black">
-                Scan Rapide • Vérification d'Authenticité
-              </p>
-              <p className="text-[7px] font-mono font-bold text-gray-800 mt-0.5">
-                Scellé : {reprintQrSignature || `EDN-${printPreview.ref || printPreview.id}`}
-              </p>
-              <p className="text-[6.5px] text-gray-600 italic mt-0.5">
-                Scannez avec votre smartphone pour attester la validité de ce duplicata
-              </p>
-            </div>
-
-            {/* SIGNATURE & MENTION LÉGALE */}
-            <div className="w-full text-center space-y-3 mt-2">
-              <div className="w-3/4 mx-auto space-y-1 pt-2">
-                <div className="h-7 border-b border-black"></div>
-                <p className="text-[7px] font-black uppercase tracking-widest">Sign. Caissier: {cashierName || 'Direction'}</p>
-              </div>
-
-              <p className="text-[8px] font-bold italic pt-2 border-t border-black text-center">
-                Merci de votre confiance ! Duplicata officiel EduNova Pro.
-              </p>
-            </div>
-
-            {/* BUFFER MARGE DE COUPE (AUTO-CUTTER EPSON PRINTER) */}
-            <div className="w-full pt-3 mt-2 border-t border-dashed border-gray-400 text-center">
-              <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black">- - - MARGE DE COUPE EPSON - - -</p>
-              <div className="h-6 print:h-12"></div>
-            </div>
-          </div>
-        )}
-      </PrintPreviewModal>
-
-      {/* STYLES D'IMPRESSION OPTIMISÉS 80MM */}
-      <style>{`
-        @media print {
-          body * { visibility: hidden !important; background: white !important; color: black !important; margin: 0 !important; padding: 0 !important; }
-          .print\\:hidden { display: none !important; }
-          #thermal-reprint-receipt { 
-            visibility: visible !important;
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 80mm !important;
-            max-width: 80mm !important;
-            margin: 0 !important;
-            padding: 4mm !important;
-            display: flex !important;
-            flex-direction: column !important;
-            box-shadow: none !important;
-            border: none !important;
-            font-family: 'Courier New', Courier, monospace, sans-serif !important;
-            color: black !important;
-            background: white !important;
-            page-break-after: always !important;
-            break-after: page !important;
-          }
-          #thermal-reprint-receipt * { 
-            visibility: visible !important; 
-            color: black !important;
-            border-color: black !important;
-          }
-          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          @page { size: 80mm auto; margin: 0; }
-        }
-      `}</style>
+        receiptData={thermalReceiptData}
+        schoolDetails={schoolDetails}
+      />
 
       <DailyCashClosureModal
         isOpen={isClosureModalOpen}

@@ -169,6 +169,24 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [parentPhoneCustom, setParentPhoneCustom] = useState<string>('');
   const [copiedRef, setCopiedRef] = useState(false);
 
+  // Format thermique du reçu POS : 80mm (Standard POS) ou 58mm (Mobile POS) avec mémorisation
+  const [posFormat, setPosFormat] = useState<'80mm' | '58mm'>(() => {
+    try {
+      const saved = localStorage.getItem('edunova_pos_receipt_format');
+      return saved === '58mm' ? '58mm' : '80mm';
+    } catch {
+      return '80mm';
+    }
+  });
+
+  const handlePosFormatChange = (fmt: '80mm' | '58mm') => {
+    setPosFormat(fmt);
+    try {
+      localStorage.setItem('edunova_pos_receipt_format', fmt);
+      toast.info(`Format de ticket réglé sur ${fmt}`);
+    } catch {}
+  };
+
   // Raccourci clavier Entrée pour déclencher instantanément l'impression du reçu
   useEffect(() => {
     if (!showReceipt) return;
@@ -2184,17 +2202,48 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               </button>
             </div>
 
+            {/* SÉLECTEUR DE FORMAT THERMIQUE (80MM STANDARD VS 58MM MOBILE) */}
+            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-inner">
+              <button
+                type="button"
+                onClick={() => handlePosFormatChange('80mm')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
+                  posFormat === '80mm'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Format Standard POS (Epson TM-T20, Star Micronics, Bixolon, 80mm)"
+              >
+                <span>80 mm</span>
+                <span className="text-[9px] opacity-75 font-normal hidden sm:inline">(Standard)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handlePosFormatChange('58mm')}
+                className={`px-2.5 py-1.5 rounded-lg text-xs font-black transition-all cursor-pointer flex items-center gap-1 ${
+                  posFormat === '58mm'
+                    ? 'bg-indigo-600 text-white shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Format Compact Mobile POS (Imprimantes Bluetooth de poche, Sunmi, Xprinter 58mm)"
+              >
+                <span>58 mm</span>
+                <span className="text-[9px] opacity-75 font-normal hidden sm:inline">(Compact)</span>
+              </button>
+            </div>
+
             {/* BOUTON HÉROS PRINCIPAL : IMPRIMER LE REÇU */}
             <button
               type="button"
               onClick={() => window.print()}
               className="w-full sm:w-auto px-4 sm:px-5 lg:px-5.5 py-2.5 sm:py-2.5 bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 hover:from-slate-900 hover:to-indigo-900 text-white rounded-xl font-black text-xs sm:text-sm shadow-xl shadow-slate-950/25 hover:shadow-indigo-950/35 transition-all flex items-center justify-center gap-2 active:scale-95 cursor-pointer ring-2 ring-indigo-500/50 hover:ring-indigo-400 whitespace-nowrap shrink-0"
-              title="Lancer l'impression directe (Raccourci: Touche Entrée)"
+              title={`Lancer l'impression directe au format ${posFormat} (Raccourci: Touche Entrée)`}
             >
               <div className="w-5 h-5 rounded-md bg-white/15 flex items-center justify-center shrink-0">
                 <Printer size={13} className="text-white" />
               </div>
-              <span className="tracking-wide uppercase">Imprimer le Reçu</span>
+              <span className="tracking-wide uppercase">Imprimer ({posFormat})</span>
               <kbd className="hidden sm:inline-flex items-center text-[9px] font-mono font-black bg-white/20 text-white px-1.5 py-0.5 rounded border border-white/25 ml-1">
                 Entrée ↵
               </kbd>
@@ -2334,23 +2383,23 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         )}
 
-        {/* PODIUM D'APERÇU HAUTE FIDÉLITÉ (80MM EPSON THERMIQUE) */}
+        {/* PODIUM D'APERÇU HAUTE FIDÉLITÉ (80MM / 58MM THERMIQUE) */}
         <div className="w-full bg-slate-100/70 p-3 sm:p-6 md:p-8 rounded-[2rem] border border-slate-200/90 shadow-inner flex flex-col items-center relative print:bg-white print:p-0 print:border-none print:shadow-none print:rounded-none">
           {/* BARRE FLOTTANTE D'ÉTAT D'IMPRESSION */}
-          <div className="w-full max-w-[80mm] flex items-center justify-between text-[11px] font-bold text-slate-500 mb-3 px-1 print:hidden">
+          <div className={`w-full ${posFormat === '58mm' ? 'max-w-[58mm]' : 'max-w-[80mm]'} transition-all duration-200 flex items-center justify-between text-[11px] font-bold text-slate-500 mb-3 px-1 print:hidden`}>
             <span className="flex items-center gap-1.5 text-slate-600">
               <Eye size={12} className="text-indigo-600" />
-              <span>Aperçu Réel Ticket 80mm</span>
+              <span>Aperçu Réel Ticket {posFormat}</span>
             </span>
             <span className="text-[10px] bg-white px-2 py-0.5 rounded-full border border-slate-200 text-slate-600 font-mono font-semibold">
-              Epson / Star POS Ready
+              {posFormat === '58mm' ? 'Mobile POS (32 col)' : 'Epson POS (48 col)'}
             </span>
           </div>
 
-          {/* TICKET DE CAISSE THERMIQUE 80MM */}
+          {/* TICKET DE CAISSE THERMIQUE 58MM / 80MM */}
           <div
             id="thermal-receipt"
-            className="bg-white p-4 sm:p-6 w-[80mm] max-w-[80mm] mx-auto shadow-2xl shadow-slate-900/10 rounded-2xl border border-slate-200 text-black font-sans leading-tight flex flex-col relative print:shadow-none print:border-none print:m-0 print:p-2 print:w-[80mm] print:rounded-none"
+            className={`bg-white ${posFormat === '58mm' ? 'p-3 w-[58mm] max-w-[58mm]' : 'p-4 sm:p-6 w-[80mm] max-w-[80mm]'} transition-all duration-200 mx-auto shadow-2xl shadow-slate-900/10 rounded-2xl border border-slate-200 text-black font-sans leading-tight flex flex-col relative print:shadow-none print:border-none print:m-0 print:rounded-none`}
           >
             {/* LIGNE DE DÉCOUPE SUPÉRIEURE STYLISÉE */}
             <div className="w-full flex justify-between items-center opacity-30 text-[6px] tracking-[0.25em] mb-2 font-mono print:hidden select-none" aria-hidden="true">
@@ -2358,39 +2407,39 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             {/* HEADER SCOLAIRE */}
-            <div className="w-full text-center border-b-2 border-black pb-2.5 mb-3">
+            <div className="w-full text-center border-b-2 border-black pb-2 mb-2.5">
               {schoolDetails?.logo_url && (
                 <img
                   src={schoolDetails.logo_url}
                   alt="Logo"
-                  className="h-14 mx-auto mb-1.5 object-contain"
+                  className={`${posFormat === '58mm' ? 'h-10' : 'h-14'} mx-auto mb-1.5 object-contain`}
                   referrerPolicy="no-referrer"
                 />
               )}
-              <h1 className="text-[13px] font-black uppercase leading-snug tracking-tight text-black">
+              <h1 className={`${posFormat === '58mm' ? 'text-[11px]' : 'text-[13px]'} font-black uppercase leading-snug tracking-tight text-black`}>
                 {schoolDetails?.name || 'ÉTABLISSEMENT SCOLAIRE'}
               </h1>
               {(() => {
                 const studentCampus = campuses?.find(c => c.id === (selectedStudent?.campus_id || currentCampusId));
                 const campusTitle = studentCampus?.name || schoolDetails?.campus_name;
                 return campusTitle ? (
-                  <p className="text-[9.5px] font-black uppercase tracking-wider text-black mt-0.5">
+                  <p className={`${posFormat === '58mm' ? 'text-[8px]' : 'text-[9.5px]'} font-black uppercase tracking-wider text-black mt-0.5`}>
                     Annexe / Campus : {campusTitle}
                   </p>
                 ) : null;
               })()}
-              <div className="text-[8.5px] font-bold text-gray-700 italic mt-0.5 space-y-0.5">
+              <div className={`${posFormat === '58mm' ? 'text-[7.5px]' : 'text-[8.5px]'} font-bold text-gray-700 italic mt-0.5 space-y-0.5`}>
                 {schoolDetails?.address && <p>{schoolDetails.address}</p>}
                 {schoolDetails?.phone && <p>Téls: {schoolDetails.phone}</p>}
               </div>
             </div>
 
             {/* TITRE DU DOCUMENT AVEC CODE-BARRES */}
-            <div className="w-full text-center mb-3 py-1.5 bg-gray-100 rounded border border-gray-300 print:bg-gray-100">
-              <h2 className="text-[12px] font-black tracking-widest uppercase">REÇU DE CAISSE OFFICIEL</h2>
-              <p className="text-[9px] font-black font-mono mt-0.5">#{transactionRef}</p>
+            <div className="w-full text-center mb-2.5 py-1.5 bg-gray-100 rounded border border-gray-300 print:bg-gray-100">
+              <h2 className={`${posFormat === '58mm' ? 'text-[10px]' : 'text-[12px]'} font-black tracking-widest uppercase`}>REÇU DE CAISSE OFFICIEL</h2>
+              <p className={`${posFormat === '58mm' ? 'text-[8px]' : 'text-[9px]'} font-black font-mono mt-0.5`}>#{transactionRef}</p>
               {/* Pattern simulation code-barres thermique propre */}
-              <div className="w-32 mx-auto my-1 flex justify-center items-center gap-[1.5px] opacity-80 h-3 overflow-hidden select-none" aria-hidden="true">
+              <div className={`${posFormat === '58mm' ? 'w-24' : 'w-32'} mx-auto my-1 flex justify-center items-center gap-[1.5px] opacity-80 h-3 overflow-hidden select-none`} aria-hidden="true">
                 {[1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2].map((w, idx) => (
                   <span
                     key={idx}
@@ -2508,8 +2557,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             {/* NET PERÇU (BOX DE MISE EN VALEUR CLAIR MONOCHROME) */}
             <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
               <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Net Perçu (Montant Réglé)</p>
-              <p className="text-[17px] font-black tracking-tight leading-none mt-1 text-black font-mono">
-                {parseFloat(montantReel || '0').toLocaleString()} <span className="text-[11px] font-bold">{currency}</span>
+              <p className={`${posFormat === '58mm' ? 'text-[14px]' : 'text-[17px]'} font-black tracking-tight leading-none mt-1 text-black font-mono`}>
+                {parseFloat(montantReel || '0').toLocaleString()} <span className={`${posFormat === '58mm' ? 'text-[9.5px]' : 'text-[11px]'} font-bold`}>{currency}</span>
               </p>
 
               {/* BLOC CONVERSION DE TAUX DE CHANGE TRANSPARENT ET EXPLICITE */}
@@ -2605,11 +2654,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <img
                     src={receiptQrDataUrl}
                     alt="QR Code d'Authenticité"
-                    className="w-24 h-24 sm:w-28 sm:h-28 object-contain mx-auto block"
+                    className={`${posFormat === '58mm' ? 'w-20 h-20' : 'w-24 h-24 sm:w-28 sm:h-28'} object-contain mx-auto block`}
                   />
                 ) : (
-                  <div className="w-24 h-24 flex items-center justify-center bg-gray-100">
-                    <QrCode size={30} className="text-gray-400" />
+                  <div className={`${posFormat === '58mm' ? 'w-20 h-20' : 'w-24 h-24 sm:w-28 sm:h-28'} flex items-center justify-center bg-gray-100`}>
+                    <QrCode size={posFormat === '58mm' ? 24 : 30} className="text-gray-400" />
                   </div>
                 )}
               </div>
@@ -2638,7 +2687,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* BUFFER MARGE DE COUPE (AUTO-CUTTER EPSON PRINTER) */}
             <div className="w-full pt-3 mt-2 border-t border-dashed border-gray-400 text-center">
-              <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black select-none">- - - MARGE DE COUPE EPSON - - -</p>
+              <p className="text-[7px] font-black uppercase tracking-[0.25em] opacity-60 text-gray-500 print:text-black select-none">- - - MARGE DE COUPE POS - - -</p>
               <div className="h-6 print:h-12"></div>
             </div>
           </div>
@@ -2651,7 +2700,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               className="px-5 py-2.5 bg-slate-900 hover:bg-black text-white text-xs font-black rounded-xl shadow-lg shadow-slate-900/10 flex items-center gap-2 active:scale-95 transition-all cursor-pointer ring-1 ring-slate-800"
             >
               <Printer size={14} />
-              <span>Imprimer le Reçu (80mm)</span>
+              <span>Imprimer le Reçu ({posFormat})</span>
             </button>
           </div>
         </div>
@@ -2665,10 +2714,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               position: absolute !important;
               left: 0 !important;
               top: 0 !important;
-              width: 80mm !important;
-              max-width: 80mm !important;
+              width: ${posFormat === '58mm' ? '54mm' : '76mm'} !important;
+              max-width: ${posFormat === '58mm' ? '54mm' : '76mm'} !important;
               margin: 0 !important;
-              padding: 4mm !important;
+              padding: ${posFormat === '58mm' ? '1.5mm' : '3mm'} !important;
               display: flex !important;
               flex-direction: column !important;
               box-shadow: none !important;
@@ -2685,7 +2734,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               border-color: black !important;
             }
             * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-            @page { size: 80mm auto; margin: 0; }
+            @page { size: ${posFormat === '58mm' ? '58mm auto' : '80mm auto'}; margin: 0; }
           }
         `}</style>
       </div>

@@ -119,9 +119,27 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
   changeDue
 }) => {
   const { terminology } = useSchool();
-  // Default directly to 'thermal' as requested for Epson 80mm printer focus
+  // Default directly to 'thermal' as requested for POS thermal receipt focus
   const [activeTab, setActiveTab] = useState<'thermal' | 'card' | 'invoice'>('thermal');
   const [copied, setCopied] = useState(false);
+
+  // Format thermique : 80mm (Standard POS) ou 58mm (Mobile POS) avec synchronisation
+  const [posFormat, setPosFormat] = useState<'80mm' | '58mm'>(() => {
+    try {
+      const saved = localStorage.getItem('edunova_pos_receipt_format');
+      return saved === '58mm' ? '58mm' : '80mm';
+    } catch {
+      return '80mm';
+    }
+  });
+
+  const handlePosFormatChange = (fmt: '80mm' | '58mm') => {
+    setPosFormat(fmt);
+    try {
+      localStorage.setItem('edunova_pos_receipt_format', fmt);
+      toast.info(`Format de ticket réglé sur ${fmt}`);
+    } catch {}
+  };
 
   const dateObj = useMemo(() => {
     return created_at instanceof Date ? created_at : new Date(created_at);
@@ -283,43 +301,75 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
 
             {/* FORMAT / VIEW MODE TABS (SOUPLESSE) */}
             <div className="relative z-10 flex items-center justify-between gap-2 mt-3 pt-3 border-t border-white/10 flex-wrap">
-              <div className="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 shadow-inner">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('thermal')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                    activeTab === 'thermal'
-                      ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Smartphone size={13} />
-                  <span>Ticket Epson 80mm</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('card')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                    activeTab === 'card'
-                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <Eye size={13} />
-                  <span>Vue Écran</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('invoice')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
-                    activeTab === 'invoice'
-                      ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
-                      : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  <FileText size={13} />
-                  <span>Facture A4</span>
-                </button>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <div className="flex bg-slate-900/90 p-1 rounded-xl border border-slate-800 shadow-inner">
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('thermal')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                      activeTab === 'thermal'
+                        ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Smartphone size={13} />
+                    <span>Ticket POS ({posFormat})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('card')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                      activeTab === 'card'
+                        ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <Eye size={13} />
+                    <span>Vue Écran</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab('invoice')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+                      activeTab === 'invoice'
+                        ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md'
+                        : 'text-slate-400 hover:text-slate-200'
+                    }`}
+                  >
+                    <FileText size={13} />
+                    <span>Facture A4</span>
+                  </button>
+                </div>
+
+                {/* SÉLECTEUR RAPIDE 80MM / 58MM POUR LE MODE TICKET THERMIQUE */}
+                {activeTab === 'thermal' && (
+                  <div className="flex items-center gap-1 bg-white/10 p-1 rounded-xl border border-white/10 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => handlePosFormatChange('80mm')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                        posFormat === '80mm'
+                          ? 'bg-emerald-400 text-slate-950 shadow-xs'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Format Standard POS 80mm"
+                    >
+                      80mm
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handlePosFormatChange('58mm')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                        posFormat === '58mm'
+                          ? 'bg-emerald-400 text-slate-950 shadow-xs'
+                          : 'text-slate-300 hover:text-white'
+                      }`}
+                      title="Format Compact Mobile POS 58mm"
+                    >
+                      58mm
+                    </button>
+                  </div>
+                )}
               </div>
 
               {/* Utility Quick Buttons */}
@@ -354,19 +404,19 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
             </div>
           </div>
 
-          {/* TAB 1: THERMAL RECEIPT 80MM (DEFAULT & HIGHLY POLISHED FOR EPSON) */}
+          {/* TAB 1: THERMAL RECEIPT (SUPPORT DUAL POS 80MM & 58MM) */}
           {activeTab === 'thermal' && (
             <div className="p-4 sm:p-6 bg-slate-200/70 overflow-y-auto flex-1 flex flex-col items-center justify-start">
               
-              {/* EPSON 80MM THERMAL PAPER SIMULATOR CONTAINER */}
-              <div className="w-full max-w-[360px] bg-white text-black font-mono text-[11px] leading-tight shadow-2xl border border-slate-300 rounded-2xl p-4 sm:p-5 relative transition-all">
+              {/* POS THERMAL PAPER SIMULATOR CONTAINER (80MM / 58MM) */}
+              <div className={`w-full ${posFormat === '58mm' ? 'max-w-[58mm] w-[58mm] p-2.5 sm:p-3 text-[9px]' : 'max-w-[360px] w-full p-4 sm:p-5 text-[11px]'} transition-all duration-200 bg-white text-black font-mono leading-tight shadow-2xl border border-slate-300 rounded-2xl relative`}>
                 
                 {/* Paper Top Jagged/Cutter Marker */}
                 <div className="flex items-center justify-between text-[8px] text-slate-600 uppercase font-black tracking-widest pb-2 mb-2 border-b border-dashed border-slate-400">
                   <span className="flex items-center gap-1">
-                    <Scissors size={10} /> Rouleau Thermique 80mm
+                    <Scissors size={10} /> Rouleau Thermique {posFormat}
                   </span>
-                  <span>Epson ESC/POS Ready</span>
+                  <span>{posFormat === '58mm' ? 'Mobile POS (32 col)' : 'Epson POS (48 col)'}</span>
                 </div>
 
                 {/* 1. INSTITUTIONAL HEADER */}
@@ -751,7 +801,7 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
               className="col-span-1 sm:col-span-2 py-3.5 bg-slate-950 hover:bg-slate-900 text-white rounded-2xl font-black text-xs sm:text-sm shadow-xl shadow-slate-950/20 transition-all active:scale-98 flex items-center justify-center gap-2 min-h-[48px]"
             >
               <Printer size={18} className="text-emerald-400" /> 
-              <span>Imprimer Reçu (Epson 80mm ESC/POS)</span>
+              <span>Imprimer Reçu ({posFormat} ESC/POS)</span>
             </button>
             
             {onNewSale ? (
@@ -784,16 +834,16 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
         </div>
       </div>
 
-      {/* DEDICATED PRINT TEMPLATE FOR EPSON 80MM PRINTERS */}
+      {/* DEDICATED PRINT TEMPLATE FOR THERMAL POS PRINTERS (58MM & 80MM) */}
       <div 
         id="thermal-pos-receipt" 
         className="hidden print:flex bg-white text-black font-mono leading-tight flex-col border-none shadow-none"
         style={{
-          width: '76mm',
-          maxWidth: '76mm',
-          padding: '2mm',
+          width: posFormat === '58mm' ? '54mm' : '76mm',
+          maxWidth: posFormat === '58mm' ? '54mm' : '76mm',
+          padding: posFormat === '58mm' ? '1.5mm' : '2mm',
           margin: '0 auto',
-          fontSize: '11px',
+          fontSize: posFormat === '58mm' ? '9px' : '11px',
           color: '#000000',
           backgroundColor: '#ffffff'
         }}
@@ -920,6 +970,40 @@ export const ModernSaleReceiptModal: React.FC<ModernSaleReceiptModalProps> = ({
           - - - - - - - - - - - - - - - - - -
         </div>
       </div>
+
+      {/* STYLES D'IMPRESSION DÉDIÉS AUX IMPRIMANTES THERMIQUES (58MM & 80MM) */}
+      <style>{`
+        @media print {
+          @page {
+            size: ${posFormat === '58mm' ? '58mm auto' : '80mm auto'};
+            margin: 0;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          #thermal-pos-receipt, #thermal-pos-receipt * {
+            visibility: visible !important;
+          }
+          #thermal-pos-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: ${posFormat === '58mm' ? '54mm' : '76mm'} !important;
+            max-width: ${posFormat === '58mm' ? '54mm' : '76mm'} !important;
+            margin: 0 auto !important;
+            padding: ${posFormat === '58mm' ? '1.5mm' : '2mm'} !important;
+            box-shadow: none !important;
+            border: none !important;
+            font-family: 'Courier New', Courier, monospace, sans-serif !important;
+            color: #000000 !important;
+            background-color: #ffffff !important;
+            display: flex !important;
+            flex-direction: column !important;
+            page-break-after: always !important;
+            break-after: page !important;
+          }
+        }
+      `}</style>
     </>
   );
 };

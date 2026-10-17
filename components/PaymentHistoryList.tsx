@@ -47,6 +47,7 @@ import { SelectPill, SelectOption } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import { ClassSelectorPill } from './ClassSelectorPill';
+import { ThermalReceiptModal, ThermalReceiptData } from './ThermalReceiptModal';
 
 import { useLocation } from 'react-router-dom';
 
