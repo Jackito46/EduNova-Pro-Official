@@ -119,6 +119,21 @@ const getReceiptFeeText = (
 
   const baseText = `${Math.round(valHTG).toLocaleString()} G`;
   if (nativeUSD > 0 && field !== 'solde') {
+    if (field === 'due' || field === 'engagement') {
+      const theoHTG = Math.round(nativeUSD * exchangeRate);
+      return `$${nativeUSD.toLocaleString()} USD (≈ ${theoHTG.toLocaleString()} G)`;
+    }
+    if (field === 'paid') {
+      let paidUSD = 0;
+      if (feeType === 'DIVERS') paidUSD = selectedStudent?.miscPaidUSD || 0;
+      else if (feeType === 'SCOLARITE') paidUSD = selectedStudent?.scolaritePaidUSD || 0;
+      else if (feeType === 'INSCRIPTION') paidUSD = selectedStudent?.inscriptionPaidUSD || 0;
+      
+      if (paidUSD > 0) {
+        return `$${paidUSD.toFixed(2)} USD (${baseText})`;
+      }
+      return `${baseText} (≈ $${(valHTG / exchangeRate).toFixed(2)} USD)`;
+    }
     if (field === 'reste' && paymentLogic?.resteUSD !== undefined) {
       const paidUSD = currency === 'USD' ? parseFloat(montantReel || '0') : (parseFloat(montantReel || '0') / exchangeRate);
       const remUSD = Math.max(0, paymentLogic.resteUSD - paidUSD);

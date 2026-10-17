@@ -32,7 +32,8 @@ import {
   ArrowRightLeft,
   Layers,
   FileText,
-  Check
+  Check,
+  Activity
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatStudentName } from '../utils/formatters';
@@ -47,6 +48,7 @@ import { UserProfile } from '../types';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { AcademicSessionPill } from './AcademicSessionPill';
 import Modal from './Modal';
+import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
 import { 
   canUserApproveCancellation, 
   parseCancellationInfo, 
@@ -145,6 +147,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [studentHistory, setStudentHistory] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const [showDiagnosticModal, setShowDiagnosticModal] = useState(false);
   const [activeTooltip, setActiveTooltip] = useState<{
     id: string;
     isMobile: boolean;
@@ -931,28 +934,137 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [selectedYearId, selectedStudent?.id, loadDetails]);
 
   const canCancelPayment = user?.is_super_admin || ['SUPER_ADMIN', 'SCHOOL_ADMIN', 'ADMIN', 'ACCOUNTANT', 'DIRECTOR', 'COMPTABLE', 'DIRECTEUR'].includes(user?.role || '');
+  const isAdminOrDirector = canUserApproveCancellation(user);
 
-  const handleCancelPayment = async (paymentId: string) => {
-    if (!window.confirm("Êtes-vous sûr de vouloir annuler ce versement ? L'opération sera marquée comme ANNULÉE et le solde de l'élève sera automatiquement recalculé.")) return;
+  const handleCancelPayment = async (t: any) => {
+    const isDirectAdmin = canUserApproveCancellation(user);
+
+    if (!isDirectAdmin) {
+      // Étape 1 : L'agent soumet une demande d'annulation au workflow (Le solde élève reste INTACT)
+      const reason = window.prompt(
+        "DEMANDE D'ANNULATION (Agent de Caisse / Comptable) :\n" +
+        "Veuillez saisir le motif de l'annulation.\n\n" +
+        "ℹ️ Important : Le solde de l'élève restera INTACT jusqu'à la validation officielle par un utilisateur de niveau Admin ou Direction."
+      );
+      if (!reason || !reason.trim()) return;
+
+      try {
+        const res = await requestPaymentCancellation({
+          paymentId: t.id,
+          sourceTable: 'payments',
+          reason: reason.trim(),
+          user,
+          studentId: selectedStudent?.id,
+          paymentRef: t.ref || t.receipt_number,
+          amount: t.amount,
+          currency: t.currency || 'HTG'
+        });
+
+        if (!res.success) {
+          throw new Error(res.message);
+        }
+
+        toast.success(res.message);
+        if (selectedStudent) {
+          loadDetails(selectedStudent);
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Erreur lors de la soumission de la demande d'annulation");
+      }
+    } else {
+      // Étape 2 : L'Admin / Direction valide directement l'annulation
+      const reason = window.prompt(
+        "CONFIRMATION D'ANNULATION (Niveau Admin / Direction) :\n" +
+        "Veuillez indiquer le motif d'annulation. Le versement sera définitivement marqué comme ANNULÉ et le solde de l'élève sera immédiatement mis à jour.",
+        "Annulation certifiée conforme par la Direction"
+      );
+      if (!reason || !reason.trim()) return;
+
+      try {
+        const res = await approvePaymentCancellation({
+          paymentId: t.id,
+          sourceTable: 'payments',
+          approverUser: user,
+          studentId: selectedStudent?.id,
+          amount: t.amount,
+          currency: t.currency || 'HTG',
+          paymentMethod: t.payment_method,
+          paymentRef: t.ref || t.receipt_number,
+          existingReason: reason.trim()
+        });
+
+        if (!res.success) {
+          throw new Error(res.message);
+        }
+
+        toast.success(res.message);
+        if (selectedStudent) {
+          loadDetails(selectedStudent);
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Erreur lors de la validation de l'annulation");
+      }
+    }
+  };
+
+  const handleApprovePendingPayment = async (t: any) => {
+    if (!isAdminOrDirector) {
+      toast.error("Action non autorisée : Seul un utilisateur de niveau 'Admin' ou 'Direction' peut approuver une annulation.");
+      return;
+    }
+    if (!window.confirm("Approuver cette demande d'annulation ? Le statut passera définitivement à ANNULÉ et le solde de l'élève sera recalculé.")) return;
     try {
-      const { error } = await supabase
-        .from('payments')
-        .update({
-          status: 'ANNULE',
-          cancelled_at: new Date().toISOString(),
-          cancelled_by: user.id,
-          cancel_reason: 'Annulation de versement en double'
-        })
-        .eq('id', paymentId);
+      const res = await approvePaymentCancellation({
+        paymentId: t.id,
+        sourceTable: 'payments',
+        approverUser: user,
+        studentId: selectedStudent?.id,
+        amount: t.amount,
+        currency: t.currency || 'HTG',
+        paymentMethod: t.payment_method,
+        paymentRef: t.ref || t.receipt_number,
+        existingReason: t.cancellation_reason || t.cancel_reason
+      });
 
-      if (error) throw error;
+      if (!res.success) {
+        throw new Error(res.message);
+      }
 
-      toast.success("Le versement a été annulé avec succès.");
+      toast.success(res.message);
       if (selectedStudent) {
         loadDetails(selectedStudent);
       }
     } catch (err: any) {
-      toast.error("Erreur lors de l'annulation du versement : " + (err.message || err.toString()));
+      toast.error(err.message || "Erreur lors de l'approbation de l'annulation");
+    }
+  };
+
+  const handleRejectPendingPayment = async (t: any) => {
+    if (!isAdminOrDirector) {
+      toast.error("Action non autorisée : Seul un utilisateur de niveau 'Admin' ou 'Direction' peut rejeter une annulation.");
+      return;
+    }
+    const rejReason = window.prompt("Motif du rejet de la demande d'annulation :", "Demande rejetée par la Direction");
+    if (!rejReason || !rejReason.trim()) return;
+    try {
+      const res = await rejectPaymentCancellation({
+        paymentId: t.id,
+        sourceTable: 'payments',
+        rejecterUser: user,
+        rejectionReason: rejReason.trim(),
+        paymentRef: t.ref || t.receipt_number
+      });
+
+      if (!res.success) {
+        throw new Error(res.message);
+      }
+
+      toast.success(res.message);
+      if (selectedStudent) {
+        loadDetails(selectedStudent);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Erreur lors du rejet de l'annulation");
     }
   };
 
@@ -1515,7 +1627,17 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <div className="bg-slate-50/60 rounded-xl p-5 border border-slate-100 space-y-4">
                           <div className="flex items-center justify-between border-b border-slate-200/60 pb-2">
                             <span className="text-xs font-bold uppercase text-slate-600 tracking-wider">Frais Divers Obligatoires</span>
-                            <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black">ANNUEL</span>
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded font-black">ANNUEL</span>
+                              <button
+                                type="button"
+                                onClick={() => setShowDiagnosticModal(true)}
+                                className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-black flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                                title="Diagnostic Barème $200 USD vs Engagement"
+                              >
+                                <Activity size={10} className="text-indigo-600" /> Diagnostic Barème
+                              </button>
+                            </div>
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between items-start text-xs text-slate-500 font-medium">
@@ -1706,14 +1828,26 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <span className="text-xs font-medium text-gray-700 bg-gray-100 px-2.5 py-0.5 rounded-md whitespace-nowrap">
                           {t.campaign?.name ? `Campagne: ${t.campaign.name}` : t.ad_hoc_campaign_id ? 'Frais de Campagne' : (t.fee_type === 'SCOLARITE' || (!t.fee_type && (!t.nature || t.nature === 'SCOLARITE' || t.nature === 'Scolarité'))) ? 'Frais Académiques' : ((t.fee_type === 'INSCRIPTION' || t.nature === 'INSCRIPTION' || t.nature === "Frais d'inscription") ? 'Inscription' : ((t.fee_type === 'DIVERS' || (t.nature || '').toLowerCase().includes('divers')) ? 'Frais Divers Obligatoires' : (t.nature || t.type || t.fee_type || 'Frais Divers Obligatoires')))}
                         </span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${
-                          t.status === 'ANNULE' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
-                          t.payment_method?.includes('EN ATTENTE') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 
-                          t.payment_method?.includes('REJETÉ') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
-                          'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                        }`}>
-                          {t.status === 'ANNULE' ? 'Annulé' : (t.payment_method || 'Cash')}
-                        </span>
+                        {(() => {
+                          const cancelInfo = parseCancellationInfo(t);
+                          if (cancelInfo.isPending) {
+                            return (
+                              <span className="text-xs font-bold px-2 py-0.5 rounded-md whitespace-nowrap bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                                ⏳ Annulation en attente (Direction)
+                              </span>
+                            );
+                          }
+                          return (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-md whitespace-nowrap ${
+                              t.status === 'ANNULE' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
+                              t.payment_method?.includes('EN ATTENTE') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 
+                              t.payment_method?.includes('REJETÉ') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
+                              'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                            }`}>
+                              {t.status === 'ANNULE' ? 'Annulé' : (t.payment_method || 'Cash')}
+                            </span>
+                          );
+                        })()}
                       </div>
 
                       <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/70 flex items-center justify-between gap-2">
@@ -1780,17 +1914,59 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <Info size={14} />
                             </button>
                           </div>
-                          {t.status !== 'ANNULE' && canCancelPayment && (
-                            <button
-                              type="button"
-                              onClick={() => handleCancelPayment(t.id)}
-                              className="mt-1 px-2 py-0.5 text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                              title="Annuler ce versement"
-                            >
-                              <Trash2 size={11} />
-                              <span>Annuler</span>
-                            </button>
-                          )}
+                          {(() => {
+                            const cancelInfo = parseCancellationInfo(t);
+                            if (cancelInfo.isCancelled || t.status === 'ANNULE') {
+                              return (
+                                <span className="mt-1 px-2 py-0.5 text-[10px] font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded inline-block">
+                                  Annulé
+                                </span>
+                              );
+                            }
+                            if (cancelInfo.isPending) {
+                              return (
+                                <div className="mt-1 flex flex-col items-end gap-1">
+                                  <span className="px-2 py-0.5 text-[10px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded whitespace-nowrap" title={cancelInfo.reason ? `Motif: ${cancelInfo.reason}` : "Demande d'annulation transmise"}>
+                                    ⏳ En attente Direction
+                                  </span>
+                                  {isAdminOrDirector && (
+                                    <div className="flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleApprovePendingPayment(t)}
+                                        className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow-2xs transition-colors cursor-pointer"
+                                        title="Approuver l'annulation et actualiser le solde"
+                                      >
+                                        Approuver
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => handleRejectPendingPayment(t)}
+                                        className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold rounded transition-colors cursor-pointer"
+                                        title="Rejeter la demande d'annulation"
+                                      >
+                                        Rejeter
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                            if (canCancelPayment) {
+                              return (
+                                <button
+                                  type="button"
+                                  onClick={() => handleCancelPayment(t)}
+                                  className="mt-1 px-2 py-0.5 text-[11px] font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                  title={isAdminOrDirector ? "Annuler ce versement (Direct Admin)" : "Soumettre une demande d'annulation à la Direction"}
+                                >
+                                  <Trash2 size={11} />
+                                  <span>Annuler</span>
+                                </button>
+                              );
+                            }
+                            return null;
+                          })()}
                         </div>
                       </div>
                     </div>
@@ -1877,14 +2053,26 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </span>
                           </td>
                           <td className="px-4 py-3.5 whitespace-nowrap">
-                            <span className={`text-xs font-medium px-2.5 py-1 rounded-md whitespace-nowrap inline-block ${
-                              t.status === 'ANNULE' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
-                              t.payment_method?.includes('EN ATTENTE') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 
-                              t.payment_method?.includes('REJETÉ') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
-                              'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            }`}>
-                              {t.status === 'ANNULE' ? 'Annulé' : (t.payment_method || 'Cash')}
-                            </span>
+                            {(() => {
+                              const cancelInfo = parseCancellationInfo(t);
+                              if (cancelInfo.isPending) {
+                                return (
+                                  <span className="text-xs font-bold px-2.5 py-1 rounded-md whitespace-nowrap inline-block bg-amber-100 text-amber-800 border border-amber-300">
+                                    ⏳ Annulation en attente (Direction)
+                                  </span>
+                                );
+                              }
+                              return (
+                                <span className={`text-xs font-medium px-2.5 py-1 rounded-md whitespace-nowrap inline-block ${
+                                  t.status === 'ANNULE' ? 'bg-rose-100 text-rose-700 border border-rose-200' :
+                                  t.payment_method?.includes('EN ATTENTE') ? 'bg-amber-50 text-amber-700 border border-amber-200' : 
+                                  t.payment_method?.includes('REJETÉ') ? 'bg-rose-50 text-rose-700 border border-rose-200' : 
+                                  'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                }`}>
+                                  {t.status === 'ANNULE' ? 'Annulé' : (t.payment_method || 'Cash')}
+                                </span>
+                              );
+                            })()}
                           </td>
                           <td className="px-4 py-3.5 text-right font-mono font-bold whitespace-nowrap">
                             {isUSD ? (
@@ -1987,17 +2175,59 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </div>
                           </td>
                           <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                            {t.status !== 'ANNULE' && canCancelPayment && (
-                              <button
-                                type="button"
-                                onClick={() => handleCancelPayment(t.id)}
-                                className="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
-                                title="Annuler ce versement en double"
-                              >
-                                <Trash2 size={13} />
-                                <span>Annuler</span>
-                              </button>
-                            )}
+                            {(() => {
+                              const cancelInfo = parseCancellationInfo(t);
+                              if (cancelInfo.isCancelled || t.status === 'ANNULE') {
+                                return (
+                                  <span className="px-2.5 py-1 text-xs font-bold text-rose-600 bg-rose-50 border border-rose-200 rounded-lg inline-block">
+                                    Annulé
+                                  </span>
+                                );
+                              }
+                              if (cancelInfo.isPending) {
+                                return (
+                                  <div className="inline-flex flex-col items-center gap-1">
+                                    <span className="px-2 py-0.5 text-[11px] font-bold text-amber-800 bg-amber-100 border border-amber-300 rounded whitespace-nowrap" title={cancelInfo.reason ? `Motif: ${cancelInfo.reason}` : "En attente de validation Direction"}>
+                                      ⏳ En attente Direction
+                                    </span>
+                                    {isAdminOrDirector && (
+                                      <div className="inline-flex items-center gap-1.5 mt-0.5">
+                                        <button
+                                          type="button"
+                                          onClick={() => handleApprovePendingPayment(t)}
+                                          className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold rounded shadow-2xs transition-colors cursor-pointer"
+                                          title="Valider l'annulation et actualiser le solde"
+                                        >
+                                          Approuver
+                                        </button>
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRejectPendingPayment(t)}
+                                          className="px-2 py-0.5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-[10px] font-bold rounded transition-colors cursor-pointer"
+                                          title="Rejeter la demande d'annulation"
+                                        >
+                                          Rejeter
+                                        </button>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              }
+                              if (canCancelPayment) {
+                                return (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCancelPayment(t)}
+                                    className="px-2.5 py-1 text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                    title={isAdminOrDirector ? "Annuler directement ce versement (Direct Admin)" : "Soumettre une demande d'annulation à la Direction"}
+                                  >
+                                    <Trash2 size={13} />
+                                    <span>Annuler</span>
+                                  </button>
+                                );
+                              }
+                              return null;
+                            })()}
                           </td>
                         </tr>
                       );
@@ -2044,6 +2274,14 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                   className="w-full py-2.5 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50 transition-colors flex items-center justify-center gap-2 text-sm cursor-pointer"
                 >
                   <Printer size={16} /> Relevé de Compte
+                </button>
+                <button 
+                  type="button"
+                  onClick={() => setShowDiagnosticModal(true)}
+                  className="w-full py-2.5 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100/70 transition-colors flex items-center justify-center gap-2 text-sm cursor-pointer shadow-2xs"
+                  title="Comparer le Total Dû théorique (barème $200 USD) avec l'engagement réel enregistré"
+                >
+                  <Activity size={16} className="text-indigo-600" /> Diagnostic Barème vs Engagement
                 </button>
               </div>
             </div>
@@ -2914,6 +3152,18 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
             })()}
           </div>
         </div>
+      )}
+      {/* Modal Diagnostic Barème USD vs Engagement */}
+      {showDiagnosticModal && selectedStudent && (
+        <StudentCurrencyDiagnosticModal
+          isOpen={showDiagnosticModal}
+          onClose={() => setShowDiagnosticModal(false)}
+          studentId={selectedStudent.id}
+          studentName={selectedStudent.fullName}
+          studentClass={selectedStudent.classe || selectedStudent.class?.name || selectedStudent.class_name || 'NS II'}
+          academicYearLabel={academicYears.find(y => y.id === selectedYearId)?.label || '2025-2026'}
+          currentExchangeRate={selectedStudent.exchangeRate || 148}
+        />
       )}
     </div>
   );

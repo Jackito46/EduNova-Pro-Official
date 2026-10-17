@@ -4,19 +4,19 @@ import {
   Usb, 
   Bluetooth, 
   Wifi, 
-  Sliders, 
   Check, 
   Save, 
   Loader2, 
-  Sparkles, 
   Info, 
-  AlertCircle, 
   Scissors, 
   FileText, 
-  Layers,
-  Smartphone,
-  Building2,
-  RefreshCw
+  RotateCcw,
+  Sparkles,
+  HelpCircle,
+  Eye,
+  Settings2,
+  CheckCircle2,
+  Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { PrinterSettings, PrinterConnectionType, ReceiptPaperWidth } from '../types';
@@ -58,6 +58,8 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
   const [footerMessage, setFooterMessage] = useState<string>(currentSettings.footer_message || '');
   const [feedLines, setFeedLines] = useState<number>(currentSettings.feed_lines ?? 3);
 
+  const [showHelp, setShowHelp] = useState<boolean>(false);
+  const [activeMobileView, setActiveMobileView] = useState<'form' | 'preview'>('form');
   const [isPrintingTest, setIsPrintingTest] = useState<boolean>(false);
 
   // Mise à jour de l'état parent
@@ -75,7 +77,7 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
     };
 
     const newGlobalSettings = {
-      ...(schoolData.global_settings || {}),
+      ...(schoolData?.global_settings || {}),
       printer_settings: updatedPrinterSettings
     };
 
@@ -102,12 +104,27 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
     } catch {}
   };
 
+  const handleResetDefaults = () => {
+    const defaultHeader = "ÉCONOMAT • REÇU CERTIFIÉ CONFORME";
+    const defaultFooter = "Conservez ce reçu précieux pour tout contrôle légal ou réclamation.";
+    setHeaderMessage(defaultHeader);
+    setFooterMessage(defaultFooter);
+    setFeedLines(3);
+    setAutoCut(true);
+    updateSettingsInParent({
+      header_message: defaultHeader,
+      footer_message: defaultFooter,
+      feed_lines: 3,
+      auto_cut: true
+    });
+    toast.success("Messages par défaut rétablis");
+  };
+
   // Test d'impression réelle d'un ticket de calibrage
   const handlePrintTestTicket = () => {
     setIsPrintingTest(true);
     updateSettingsInParent();
 
-    // Rendu d'une fenêtre d'impression pour ticket de test
     const printWindow = window.open('', '_blank', 'width=400,height=600');
     if (!printWindow) {
       toast.error("Veuillez autoriser les fenêtres pop-up pour lancer le test d'impression.");
@@ -133,7 +150,7 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
               margin: 0;
             }
             body {
-              font-family: 'Courier New', Courier, monospace, monospace;
+              font-family: 'Courier New', Courier, monospace;
               width: ${is58 ? '52mm' : '74mm'};
               margin: 0 auto;
               padding: 3mm;
@@ -144,14 +161,14 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
             }
             .center { text-align: center; }
             .bold { font-weight: bold; }
-            .divider { border-bottom: 1px dashed black; margin: 6px 0; }
-            .double-divider { border-bottom: 2px solid black; margin: 6px 0; }
+            .divider { border-bottom: 1px dashed black; margin: 5px 0; }
+            .double-divider { border-bottom: 2px solid black; margin: 5px 0; }
             .row { display: flex; justify-content: space-between; margin: 2px 0; }
-            .badge { display: inline-block; border: 1px solid black; padding: 2px 4px; font-size: 9px; font-weight: bold; margin: 4px 0; }
+            .badge { display: inline-block; border: 1px solid black; padding: 2px 5px; font-size: 9px; font-weight: bold; margin: 4px 0; }
           </style>
         </head>
         <body>
-          <div class="center bold" style="font-size: ${is58 ? '12px' : '15px'};">
+          <div class="center bold" style="font-size: ${is58 ? '12px' : '14px'};">
             ${schoolData?.name || 'EDUNOVA PRO - ÉTABLISSEMENT'}
           </div>
           <div class="center" style="font-size: 9px; margin-top: 2px;">
@@ -160,7 +177,7 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
           <div class="double-divider"></div>
 
           <div class="center">
-            <span class="badge">TEST REUSSI • ${paperWidth}</span>
+            <span class="badge">TEST ÉTALONNAGE • ${paperWidth}</span>
           </div>
 
           <div class="row">
@@ -168,29 +185,29 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
             <span class="bold">${dateStr}</span>
           </div>
           <div class="row">
-            <span>Type Connexion :</span>
+            <span>Connexion :</span>
             <span class="bold">${printerType}</span>
           </div>
           ${printerType === 'Network' ? `
             <div class="row">
-              <span>IP Imprimante :</span>
+              <span>Hôte IP :</span>
               <span class="bold">${networkIp}:${networkPort}</span>
             </div>
           ` : ''}
           <div class="row">
-            <span>Modèle déclaré :</span>
-            <span class="bold">${printerName || 'Standard ESC/POS'}</span>
+            <span>Modèle :</span>
+            <span class="bold">${printerName || 'ESC/POS Standard'}</span>
           </div>
           <div class="row">
             <span>Auto-Cutter :</span>
-            <span class="bold">${autoCut ? 'ACTIVÉ (Auto)' : 'MANUEL'}</span>
+            <span class="bold">${autoCut ? 'Activé' : 'Manuel'}</span>
           </div>
 
           <div class="divider"></div>
 
           <div class="center bold">ÉCHANTILLON D'ÉCRITURE</div>
           <div class="row"><span>Article Test 1</span><span>500 HTG</span></div>
-          <div class="row"><span>Frais Écolage Test</span><span>1 500 HTG</span></div>
+          <div class="row"><span>Frais Scolarité Test</span><span>1 500 HTG</span></div>
           <div class="divider"></div>
           <div class="row bold" style="font-size: ${is58 ? '11px' : '13px'};">
             <span>TOTAL TEST :</span>
@@ -203,8 +220,8 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
             ${footerMessage || 'Conservez ce ticket de test.'}
           </div>
 
-          <div style="height: ${feedLines * 6}mm;"></div>
-          ${autoCut ? '<div class="center" style="font-size: 7px; color: gray;">- - - LIGNE DE DÉCOUPE AUTOMATIQUE - - -</div>' : ''}
+          <div style="height: ${feedLines * 5}mm;"></div>
+          ${autoCut ? '<div class="center" style="font-size: 7px; color: gray;">- - - DÉCOUPE AUTOMATIQUE - - -</div>' : ''}
           <script>
             window.onload = function() {
               window.print();
@@ -223,157 +240,223 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {/* HEADER SECTION */}
-      <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-12 h-12 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
-            <Printer size={24} />
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-black text-slate-900 tracking-tight">
-                Configuration Imprimante & Tickets Reçus
-              </h3>
-              <span className="px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200">
-                ESC/POS Thermique
-              </span>
+    <div className="space-y-3.5 sm:space-y-4">
+      {/* HEADER SECTION COMPACTE & FLUIDE */}
+      <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/90 shadow-2xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
+              <Printer size={20} />
             </div>
-            <p className="text-xs text-slate-500 font-medium mt-0.5">
-              Définissez le type de connexion matérielle et la largeur du rouleau papier utilisée pour tous les reçus de caisse de l'école.
-            </p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-base font-bold text-slate-900 tracking-tight">
+                  Configuration Imprimante & Tickets Reçus
+                </h3>
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/70 inline-flex items-center gap-1">
+                  <CheckCircle2 size={12} /> ESC/POS Thermique
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 truncate mt-0.5">
+                Format {paperWidth} · Connexion {printerType} · Découpe {autoCut ? 'Auto' : 'Manuelle'}
+              </p>
+            </div>
+          </div>
+
+          {/* ACTIONS D'ENTÊTE */}
+          <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowHelp(prev => !prev)}
+              className={`p-2 rounded-lg text-xs font-semibold border transition-all flex items-center gap-1.5 cursor-pointer ${
+                showHelp 
+                  ? 'bg-indigo-50 text-indigo-700 border-indigo-200' 
+                  : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border-slate-200'
+              }`}
+              title="Afficher/masquer le guide technique rapide"
+            >
+              <HelpCircle size={15} />
+              <span className="hidden sm:inline">Guide</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handlePrintTestTicket}
+              disabled={isPrintingTest}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 active:scale-98 text-slate-700 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 border border-slate-200 cursor-pointer disabled:opacity-50"
+              title="Imprimer un ticket de test réel"
+            >
+              <FileText size={14} className="text-indigo-600" />
+              <span>Tester</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                updateSettingsInParent();
+                if (handleUpdateSchool) handleUpdateSchool();
+              }}
+              disabled={saving || !canManageAllCampuses}
+              className="px-4 py-2 bg-slate-900 hover:bg-slate-800 active:scale-98 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 shadow-2xs cursor-pointer disabled:opacity-40"
+            >
+              {saving ? <Loader2 size={14} className="animate-spin text-emerald-400" /> : <Save size={14} className="text-emerald-400" />}
+              <span>Enregistrer</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handlePrintTestTicket}
-            disabled={isPrintingTest}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-slate-200 cursor-pointer"
-            title="Imprimer un ticket d'étalonnage pour tester votre imprimante thermique"
-          >
-            <FileText size={14} className="text-indigo-600" />
-            <span>Tester l'impression</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => {
-              updateSettingsInParent();
-              if (handleUpdateSchool) handleUpdateSchool();
-            }}
-            disabled={saving || !canManageAllCampuses}
-            className="px-5 py-2 bg-slate-900 hover:bg-black active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-xs cursor-pointer disabled:opacity-40"
-          >
-            {saving ? <Loader2 size={14} className="animate-spin text-emerald-400" /> : <Save size={14} className="text-emerald-400" />}
-            <span>Enregistrer</span>
-          </button>
-        </div>
+        {/* GUIDE TECHNIQUE DÉPLIABLE (SANS ENCOMBRER L'INTERFACE) */}
+        {showHelp && (
+          <div className="mt-3 pt-3 border-t border-slate-100 grid grid-cols-1 md:grid-cols-3 gap-2.5 text-xs text-slate-600 animate-in fade-in duration-200">
+            <div className="p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100/70">
+              <span className="font-bold text-indigo-900 flex items-center gap-1">
+                <Usb size={13} /> USB Câble
+              </span>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Connectez l'imprimante directement au PC caisse. Reconnue via le gestionnaire d'impression standard.
+              </p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100/70">
+              <span className="font-bold text-indigo-900 flex items-center gap-1">
+                <Bluetooth size={13} /> Bluetooth Mobile
+              </span>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Idéal pour tablettes tactiles et terminaux mobiles de poche. Appairage direct sans fil.
+              </p>
+            </div>
+            <div className="p-2.5 rounded-lg bg-indigo-50/50 border border-indigo-100/70">
+              <span className="font-bold text-indigo-900 flex items-center gap-1">
+                <Wifi size={13} /> Réseau Ethernet/IP
+              </span>
+              <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                Permet de partager une seule imprimante entre plusieurs postes de caisse via port Raw 9100.
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* COLONNE GAUCHE (2/3) : PARAMÉTRAGE MATÉRIEL */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* CONTRÔLEUR D'ONGLET MOBILE (PARAMÈTRES VS APERÇU) */}
+      <div className="flex lg:hidden bg-slate-100 p-1 rounded-lg border border-slate-200">
+        <button
+          type="button"
+          onClick={() => setActiveMobileView('form')}
+          className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+            activeMobileView === 'form' 
+              ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Settings2 size={13} />
+          <span>Paramètres</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveMobileView('preview')}
+          className={`flex-1 py-1.5 px-3 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-1.5 ${
+            activeMobileView === 'preview' 
+              ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80' 
+              : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Eye size={13} />
+          <span>Aperçu Ticket ({paperWidth})</span>
+        </button>
+      </div>
+
+      {/* GRILLE PRINCIPALE RESPONSIVE */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 sm:gap-4 items-start">
+        
+        {/* COLONNE GAUCHE : FORMULAIRES OPTIMISÉS ET COMPACTS (8 COLS DESKTOP) */}
+        <div className={`space-y-3.5 sm:space-y-4 lg:col-span-7 xl:col-span-8 ${activeMobileView === 'preview' ? 'hidden lg:block' : 'block'}`}>
           
-          {/* 1. TYPE DE CONNEXION */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
-            <div>
-              <div className="flex items-center gap-2 text-indigo-600 text-xs font-black uppercase tracking-wider">
-                <span className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px]">1</span>
-                <span>Type de Connexion Imprimante</span>
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 mt-1">
-                Comment l'imprimante est-elle reliée au poste de travail ?
-              </h4>
+          {/* SECTION 1 : CONNEXION MATÉRIELLE */}
+          <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/90 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">1</span>
+                Type de Connexion
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Mode actuel : <strong className="text-indigo-600">{printerType}</strong>
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* OPTION USB */}
+            {/* SÉLECTEUR SEGMENTÉ EN 3 BOUTONS COMPACTS */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {/* USB */}
               <button
                 type="button"
                 onClick={() => handleSelectType('USB')}
-                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-3 cursor-pointer ${
+                className={`p-2.5 rounded-lg border text-left transition-all flex items-center sm:flex-col sm:items-start gap-2.5 cursor-pointer ${
                   printerType === 'USB'
-                    ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs'
+                    ? 'bg-indigo-50/70 border-indigo-600 ring-1 ring-indigo-500/30'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${printerType === 'USB' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    <Usb size={18} />
-                  </div>
-                  {printerType === 'USB' && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                  )}
+                <div className={`p-1.5 rounded-md shrink-0 ${printerType === 'USB' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  <Usb size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900">USB (Câble direct)</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                    Standard caisse de bureau. Branchement par port USB / Câble direct PC ou laptop.
-                  </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900">USB Câble</span>
+                    {printerType === 'USB' && <Check size={12} className="text-indigo-600 shrink-0" />}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">Poste direct</p>
                 </div>
               </button>
 
-              {/* OPTION BLUETOOTH */}
+              {/* BLUETOOTH */}
               <button
                 type="button"
                 onClick={() => handleSelectType('Bluetooth')}
-                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-3 cursor-pointer ${
+                className={`p-2.5 rounded-lg border text-left transition-all flex items-center sm:flex-col sm:items-start gap-2.5 cursor-pointer ${
                   printerType === 'Bluetooth'
-                    ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs'
+                    ? 'bg-indigo-50/70 border-indigo-600 ring-1 ring-indigo-500/30'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${printerType === 'Bluetooth' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    <Bluetooth size={18} />
-                  </div>
-                  {printerType === 'Bluetooth' && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                  )}
+                <div className={`p-1.5 rounded-md shrink-0 ${printerType === 'Bluetooth' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  <Bluetooth size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900">Bluetooth (Sans-fil)</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                    Idéal pour tablettes, smartphones ou mini-imprimantes mobiles de poche.
-                  </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900">Bluetooth</span>
+                    {printerType === 'Bluetooth' && <Check size={12} className="text-indigo-600 shrink-0" />}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">Tablette / Mobile</p>
                 </div>
               </button>
 
-              {/* OPTION RÉSEAU / ETHERNET */}
+              {/* RÉSEAU IP */}
               <button
                 type="button"
                 onClick={() => handleSelectType('Network')}
-                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-3 cursor-pointer ${
+                className={`p-2.5 rounded-lg border text-left transition-all flex items-center sm:flex-col sm:items-start gap-2.5 cursor-pointer ${
                   printerType === 'Network'
-                    ? 'bg-indigo-50/70 border-indigo-600 ring-2 ring-indigo-500/20 shadow-xs'
+                    ? 'bg-indigo-50/70 border-indigo-600 ring-1 ring-indigo-500/30'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className={`p-2 rounded-lg ${printerType === 'Network' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
-                    <Wifi size={18} />
-                  </div>
-                  {printerType === 'Network' && (
-                    <span className="w-2 h-2 rounded-full bg-indigo-600" />
-                  )}
+                <div className={`p-1.5 rounded-md shrink-0 ${printerType === 'Network' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                  <Wifi size={15} />
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900">Réseau (Ethernet / IP)</p>
-                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                    Imprimante partagée via switch réseau ou Wi-Fi interne de l'école.
-                  </p>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-900">Réseau IP</span>
+                    {printerType === 'Network' && <Check size={12} className="text-indigo-600 shrink-0" />}
+                  </div>
+                  <p className="text-[11px] text-slate-500 truncate">Partagée LAN</p>
                 </div>
               </button>
             </div>
 
-            {/* DÉTAILS SI RÉSEAU IP */}
+            {/* DÉTAILS RÉSEAU IP (INLINE CONDITIONNEL COMPACT) */}
             {printerType === 'Network' && (
-              <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in duration-200">
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-2.5 animate-in fade-in duration-200">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    Adresse IP de l'imprimante
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Adresse IP Imprimante
                   </label>
                   <input
                     type="text"
@@ -382,13 +465,13 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
                       setNetworkIp(e.target.value);
                       updateSettingsInParent({ network_ip: e.target.value });
                     }}
-                    placeholder="Ex: 192.168.1.150"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600"
+                    placeholder="192.168.1.200"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    Port Raw ESC/POS (Par défaut: 9100)
+                  <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                    Port Raw ESC/POS
                   </label>
                   <input
                     type="text"
@@ -398,15 +481,16 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
                       updateSettingsInParent({ network_port: e.target.value });
                     }}
                     placeholder="9100"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600"
+                    className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-mono font-bold text-slate-900 outline-none focus:border-indigo-600"
                   />
                 </div>
               </div>
             )}
 
+            {/* MODÈLE DÉCLARÉ */}
             <div>
-              <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                Nom ou modèle de l'imprimante (Optionnel)
+              <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                Modèle d'imprimante (Optionnel)
               </label>
               <input
                 type="text"
@@ -415,191 +499,200 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
                   setPrinterName(e.target.value);
                   updateSettingsInParent({ printer_name: e.target.value });
                 }}
-                placeholder="Ex: Epson TM-T20III, Xprinter XP-N160M, Zjiang 58, Star Micronics..."
-                className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-900 outline-none focus:border-indigo-600"
+                placeholder="Ex: Epson TM-T20III, Xprinter XP-N160M, Zjiang..."
+                className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs font-medium text-slate-900 outline-none focus:border-indigo-600"
               />
             </div>
           </div>
 
-          {/* 2. LARGEUR DU PAPIER THERMIQUE (58MM OU 80MM) */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
-            <div>
-              <div className="flex items-center gap-2 text-indigo-600 text-xs font-black uppercase tracking-wider">
-                <span className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px]">2</span>
-                <span>Largeur du Rouleau Papier (Reçus)</span>
-              </div>
-              <h4 className="text-sm font-bold text-slate-900 mt-1">
-                Sélectionnez le format exact du papier thermique inséré dans votre appareil
-              </h4>
+          {/* SECTION 2 : FORMAT PAPIER & DÉCOUPE */}
+          <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/90 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">2</span>
+                Format du Papier & Découpe
+              </span>
+              <span className="text-[11px] font-medium text-slate-500">
+                Largeur : <strong className="text-emerald-700">{paperWidth}</strong>
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* OPTION 80MM */}
+            {/* SÉLECTEUR 80MM VS 58MM COMPACT */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              {/* 80 MM */}
               <button
                 type="button"
                 onClick={() => handleSelectWidth('80mm')}
-                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-3 cursor-pointer ${
+                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
                   paperWidth === '80mm'
-                    ? 'bg-emerald-50/70 border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs'
+                    ? 'bg-emerald-50/70 border-emerald-600 ring-1 ring-emerald-500/30'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-md bg-emerald-600 text-white font-black text-xs">
-                    80 mm (Standard POS)
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">80 mm · Standard Caisse</span>
                   {paperWidth === '80mm' && (
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700">
-                      <Check size={14} /> Actif
-                    </div>
+                    <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                      <Check size={13} /> Actif
+                    </span>
                   )}
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900">Format Grand Rouleau (80 mm)</p>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                    <strong>Recommandé pour l'économat et la caisse principale.</strong> Offre 48 colonnes d'affichage, une lisibilité optimale, le détail bidevise complet (HTG/USD) et un QR Code haute définition.
-                  </p>
-                </div>
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-600 font-mono">
-                  <span>Largeur utile: ~72-76mm</span>
-                  <span>48 colonnes</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Recommandé pour l'économat principal. 48 colonnes, bidevise et QR Code haute lisibilité.
+                </p>
+                <div className="mt-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                  <span>Largeur utile: 72-76mm</span>
+                  <span>48 col.</span>
                 </div>
               </button>
 
-              {/* OPTION 58MM */}
+              {/* 58 MM */}
               <button
                 type="button"
                 onClick={() => handleSelectWidth('58mm')}
-                className={`p-4 rounded-xl border text-left transition-all relative flex flex-col justify-between gap-3 cursor-pointer ${
+                className={`p-3 rounded-lg border text-left transition-all cursor-pointer ${
                   paperWidth === '58mm'
-                    ? 'bg-emerald-50/70 border-emerald-600 ring-2 ring-emerald-500/20 shadow-xs'
+                    ? 'bg-emerald-50/70 border-emerald-600 ring-1 ring-emerald-500/30'
                     : 'bg-white hover:bg-slate-50 border-slate-200 text-slate-700'
                 }`}
               >
                 <div className="flex items-center justify-between">
-                  <span className="px-2.5 py-1 rounded-md bg-slate-800 text-white font-black text-xs">
-                    58 mm (Compact Mobile)
-                  </span>
+                  <span className="text-xs font-bold text-slate-900">58 mm · Compact Mobile</span>
                   {paperWidth === '58mm' && (
-                    <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-700">
-                      <Check size={14} /> Actif
-                    </div>
+                    <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
+                      <Check size={13} /> Actif
+                    </span>
                   )}
                 </div>
-                <div>
-                  <p className="text-xs font-black text-slate-900">Format Rouleau Étroit (58 mm)</p>
-                  <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                    <strong>Format compact et économique.</strong> Convient aux imprimantes de poche Bluetooth et petits guichets. Affichage concentré sur 32 colonnes avec QR code adapté.
-                  </p>
-                </div>
-                <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-600 font-mono">
-                  <span>Largeur utile: ~48-52mm</span>
-                  <span>32 colonnes</span>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Format économique pour imprimantes de poche et guichets rapides. 32 colonnes.
+                </p>
+                <div className="mt-2 pt-1.5 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-400 font-mono">
+                  <span>Largeur utile: 48-52mm</span>
+                  <span>32 col.</span>
                 </div>
               </button>
             </div>
+
+            {/* DÉCOUPE AUTO & LIGNES DE MARGE INLINE */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={autoCut}
+                  onChange={(e) => {
+                    setAutoCut(e.target.checked);
+                    updateSettingsInParent({ auto_cut: e.target.checked });
+                  }}
+                  className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer"
+                />
+                <span className="text-xs font-semibold text-slate-800 flex items-center gap-1.5">
+                  <Scissors size={14} className="text-slate-500" /> Découpe automatique (Auto-Cutter)
+                </span>
+              </label>
+
+              <div className="flex items-center gap-2 text-xs text-slate-600">
+                <span className="text-[11px] font-medium text-slate-500">Marge finale :</span>
+                <select
+                  value={feedLines}
+                  onChange={(e) => {
+                    const val = Number(e.target.value);
+                    setFeedLines(val);
+                    updateSettingsInParent({ feed_lines: val });
+                  }}
+                  aria-label="Marge finale en lignes de saut de papier"
+                  className="px-2 py-1 bg-white border border-slate-300 rounded text-xs font-semibold text-slate-800 outline-none focus:border-indigo-600 cursor-pointer"
+                >
+                  <option value={1}>1 ligne (Court)</option>
+                  <option value={2}>2 lignes</option>
+                  <option value={3}>3 lignes (Standard)</option>
+                  <option value={4}>4 lignes</option>
+                  <option value={5}>5 lignes (Aéré)</option>
+                </select>
+              </div>
+            </div>
           </div>
 
-          {/* 3. OPTIONS D'ÉDITION ET DÉCOUPE */}
-          <div className="bg-white rounded-2xl p-5 sm:p-6 border border-slate-200/80 shadow-xs space-y-4">
-            <div className="flex items-center gap-2 text-indigo-600 text-xs font-black uppercase tracking-wider">
-              <span className="w-5 h-5 rounded-full bg-indigo-100 flex items-center justify-center text-[10px]">3</span>
-              <span>Découpe et Messages Personnalisés</span>
+          {/* SECTION 3 : PERSONNALISATION DES MESSAGES DU TICKET */}
+          <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/90 shadow-2xs space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                <span className="w-4 h-4 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-bold flex items-center justify-center">3</span>
+                Messages & Mentions Légales
+              </span>
+              <button
+                type="button"
+                onClick={handleResetDefaults}
+                className="text-[11px] text-slate-500 hover:text-indigo-600 transition-colors flex items-center gap-1 cursor-pointer"
+                title="Rétablir les messages d'origine"
+              >
+                <RotateCcw size={12} />
+                <span>Rétablir par défaut</span>
+              </button>
             </div>
 
-            <div className="space-y-4">
-              {/* AUTO-CUT TOGGLE */}
-              <div className="flex items-center justify-between p-3.5 bg-slate-50 rounded-xl border border-slate-200/70">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-lg bg-white border border-slate-200 text-slate-700">
-                    <Scissors size={18} />
-                  </div>
-                  <div>
-                    <p className="text-xs font-bold text-slate-900">Découpe automatique du ticket (Auto-cutter)</p>
-                    <p className="text-[11px] text-slate-500">
-                      Envoie l'instruction de coupe automatique à la fin de l'émission du reçu
-                    </p>
-                  </div>
-                </div>
-
-                <label className="relative inline-flex items-center cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={autoCut}
-                    onChange={(e) => {
-                      setAutoCut(e.target.checked);
-                      updateSettingsInParent({ auto_cut: e.target.checked });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Sous-titre d'en-tête
                 </label>
+                <input
+                  type="text"
+                  value={headerMessage}
+                  onChange={(e) => {
+                    setHeaderMessage(e.target.value);
+                    updateSettingsInParent({ header_message: e.target.value });
+                  }}
+                  placeholder="ÉCONOMAT • REÇU CERTIFIÉ CONFORME"
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs text-slate-900 outline-none focus:border-indigo-600"
+                />
               </div>
 
-              {/* MESSAGES PERSONNALISÉS */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    Sous-titre d'entête du ticket
-                  </label>
-                  <input
-                    type="text"
-                    value={headerMessage}
-                    onChange={(e) => {
-                      setHeaderMessage(e.target.value);
-                      updateSettingsInParent({ header_message: e.target.value });
-                    }}
-                    placeholder="Ex: ÉCONOMAT • REÇU OFFICIEL"
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block mb-1">
-                    Message de pied de ticket
-                  </label>
-                  <input
-                    type="text"
-                    value={footerMessage}
-                    onChange={(e) => {
-                      setFooterMessage(e.target.value);
-                      updateSettingsInParent({ footer_message: e.target.value });
-                    }}
-                    placeholder="Ex: Conservez ce reçu précieux pour tout recours."
-                    className="w-full px-3 py-2 bg-white border border-slate-300 rounded-lg text-xs font-medium text-slate-900 outline-none focus:border-indigo-600"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-semibold text-slate-700 block mb-1">
+                  Message de pied de reçu
+                </label>
+                <input
+                  type="text"
+                  value={footerMessage}
+                  onChange={(e) => {
+                    setFooterMessage(e.target.value);
+                    updateSettingsInParent({ footer_message: e.target.value });
+                  }}
+                  placeholder="Conservez ce reçu précieux pour tout contrôle légal ou réclamation."
+                  className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-md text-xs text-slate-900 outline-none focus:border-indigo-600"
+                />
               </div>
             </div>
           </div>
         </div>
 
-        {/* COLONNE DROITE (1/3) : APERÇU DYNAMIQUE DU TICKET */}
-        <div className="space-y-4">
-          <div className="bg-slate-900 text-white rounded-2xl p-5 border border-slate-800 shadow-md">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                <FileText size={13} className="text-emerald-400" /> Aperçu du Rendu Ticket
+        {/* COLONNE DROITE : APERÇU THERMIQUE DENSE, STICKY & RÉACTIF (4-5 COLS DESKTOP) */}
+        <div className={`lg:col-span-5 xl:col-span-4 ${activeMobileView === 'form' ? 'hidden lg:block' : 'block'}`}>
+          <div className="lg:sticky lg:top-4 bg-slate-900 text-white rounded-xl p-3.5 sm:p-4 border border-slate-800 shadow-sm space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                <Eye size={13} className="text-emerald-400" /> Rendu en Direct
               </span>
-              <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase font-mono bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                {paperWidth} • {printerType}
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-slate-800 text-emerald-400 border border-slate-700">
+                {paperWidth} · {printerType}
               </span>
             </div>
 
-            {/* SIMULATEUR TICKET THERMIQUE */}
-            <div className={`mx-auto bg-white text-black p-3.5 rounded-lg font-mono text-[10.5px] shadow-lg border border-slate-300 leading-snug transition-all ${
-              paperWidth === '58mm' ? 'max-w-[210px] text-[9.5px]' : 'max-w-[270px]'
+            {/* FEUILLE DU TICKET THERMIQUE AVEC STYLE IMPRIMANTE CAISSE */}
+            <div className={`mx-auto bg-white text-black p-3 rounded font-mono shadow-md border border-slate-300 leading-snug transition-all ${
+              paperWidth === '58mm' ? 'max-w-[210px] text-[9.5px]' : 'max-w-[260px] text-[10px]'
             }`}>
-              <div className="text-center font-bold text-xs">
+              <div className="text-center font-bold text-xs truncate">
                 {schoolData?.name || 'EDUNOVA PRO ACADEMY'}
               </div>
-              <div className="text-center text-[8.5px] text-gray-600 mt-0.5">
+              <div className="text-center text-[8.5px] text-gray-600 mt-0.5 line-clamp-1">
                 {headerMessage || 'ÉCONOMAT • REÇU CERTIFIÉ CONFORME'}
               </div>
               <div className="border-b border-black my-1.5 border-dashed"></div>
 
               <div className="flex justify-between text-[9px]">
-                <span>Réf:</span>
+                <span>Reçu N°:</span>
                 <span className="font-bold">RCP-2026-0042</span>
               </div>
               <div className="flex justify-between text-[9px]">
@@ -608,7 +701,7 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
               </div>
               <div className="flex justify-between text-[9px]">
                 <span>Élève:</span>
-                <span className="font-bold truncate max-w-[120px]">JEAN-BAPTISTE Pierre</span>
+                <span className="font-bold truncate max-w-[120px]">JEAN-BAPTISTE P.</span>
               </div>
               <div className="flex justify-between text-[9px]">
                 <span>Classe:</span>
@@ -621,7 +714,7 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
                 <span>Frais Scolarité :</span>
                 <span>5 000 HTG</span>
               </div>
-              <div className="flex justify-between text-[8.5px] text-gray-700">
+              <div className="flex justify-between text-[8.5px] text-gray-600">
                 <span>Mode:</span>
                 <span>Cash / Espèces</span>
               </div>
@@ -633,34 +726,39 @@ export const PrinterSettingsTab: React.FC<PrinterSettingsTabProps> = ({
                 <span>5 000 HTG</span>
               </div>
 
+              {/* QR CODE COMPACT */}
               <div className="my-2 p-1.5 bg-gray-50 border border-black/30 text-center rounded">
-                <div className="w-12 h-12 bg-gray-200 mx-auto flex items-center justify-center text-[8px] font-bold border border-black">
+                <div className="w-10 h-10 bg-gray-200 mx-auto flex items-center justify-center text-[7.5px] font-bold border border-black">
                   QR CODE
                 </div>
-                <div className="text-[7px] font-bold mt-0.5">VÉRIFIÉ AUTHENTIQUE</div>
+                <div className="text-[7px] font-bold mt-0.5 text-gray-700">CERTIFIÉ AUTHENTIQUE</div>
               </div>
 
-              <div className="text-center text-[7.5px] italic text-gray-700 mt-1">
-                {footerMessage || 'Conservez ce reçu précieux.'}
+              <div className="text-center text-[7.5px] italic text-gray-600 mt-1 line-clamp-2">
+                {footerMessage || 'Conservez ce reçu précieux pour tout contrôle légal ou réclamation.'}
               </div>
 
               {autoCut && (
-                <div className="text-center text-[7px] text-gray-400 mt-2 border-t border-dashed border-gray-300 pt-1">
-                  - - - DÉCOUPE AUTO - - -
+                <div className="text-center text-[7px] text-gray-400 mt-1.5 border-t border-dashed border-gray-300 pt-1">
+                  - - - DÉCOUPE AUTOMATIQUE - - -
                 </div>
               )}
             </div>
 
-            <button
-              type="button"
-              onClick={handlePrintTestTicket}
-              className="w-full mt-4 py-2.5 px-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-            >
-              <Printer size={14} />
-              <span>Lancer le test sur mon imprimante</span>
-            </button>
+            <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+              <span>{paperWidth === '58mm' ? 'Rouleau 58mm (32 col)' : 'Rouleau 80mm (48 col)'}</span>
+              <button
+                type="button"
+                onClick={handlePrintTestTicket}
+                className="text-emerald-400 hover:text-emerald-300 font-semibold flex items-center gap-1 cursor-pointer"
+              >
+                <Printer size={12} />
+                <span>Tester</span>
+              </button>
+            </div>
           </div>
         </div>
+
       </div>
     </div>
   );
