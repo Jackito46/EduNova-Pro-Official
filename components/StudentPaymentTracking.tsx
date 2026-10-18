@@ -809,6 +809,8 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         isNotEnrolledInTargetYear: !isEnrolled,
         isEnrolled,
         otherEnrollments,
+        hasPreviousEnrollment,
+        isReenrollment: hasPreviousEnrollment,
         inscriptionFee: adjAdmissionExpected,
         tuitionFee: tuitionExpected,
         rawTuitionExpected,
@@ -2574,8 +2576,12 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 </thead>
                                 <tbody className="divide-y divide-slate-100 text-xs">
                                   <tr className="hover:bg-slate-50/40">
-                                    <td className="py-1.5 px-3 font-semibold text-slate-700">Frais d'Inscription / Réinscription</td>
-                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">{selectedStudent.inscriptionFee.toLocaleString()} HTG</td>
+                                    <td className="py-1.5 px-3 font-semibold text-slate-700">
+                                      {selectedStudent.hasPreviousEnrollment ? 'Frais de Réinscription' : "Frais d'Inscription"}
+                                    </td>
+                                    <td className="py-1.5 px-3 text-right font-mono font-bold text-slate-900">
+                                      {selectedStudent.inscriptionFee === 0 ? 'Exonéré (0 HTG)' : `${selectedStudent.inscriptionFee.toLocaleString()} HTG`}
+                                    </td>
                                   </tr>
                                   <tr className="hover:bg-slate-50/40">
                                     <td className="py-1.5 px-3 font-semibold text-slate-700">Frais de Scolarité ({terminology.tuition})</td>

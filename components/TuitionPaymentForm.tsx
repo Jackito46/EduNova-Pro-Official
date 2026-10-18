@@ -251,7 +251,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     const feeLabel = feeType.startsWith('ADHOC_') 
       ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
       : feeType === 'INSCRIPTION' 
-      ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription") 
+      ? (selectedStudent.isReenrollment ? 'Frais de Réinscription' : "Frais d'Inscription") 
       : feeType === 'SCOLARITE' 
       ? `Frais de Scolarité` 
       : feeType === 'DIVERS'
@@ -300,12 +300,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Options mémoïsées pour les menus déroulants harmonisés (SelectPill)
   const feeTypeOptions: SelectOption[] = useMemo(() => {
-    const isInscriptionReenrollment = selectedStudent && selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) && selectedStudent.inscriptionDue > 0;
+    const isInscriptionReenrollment = Boolean(selectedStudent?.isReenrollment);
     const opts: SelectOption[] = [
       {
         value: 'INSCRIPTION',
         label: isInscriptionReenrollment ? 'Réinscription' : 'Inscription',
-        badge: isInscriptionReenrollment ? 'Réinscription' : 'Frais Fixes',
+        badge: isInscriptionReenrollment ? 'Ancien Élève' : 'Frais Fixes',
         icon: Tags
       },
       {
@@ -737,9 +737,58 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       const currentLevel = currentEnrollment?.class?.level || studentData.class?.level || 'N/A';
 
       const hasPrior = (priorEnrollments?.length || 0) > 0;
-      const curAdmDue = currentPlan 
-        ? (hasPrior ? Number(currentPlan.reenrollment_fee || 0) : Number(currentPlan.inscription_fee || 0))
-        : (isEnrolledCurrent ? 0 : 2500);
+      
+      // Paiements et ventilation pour la session active ciblée
+      const isAdmissionPayment = (p: any) => {
+        const s = `${p.fee_type || ''} ${p.nature || ''} ${p.type || ''} ${p.description || ''}`.toLowerCase();
+        return s.includes('inscri') || s.includes('admiss') || s.includes('reinscri') || s.includes('réinscri') || s.includes('entree') || s.includes('entrée');
+      };
+      const isMiscPayment = (p: any) => {
+        const s = `${p.fee_type || ''} ${p.nature || ''} ${p.type || ''} ${p.description || ''}`.toLowerCase();
+        return s.includes('divers') || s.includes('misc');
+      };
+
+      const curPayments = (allPayments || []).filter((p: any) => {
+        if (p.academic_year_id === targetYearId) return true;
+        if (!p.academic_year_id && !hasPrior) return true;
+        return false;
+      }).filter((p: any) => 
+        !p.payment_method?.includes('EN ATTENTE') && 
+        !p.payment_method?.includes('REJETÉ') &&
+        p.status !== 'ANNULE'
+      );
+
+      const curAdmPayments = curPayments.filter(p => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
+      const curMiscPayments = curPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
+      const curTuitionPayments = curPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
+      const curCampaignPayments = curPayments.filter(p => !!p.ad_hoc_campaign_id);
+
+      const curAdmHTG = currentPlan ? (hasPrior ? Number(currentPlan.reenrollment_fee ?? 0) : Number(currentPlan.inscription_fee ?? 0)) : 0;
+      const curAdmUSD = currentPlan ? (hasPrior ? Number(currentPlan.reenrollment_fee_usd ?? 0) : Number(currentPlan.inscription_fee_usd ?? 0)) : 0;
+      const curMiscHTG = currentPlan && currentPlan.is_misc_mandatory ? Number(currentPlan.misc_fee_htg || 0) : 0;
+      const curMiscUSD = currentPlan && currentPlan.is_misc_mandatory ? Number(currentPlan.misc_fee_usd || 0) : 0;
+      const curTuitionDiscount = Number(currentEnrollment?.tuition_discount || 0);
+      const curTuitionAddition = Number(currentEnrollment?.tuition_addition || 0);
+      const curStudentDiscount = Number(studentData.discount_amount || 0);
+      const curTotalDiscount = curTuitionDiscount + curStudentDiscount;
+      const curTuitionHTG = currentPlan ? (Number(currentPlan.tuition_fee || 0) + curTuitionAddition) : curTuitionAddition;
+      const curTuitionUSD = currentPlan ? Number(currentPlan.tuition_fee_usd || 0) : 0;
+
+      const curAdmBal = computeFeeCategoryBalance(curAdmHTG, curAdmUSD, curAdmPayments, currentExchangeRate);
+      const curMiscBal = computeFeeCategoryBalance(curMiscHTG, curMiscUSD, curMiscPayments, currentExchangeRate);
+      const curTuitionBal = computeFeeCategoryBalance(curTuitionHTG, curTuitionUSD, curTuitionPayments, currentExchangeRate, curTotalDiscount);
+
+      const curAdHocPaid = curCampaignPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || (p.currency === 'USD' ? p.amount * currentExchangeRate : p.amount) || 0), 0);
+      const curAdHocDue = (currentCampaigns || []).reduce((acc: number, c: any) => {
+        const amt = Number(c.amount || 0);
+        return acc + (c.currency === 'USD' ? amt * currentExchangeRate : amt);
+      }, 0);
+
+      const curSessionTotalDue = curAdmBal.effectiveDueHTG + curMiscBal.effectiveDueHTG + curTuitionBal.effectiveDueHTG + curAdHocDue;
+      const curSessionTotalPaid = curAdmBal.paidHTGEquiv + curMiscBal.paidHTGEquiv + curTuitionBal.paidHTGEquiv + curAdHocPaid;
+      const curSessionRemaining = curAdmBal.remainingHTGEquiv + curMiscBal.remainingHTGEquiv + curTuitionBal.remainingHTGEquiv + Math.max(0, curAdHocDue - curAdHocPaid);
+      const curSolvent = curSessionRemaining <= 50;
+      const curTrueRemaining = curSolvent ? 0 : Math.round(curSessionRemaining);
 
       const currentSessionDetail: SessionAuditDetail = {
         academicYearId: targetYearId,
@@ -747,24 +796,25 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         className: currentClassName,
         level: currentLevel,
         isCurrentSession: true,
+        isFutureSession: false,
         isEnrolled: isEnrolledCurrent,
-        inscriptionDue: curAdmDue,
-        inscriptionPaid: 0,
-        inscriptionRemaining: curAdmDue,
-        inscriptionIsPaid: false,
-        miscDue: currentPlan && currentPlan.is_misc_mandatory ? Number(currentPlan.misc_fee_htg || 0) : 0,
-        miscPaid: 0,
-        miscRemaining: currentPlan && currentPlan.is_misc_mandatory ? Number(currentPlan.misc_fee_htg || 0) : 0,
-        tuitionDue: currentPlan ? Number(currentPlan.tuition_fee || 0) : 0,
-        tuitionPaid: 0,
-        tuitionRemaining: currentPlan ? Number(currentPlan.tuition_fee || 0) : 0,
-        adHocDue: 0,
-        adHocPaid: 0,
-        adHocRemaining: 0,
-        totalDue: 0,
-        totalPaid: 0,
-        remainingDebt: 0,
-        isSolvent: true
+        inscriptionDue: curAdmBal.effectiveDueHTG,
+        inscriptionPaid: curAdmBal.paidHTGEquiv,
+        inscriptionRemaining: curAdmBal.remainingHTGEquiv,
+        inscriptionIsPaid: curAdmBal.isPaid,
+        miscDue: curMiscBal.effectiveDueHTG,
+        miscPaid: curMiscBal.paidHTGEquiv,
+        miscRemaining: curMiscBal.remainingHTGEquiv,
+        tuitionDue: curTuitionBal.effectiveDueHTG,
+        tuitionPaid: curTuitionBal.paidHTGEquiv,
+        tuitionRemaining: curTuitionBal.remainingHTGEquiv,
+        adHocDue: curAdHocDue,
+        adHocPaid: curAdHocPaid,
+        adHocRemaining: Math.max(0, curAdHocDue - curAdHocPaid),
+        totalDue: Math.round(curSessionTotalDue),
+        totalPaid: Math.round(curSessionTotalPaid),
+        remainingDebt: curTrueRemaining,
+        isSolvent: curSolvent
       };
 
       // Règle d'or : Si l'élève n'a AUCUNE inscription antérieure (0 session précédente),
@@ -1039,8 +1089,18 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 .eq('class_id', effectiveClassId)
                 .maybeSingle();
               plan = fallback.data;
-            } else {
+            } else if (planData) {
               plan = planData;
+            } else {
+              // Si aucun barème pour cette année, fallback sur le dernier barème existant de la classe
+              const { data: latestPlan } = await supabase.from('fee_plans')
+                .select('*')
+                .eq('school_id', user.school_id)
+                .eq('class_id', effectiveClassId)
+                .order('created_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              plan = latestPlan;
             }
           } catch (e) {
             const fallback = await supabase.from('fee_plans')
@@ -1148,16 +1208,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const miscPayments = validPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && isMiscPayment(p));
         const tuitionPayments = validPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
-        // Vérifier si l'étudiant a des inscriptions antérieures (Réinscription)
-        const { data: prevEnrollments } = await supabase
-          .from('enrollments')
-          .select('academic_year_id')
-          .eq('school_id', user.school_id)
-          .eq('student_id', studentId)
-          .neq('academic_year_id', yearId)
-          .limit(1);
-        
-        const hasPreviousEnrollment = (prevEnrollments?.length || 0) > 0;
+        // Vérifier si l'étudiant a des inscriptions antérieures (Réinscription vs Inscription)
+        // Règle d'or : Un élève déjà présent dans le système pour une session antérieure est un ancien élève (Réinscription).
+        // Il ne paie JAMAIS les frais d'inscription initiale, mais les frais de réinscription (qui peuvent être 0 si l'école ne le recommande pas).
+        const isReturning = Boolean(
+          (otherEnrollments && otherEnrollments.length > 0) ||
+          (allEnrollments && allEnrollments.length > 1) ||
+          (allEnrollments && allEnrollments.some((e: any) => e.academic_year_id !== yearId)) ||
+          data.has_previous_enrollment
+        );
+        const hasPreviousEnrollment = isReturning;
         
         const baseDueHTG = plan ? Number(plan.tuition_fee || 0) : 0;
         const baseDueUSD = plan ? Number(plan.tuition_fee_usd || 0) * currentExchangeRate : 0;
@@ -1168,10 +1228,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         
         // Logique de frais d'entrée (Inscription vs Réinscription)
         const inscriptionHTG_val = plan 
-          ? (hasPreviousEnrollment ? Number(plan.reenrollment_fee || 0) : Number(plan.inscription_fee || 0))
+          ? (hasPreviousEnrollment ? Number(plan.reenrollment_fee ?? 0) : Number(plan.inscription_fee ?? 0))
           : 0;
         const inscriptionUSD_val = plan 
-          ? (hasPreviousEnrollment ? Number(plan.reenrollment_fee_usd || 0) : Number(plan.inscription_fee_usd || 0))
+          ? (hasPreviousEnrollment ? Number(plan.reenrollment_fee_usd ?? 0) : Number(plan.inscription_fee_usd ?? 0))
           : 0;
 
         // Calculs multi-devises rigoureux avec respect des règlements antérieurs
@@ -1420,7 +1480,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           plan: plan,
           adHocCampaigns: campaignsList,
           isNotEnrolledInTargetYear: !enrollment,
-          otherEnrollments: otherEnrollments
+          otherEnrollments: otherEnrollments,
+          isReenrollment: isReturning,
+          hasPreviousEnrollment: isReturning,
+          isReturning: isReturning
         });
         setParentPhoneCustom(data.parent_phone || data.phone || '');
         setIsLocked(true);
@@ -1918,7 +1981,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const mappedType = isAdHoc 
           ? (adHocCampaign ? `Campagne: ${adHocCampaign.name}` : 'Frais de Campagne')
           : feeType === 'SCOLARITE' ? terminology.tuition 
-          : feeType === 'INSCRIPTION' ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription")
+          : feeType === 'INSCRIPTION' ? (selectedStudent.isReenrollment ? 'Frais de Réinscription' : "Frais d'Inscription")
           : feeType === 'CREDIT_PORTEFEUILLE' ? 'Recharge Portefeuille Élève'
           : 'Frais Divers Obligatoires';
 
@@ -2521,7 +2584,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     {feeType.startsWith('ADHOC_') 
                       ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
                       : feeType === 'INSCRIPTION' 
-                      ? (selectedStudent.inscriptionDue === (selectedStudent.plan?.reenrollment_fee || 0) ? 'Frais de Réinscription' : "Frais d'Inscription") 
+                      ? (selectedStudent.isReenrollment ? 'Frais de Réinscription' : "Frais d'Inscription") 
                       : feeType === 'SCOLARITE' 
                       ? `Frais de Scolarité (${terminology.tuition})` 
                       : feeType === 'DIVERS'
@@ -2780,8 +2843,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   const isInscriptionForced = selectedStudent && !selectedStudent.inscriptionIsPaid && (
-    ((selectedStudent.inscriptionDue || 0) > (selectedStudent.inscriptionPaid || 0) + 450) || 
-    ((selectedStudent.inscriptionRemainingUSD || 0) > 3.00)
+    (((selectedStudent.inscriptionDue || 0) > 0) && ((selectedStudent.inscriptionDue || 0) > (selectedStudent.inscriptionPaid || 0) + 450)) || 
+    (((selectedStudent.inscriptionUSD || 0) > 0) && ((selectedStudent.inscriptionRemainingUSD || 0) > 3.00))
   );
   const miscRemainingDueHTG = selectedStudent?.miscRemainingHTGEquiv !== undefined
     ? Number(selectedStudent.miscRemainingHTGEquiv || 0)
@@ -3212,7 +3275,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         Priorité
                       </span>
                       <span className="text-xs font-bold text-rose-950">
-                        Frais d’inscription non soldés
+                        {selectedStudent.isReenrollment ? 'Frais de réinscription non soldés' : 'Frais d’inscription non soldés'}
                       </span>
                       <span className="text-xs font-mono font-black text-rose-700 bg-rose-100 px-2 py-0.5 rounded border border-rose-200">
                         {(() => {
@@ -3230,7 +3293,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </span>
                     </div>
                     <p className="text-xs text-rose-900/80 mt-1">
-                      Le solde d'inscription doit être intégralement réglé avant toute imputation sur la scolarité.
+                      {selectedStudent.isReenrollment 
+                        ? "Le solde de réinscription doit être intégralement réglé avant toute imputation sur la scolarité."
+                        : "Le solde d'inscription doit être intégralement réglé avant toute imputation sur la scolarité."}
                     </p>
                   </div>
                 </div>
@@ -3639,10 +3704,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <CheckCircle2 className="text-blue-600 mt-0.5 shrink-0" size={16} />
                         <div>
                           <p className="text-[11px] sm:text-xs text-blue-900 font-semibold leading-relaxed">
-                            <strong className="font-bold">Dossier Conforme (Aucun Arriéré) :</strong> L'{terminology.student.toLowerCase()} n'a aucune dette sur les sessions antérieures. Le montant saisi sera imputé directement aux frais d'inscription de la session courante ({activeYear?.label || 'Session active'}).
+                            <strong className="font-bold">Dossier Conforme (Aucun Arriéré) :</strong> L'{terminology.student.toLowerCase()} n'a aucune dette sur les sessions antérieures. Le montant saisi sera imputé directement {selectedStudent.isReenrollment ? 'aux frais de réinscription' : "aux frais d'inscription"} de la session courante ({activeYear?.label || 'Session active'}).
                           </p>
                           <p className="text-[10.5px] text-blue-700 mt-0.5">
-                            Frais d'inscription de la session : {(selectedStudent.inscriptionDue || 2500).toLocaleString()} HTG.
+                            {selectedStudent.isReenrollment ? 'Frais de réinscription de la session : ' : "Frais d'inscription de la session : "}
+                            {selectedStudent.inscriptionDue === 0 ? 'Exonéré / 0 HTG (Offert)' : `${(selectedStudent.inscriptionDue ?? 0).toLocaleString()} HTG`}.
                           </p>
                         </div>
                       </div>

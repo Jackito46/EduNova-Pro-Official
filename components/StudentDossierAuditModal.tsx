@@ -27,6 +27,7 @@ import {
   TrendingUp,
   Banknote
 } from 'lucide-react';
+import { AcademicSessionPill } from './AcademicSessionPill';
 
 export interface SessionAuditDetail {
   academicYearId: string;
@@ -291,10 +292,35 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const studentCode = student.code || student.reference_number || (student.id ? student.id.substring(0, 8) : 'N/A');
   const isNotEnrolledCurrent = Boolean(student.isNotEnrolledInTargetYear);
   const safeSessions = sessions || [];
-  const currentSession = safeSessions.find(s => s.isCurrentSession);
+  const currentSession = safeSessions.find(s => s.academicYearId === activeYear?.id || s.isCurrentSession);
   const pastSessions = safeSessions.filter(s => !s.isCurrentSession && !s.isFutureSession);
   const futureSessions = safeSessions.filter(s => s.isFutureSession && !s.isCurrentSession);
   const isSolventHistory = globalDebt === 0;
+
+  // Détection rigoureuse : Ancien élève réinscrit vs Nouvel élève (Première inscription)
+  const isReturningStudent = Boolean(
+    student.isReenrollment || 
+    student.hasPreviousEnrollment || 
+    (student.otherEnrollments && student.otherEnrollments.length > 0) ||
+    pastSessions.length > 0 ||
+    safeSessions.some(s => !s.isCurrentSession && !s.isFutureSession)
+  );
+
+  const admissionFeeDue = (student.inscriptionDue !== undefined && student.inscriptionDue !== null)
+    ? Number(student.inscriptionDue)
+    : (currentSession?.inscriptionDue !== undefined ? Number(currentSession.inscriptionDue) : 0);
+
+  const selectedSessionDue = currentSession?.totalDue !== undefined && currentSession.totalDue > 0
+    ? currentSession.totalDue 
+    : (student.totalDue || 0);
+
+  const selectedSessionPaid = currentSession?.totalPaid !== undefined && currentSession.totalPaid > 0
+    ? currentSession.totalPaid 
+    : (student.paid || 0);
+
+  const selectedSessionRemaining = currentSession?.remainingDebt !== undefined
+    ? currentSession.remainingDebt
+    : (student.totalRemaining || 0);
 
   // Nom de l'établissement et de l'annexe (Multi-tenant & Multi-annexe)
   const institutionName = school?.name || school?.school_name || 'Établissement';
@@ -324,7 +350,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                     : 'bg-rose-50 text-rose-700 border-rose-200'
                 }`}>
-                  {isSolventHistory ? 'Historique Soldé' : `Arriéré : ${globalDebt.toLocaleString()} HTG`}
+                  {isSolventHistory ? 'Historique Antérieur Soldé' : `Arriéré Passé : ${globalDebt.toLocaleString()} HTG`}
                 </span>
                 {isNotEnrolledCurrent && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
@@ -370,6 +396,84 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
             >
               <X size={18} />
             </button>
+          </div>
+        </div>
+
+        {/* BANDEAU SESSION SÉLECTIONNÉE & MONTANTS DU GUICHET */}
+        <div className="px-4 sm:px-6 py-2.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 border-b border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          {/* Sélecteur de session et badge Admission */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+              <Calendar size={13} className="text-blue-600 shrink-0" />
+              <span>Session Sélectionnée :</span>
+            </div>
+            {academicYears && academicYears.length > 0 && onSelectYear ? (
+              <AcademicSessionPill
+                academicYears={academicYears}
+                selectedYearId={activeYear?.id || ''}
+                onSelectYear={(newYr) => onSelectYear(newYr)}
+                variant="compact"
+                size="xs"
+                colorScheme="blue"
+              />
+            ) : (
+              <span className="px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-900 font-black text-xs border border-blue-200">
+                {activeYear?.label || 'Session Active'}
+              </span>
+            )}
+
+            {/* Distinction Réinscription (Ancien) vs Inscription (Nouveau) */}
+            {isReturningStudent ? (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100/90 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
+                <Sparkles size={10} className="text-emerald-600 shrink-0" />
+                <span>Réinscription (Ancien Élève)</span>
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100/90 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
+                <span>Nouvelle Inscription</span>
+              </span>
+            )}
+
+            {admissionFeeDue === 0 && (
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
+                Frais d'entrée : 0 HTG (Offert / Exonéré)
+              </span>
+            )}
+          </div>
+
+          {/* Chiffres clés pour la session sélectionnée */}
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs">
+            <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center gap-1.5" title="Montant total exigible pour la session sélectionnée">
+              <span className="text-[10px] text-slate-500 font-bold uppercase">Attendu Session :</span>
+              <span className="font-mono font-black text-slate-900">{selectedSessionDue.toLocaleString()} HTG</span>
+            </div>
+
+            <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center gap-1.5" title="Montant total encaissé pour la session sélectionnée">
+              <span className="text-[10px] text-emerald-700 font-bold uppercase">Encaissé :</span>
+              <span className="font-mono font-black text-emerald-600">{selectedSessionPaid.toLocaleString()} HTG</span>
+            </div>
+
+            <div className={`px-2.5 py-1 rounded-lg border shadow-2xs flex items-center gap-1.5 ${
+              selectedSessionRemaining <= 0 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
+                : 'bg-rose-50 text-rose-800 border-rose-200'
+            }`} title="Solde restant pour la session sélectionnée">
+              <span className="text-[10px] font-bold uppercase opacity-80">Reste Session :</span>
+              <span className="font-mono font-black">
+                {selectedSessionRemaining <= 0 ? '0 HTG (Soldé)' : `${selectedSessionRemaining.toLocaleString()} HTG`}
+              </span>
+            </div>
+
+            <div className={`px-2.5 py-1 rounded-lg border shadow-2xs flex items-center gap-1.5 ${
+              globalDebt <= 0 
+                ? 'bg-slate-50 text-slate-600 border-slate-200' 
+                : 'bg-amber-50 text-amber-900 border-amber-200'
+            }`} title="Dette arriérée cumulée sur les sessions antérieures">
+              <span className="text-[10px] font-bold uppercase opacity-80">Arriérés :</span>
+              <span className="font-mono font-black">
+                {globalDebt <= 0 ? '0 HTG (À jour)' : `${globalDebt.toLocaleString()} HTG`}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -433,12 +537,16 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
               {/* CARTES KPI VISUELLES : LES 4 POSTES DE FRAIS */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                 
-                {/* 1. Inscription / Entrée */}
+                {/* 1. Inscription / Réinscription */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Inscription</span>
-                      <span className="text-[9px] font-bold text-slate-400">Entrée</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
+                        {isReturningStudent ? 'Réinscription' : 'Inscription'}
+                      </span>
+                      <span className="text-[9px] font-bold text-slate-400">
+                        {isReturningStudent ? 'Ancien Élève' : 'Entrée'}
+                      </span>
                     </div>
                     <div className="mt-1">
                       <p className="text-lg font-black font-mono text-slate-900 leading-none">
@@ -453,7 +561,9 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                   <div className="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
                     <span className="text-slate-400">Attendu :</span>
-                    <span className="font-mono font-bold text-slate-700">{(student.inscriptionDue || 2500).toLocaleString()} HTG</span>
+                    <span className="font-mono font-bold text-slate-700">
+                      {admissionFeeDue === 0 ? 'Exonéré (0 HTG)' : `${admissionFeeDue.toLocaleString()} HTG`}
+                    </span>
                   </div>
                 </div>
 
@@ -657,12 +767,14 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
 
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Frais d'Inscription</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
+                      {isReturningStudent ? 'Frais de Réinscription' : "Frais d'Inscription"}
+                    </span>
                     <span className="text-sm font-black font-mono text-slate-900 mt-0.5 block">
-                      {(student.inscriptionDue || 2500).toLocaleString()} HTG
+                      {admissionFeeDue === 0 ? 'Exonéré (0 HTG)' : `${admissionFeeDue.toLocaleString()} HTG`}
                     </span>
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
-                      {isNotEnrolledCurrent ? "En attente" : "Acquitté"}
+                      {admissionFeeDue === 0 ? "Offert / Sans frais" : (student.inscriptionIsPaid ? "Acquitté" : (isNotEnrolledCurrent ? "En attente" : "Solde en cours"))}
                     </span>
                   </div>
 

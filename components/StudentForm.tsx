@@ -39,6 +39,10 @@ import { SelectPill } from './SelectPill';
 import { DatePickerPill } from './DatePickerPill';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
 import { MonCashService } from '../services/moncashService';
+import { 
+  calculateEnrollmentPricing, 
+  detectReturningStudentStatus 
+} from '../utils/enrollmentFeeCalculator';
 
 const InfoTooltip = ({ content, title }: { content: string; title?: string }) => {
   const [isOpen, setIsOpen] = useState(false);
@@ -176,6 +180,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [targetYearId, setTargetYearId] = useState<string>('');
   const [dbClasses, setDbClasses] = useState<SchoolClass[]>([]);
   const [dbFees, setDbFees] = useState<any[]>([]);
+  const [studentPriorEnrollments, setStudentPriorEnrollments] = useState<any[]>([]);
   const [loadingRefs, setLoadingRefs] = useState(true);
 
   // Multi-campus / Annexe state selection within form
@@ -442,6 +447,20 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             setSelectedCampusId(student.campus_id);
           }
 
+          // Détection automatique du statut d'inscription antérieure
+          try {
+            const { data: enrs } = await supabase
+              .from('enrollments')
+              .select('id, academic_year_id, status, academic_year:academic_years(id, label, status)')
+              .eq('school_id', user.school_id)
+              .eq('student_id', id);
+            if (enrs && enrs.length > 0) {
+              setStudentPriorEnrollments(enrs);
+            }
+          } catch (enrErr) {
+            console.warn("Échec récupération historique inscriptions élève:", enrErr);
+          }
+
           let debtValue = 0;
           try {
             const { data: realDebt, error: rpcError } = await supabase.rpc('get_student_global_debt', { p_student_id: id });
@@ -632,27 +651,29 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     return groups;
   }, [classesForStep, classSearchTerm]);
 
+  const isReturningStudent = useMemo(() => {
+    return detectReturningStudentStatus({
+      isExplicitReenroll: isReenroll,
+      studentId: id,
+      targetYearId: targetYearId || null,
+      priorEnrollments: studentPriorEnrollments,
+      allEnrollments: studentPriorEnrollments
+    });
+  }, [isReenroll, id, targetYearId, studentPriorEnrollments]);
+
   const currentPricing = useMemo(() => {
     const plan = dbFees.find(f => f.class_id === formData.selectedClassId);
-    if (!plan) return { exists: false, inscription: { amount: 0, currency: 'HTG' }, tuition: { amount: 0, currency: 'HTG' }, miscFee: { amount: 0, currency: 'HTG' }, isMiscMandatory: false };
-
-    const inscription = isReenroll ? (plan.reenrollment_fee || 0) : (plan.inscription_fee || 0);
-    const inscription_usd = isReenroll ? (plan.reenrollment_fee_usd || 0) : (plan.inscription_fee_usd || 0);
-    
-    const tuition = (plan.tuition_fee || 0);
-    const tuition_usd = (plan.tuition_fee_usd || 0);
-    
-    const miscFee = plan.misc_fee_htg || 0;
-    const miscFee_usd = plan.misc_fee_usd || 0;
-
-    return { 
-      inscription: inscription_usd > 0 ? { amount: inscription_usd, currency: 'USD' } : { amount: inscription, currency: 'HTG' },
-      tuition: tuition_usd > 0 ? { amount: tuition_usd, currency: 'USD' } : { amount: tuition, currency: 'HTG' },
-      miscFee: miscFee_usd > 0 ? { amount: miscFee_usd, currency: 'USD' } : { amount: miscFee, currency: 'HTG' },
-      isMiscMandatory: plan.is_misc_mandatory || false,
-      exists: true 
-    };
-  }, [formData.selectedClassId, dbFees, isReenroll]);
+    return calculateEnrollmentPricing(plan || null, {
+      statusInput: {
+        isExplicitReenroll: isReenroll,
+        studentId: id,
+        targetYearId: targetYearId || null,
+        priorEnrollments: studentPriorEnrollments,
+        allEnrollments: studentPriorEnrollments
+      },
+      exchangeRate: 140
+    });
+  }, [formData.selectedClassId, dbFees, isReenroll, id, targetYearId, studentPriorEnrollments]);
 
   // Synchroniser la devise d'encaissement avec la devise définie pour les frais de la classe
   useEffect(() => {
@@ -920,7 +941,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             studentName: `${formData.firstName} ${formData.lastName}`.trim(),
             studentCode: targetStudentId.substring(0, 8).toUpperCase(),
             studentClass: selectedClass?.name || 'Réinscription',
-            feeTypeLabel: isReenroll ? 'Frais de Réinscription' : "Frais d'Inscription",
+            feeTypeLabel: isReturningStudent ? 'Frais de Réinscription' : "Frais d'Inscription",
             redirectUrl,
             payerPhone: moncashPayerPhone || formData.parentPhone || formData.phone,
             initiatedAt: new Date().toISOString(),
@@ -957,8 +978,8 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           amount_htg_equivalent: equivalentHtgToSave,
           exchange_rate_applied: actualExchangeRate || 140,
           currency: paymentCurrency,
-          nature: "Frais d'inscription",
-          type: 'Inscription',
+          nature: isReturningStudent ? "Frais de réinscription" : "Frais d'inscription",
+          type: isReturningStudent ? 'Réinscription' : 'Inscription',
           fee_type: 'INSCRIPTION',
           method: inscriptionPaymentMethod,
           payment_method: inscriptionPaymentMethod,
@@ -1962,7 +1983,19 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </div>
 
                         {currentPricing.exists ? (
-                          <div className="space-y-2">
+                          <div className="space-y-2.5">
+                            {/* Badge Profil Élève : Nouveau vs Ancien Réinscrit */}
+                            <div className="flex items-center justify-between p-2 rounded-lg bg-slate-100/80 border border-slate-200 text-xs">
+                              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Statut Élève :</span>
+                              <span className={`px-2 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider ${
+                                currentPricing.isReturningStudent
+                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                  : 'bg-blue-100 text-blue-800 border border-blue-300'
+                              }`}>
+                                {currentPricing.isReturningStudent ? 'Ancien Élève (Réinscription)' : 'Nouvel Élève (Inscription)'}
+                              </span>
+                            </div>
+
                             <div className="flex justify-between items-center text-xs py-1 border-b border-slate-200/60">
                               <span className="text-slate-600 font-medium">{terminology.tuition} Annuelle :</span>
                               <span className="font-bold text-slate-900 font-mono">
@@ -1971,11 +2004,45 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </div>
 
                             <div className="flex justify-between items-center text-xs py-1 border-b border-slate-200/60">
-                              <span className="text-slate-600 font-medium">{isReenroll ? 'Frais de Réinscription :' : "Frais d'Inscription :"}</span>
-                              <span className={`font-bold font-mono ${isReenroll && currentPricing.inscription.amount === 0 ? 'text-emerald-600' : 'text-slate-900'}`}>
-                                {isReenroll && currentPricing.inscription.amount === 0 ? 'OFFERT (0 HTG)' : `${currentPricing.inscription.amount.toLocaleString()} ${currentPricing.inscription.currency}`}
+                              <span className="text-slate-600 font-medium">{currentPricing.feeLabel} :</span>
+                              <span className={`font-bold font-mono ${currentPricing.applicableAdmissionFee.isZero ? 'text-emerald-600' : 'text-slate-900'}`}>
+                                {currentPricing.applicableAdmissionFee.isZero 
+                                  ? 'OFFERT (0 HTG)' 
+                                  : `${currentPricing.applicableAdmissionFee.amount.toLocaleString()} ${currentPricing.applicableAdmissionFee.currency}`}
                               </span>
                             </div>
+
+                            {/* Différentiel et économie accordée pour ancien élève */}
+                            {currentPricing.isReturningStudent && (
+                              <div className="p-2.5 rounded-lg bg-emerald-50/70 border border-emerald-200/90 text-xs space-y-1">
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-slate-500">Tarif Nouveaux Élèves :</span>
+                                  <span className="font-mono line-through text-slate-400">
+                                    {currentPricing.standardInscriptionFee.displayString}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between text-[11px]">
+                                  <span className="text-emerald-800 font-bold">Tarif Réinscription :</span>
+                                  <span className="font-mono font-black text-emerald-700">
+                                    {currentPricing.applicableAdmissionFee.displayString}
+                                  </span>
+                                </div>
+                                {currentPricing.difference.hasAdvantage && (
+                                  <div className="pt-1 border-t border-emerald-200/60 text-[10.5px] text-emerald-900 font-semibold flex items-center justify-between">
+                                    <span>Avantage Ancien Élève :</span>
+                                    <span className="px-1.5 py-0.5 rounded bg-emerald-200/70 text-emerald-900 font-bold">
+                                      {currentPricing.difference.badgeLabel}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {currentPricing.applicableAdmissionFee.isZero && (
+                              <div className="p-2 rounded-lg bg-blue-50/80 border border-blue-200 text-[11px] text-blue-900 font-medium">
+                                ℹ️ Frais d'entrée fixés à 0 HTG par l'administration (aucun blocage à l'admission).
+                              </div>
+                            )}
 
                             {currentPricing.miscFee.amount > 0 && (
                               <div className="flex justify-between items-center text-xs py-1 border-b border-slate-200/60">
@@ -2235,7 +2302,23 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </div>
                   </div>
 
-                  {/* Immediate Payment Option */}
+                  {/* Immediate Payment Option or Zero Fee Banner */}
+                  {!isEdit && currentPricing.inscription.amount === 0 && (
+                    <div className="bg-emerald-50/80 rounded-xl p-3.5 sm:p-4 border border-emerald-200/90 flex items-start gap-3 shadow-2xs">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200">
+                        <CheckCircle2 size={18} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-black text-emerald-950">
+                          {isReturningStudent ? 'Frais de Réinscription : Offerts / Exonérés (0 HTG)' : "Frais d'Inscription : Exonérés (0 HTG)"}
+                        </h4>
+                        <p className="text-[11px] text-emerald-800 font-medium mt-0.5">
+                          L'administration scolaire a fixé les frais d'entrée à 0 HTG. Le dossier peut être validé et scellé immédiatement sans aucun encaissement d'inscription.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
                   {!isEdit && currentPricing.inscription.amount > 0 && (
                     <div className="bg-white rounded-xl p-3.5 sm:p-4 border border-slate-200/80 space-y-3 shadow-2xs">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
@@ -2246,7 +2329,7 @@ const StudentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <div>
                             <div className="flex items-center gap-2">
                               <h4 className="text-xs font-black text-slate-900">
-                                {isReenroll ? 'Règlement Immédiat des Frais de Réinscription' : "Règlement Immédiat des Frais d'Inscription"}
+                                {isReturningStudent ? 'Règlement Immédiat des Frais de Réinscription' : "Règlement Immédiat des Frais d'Inscription"}
                               </h4>
                               <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                                 {currentPricing.inscription.amount.toLocaleString()} {currentPricing.inscription.currency}
