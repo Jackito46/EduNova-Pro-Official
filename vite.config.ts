@@ -123,6 +123,53 @@ export default defineConfig(({ mode }) => {
                   return 'vendor-ui';
                 }
               }
+
+              // Découpage modulaire des vues applicatives volumineuses pour accélérer le premier chargement
+              if (
+                id.includes('/components/FinancialAuditView') || 
+                id.includes('/components/StudentCurrencyDiagnosticView') || 
+                id.includes('/components/StudentCurrencyDiagnosticModal') || 
+                id.includes('/components/ReportsView') || 
+                id.includes('/components/ReportCardsView')
+              ) {
+                return 'views-reports';
+              }
+
+              if (
+                id.includes('/components/PaymentHistoryList') || 
+                id.includes('/components/StudentPaymentTracking') || 
+                id.includes('/components/AccountStatementView') || 
+                id.includes('/components/TuitionPaymentForm') || 
+                id.includes('/components/ReceiptManagementView') || 
+                id.includes('/components/FinanceHub') ||
+                id.includes('/components/PayrollManagementView') ||
+                id.includes('/components/ExpensesView') ||
+                id.includes('/components/SuppliesView') ||
+                id.includes('/components/AdHocCampaignsView')
+              ) {
+                return 'views-finance';
+              }
+
+              if (
+                id.includes('/components/SettingsView') || 
+                id.includes('/components/PrinterSettingsTab') || 
+                id.includes('/components/PaymentMethodManager') || 
+                id.includes('/components/UserManagementView') || 
+                id.includes('/components/SuperAdminDashboard') ||
+                id.includes('/components/SystemHealthView')
+              ) {
+                return 'views-admin';
+              }
+
+              if (
+                id.includes('/components/StudentDetailView') || 
+                id.includes('/components/StudentForm') || 
+                id.includes('/components/StudentList') || 
+                id.includes('/components/ClassManagement') || 
+                id.includes('/components/ClassSubjectManager')
+              ) {
+                return 'views-academic';
+              }
             }
           }
         }
