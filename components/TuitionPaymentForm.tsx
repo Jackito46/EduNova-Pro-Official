@@ -775,14 +775,32 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         return;
       }
 
-      // 2. Audit rigoureux et exhaustif de chaque session antérieure
+      // 2. Audit rigoureux et exhaustif de chaque session antérieure ou future
       const sessionAudits: SessionAuditDetail[] = [];
       let cumulativePastDebt = 0;
+      const targetYearObj = academicYears.find(y => y.id === targetYearId) || activeYear;
 
       for (const enr of priorEnrollments) {
         const yearLabel = enr.academic_year?.label || 'Session Antérieure';
         const clsName = enr.class?.name || 'Classe Historique';
         const lvl = enr.class?.level || 'N/A';
+        const enrYearStatus = enr.academic_year?.status;
+
+        // Détection formelle d'une session FUTURE (en préparation) vs session PASSÉE (archive)
+        let isFutureSession = false;
+        if (enrYearStatus === 'FUTURE') {
+          isFutureSession = true;
+        } else if (targetYearObj?.label && enr.academic_year?.label) {
+          const parseStartYear = (lbl: string) => {
+            const m = String(lbl).match(/(\d{4})/);
+            return m ? parseInt(m[1], 10) : 0;
+          };
+          const targetStart = parseStartYear(targetYearObj.label);
+          const enrStart = parseStartYear(enr.academic_year.label);
+          if (targetStart > 0 && enrStart > targetStart) {
+            isFutureSession = true;
+          }
+        }
 
         // Plan tarifaire de la session passée
         let pastPlan: any = null;
@@ -882,7 +900,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const isSolvent = sessionRemaining <= 50;
         const trueRemaining = isSolvent ? 0 : Math.round(sessionRemaining);
 
-        cumulativePastDebt += trueRemaining;
+        // Seules les sessions ANTÉRIEURES (passées) génèrent des arriérés historiques !
+        // Une session FUTURE (en préparation) n'est jamais une dette échue / arriérée.
+        if (!isFutureSession) {
+          cumulativePastDebt += trueRemaining;
+        }
 
         sessionAudits.push({
           academicYearId: enr.academic_year_id,
@@ -890,6 +912,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           className: clsName,
           level: lvl,
           isCurrentSession: false,
+          isFutureSession,
           isEnrolled: true,
           inscriptionDue: pastAdmBal.effectiveDueHTG,
           inscriptionPaid: pastAdmBal.paidHTGEquiv,
@@ -907,7 +930,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           totalDue: Math.round(sessionTotalDue),
           totalPaid: Math.round(sessionTotalPaid),
           remainingDebt: trueRemaining,
-          isSolvent
+          isSolvent: isFutureSession ? true : isSolvent
         });
       }
 
@@ -3637,10 +3660,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <CheckCircle2 className="text-emerald-600 mt-0.5 shrink-0" size={16} />
                         <div>
                           <p className="text-[11px] sm:text-xs text-emerald-900 font-medium leading-relaxed">
-                            <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est 100% en règle pour l'ensemble des sessions antérieures ({selectedStudent.otherEnrollments.length} session(s) précédente(s)). Aucun arriéré à apurer.
+                            <strong className="font-bold">Solvabilité Certifiée :</strong> L'{terminology.student.toLowerCase()} est 100% en règle pour l'ensemble des sessions antérieures. Aucun arriéré à apurer.
                           </p>
                           <p className="text-[10.5px] text-emerald-700 mt-0.5">
-                            Le versement sera intégralement imputé à la session active ({activeYear?.label || 'Session active'}).
+                            {selectedStudent.otherEnrollments.some((e: any) => e.academic_year?.status === 'FUTURE')
+                              ? `Élève également pré-inscrit(e) pour la future session (${selectedStudent.otherEnrollments.find((e: any) => e.academic_year?.status === 'FUTURE')?.academic_year?.label || 'Prochaine session'}).`
+                              : `Le versement sera intégralement imputé à la session active (${activeYear?.label || 'Session active'}).`}
                           </p>
                         </div>
                       </div>

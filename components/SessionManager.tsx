@@ -338,6 +338,30 @@ export default function SessionManager({ user, schoolData, years, onRefresh }: S
             if (rpcError) throw rpcError;
           }
         }
+
+        // Synchronisation automatique de la classe des élèves réinscrits pour la session activée
+        try {
+          const { data: enrolledStudents } = await supabase
+            .from('enrollments')
+            .select('student_id, class_id')
+            .eq('academic_year_id', yearId)
+            .eq('school_id', user.school_id)
+            .not('class_id', 'is', null);
+
+          if (enrolledStudents && enrolledStudents.length > 0) {
+            for (const item of enrolledStudents) {
+              if (item.student_id && item.class_id) {
+                await supabase
+                  .from('students')
+                  .update({ class_id: item.class_id })
+                  .eq('id', item.student_id)
+                  .eq('school_id', user.school_id);
+              }
+            }
+          }
+        } catch (syncErr) {
+          console.warn("Synchronisation des classes lors de l'activation:", syncErr);
+        }
       } else {
         const isActiveState = status === 'ACTIVE';
         const { error } = await supabase

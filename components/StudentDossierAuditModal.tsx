@@ -34,6 +34,7 @@ export interface SessionAuditDetail {
   className: string;
   level: string;
   isCurrentSession: boolean;
+  isFutureSession?: boolean;
   isEnrolled: boolean;
   inscriptionDue: number;
   inscriptionPaid: number;
@@ -291,7 +292,8 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const isNotEnrolledCurrent = Boolean(student.isNotEnrolledInTargetYear);
   const safeSessions = sessions || [];
   const currentSession = safeSessions.find(s => s.isCurrentSession);
-  const pastSessions = safeSessions.filter(s => !s.isCurrentSession);
+  const pastSessions = safeSessions.filter(s => !s.isCurrentSession && !s.isFutureSession);
+  const futureSessions = safeSessions.filter(s => s.isFutureSession && !s.isCurrentSession);
   const isSolventHistory = globalDebt === 0;
 
   // Nom de l'établissement et de l'annexe (Multi-tenant & Multi-annexe)
@@ -756,6 +758,63 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                 )}
               </div>
+
+              {/* SESSIONS FUTURES (EN PRÉPARATION) */}
+              {futureSessions.length > 0 && (
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles size={13} className="text-indigo-600" />
+                      <span className="text-xs font-bold text-indigo-950">
+                        Future(s) Session(s) — Pré-inscription ({futureSessions.length})
+                      </span>
+                    </div>
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full">
+                      Frais prévisionnels (Non exigibles avant rentrée)
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {futureSessions.map((session, idx) => (
+                      <div 
+                        key={session.academicYearId || idx}
+                        className="p-3 rounded-xl border border-indigo-200/90 bg-indigo-50/30 space-y-2"
+                      >
+                        <div className="flex items-center justify-between gap-2 border-b border-indigo-100 pb-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-black text-indigo-950">{session.academicYearLabel}</span>
+                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-1.5 py-0.2 rounded font-mono">
+                              {session.className} ({session.level})
+                            </span>
+                          </div>
+                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
+                            Session en Préparation
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
+                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase">Inscription / Réinsc.</span>
+                            <span className="font-mono font-bold text-slate-800 text-[11px]">{session.inscriptionDue.toLocaleString()} HTG</span>
+                          </div>
+                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
+                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase">Scolarité Prévue</span>
+                            <span className="font-mono font-bold text-slate-800 text-[11px]">{session.tuitionDue.toLocaleString()} HTG</span>
+                          </div>
+                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
+                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase">Frais Divers</span>
+                            <span className="font-mono font-bold text-slate-800 text-[11px]">{session.miscDue.toLocaleString()} HTG</span>
+                          </div>
+                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
+                            <span className="text-[8.5px] text-indigo-600 font-bold block uppercase">Total Prévisionnel</span>
+                            <span className="font-mono font-black text-indigo-900 text-[11px]">{session.totalDue.toLocaleString()} HTG</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
             </div>
           )}
