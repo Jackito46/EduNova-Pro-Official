@@ -249,6 +249,11 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
       const isCampaignPayment = (p: any) => Boolean(
         p.ad_hoc_campaign_id ||
         p.fee_type === 'AD_HOC' ||
+        p.fee_type === 'CAMPAGNE' ||
+        p.fee_type === 'CAMPAIGN' ||
+        (p.nature || '').toLowerCase().includes('campagne') ||
+        (p.type || '').toLowerCase().includes('campagne') ||
+        (p.description || '').toLowerCase().includes('campagne') ||
         (adHocRes.data || []).some((fee: any) => {
           const cName = (fee.campaign?.name || '').toLowerCase();
           const nat = (p.nature || p.label || p.type || p.description || '').toLowerCase();

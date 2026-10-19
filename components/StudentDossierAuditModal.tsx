@@ -317,6 +317,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
         const refStr = String(tx?.reference_number || tx?.transaction_reference || tx?.id || '').toLowerCase();
         const motifTitle = (motif.title || '').toLowerCase();
         const methodStr = String(tx?.payment_method || '').toLowerCase();
+        const amountStr = String(tx?.amount ?? tx?.paid_amount ?? tx?.total_amount ?? '').toLowerCase();
         return dateStr.includes(q) || refStr.includes(q) || motifTitle.includes(q) || methodStr.includes(q) || amountStr.includes(q);
       }
 

@@ -212,12 +212,14 @@ BEGIN
       AND fee_type = 'INSCRIPTION'
       AND (status IS NULL OR status NOT IN ('ANNULE', 'ANNULÉ'));
 
-    -- Calculer ce qui a déjà été payé en Divers
+    -- Calculer ce qui a déjà été payé en Divers (en excluant formellement les règlements de campagnes ad-hoc)
     SELECT COALESCE(SUM(amount_htg_equivalent), 0) INTO v_misc_paid
     FROM public.payments
     WHERE student_id = NEW.student_id 
       AND academic_year_id = NEW.academic_year_id 
       AND fee_type = 'DIVERS'
+      AND ad_hoc_campaign_id IS NULL
+      AND (nature IS NULL OR (nature NOT ILIKE '%campagne%' AND nature NOT ILIKE '%adhoc%'))
       AND (status IS NULL OR status NOT IN ('ANNULE', 'ANNULÉ'));
 
     -- RÈGLE 1 : L'inscription doit être payée en premier
@@ -449,17 +451,21 @@ BEGIN
             v_adm_paid_usd := v_adm_paid_usd + p_usd_val;
             v_adm_paid_htg := v_adm_paid_htg + p_htg_val;
 
-        -- B. Frais Divers
-        ELSIF r_pay.fee_type = 'DIVERS' 
-              OR r_pay.nature ILIKE '%divers%' THEN
+        -- B. Campagnes Ad Hoc (Priorité sur 'DIVERS' pour lier tout versement de campagne)
+        ELSIF r_pay.ad_hoc_campaign_id IS NOT NULL 
+              OR r_pay.fee_type IN ('AD_HOC', 'CAMPAGNE', 'CAMPAIGN') 
+              OR r_pay.nature ILIKE '%campagne%' 
+              OR r_pay.nature ILIKE '%adhoc%' 
+              OR r_pay.type ILIKE '%campagne%' 
+              OR r_pay.description ILIKE '%campagne%' THEN
+            v_adhoc_paid_htg := v_adhoc_paid_htg + p_htg_val;
+
+        -- C. Frais Divers Obligatoires
+        ELSIF (r_pay.fee_type = 'DIVERS' OR r_pay.nature ILIKE '%divers%') 
+              AND r_pay.ad_hoc_campaign_id IS NULL 
+              AND (r_pay.nature IS NULL OR r_pay.nature NOT ILIKE '%campagne%') THEN
             v_misc_paid_usd := v_misc_paid_usd + p_usd_val;
             v_misc_paid_htg := v_misc_paid_htg + p_htg_val;
-
-        -- C. Campagnes Ad Hoc
-        ELSIF r_pay.ad_hoc_campaign_id IS NOT NULL 
-              OR r_pay.fee_type = 'AD_HOC' 
-              OR r_pay.nature ILIKE '%adhoc%' THEN
-            v_adhoc_paid_htg := v_adhoc_paid_htg + p_htg_val;
 
         -- D. Scolarité (par défaut)
         ELSE

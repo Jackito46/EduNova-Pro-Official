@@ -350,6 +350,9 @@ export const StudentCurrencyDiagnosticView: React.FC<StudentCurrencyDiagnosticVi
   const tauxActuel = exchangeRate > 0 ? exchangeRate : 148;
   const isFullyPaid = currentProfile.paymentScenario === 'FULL_TODAY';
 
+  // Calculs scellés réels
+  const receipts = currentProfile.receipts;
+
   const hasPaidCampaign = currentProfile.fixedFees.some(f => (f.name.toLowerCase().includes('campagne') || f.name.toLowerCase().includes('activité')) && f.paid) ||
     receipts.some(r => r.rubrique === 'Campagnes' || r.nature.toLowerCase().includes('campagne'));
 
@@ -358,8 +361,6 @@ export const StudentCurrencyDiagnosticView: React.FC<StudentCurrencyDiagnosticVi
   const totalFixeHTG = currentProfile.fixedFees.reduce((acc, f) => acc + f.amount, 0);
   const totalDuTheoriqueGlobal = totalFixeHTG + totalTheoriqueFraisUSD;
 
-  // Calculs scellés réels
-  const receipts = currentProfile.receipts;
   const totalScelleReelGlobal = receipts.reduce((acc, r) => acc + r.scelleHTG, 0);
   const totalTheoriqueReconduit = receipts.reduce((acc, r) => acc + r.theoriqueHTG, 0);
   const totalEcartChangeAbsorbe = totalTheoriqueReconduit - totalScelleReelGlobal;
