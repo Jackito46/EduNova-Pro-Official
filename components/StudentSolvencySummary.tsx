@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { 
   CreditCard, ShieldCheck, CheckCircle2, AlertCircle, Clock, 
@@ -16,6 +16,11 @@ export interface StudentSolvencySummaryProps {
   academicYearId?: string;
   className?: string;
   onPaymentSuccess?: () => void;
+  onSolvencyLoaded?: (data: SolvencyData) => void;
+  preloadedPayments?: any[];
+  preloadedStudent?: any;
+  preloadedEnrollments?: any[];
+  preloadedCampaigns?: any[];
 }
 
 export interface SolvencyData {
@@ -40,6 +45,11 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
   studentName,
   academicYearId,
   className = '',
+  onSolvencyLoaded,
+  preloadedPayments,
+  preloadedStudent,
+  preloadedEnrollments,
+  preloadedCampaigns,
 }) => {
   const navigate = useNavigate();
   const { terminology } = useSchool();
@@ -49,6 +59,14 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
   const [resolvedYearId, setResolvedYearId] = useState<string | undefined>(academicYearId);
   const [data, setData] = useState<SolvencyData | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Évite les boucles infinies de re-render via une référence stable
+  const onSolvencyLoadedRef = useRef(onSolvencyLoaded);
+  useEffect(() => {
+    onSolvencyLoadedRef.current = onSolvencyLoaded;
+  }, [onSolvencyLoaded]);
+
+  const isCalculatingRef = useRef(false);
 
   const calculateSolvency = useCallback(async (isSilent = false) => {
     if (!studentId || !schoolId) return;
@@ -105,45 +123,59 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
       }
 
       // 3. Charger l'élève, ses inscriptions et sa classe effective
-      const [
-        studentRes,
-        enrollmentRes,
-        allEnrollmentsRes,
-        adHocRes
-      ] = await Promise.all([
-        supabase
-          .from('students')
-          .select('id, discount_amount, discount_type, class_id')
-          .eq('id', studentId)
-          .eq('school_id', schoolId)
-          .single(),
-        targetYearId
-          ? supabase
-              .from('enrollments')
-              .select('class_id, academic_year_id, tuition_discount, tuition_addition')
-              .eq('student_id', studentId)
-              .eq('academic_year_id', targetYearId)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        supabase
-          .from('enrollments')
-          .select('academic_year_id')
-          .eq('student_id', studentId),
-        supabase
-          .from('student_ad_hoc_fees')
-          .select(`
-            custom_amount,
-            campaign:ad_hoc_campaigns!campaign_id(id, amount, currency, academic_year_id, status)
-          `)
-          .eq('student_id', studentId)
-          .eq('school_id', schoolId)
-      ]);
+      let studentRecord = preloadedStudent || null;
+      let enrollmentRecord = preloadedEnrollments ? (
+        preloadedEnrollments.find((e: any) => e.academic_year_id === targetYearId) || preloadedEnrollments[0] || null
+      ) : null;
+      let previousEnrollments = preloadedEnrollments || [];
+      let adHocFeesList = preloadedCampaigns || null;
 
-      const studentRecord = studentRes.data;
-      const enrollmentRecord = enrollmentRes.data;
-      const previousEnrollments = allEnrollmentsRes.data || [];
+      if (!studentRecord || !enrollmentRecord || !adHocFeesList) {
+        const [
+          studentRes,
+          enrollmentRes,
+          allEnrollmentsRes,
+          adHocRes
+        ] = await Promise.all([
+          !studentRecord ? supabase
+            .from('students')
+            .select('id, discount_amount, discount_type, class_id')
+            .eq('id', studentId)
+            .eq('school_id', schoolId)
+            .maybeSingle() : Promise.resolve({ data: studentRecord }),
+          (!enrollmentRecord && targetYearId)
+            ? supabase
+                .from('enrollments')
+                .select('class_id, academic_year_id, tuition_discount, tuition_addition')
+                .eq('student_id', studentId)
+                .eq('academic_year_id', targetYearId)
+                .maybeSingle()
+            : Promise.resolve({ data: enrollmentRecord }),
+          (previousEnrollments.length === 0)
+            ? supabase
+                .from('enrollments')
+                .select('academic_year_id')
+                .eq('student_id', studentId)
+            : Promise.resolve({ data: previousEnrollments }),
+          (!adHocFeesList)
+            ? supabase
+                .from('student_ad_hoc_fees')
+                .select(`
+                  custom_amount,
+                  campaign:ad_hoc_campaigns!campaign_id(id, amount, currency, academic_year_id, status)
+                `)
+                .eq('student_id', studentId)
+                .eq('school_id', schoolId)
+            : Promise.resolve({ data: adHocFeesList })
+        ]);
+
+        if (!studentRecord) studentRecord = studentRes.data;
+        if (!enrollmentRecord) enrollmentRecord = enrollmentRes.data;
+        if (previousEnrollments.length === 0) previousEnrollments = allEnrollmentsRes.data || [];
+        if (!adHocFeesList) adHocFeesList = adHocRes.data || [];
+      }
+
       const isReenrolled = previousEnrollments.length > 1;
-
       const effectiveClassId = enrollmentRecord?.class_id || classId || studentRecord?.class_id;
 
       // 4. Charger le plan tarifaire (fee_plans)
@@ -175,19 +207,23 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         }
       }
 
-      // 5. Charger tous les paiements réels de l'élève depuis la table payments
-      let payQuery = supabase
-        .from('payments')
-        .select('*')
-        .eq('student_id', studentId)
-        .eq('school_id', schoolId)
-        .order('created_at', { ascending: false });
+      // 5. Récupérer les paiements valides (instantanément depuis preloadedPayments si dispo)
+      let rawPaymentsData = preloadedPayments;
+      if (!rawPaymentsData) {
+        let payQuery = supabase
+          .from('payments')
+          .select('*')
+          .eq('student_id', studentId)
+          .eq('school_id', schoolId)
+          .order('created_at', { ascending: false });
 
-      const { data: paymentsData, error: payError } = await payQuery;
-      if (payError) throw payError;
+        const { data: paymentsData, error: payError } = await payQuery;
+        if (payError) throw payError;
+        rawPaymentsData = paymentsData || [];
+      }
 
       // Filtrer les paiements valides (non annulés, non rejetés)
-      const validPayments = (paymentsData || []).filter((p: any) => {
+      const validPayments = (rawPaymentsData || []).filter((p: any) => {
         const status = String(p.status || '').toUpperCase();
         if (status.includes('ANNUL') || status.includes('REJET') || status.includes('CANCEL')) return false;
         const method = String(p.payment_method || '').toUpperCase();
@@ -254,7 +290,7 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         (p.nature || '').toLowerCase().includes('campagne') ||
         (p.type || '').toLowerCase().includes('campagne') ||
         (p.description || '').toLowerCase().includes('campagne') ||
-        (adHocRes.data || []).some((fee: any) => {
+        (adHocFeesList || []).some((fee: any) => {
           const cName = (fee.campaign?.name || '').toLowerCase();
           const nat = (p.nature || p.label || p.type || p.description || '').toLowerCase();
           return cName && nat && (nat.includes(cName) || (cName.includes('assurance') && nat.includes('assurance')));
@@ -292,7 +328,7 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
       let adHocPaid = 0;
       let adHocRemaining = 0;
 
-      (adHocRes.data || []).forEach((fee: any) => {
+      (adHocFeesList || []).forEach((fee: any) => {
         if (!targetYearId || !fee.campaign?.academic_year_id || fee.campaign?.academic_year_id === targetYearId) {
           const cAmt = fee.custom_amount !== null && fee.custom_amount !== undefined
             ? Number(fee.custom_amount)
@@ -335,7 +371,7 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         solvencyStatus = 'UNPAID';
       }
 
-      setData({
+      const solvencyResult: SolvencyData = {
         totalExpected,
         totalDiscount,
         netDue,
@@ -348,7 +384,12 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         lastPaymentAmount,
         academicYearLabel: targetYearLabel,
         exchangeRate
-      });
+      };
+
+      setData(solvencyResult);
+      if (onSolvencyLoadedRef.current) {
+        onSolvencyLoadedRef.current(solvencyResult);
+      }
     } catch (err: any) {
       console.error("Erreur calcul solvabilité en temps réel:", err);
       setError("Impossible d'auditer la solvabilité financière en temps réel.");
@@ -356,7 +397,7 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [studentId, schoolId, classId, academicYearId]);
+  }, [studentId, schoolId, classId, academicYearId, preloadedPayments, preloadedStudent, preloadedEnrollments, preloadedCampaigns]);
 
   useEffect(() => {
     calculateSolvency();
