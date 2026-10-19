@@ -1465,7 +1465,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                   Audit Devise
                 </span>
                 <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded border border-amber-400/30">
-                  Christelle (NS II) • ID: 9f18c76c...
+                  Augustin Djenny (NS II) • ID: c3b12a55...
                 </span>
                 <span className="text-[9.5px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded-full font-bold border border-emerald-400/30">
                   Écart Amorti (+640 G)
@@ -1488,7 +1488,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </button>
             <button
               type="button"
-              onClick={() => navigate('/economat/diagnostic?student_id=9f18c76c-7592-4549-82c4-d1fcc2ee8b0d')}
+              onClick={() => navigate('/economat/diagnostic?student_id=c3b12a55-d5d1-460b-8a7d-c8eed32a727c')}
               className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/20 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
             >
               <span>Plein Écran</span>
@@ -1778,8 +1778,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         <StudentCurrencyDiagnosticModal
           isOpen={isDiagnosticModalOpen}
           onClose={() => setIsDiagnosticModalOpen(false)}
-          studentId="9f18c76c-7592-4549-82c4-d1fcc2ee8b0d"
-          studentName="DESROSIERS Christelle"
+          studentId="c3b12a55-d5d1-460b-8a7d-c8eed32a727c"
+          studentName="AUGUSTIN Djenny"
           studentClass="NS II"
           currentExchangeRate={148}
         />

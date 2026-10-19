@@ -30,8 +30,8 @@ export interface StudentCurrencyDiagnosticModalProps {
 export const StudentCurrencyDiagnosticModal: React.FC<StudentCurrencyDiagnosticModalProps> = ({
   isOpen,
   onClose,
-  studentId = '9f18c76c-7592-4549-82c4-d1fcc2ee8b0d',
-  studentName = 'DESROSIERS Christelle',
+  studentId = 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c',
+  studentName = 'AUGUSTIN Djenny',
   studentClass = 'NS II',
   academicYearLabel = '2025-2026',
   currentExchangeRate = 148,

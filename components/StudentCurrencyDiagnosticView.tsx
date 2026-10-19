@@ -68,9 +68,9 @@ interface BenchmarkProfile {
 // Profils de référence révisés avec le scénario "Tout payé aujourd'hui"
 const BENCHMARK_PROFILES: BenchmarkProfile[] = [
   {
-    id: '9f18c76c-7592-4549-82c4-d1fcc2ee8b0d-full',
-    fullName: 'DESROSIERS Christelle',
-    studentCode: 'DES-2026-9F18',
+    id: 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c',
+    fullName: 'AUGUSTIN Djenny',
+    studentCode: 'AUG-2026-C3B1',
     class: 'NS II',
     usdFeeName: 'Frais Divers Obligatoires',
     usdFeeTotal: 200,
@@ -153,14 +153,14 @@ const BENCHMARK_PROFILES: BenchmarkProfile[] = [
     ]
   },
   {
-    id: '9f18c76c-7592-4549-82c4-d1fcc2ee8b0d-partial',
-    fullName: 'DESROSIERS Christelle',
-    studentCode: 'DES-2026-9F18',
+    id: 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c-partial',
+    fullName: 'AUGUSTIN Djenny',
+    studentCode: 'AUG-2026-C3B1',
     class: 'NS II',
     usdFeeName: 'Frais Divers Obligatoires',
     usdFeeTotal: 200,
     paymentScenario: 'PARTIAL',
-    description: 'Paiement partiel (Scolarité 65 000 G en cours)',
+    description: 'Paiement partiel (Scolarité 65 000 G en attente)',
     receipts: [
       {
         date: '21/08/2026',
@@ -322,8 +322,14 @@ export const StudentCurrencyDiagnosticView: React.FC<StudentCurrencyDiagnosticVi
 
   // Profil actif
   const currentProfile = useMemo(() => {
-    const found = BENCHMARK_PROFILES.find(p => p.id === selectedProfileId);
-    if (found) return found;
+    if (selectedProfileId) {
+      const found = BENCHMARK_PROFILES.find(p => 
+        p.id.toLowerCase() === selectedProfileId.toLowerCase() ||
+        p.id.toLowerCase().startsWith(selectedProfileId.toLowerCase()) ||
+        selectedProfileId.toLowerCase().startsWith(p.id.toLowerCase())
+      );
+      if (found) return found;
+    }
     return BENCHMARK_PROFILES[0];
   }, [selectedProfileId]);
 

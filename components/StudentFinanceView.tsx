@@ -858,9 +858,9 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         <StudentCurrencyDiagnosticModal
           isOpen={isDiagnosticOpen}
           onClose={() => setIsDiagnosticOpen(false)}
-          studentId={studentData?.id || '9f18c76c-7592-4549-82c4-d1fcc2ee8b0d'}
-          studentName={studentData ? `${studentData.last_name} ${studentData.first_name}` : 'DESROSIERS Christelle'}
-          studentClass="NS II"
+          studentId={studentData?.id || 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c'}
+          studentName={studentData ? `${studentData.last_name} ${studentData.first_name}` : 'AUGUSTIN Djenny'}
+          studentClass={studentData?.class?.name || 'NS II'}
           currentExchangeRate={exchangeRate}
         />
       )}
