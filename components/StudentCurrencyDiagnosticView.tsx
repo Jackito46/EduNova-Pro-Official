@@ -201,12 +201,26 @@ const BENCHMARK_PROFILES: BenchmarkProfile[] = [
         ecartHTG: 0,
         isToday: true,
         status: 'VALIDE'
+      },
+      {
+        date: '18/10/2026',
+        ref: 'RCP-7D120B44',
+        nature: 'Campagnes & Activités Parascolaires',
+        rubrique: 'Campagnes',
+        originalAmount: 2500,
+        originalCurrency: 'HTG',
+        rateApplied: null,
+        scelleHTG: 2500,
+        theoriqueHTG: 2500,
+        ecartHTG: 0,
+        isToday: true,
+        status: 'VALIDE'
       }
     ],
     fixedFees: [
       { name: 'Inscription Administrative', amount: 2500, paid: true, ref: 'RCP-80221E37', date: '21/08/2026' },
       { name: 'Scolarité Contrat Annuel', amount: 65000, paid: false, ref: 'En attente' },
-      { name: 'Campagnes & Activités', amount: 2500, paid: false, ref: 'En attente' }
+      { name: 'Campagnes & Activités', amount: 2500, paid: true, ref: 'RCP-7D120B44', date: '18/10/2026', isToday: true }
     ]
   },
   {
@@ -336,6 +350,9 @@ export const StudentCurrencyDiagnosticView: React.FC<StudentCurrencyDiagnosticVi
   const tauxActuel = exchangeRate > 0 ? exchangeRate : 148;
   const isFullyPaid = currentProfile.paymentScenario === 'FULL_TODAY';
 
+  const hasPaidCampaign = currentProfile.fixedFees.some(f => (f.name.toLowerCase().includes('campagne') || f.name.toLowerCase().includes('activité')) && f.paid) ||
+    receipts.some(r => r.rubrique === 'Campagnes' || r.nature.toLowerCase().includes('campagne'));
+
   // Calculs financiers
   const totalTheoriqueFraisUSD = currentProfile.usdFeeTotal * tauxActuel;
   const totalFixeHTG = currentProfile.fixedFees.reduce((acc, f) => acc + f.amount, 0);
@@ -399,6 +416,12 @@ export const StudentCurrencyDiagnosticView: React.FC<StudentCurrencyDiagnosticVi
                 Paiement Partiel
               </span>
             )}
+            {hasPaidCampaign && (
+              <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 text-[10px] font-black uppercase tracking-wider border border-purple-300 flex items-center gap-1">
+                <Sparkles size={11} className="text-purple-700" />
+                Campagne Réglée (RCP-7D120B44)
+              </span>
+            )}
           </div>
         </div>
 
@@ -459,6 +482,12 @@ export const StudentCurrencyDiagnosticView: React.FC<StudentCurrencyDiagnosticVi
             <span className="text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-md flex items-center gap-1">
               <CheckCircle2 size={11} /> Barème ${currentProfile.usdFeeTotal}.00 USD Honoré (100%)
             </span>
+            {hasPaidCampaign && (
+              <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-400/30 px-2 py-0.5 rounded-md flex items-center gap-1">
+                <Sparkles size={11} className="text-purple-300" />
+                Frais Campagnes Détectés (2 500 HTG Soldés)
+              </span>
+            )}
             {isFullyPaid && (
               <span className="text-[10px] font-bold bg-blue-500/20 text-blue-300 border border-blue-400/30 px-2 py-0.5 rounded-md">
                 Scolarité Soldée le 18/10/2026

@@ -780,10 +780,24 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         p.status !== 'ANNULE'
       );
 
-      const curAdmPayments = curPayments.filter(p => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
-      const curMiscPayments = curPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
-      const curTuitionPayments = curPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
-      const curCampaignPayments = curPayments.filter(p => !!p.ad_hoc_campaign_id);
+      const isCampPay = (p: any) => Boolean(
+        p.ad_hoc_campaign_id || 
+        p.campaign_id || 
+        p.campaign?.id ||
+        (p.fee_type || '').toUpperCase() === 'AD_HOC' ||
+        (p.fee_type || '').toUpperCase() === 'CAMPAGNE' ||
+        (p.fee_type || '').toUpperCase() === 'CAMPAIGN' ||
+        (p.rubrique || '').toLowerCase().includes('campagne') ||
+        (p.nature || '').toLowerCase().includes('campagne') ||
+        (p.nature || '').toLowerCase().includes('parascolaire') ||
+        (p.type || '').toLowerCase().includes('campagne') ||
+        (p.description || '').toLowerCase().includes('campagne')
+      );
+
+      const curCampaignPayments = curPayments.filter(p => isCampPay(p));
+      const curAdmPayments = curPayments.filter(p => !isCampPay(p) && isAdmissionPayment(p));
+      const curMiscPayments = curPayments.filter(p => !isCampPay(p) && !isAdmissionPayment(p) && isMiscPayment(p));
+      const curTuitionPayments = curPayments.filter(p => !isCampPay(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
       const curAdmHTG = currentPlan ? (hasPrior ? Number(currentPlan.reenrollment_fee ?? 0) : Number(currentPlan.inscription_fee ?? 0)) : 0;
       const curAdmUSD = currentPlan ? (hasPrior ? Number(currentPlan.reenrollment_fee_usd ?? 0) : Number(currentPlan.inscription_fee_usd ?? 0)) : 0;
@@ -801,10 +815,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       const curTuitionBal = computeFeeCategoryBalance(curTuitionHTG, curTuitionUSD, curTuitionPayments, currentExchangeRate, curTotalDiscount);
 
       const curAdHocPaid = curCampaignPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || (p.currency === 'USD' ? p.amount * currentExchangeRate : p.amount) || 0), 0);
-      const curAdHocDue = (currentCampaigns || []).reduce((acc: number, c: any) => {
+      let curAdHocDue = (currentCampaigns || []).reduce((acc: number, c: any) => {
         const amt = Number(c.amount || 0);
         return acc + (c.currency === 'USD' ? amt * currentExchangeRate : amt);
       }, 0);
+      if (curAdHocDue === 0 && curAdHocPaid > 0) {
+        curAdHocDue = curAdHocPaid;
+      }
 
       const curSessionTotalDue = curAdmBal.effectiveDueHTG + curMiscBal.effectiveDueHTG + curTuitionBal.effectiveDueHTG + curAdHocDue;
       const curSessionTotalPaid = curAdmBal.paidHTGEquiv + curMiscBal.paidHTGEquiv + curTuitionBal.paidHTGEquiv + curAdHocPaid;
@@ -956,10 +973,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           return s.includes('divers') || s.includes('misc');
         };
 
-        const pastAdmPayments = pastPayments.filter(p => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
-        const pastMiscPayments = pastPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
-        const pastTuitionPayments = pastPayments.filter(p => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
-        const pastCampaignPayments = pastPayments.filter(p => !!p.ad_hoc_campaign_id);
+        const pastCampaignPayments = pastPayments.filter(p => isCampPay(p));
+        const pastAdmPayments = pastPayments.filter(p => !isCampPay(p) && isAdmissionPayment(p));
+        const pastMiscPayments = pastPayments.filter(p => !isCampPay(p) && !isAdmissionPayment(p) && isMiscPayment(p));
+        const pastTuitionPayments = pastPayments.filter(p => !isCampPay(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
         const pastAdmBal = computeFeeCategoryBalance(pastAdmHTG, pastAdmUSD, pastAdmPayments, currentExchangeRate);
         const pastMiscBal = computeFeeCategoryBalance(pastMiscHTG, pastMiscUSD, pastMiscPayments, currentExchangeRate);
@@ -1266,7 +1283,19 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           };
         }
 
-        const isCampaignPayment = (p: any) => !!p.ad_hoc_campaign_id;
+        const isCampaignPayment = (p: any) => Boolean(
+          p.ad_hoc_campaign_id || 
+          p.campaign_id || 
+          p.campaign?.id ||
+          (p.fee_type || '').toUpperCase() === 'AD_HOC' ||
+          (p.fee_type || '').toUpperCase() === 'CAMPAGNE' ||
+          (p.fee_type || '').toUpperCase() === 'CAMPAIGN' ||
+          (p.rubrique || '').toLowerCase().includes('campagne') ||
+          (p.nature || '').toLowerCase().includes('campagne') ||
+          (p.nature || '').toLowerCase().includes('parascolaire') ||
+          (p.type || '').toLowerCase().includes('campagne') ||
+          (p.description || '').toLowerCase().includes('campagne')
+        );
         const isAdmissionPayment = (p: any) => {
           const feeTypeStr = (p.fee_type || '').toLowerCase();
           const natureStr = (p.nature || '').toLowerCase();

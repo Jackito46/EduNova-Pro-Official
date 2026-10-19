@@ -77,32 +77,52 @@ interface StudentDossierAuditModalProps {
  * Résolution experte du motif précis d'un paiement
  * Permet de distinguer immédiatement les Frais Divers Institutionnels récurrents (HTG)
  * des Frais Spécifiques / Campagnes / Stages (USD ou ponctuels).
+/**
+ * Détection universelle et robuste des règlements de frais de campagne
  */
+export const isCampaignPayment = (tx: any): boolean => {
+  if (!tx) return false;
+  if (tx.ad_hoc_campaign_id || tx.campaign_id || tx.campaign?.id) return true;
+  const ft = (tx.fee_type || '').toUpperCase();
+  if (ft === 'AD_HOC' || ft === 'CAMPAGNE' || ft === 'CAMPAIGN') return true;
+  const rub = (tx.rubrique || '').toLowerCase();
+  if (rub.includes('campagne') || rub.includes('parascolaire')) return true;
+  const nat = (tx.nature || '').toLowerCase();
+  if (nat.includes('campagne') || nat.includes('parascolaire') || nat.includes('ad hoc') || nat.includes('ad_hoc')) return true;
+  const typ = (tx.type || '').toLowerCase();
+  if (typ.includes('campagne') || typ.includes('parascolaire')) return true;
+  const desc = (tx.description || '').toLowerCase();
+  if (desc.includes('campagne') || desc.includes('parascolaire')) return true;
+  return false;
+};
+
 export const resolvePaymentMotif = (tx: any, terminology: any) => {
   const natureStr = (tx.nature || '').trim();
   const typeStr = (tx.type || '').trim();
   const descStr = (tx.description || '').trim();
   const ft = (tx.fee_type || '').toUpperCase();
-  const isUSD = tx.currency === 'USD';
+  const genericTerms = ['frais divers', 'divers', 'scolarite', 'scolarité', 'inscription', 'droits de scolarité'];
 
-  // 1. Campagne Ad-Hoc rattachée explicitement
-  if (tx.campaign?.name) {
+  // 1. Campagne Ad-Hoc rattachée explicitement ou identifiée par son libellé
+  if (tx.campaign?.name || isCampaignPayment(tx)) {
+    const title = tx.campaign?.name || (natureStr && !genericTerms.includes(natureStr.toLowerCase()) ? natureStr : (descStr || typeStr || 'Campagnes & Activités Parascolaires'));
     return {
-      title: tx.campaign.name,
-      category: 'Frais Spécifique / Campagne',
+      title,
+      category: 'Frais de Campagne & Activités',
       badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-      isSpecial: true
+      isSpecial: true,
+      isCampaign: true
     };
   }
 
   // 2. Si le champ type ou nature contient un libellé spécifique explicite (non générique)
-  const genericTerms = ['frais divers', 'divers', 'scolarite', 'scolarité', 'inscription', 'droits de scolarité'];
   if (natureStr && !genericTerms.includes(natureStr.toLowerCase())) {
     return {
       title: natureStr,
       category: natureStr.toLowerCase().includes('stage') ? 'Stage Académique' : 'Frais Spécifique',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      isSpecial: true
+      isSpecial: true,
+      isCampaign: false
     };
   }
 
@@ -111,7 +131,8 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: typeStr,
       category: typeStr.toLowerCase().includes('stage') ? 'Stage Académique' : 'Frais Spécifique',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      isSpecial: true
+      isSpecial: true,
+      isCampaign: false
     };
   }
 
@@ -121,7 +142,8 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: "Frais d'Inscription / Régularisation d'Entrée",
       category: "Admission & Entrée",
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-      isSpecial: false
+      isSpecial: false,
+      isCampaign: false
     };
   }
 
@@ -130,7 +152,8 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: `${terminology.tuition || 'Scolarité'} (Droits d'études)`,
       category: "Scolarité",
       badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-      isSpecial: false
+      isSpecial: false,
+      isCampaign: false
     };
   }
 
@@ -139,7 +162,8 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: `Alimentation Portefeuille ${terminology.student || 'Élève'}`,
       category: "Portefeuille",
       badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
-      isSpecial: false
+      isSpecial: false,
+      isCampaign: false
     };
   }
 
@@ -150,7 +174,8 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: descStr || typeStr || natureStr || 'Frais Divers Obligatoires',
       category: 'Frais Divers Obligatoires',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      isSpecial: false
+      isSpecial: false,
+      isCampaign: false
     };
   }
 
@@ -158,7 +183,8 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
     title: descStr || typeStr || natureStr || tx.fee_type || 'Frais Scolaires',
     category: 'Règlement',
     badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
-    isSpecial: false
+    isSpecial: false,
+    isCampaign: false
   };
 };
 
@@ -196,6 +222,11 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
 
     let miscPaidHTG = 0;
     let miscPaidUSD = 0;
+
+    let campaignsPaidHTG = 0;
+    let campaignsPaidUSD = 0;
+    let campaignsReceiptCount = 0;
+
     let miscSpecialPaidUSD = 0;
     let miscSpecialPaidHTG = 0;
 
@@ -214,28 +245,34 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       }
       totalPaidHTGEquiv += equiv;
 
+      const isCamp = isCampaignPayment(t);
       const motif = resolvePaymentMotif(t, terminology || {});
       const ft = (t?.fee_type || '').toUpperCase();
       const isMiscFee = ft === 'DIVERS' || (t?.nature || '').toLowerCase().includes('divers') || (t?.type || '').toLowerCase().includes('divers');
 
-      if (ft === 'INSCRIPTION') {
+      if (isCamp) {
+        campaignsReceiptCount++;
+        if (isUSD) campaignsPaidUSD += amt;
+        else campaignsPaidHTG += amt;
+      } else if (ft === 'INSCRIPTION') {
         if (isUSD) inscriptionPaidUSD += amt;
         else inscriptionPaidHTG += amt;
       } else if (ft === 'SCOLARITE') {
         if (isUSD) tuitionPaidUSD += amt;
         else tuitionPaidHTG += amt;
-      } else if (isMiscFee && !motif.isSpecial && !t?.ad_hoc_campaign_id) {
+      } else if (isMiscFee && !motif.isSpecial) {
         // Règlement bimonétaire (HTG & USD) des Frais Divers Obligatoires
         if (isUSD) miscPaidUSD += amt;
         else miscPaidHTG += amt;
       } else {
-        // Campagnes ad-hoc ou prestations spécifiques
+        // Autres prestations spécifiques
         if (isUSD) miscSpecialPaidUSD += amt;
         else miscSpecialPaidHTG += amt;
       }
     }
 
     const hasDualMiscFees = (miscPaidHTG > 0 && miscPaidUSD > 0) || validTxs.filter(t => (t?.fee_type || '').toUpperCase() === 'DIVERS').length >= 2;
+    const campaignsTotalHTGEquiv = campaignsPaidHTG + (campaignsPaidUSD * (currentExchangeRate || 135));
 
     return {
       totalPaidHTG,
@@ -247,6 +284,10 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       tuitionPaidUSD,
       miscPaidHTG,
       miscPaidUSD,
+      campaignsPaidHTG,
+      campaignsPaidUSD,
+      campaignsReceiptCount,
+      campaignsTotalHTGEquiv,
       miscSpecialPaidUSD,
       miscSpecialPaidHTG,
       hasDualMiscFees,
@@ -258,16 +299,16 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const filteredTransactions = useMemo(() => {
     const safeTxs = transactions || [];
     return safeTxs.filter(tx => {
+      const isCamp = isCampaignPayment(tx);
       const motif = resolvePaymentMotif(tx, terminology || {});
-      const isUSD = tx?.currency === 'USD';
       const ft = (tx?.fee_type || '').toUpperCase();
       const isMiscFee = ft === 'DIVERS' || (tx?.nature || '').toLowerCase().includes('divers') || (tx?.type || '').toLowerCase().includes('divers');
 
       // Filtre catégorie
       if (txFilter === 'INSCRIPTION' && ft !== 'INSCRIPTION') return false;
-      if (txFilter === 'SCOLARITE' && ft !== 'SCOLARITE') return false;
-      if (txFilter === 'DIVERS' && (!isMiscFee || motif.isSpecial || tx?.ad_hoc_campaign_id)) return false;
-      if (txFilter === 'SPECIFIQUES' && (isMiscFee && !motif.isSpecial && !tx?.ad_hoc_campaign_id)) return false;
+      if (txFilter === 'SCOLARITE' && (ft !== 'SCOLARITE' || isCamp)) return false;
+      if (txFilter === 'DIVERS' && (!isMiscFee || motif.isSpecial || isCamp)) return false;
+      if (txFilter === 'SPECIFIQUES' && (!isCamp && !motif.isSpecial)) return false;
 
       // Filtre recherche textuelle
       if (searchTx.trim()) {
@@ -276,8 +317,6 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
         const refStr = String(tx?.reference_number || tx?.transaction_reference || tx?.id || '').toLowerCase();
         const motifTitle = (motif.title || '').toLowerCase();
         const methodStr = String(tx?.payment_method || '').toLowerCase();
-        const amountStr = String(tx?.amount || '');
-
         return dateStr.includes(q) || refStr.includes(q) || motifTitle.includes(q) || methodStr.includes(q) || amountStr.includes(q);
       }
 
@@ -296,6 +335,14 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const pastSessions = safeSessions.filter(s => !s.isCurrentSession && !s.isFutureSession);
   const futureSessions = safeSessions.filter(s => s.isFutureSession && !s.isCurrentSession);
   const isSolventHistory = globalDebt === 0;
+
+  // Calculs spécifiques des campagnes & activités pour cet élève
+  const campaignPaidHTGEquiv = analysis.campaignsTotalHTGEquiv > 0 
+    ? analysis.campaignsTotalHTGEquiv 
+    : (analysis.miscSpecialPaidHTG + (analysis.miscSpecialPaidUSD * (currentExchangeRate || 135)));
+  const campaignExpectedHTG = Number(student?.campaignsFee || student?.adHocDue || currentSession?.adHocDue || (campaignPaidHTGEquiv > 0 ? campaignPaidHTGEquiv : 0));
+  const campaignRemainingHTG = Math.max(0, campaignExpectedHTG - campaignPaidHTGEquiv);
+  const isCampaignPaid = campaignExpectedHTG > 0 ? (campaignRemainingHTG <= 50) : (campaignPaidHTGEquiv > 0);
 
   // Détection rigoureuse : Ancien élève réinscrit vs Nouvel élève (Première inscription)
   const isReturningStudent = Boolean(
@@ -616,37 +663,55 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                 </div>
 
-                {/* 4. Frais Spécifiques (Campagnes & Options) */}
-                <div className="bg-purple-50/30 p-3 rounded-xl border border-purple-200/80 shadow-2xs hover:border-purple-300 transition-all flex flex-col justify-between">
+                {/* 4. Frais de Campagnes & Activités Parascolaires */}
+                <div className="bg-purple-50/40 p-3 rounded-xl border border-purple-200/90 shadow-2xs hover:border-purple-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-700">Frais Spécifiques</span>
-                      <span className="text-[9px] font-bold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded border border-purple-200">Campagnes & Options</span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-800">Campagnes & Activités</span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
+                        isCampaignPaid 
+                          ? 'text-emerald-800 bg-emerald-100/90 border-emerald-300' 
+                          : 'text-purple-700 bg-purple-100/80 border-purple-200'
+                      }`}>
+                        {isCampaignPaid ? 'Soldé (Reçu Détecté)' : (campaignPaidHTGEquiv > 0 ? 'Partiel' : 'En attente')}
+                      </span>
                     </div>
                     <div className="mt-1">
                       <p className="text-lg font-black font-mono text-purple-950 leading-none">
-                        {analysis.miscSpecialPaidUSD > 0 ? (
+                        {analysis.campaignsPaidHTG > 0 ? (
                           <>
-                            ${analysis.miscSpecialPaidUSD.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">USD</span>
+                            {analysis.campaignsPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
+                          </>
+                        ) : analysis.campaignsPaidUSD > 0 ? (
+                          <>
+                            ${analysis.campaignsPaidUSD.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">USD</span>
+                          </>
+                        ) : campaignPaidHTGEquiv > 0 ? (
+                          <>
+                            {campaignPaidHTGEquiv.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
                           </>
                         ) : (
                           <>
-                            {analysis.miscSpecialPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
+                            0 <span className="text-xs font-sans font-semibold text-slate-400">HTG</span>
                           </>
                         )}
                       </p>
-                      {analysis.miscSpecialPaidUSD > 0 && analysis.miscSpecialPaidHTG > 0 && (
+                      {analysis.campaignsPaidUSD > 0 && analysis.campaignsPaidHTG > 0 && (
                         <p className="text-xs font-mono font-bold text-purple-800 mt-0.5">
-                          + {analysis.miscSpecialPaidHTG.toLocaleString()} HTG
+                          + ${analysis.campaignsPaidUSD.toLocaleString()} USD
                         </p>
                       )}
-                      <p className="text-[10px] text-purple-500/80 mt-0.5">Prestations optionnelles</p>
+                      <p className="text-[10px] text-purple-700 font-medium mt-0.5">
+                        {analysis.campaignsReceiptCount > 0 
+                          ? `${analysis.campaignsReceiptCount} reçu(s) de campagne scellé(s)` 
+                          : 'Activités & cotisations ciblées'}
+                      </p>
                     </div>
                   </div>
                   <div className="mt-2.5 pt-1.5 border-t border-purple-100 flex items-center justify-between text-[10.5px]">
-                    <span className="text-purple-600">Total :</span>
+                    <span className="text-purple-700 font-medium">Attendu :</span>
                     <span className="font-mono font-bold text-purple-950">
-                      {(analysis.miscSpecialPaidHTG + (analysis.miscSpecialPaidUSD * (currentExchangeRate || 135))).toLocaleString()} HTG
+                      {campaignExpectedHTG === 0 && campaignPaidHTGEquiv === 0 ? '0 HTG (Non assigné)' : `${campaignExpectedHTG.toLocaleString()} HTG`}
                     </span>
                   </div>
                 </div>
@@ -765,7 +830,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
                     <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
                       {isReturningStudent ? 'Frais de Réinscription' : "Frais d'Inscription"}
@@ -795,6 +860,16 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     </span>
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
                       Payé : {(student.miscPaid || 0).toLocaleString()} HTG
+                    </span>
+                  </div>
+
+                  <div className="bg-purple-50/50 p-2.5 rounded-lg border border-purple-200/80">
+                    <span className="text-[9px] font-bold text-purple-700 uppercase tracking-wider block">Campagnes & Activités</span>
+                    <span className="text-sm font-black font-mono text-purple-950 mt-0.5 block">
+                      {campaignPaidHTGEquiv.toLocaleString()} HTG
+                    </span>
+                    <span className="text-[10px] text-purple-600 mt-0.5 block font-medium">
+                      {isCampaignPaid ? 'Soldé (Acquitté)' : `Dû : ${campaignRemainingHTG.toLocaleString()} HTG`}
                     </span>
                   </div>
 
@@ -994,7 +1069,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                       txFilter === 'SPECIFIQUES' ? 'bg-purple-700 text-white' : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
                     }`}
                   >
-                    Campagnes & Options
+                    Campagnes & Activités ({analysis.campaignsReceiptCount})
                   </button>
                 </div>
               </div>

@@ -422,7 +422,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       const isCampaignPayment = (p: any) => Boolean(
         p.ad_hoc_campaign_id || 
+        p.campaign_id ||
         p.fee_type === 'AD_HOC' || 
+        (p.fee_type || '').toUpperCase() === 'CAMPAGNE' ||
+        (p.fee_type || '').toUpperCase() === 'CAMPAIGN' ||
+        (p.rubrique || '').toLowerCase().includes('campagne') ||
+        (p.nature || '').toLowerCase().includes('campagne') ||
+        (p.nature || '').toLowerCase().includes('parascolaire') ||
+        (p.type || '').toLowerCase().includes('campagne') ||
+        (p.description || '').toLowerCase().includes('campagne') ||
         p.campaign?.id ||
         activeCampaigns.some((c: any) => {
           const campName = (c.name || '').toLowerCase();
