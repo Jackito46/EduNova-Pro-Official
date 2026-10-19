@@ -444,6 +444,24 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
     };
   }, [id, user?.school_id, fetchStudentData]);
 
+  // Calculs financiers synthétiques pour la mise en avant immédiate (Solde, Paiements, Solvabilité)
+  const validPayments = useMemo(() => {
+    return (payments || []).filter((p: any) => {
+      const st = String(p.status || '').toUpperCase();
+      return !st.includes('ANNUL') && !st.includes('REJET');
+    });
+  }, [payments]);
+
+  const totalPaidHTG = useMemo(() => {
+    return validPayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+  }, [validPayments]);
+
+  const lastPayment = useMemo(() => {
+    return validPayments.length > 0 ? validPayments[0] : null;
+  }, [validPayments]);
+
+  const isDossierSolde = studentDebt <= 0;
+
   const handleNext = () => {
     if (currentIndex < allStudentIds.length - 1) {
       const nextId = allStudentIds[currentIndex + 1];
@@ -617,24 +635,6 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }
 
   const fullName = formatStudentName(student.last_name, student.first_name).fullName;
-
-  // Calculs financiers synthétiques pour la mise en avant immédiate (Solde, Paiements, Solvabilité)
-  const validPayments = useMemo(() => {
-    return (payments || []).filter((p: any) => {
-      const st = String(p.status || '').toUpperCase();
-      return !st.includes('ANNUL') && !st.includes('REJET');
-    });
-  }, [payments]);
-
-  const totalPaidHTG = useMemo(() => {
-    return validPayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
-  }, [validPayments]);
-
-  const lastPayment = useMemo(() => {
-    return validPayments.length > 0 ? validPayments[0] : null;
-  }, [validPayments]);
-
-  const isDossierSolde = studentDebt <= 0;
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-24 px-4 sm:px-6 lg:px-8">
