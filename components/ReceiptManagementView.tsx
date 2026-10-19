@@ -205,44 +205,35 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
-        const { data: classesData } = await supabase.from('classes').select('*').eq('school_id', effectiveSchoolId).order('name');
+        // Exécution en parallèle de toutes les requêtes du module des reçus
+        const [
+          { data: classesData },
+          { data: studentsData, error: stErr },
+          { data: paymentsData, error: payErr },
+          { data: suppliesData, error: supErr }
+        ] = await Promise.all([
+          supabase.from('classes').select('*').eq('school_id', effectiveSchoolId).order('name'),
+          supabase.from('students').select('id, first_name, last_name, class_id, reference_number, phone, parent_phone, campus_id').eq('school_id', effectiveSchoolId),
+          supabase.from('payments').select(`
+            *,
+            campaign:ad_hoc_campaigns(id, name, amount, currency),
+            student:students(id, first_name, last_name, reference_number, class_id, campus_id, class:classes(id, name))
+          `).eq('school_id', effectiveSchoolId).order('created_at', { ascending: false }),
+          supabase.from('school_supplies').select(`
+            *,
+            student:students(id, first_name, last_name, reference_number, class_id, campus_id, class:classes(id, name))
+          `).eq('school_id', effectiveSchoolId).order('created_at', { ascending: false })
+        ]);
+
         if (classesData) {
           setClasses(classesData);
           if (classesData.length > 0) setGenClass(classesData[0].id);
         }
 
-        // Chargement fiable des élèves sans colonne inexistante 'code' (qui causait l'erreur 42703)
-        const { data: studentsData, error: stErr } = await supabase
-          .from('students')
-          .select('id, first_name, last_name, class_id, reference_number, phone, parent_phone, campus_id')
-          .eq('school_id', effectiveSchoolId);
-        
         if (stErr) console.warn("Avertissement chargement élèves:", stErr);
         if (studentsData) setStudents(studentsData);
 
-        // Paiements scellés avec jointure enrichie directe (student, class, campaign)
-        const { data: paymentsData, error: payErr } = await supabase
-          .from('payments')
-          .select(`
-            *,
-            campaign:ad_hoc_campaigns(id, name, amount, currency),
-            student:students(id, first_name, last_name, reference_number, class_id, campus_id, class:classes(id, name))
-          `)
-          .eq('school_id', effectiveSchoolId)
-          .order('created_at', { ascending: false });
-        
         if (payErr) console.warn("Avertissement chargement paiements:", payErr);
-
-        // Récupération et harmonisation des reçus de fournitures scolaires avec jointure élève
-        const { data: suppliesData, error: supErr } = await supabase
-          .from('school_supplies')
-          .select(`
-            *,
-            student:students(id, first_name, last_name, reference_number, class_id, campus_id, class:classes(id, name))
-          `)
-          .eq('school_id', effectiveSchoolId)
-          .order('created_at', { ascending: false });
-
         if (supErr) console.warn("Avertissement chargement fournitures:", supErr);
 
         const groupedHistorySupplies = new Map<string, any>();

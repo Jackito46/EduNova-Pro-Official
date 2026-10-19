@@ -869,6 +869,29 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       let cumulativePastDebt = 0;
       const targetYearObj = academicYears.find(y => y.id === targetYearId) || activeYear;
 
+      // Préchargement groupé (Batch) pour éliminer le goulot d'étranglement des requêtes en boucle
+      const priorClassIds = priorEnrollments.map((e: any) => e.class_id).filter(Boolean);
+      const priorYearIds = priorEnrollments.map((e: any) => e.academic_year_id).filter(Boolean);
+
+      const [batchPlansRes, batchAdHocRes] = await Promise.all([
+        (priorClassIds.length > 0 && priorYearIds.length > 0)
+          ? supabase
+              .from('fee_plans')
+              .select('*')
+              .eq('school_id', user.school_id)
+              .in('class_id', priorClassIds)
+              .in('academic_year_id', priorYearIds)
+          : Promise.resolve({ data: [] }),
+        supabase
+          .from('student_ad_hoc_fees')
+          .select('campaign_id, custom_amount, campaign:ad_hoc_campaigns(id, name, amount, currency, academic_year_id)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', studentData.id)
+      ]);
+
+      const allPriorPlans = (batchPlansRes as any)?.data || [];
+      const pastAdHocFees = (batchAdHocRes as any)?.data || [];
+
       for (const enr of priorEnrollments) {
         const yearLabel = enr.academic_year?.label || 'Session Antérieure';
         const clsName = enr.class?.name || 'Classe Historique';
@@ -891,32 +914,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
-        // Plan tarifaire de la session passée
-        let pastPlan: any = null;
-        if (enr.class_id) {
-          try {
-            const { data: pPlan } = await supabase
-              .from('fee_plans')
-              .select('*')
-              .eq('school_id', user.school_id)
-              .eq('class_id', enr.class_id)
-              .eq('academic_year_id', enr.academic_year_id)
-              .maybeSingle();
-            pastPlan = pPlan;
-            if (!pastPlan) {
-              const { data: fbPlan } = await supabase
-                .from('fee_plans')
-                .select('*')
-                .eq('school_id', user.school_id)
-                .eq('class_id', enr.class_id)
-                .limit(1)
-                .maybeSingle();
-              pastPlan = fbPlan;
-            }
-          } catch (e) {
-            console.warn("Erreur audit plan tarifaire passé:", e);
-          }
-        }
+        // Plan tarifaire de la session passée récupéré instantanément depuis le cache en mémoire
+        const pastPlan: any = allPriorPlans.find((p: any) => p.class_id === enr.class_id && p.academic_year_id === enr.academic_year_id) ||
+                             allPriorPlans.find((p: any) => p.class_id === enr.class_id) || null;
 
         // Paiements passés pour cette session
         const pastPayments = (allPayments || []).filter((p: any) => {
@@ -928,30 +928,22 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           p.status !== 'ANNULE'
         );
 
-        // Frais ad-hoc passés
+        // Frais ad-hoc passés filtrés en mémoire
         let pastAdHocDue = 0;
         let pastAdHocPaid = 0;
-        try {
-          const { data: pastAdHocFees } = await supabase
-            .from('student_ad_hoc_fees')
-            .select('campaign_id, custom_amount, campaign:ad_hoc_campaigns(id, name, amount, currency, academic_year_id)')
-            .eq('school_id', user.school_id)
-            .eq('student_id', studentData.id);
-          
-          if (pastAdHocFees) {
-            const relevantPastAdHocs = (pastAdHocFees as any[]).filter((f: any) => {
-              const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
-              return camp?.academic_year_id === enr.academic_year_id;
-            });
-            for (const f of relevantPastAdHocs) {
-              const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
-              const cAmt = (f.custom_amount !== null && f.custom_amount !== undefined) ? Number(f.custom_amount) : Number(camp?.amount || 0);
-              const cCurr = camp?.currency || 'HTG';
-              const dueHTG = cCurr === 'USD' ? cAmt * (currentExchangeRate || 135) : cAmt;
-              pastAdHocDue += dueHTG;
-            }
+        if (pastAdHocFees && pastAdHocFees.length > 0) {
+          const relevantPastAdHocs = (pastAdHocFees as any[]).filter((f: any) => {
+            const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
+            return camp?.academic_year_id === enr.academic_year_id;
+          });
+          for (const f of relevantPastAdHocs) {
+            const camp = Array.isArray(f.campaign) ? f.campaign[0] : f.campaign;
+            const cAmt = (f.custom_amount !== null && f.custom_amount !== undefined) ? Number(f.custom_amount) : Number(camp?.amount || 0);
+            const cCurr = camp?.currency || 'HTG';
+            const dueHTG = cCurr === 'USD' ? cAmt * (currentExchangeRate || 135) : cAmt;
+            pastAdHocDue += dueHTG;
           }
-        } catch (e) {}
+        }
 
         const pastAdmHTG = pastPlan ? Number(pastPlan.inscription_fee || pastPlan.reenrollment_fee || 0) : 0;
         const pastAdmUSD = pastPlan ? Number(pastPlan.inscription_fee_usd || pastPlan.reenrollment_fee_usd || 0) : 0;
@@ -1060,12 +1052,46 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!yearId) return;
     setLoadingDebt(true);
     try {
-      const { data: dbData } = await supabase
-        .from('students')
-        .select('*, class:classes(id, name, level, campus_id)')
-        .eq('school_id', user.school_id)
-        .eq('id', studentId)
-        .single();
+      // Exécution parallèle haute performance des requêtes nécessaires
+      const [
+        { data: dbData },
+        { data: allEnrollmentsData },
+        { data: pData, error: pErr },
+        { data: campaignsData },
+        { data: assignmentsData }
+      ] = await Promise.all([
+        supabase
+          .from('students')
+          .select('*, class:classes(id, name, level, campus_id)')
+          .eq('school_id', user.school_id)
+          .eq('id', studentId)
+          .single(),
+        supabase
+          .from('enrollments')
+          .select('class_id, academic_year_id, tuition_discount, tuition_addition, class:classes(id, name, level, campus_id), academic_year:academic_years(id, label, status)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', studentId),
+        supabase
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('ad_hoc_campaigns')
+          .select('id, name, amount, currency, campus_id, class_id')
+          .eq('school_id', user.school_id)
+          .eq('academic_year_id', yearId),
+        supabase
+          .from('student_ad_hoc_fees')
+          .select('campaign_id, custom_amount')
+          .eq('school_id', user.school_id)
+          .eq('student_id', studentId)
+      ]);
+
+      if (pErr) {
+        console.error("Erreur pErr payments:", pErr);
+      }
       
       let data = dbData;
       if (!data && studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
@@ -1084,24 +1110,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       if (data) {
         const formatted = formatStudentName(data.last_name, data.first_name);
-        // 1. Essayer de trouver la classe via enrollments pour l'année cible et vérifier les autres inscriptions de l'élève
+        // Résolution immédiate des inscriptions
         let enrollment = null;
         let otherEnrollments: any[] = [];
         let allEnrollments: any[] = [];
-        try {
-          const { data: allEnrollmentsData } = await supabase
-            .from('enrollments')
-            .select('class_id, academic_year_id, tuition_discount, tuition_addition, class:classes(id, name, level, campus_id), academic_year:academic_years(id, label, status)')
-            .eq('school_id', user.school_id)
-            .eq('student_id', studentId);
-          
-          if (allEnrollmentsData && allEnrollmentsData.length > 0) {
-            allEnrollments = allEnrollmentsData;
-            enrollment = allEnrollmentsData.find((e: any) => e.academic_year_id === yearId) || null;
-            otherEnrollments = allEnrollmentsData.filter((e: any) => e.academic_year_id !== yearId);
-          }
-        } catch (e) {
-          console.error("Erreur chargement enrollment:", e);
+        if (allEnrollmentsData && allEnrollmentsData.length > 0) {
+          allEnrollments = allEnrollmentsData;
+          enrollment = allEnrollmentsData.find((e: any) => e.academic_year_id === yearId) || null;
+          otherEnrollments = allEnrollmentsData.filter((e: any) => e.academic_year_id !== yearId);
         }
 
         const effectiveClassId = enrollment?.class_id || data.class_id;
@@ -1120,10 +1136,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             if (campusData) campusName = campusData.name;
           } catch(e) {}
         }
-
-        console.log("DEBUG Guichet - studentId:", studentId);
-        console.log("DEBUG Guichet - yearId:", yearId);
-        console.log("DEBUG Guichet - effectiveClassId:", effectiveClassId);
 
         let plan = null;
         if (effectiveClassId) {
@@ -1166,22 +1178,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
-        let allStudentPayments: any[] = [];
-        try {
-          const { data: pData, error: pErr } = await supabase.from('payments')
-            .select('*, campaign:ad_hoc_campaigns(id, name)')
-            .eq('school_id', user.school_id)
-            .eq('student_id', data.id);
-          
-          if (pData) {
-            allStudentPayments = pData;
-          }
-          if (pErr) {
-            console.error("Erreur pErr payments:", pErr);
-          }
-        } catch (e) {
-          console.error("Erreur chargement paiements:", e);
-        }
+        let allStudentPayments: any[] = pData || [];
+        // Mise à jour immédiate des transactions pour afficher la liste sans délai
+        setAllStudentTransactions(allStudentPayments);
 
         // Si aucun paiement en base pour l'élève repère Augustin Djenny ayant tout réglé aujourd'hui
         if ((!allStudentPayments || allStudentPayments.length === 0) && data.id === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
@@ -1483,29 +1482,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const scolaritePaid = grossTuitionPaid - miscCoverFromTuition;
         
 
-        let allCampaigns: any[] = [];
-        try {
-          const { data: campaignsData } = await supabase
-            .from('ad_hoc_campaigns')
-            .select('id, name, amount, currency, campus_id, class_id')
-            .eq('school_id', user.school_id)
-            .eq('academic_year_id', yearId);
-          allCampaigns = campaignsData || [];
-        } catch(e) {}
-
-        let explicitCampaignCustomAmounts = new Map<string, number | null>();
-        try {
-          const { data: assignmentsData } = await supabase
-            .from('student_ad_hoc_fees')
-            .select('campaign_id, custom_amount')
-            .eq('school_id', user.school_id)
-            .eq('student_id', studentId);
-          if (assignmentsData) {
-            assignmentsData.forEach(a => {
-              explicitCampaignCustomAmounts.set(a.campaign_id, a.custom_amount);
-            });
-          }
-        } catch(e) {}
+        const allCampaigns = campaignsData || [];
+        const explicitCampaignCustomAmounts = new Map<string, number | null>();
+        if (assignmentsData) {
+          assignmentsData.forEach(a => {
+            explicitCampaignCustomAmounts.set(a.campaign_id, a.custom_amount);
+          });
+        }
 
         let currentRemDiscount = remainingDiscountAfterCore;
         const campaignsList = allCampaigns.map(c => {

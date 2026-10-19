@@ -143,36 +143,46 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       }
 
-      // 2. Fetch Enrollments
-      const { data: enrollData } = await supabase
-        .from('enrollments')
-        .select('*, academic_year:academic_years(*), class:classes(*)')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
+      // 2. Fetch Enrollments, Payments, Supplies, Disciplinary and Campaigns en parallèle (Zero Bottleneck)
+      const [
+        { data: enrollData },
+        { data: payData, error: payErr },
+        { data: supplyData },
+        { data: discData },
+        { data: rawCampaignData }
+      ] = await Promise.all([
+        supabase
+          .from('enrollments')
+          .select('*, academic_year:academic_years(*), class:classes(*)')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name)')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('school_supplies')
+          .select('*, item:supply_catalog(name)')
+          .eq('student_id', studentId)
+          .eq('school_id', user.school_id)
+          .gt('paid_amount', 0),
+        supabase
+          .from('disciplinary_records')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('incident_date', { ascending: false }),
+        supabase
+          .from('student_ad_hoc_fees')
+          .select(`
+            id,
+            custom_amount,
+            adjustment_reason,
+            campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year:academic_year_id(label))
+          `)
+          .eq('student_id', studentId)
+      ]);
 
-      if ((!enrollData || enrollData.length === 0) && studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
-        setEnrollments([{
-          id: 'enr-aug-1',
-          student_id: 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c',
-          class_id: 'class-ns-ii',
-          academic_year_id: 'year-2026-2027',
-          academic_year: { id: 'year-2026-2027', label: '2026-2027', is_active: true },
-          class: { id: 'class-ns-ii', name: 'NS II', level: 'Secondaire' },
-          tuition_discount: 0,
-          tuition_addition: 0,
-          created_at: '2026-07-27T11:16:06.709Z'
-        }]);
-      } else {
-        setEnrollments(enrollData || []);
-      }
-
-      // 3. Fetch Payments
-      const { data: payData, error: payErr } = await supabase
-        .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name)')
-        .eq('student_id', studentId)
-        .order('created_at', { ascending: false });
-        
       if (payErr) {
         console.error("Erreur chargement des versements de l'élève:", payErr);
       }
@@ -247,14 +257,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         ];
       }
         
-      // 3.5 Fetch Supply Payments (if any)
-      const { data: supplyData } = await supabase
-        .from('school_supplies')
-        .select('*, item:supply_catalog(name)')
-        .eq('student_id', studentId)
-        .eq('school_id', user.school_id)
-        .gt('paid_amount', 0);
-
+      // 3.5 Fournitures scolaires (déjà préchargées en parallèle)
       const normalizedPayments = [
         ...rawPayments.map((p: any) => {
           let tLabel = p.nature || p.type || p.fee_type || 'Frais Divers';
@@ -312,27 +315,11 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       setPayments(normalizedPayments);
 
-      // 4. Fetch Disciplinary Records
-      const { data: discData } = await supabase
-        .from('disciplinary_records')
-        .select('*')
-        .eq('student_id', studentId)
-        .order('incident_date', { ascending: false });
+      // 4. Disciplinary Records & 5. Ad-Hoc Campaigns (déjà préchargés)
       setDisciplinaryRecords(discData || []);
 
-      // 5. Fetch Ad-Hoc Campaigns
       try {
-        const { data: campaignData } = await supabase
-          .from('student_ad_hoc_fees')
-          .select(`
-            id,
-            custom_amount,
-            adjustment_reason,
-            campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year:academic_year_id(label))
-          `)
-          .eq('student_id', studentId);
-
-        let mappedCampaigns = (campaignData || []).map((fee: any) => {
+        let mappedCampaigns = (rawCampaignData || []).map((fee: any) => {
           if (!fee.campaign) return null;
           return {
             ...fee.campaign,

@@ -294,28 +294,57 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!targetYear) return;
     setLoading(true);
     try {
-      // 1. Essayer de trouver la classe et les inscriptions pour l'année cible et les autres années
-      let enrollment = null;
-      let otherEnrollments: any[] = [];
-      try {
-        const { data: allEnrollmentsData } = await supabase
+      // 1. Exécution parallèle haute performance des requêtes essentielles
+      const [
+        { data: allEnrollmentsData },
+        { data: rateRes },
+        { data: allStudentPayments, error: paymentsError },
+        { data: rawCampaignData }
+      ] = await Promise.all([
+        supabase
           .from('enrollments')
           .select('class_id, academic_year_id, tuition_discount, tuition_addition, class:classes(id, name), academic_year:academic_years(id, label, status)')
           .eq('school_id', user.school_id)
-          .eq('student_id', student.id);
-        
-        if (allEnrollmentsData && allEnrollmentsData.length > 0) {
-          const foundInTarget = allEnrollmentsData.find((e: any) => e.academic_year_id === targetYear);
-          if (foundInTarget) {
-            enrollment = foundInTarget;
-            otherEnrollments = allEnrollmentsData.filter((e: any) => e.academic_year_id !== targetYear);
-          } else {
-            enrollment = null;
-            otherEnrollments = allEnrollmentsData;
-          }
+          .eq('student_id', student.id),
+        supabase
+          .from('exchange_rates')
+          .select('*')
+          .eq('school_id', user.school_id)
+          .order('effective_date', { ascending: false })
+          .limit(1),
+        supabase
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('student_ad_hoc_fees')
+          .select(`
+            id,
+            custom_amount,
+            adjustment_reason,
+            campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year_id)
+          `)
+          .eq('school_id', user.school_id)
+          .eq('student_id', student.id)
+      ]);
+
+      if (paymentsError) {
+        console.error("Erreur chargement payments:", paymentsError);
+      }
+
+      let enrollment = null;
+      let otherEnrollments: any[] = [];
+      if (allEnrollmentsData && allEnrollmentsData.length > 0) {
+        const foundInTarget = allEnrollmentsData.find((e: any) => e.academic_year_id === targetYear);
+        if (foundInTarget) {
+          enrollment = foundInTarget;
+          otherEnrollments = allEnrollmentsData.filter((e: any) => e.academic_year_id !== targetYear);
+        } else {
+          enrollment = null;
+          otherEnrollments = allEnrollmentsData;
         }
-      } catch (e) {
-        console.error("Erreur chargement enrollment:", e);
       }
 
       const isEnrolled = !!enrollment;
@@ -324,14 +353,6 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         ? (enrollment?.class?.name || student.class?.name || 'Registre Académique') 
         : 'Non inscrit';
 
-      // Fetch exchange rate
-      const { data: rateRes } = await supabase
-        .from('exchange_rates')
-        .select('*')
-        .eq('school_id', user.school_id)
-        .order('effective_date', { ascending: false })
-        .limit(1);
-      
       const currentExchangeRate = rateRes?.[0]?.rate_usd_to_htg || rateRes?.[0]?.rate || 132.50;
 
       let plan = null;
@@ -350,27 +371,7 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         plan = planData;
       }
 
-      const { data: allStudentPayments, error: paymentsError } = await supabase
-        .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-        .eq('school_id', user.school_id)
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
-      
-      if (paymentsError) {
-        console.error("Erreur chargement payments:", paymentsError);
-      }
-
-      // Vérifier si l'étudiant a des inscriptions antérieures (Réinscription)
-      const { data: prevEnrollments } = await supabase
-        .from('enrollments')
-        .select('id, academic_year_id')
-        .eq('school_id', user.school_id)
-        .eq('student_id', student.id)
-        .neq('academic_year_id', targetYear)
-        .limit(5);
-      
-      const hasPreviousEnrollment = (prevEnrollments?.length || 0) > 0;
+      const hasPreviousEnrollment = (otherEnrollments?.length || 0) > 0;
 
       // Filtrer les paiements pour cette session académique
       const payments = allStudentPayments?.filter((p: any) => {
@@ -378,30 +379,17 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (!p.academic_year_id) {
           return !hasPreviousEnrollment;
         }
-        const isEnrolledInPaymentYear = prevEnrollments?.some((e: any) => e.academic_year_id === p.academic_year_id);
+        const isEnrolledInPaymentYear = otherEnrollments?.some((e: any) => e.academic_year_id === p.academic_year_id);
         if (!isEnrolledInPaymentYear && isEnrolled) {
           return true;
         }
         return false;
       }) || [];
 
-      // Fetch student's assigned ad-hoc campaigns
-      let campaignData: any[] = [];
-      try {
-        const { data } = await supabase
-          .from('student_ad_hoc_fees')
-          .select(`
-            id,
-            custom_amount,
-            adjustment_reason,
-            campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year_id)
-          `)
-          .eq('school_id', user.school_id)
-          .eq('student_id', student.id);
-        campaignData = data || [];
-      } catch (err) {
-        console.error("Erreur chargement student_ad_hoc_fees:", err);
-      }
+      // Mettre à jour l'historique immédiatement pour éliminer le goulot d'étranglement perçu
+      setStudentHistory(payments);
+
+      const campaignData = rawCampaignData || [];
 
       const activeCampaigns = campaignData
         .map((fee: any) => {
@@ -653,26 +641,8 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       if (yearStatus !== 'FUTURE') {
         try {
-          // Calculate true global debt in the frontend for absolute multi-tenant safety and accuracy
-          const { data: allEnrollments } = await supabase
-            .from('enrollments')
-            .select('academic_year_id, class_id, tuition_discount, tuition_addition, academic_year:academic_years(id, status, label)')
-            .eq('school_id', user.school_id)
-            .eq('student_id', student.id);
-
-          const { data: allPayments } = await supabase
-            .from('payments')
-            .select('amount, currency, amount_htg_equivalent, amount_usd_equivalent, fee_type, academic_year_id, exchange_rate_applied')
-            .eq('school_id', user.school_id)
-            .eq('student_id', student.id);
-
-          const { data: allAdHocFees } = await supabase
-            .from('student_ad_hoc_fees')
-            .select('custom_amount, campaign:ad_hoc_campaigns(id, amount, currency, academic_year_id)')
-            .eq('school_id', user.school_id)
-            .eq('student_id', student.id);
-
-          const enrolls = allEnrollments || [];
+          // Utilisation immédiate des données déjà chargées en mémoire pour une performance instantanée
+          const enrolls = allEnrollmentsData || [];
           const classIds = enrolls.map((e: any) => e.class_id).filter(Boolean);
           const yearIds = enrolls.map((e: any) => e.academic_year_id).filter(Boolean);
 
@@ -705,18 +675,11 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
               if (!planForYr) continue;
 
               // 1. Admission / Inscription Fee
-              const enrollYearPayments = (allPayments || []).filter((p: any) => p.academic_year_id === yrId);
+              const enrollYearPayments = (allStudentPayments || []).filter((p: any) => p.academic_year_id === yrId);
               const enrollAdmissionPayments = enrollYearPayments.filter((p: any) => p.fee_type === 'INSCRIPTION');
 
-              // Check if student had previous enrollments before this year
-              const { data: prevEn } = await supabase
-                .from('enrollments')
-                .select('id')
-                .eq('school_id', user.school_id)
-                .eq('student_id', student.id)
-                .neq('academic_year_id', yrId)
-                .limit(1);
-              const isReenrollment = (prevEn?.length || 0) > 0;
+              // Check in-memory if student had previous enrollments before this year (zero DB call)
+              const isReenrollment = enrolls.some((e: any) => e.academic_year_id !== yrId);
 
               const planAdmHTG = isReenrollment ? Number(planForYr.reenrollment_fee || 0) : Number(planForYr.inscription_fee || 0);
               const planAdmUSD = isReenrollment ? Number(planForYr.reenrollment_fee_usd || 0) : Number(planForYr.inscription_fee_usd || 0);
@@ -752,11 +715,11 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
               );
 
               const yrCampaignPayments = enrollYearPayments.filter((p: any) => p.fee_type === 'AD_HOC');
-              const yrCampHTG = (allAdHocFees || [])
+              const yrCampHTG = (rawCampaignData || [])
                 .filter((fee: any) => fee.campaign && fee.campaign.academic_year_id === yrId && fee.campaign.currency !== 'USD')
                 .reduce((sum: number, fee: any) => sum + (fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign?.amount || 0)), 0);
 
-              const yrCampUSD = (allAdHocFees || [])
+              const yrCampUSD = (rawCampaignData || [])
                 .filter((fee: any) => fee.campaign && fee.campaign.academic_year_id === yrId && fee.campaign.currency === 'USD')
                 .reduce((sum: number, fee: any) => sum + (fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign?.amount || 0)), 0);
 

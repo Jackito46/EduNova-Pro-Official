@@ -204,13 +204,6 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
         paymentsQuery = paymentsQuery.eq('campus_id', currentCampusId);
       }
       
-      const { data: paymentsData, error: paymentsError } = await paymentsQuery.order('created_at', { ascending: false });
-
-      if (paymentsError) {
-        console.error("Erreur Supabase paiements:", paymentsError);
-        throw paymentsError;
-      }
-      
       let suppliesQuery = supabase
         .from('school_supplies')
         .select('*')
@@ -219,13 +212,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (currentCampusId) {
         suppliesQuery = suppliesQuery.eq('campus_id', currentCampusId);
       }
-      
-      const { data: suppliesData, error: suppliesError } = await suppliesQuery.order('created_at', { ascending: false });
-        
-      if (suppliesError) {
-        console.error("Erreur Supabase supplies:", suppliesError);
-      }
-      
+
       let studentsQuery = supabase
         .from('students')
         .select('id, first_name, last_name, class_id, phone, parent_phone, parent_name')
@@ -234,13 +221,7 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (currentCampusId) {
         studentsQuery = studentsQuery.eq('campus_id', currentCampusId);
       }
-      
-      const { data: studentsData, error: studentsError } = await studentsQuery;
-        
-      if (studentsError) {
-        console.error("Erreur Supabase students:", studentsError);
-      }
-      
+
       let classesQuery = supabase
         .from('classes')
         .select('id, name')
@@ -249,23 +230,44 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (currentCampusId) {
         classesQuery = classesQuery.eq('campus_id', currentCampusId);
       }
-      
-      const { data: classesData, error: classesError } = await classesQuery;
-        
+
+      // Exécution parallèle haute vitesse de toutes les requêtes du journal
+      const [
+        { data: paymentsData, error: paymentsError },
+        { data: suppliesData, error: suppliesError },
+        { data: studentsData, error: studentsError },
+        { data: classesData, error: classesError },
+        { data: yearsData, error: yearsError }
+      ] = await Promise.all([
+        paymentsQuery.order('created_at', { ascending: false }),
+        suppliesQuery.order('created_at', { ascending: false }),
+        studentsQuery,
+        classesQuery,
+        supabase
+          .from('academic_years')
+          .select('*')
+          .eq('school_id', user.school_id)
+          .order('start_date', { ascending: false })
+      ]);
+
+      if (paymentsError) {
+        console.error("Erreur Supabase paiements:", paymentsError);
+        throw paymentsError;
+      }
+      if (suppliesError) {
+        console.error("Erreur Supabase supplies:", suppliesError);
+      }
+      if (studentsError) {
+        console.error("Erreur Supabase students:", studentsError);
+      }
       if (classesError) {
         console.error("Erreur Supabase classes:", classesError);
       }
-      setClasses(classesData || []);
-
-      const { data: yearsData, error: yearsError } = await supabase
-        .from('academic_years')
-        .select('*')
-        .eq('school_id', user.school_id)
-        .order('start_date', { ascending: false });
-
       if (yearsError) {
         console.error("Erreur Supabase academic_years:", yearsError);
       }
+
+      setClasses(classesData || []);
       setAcademicYears(yearsData || []);
       
       // Create maps for quick lookup

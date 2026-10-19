@@ -49,32 +49,44 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
       try {
         setLoading(true);
-        // Fetch current exchange rate
-        const { data: rateRes } = await supabase
-          .from('exchange_rates')
-          .select('*')
-          .eq('school_id', user.school_id)
-          .order('effective_date', { ascending: false })
-          .limit(1);
+        // Exécution en parallèle haute performance de toutes les requêtes financières de l'élève
+        const [
+          { data: rateRes },
+          { data: planData },
+          { data: paymentsData, error: paymentsErr },
+          { data: campaignData, error: campaignErr }
+        ] = await Promise.all([
+          supabase
+            .from('exchange_rates')
+            .select('*')
+            .eq('school_id', user.school_id)
+            .order('effective_date', { ascending: false })
+            .limit(1),
+          supabase
+            .from('fee_plans')
+            .select('*')
+            .eq('class_id', studentData.class_id)
+            .eq('academic_year_id', activeYear.id)
+            .maybeSingle(),
+          supabase
+            .from('payments')
+            .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+            .eq('student_id', studentData.id)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('student_ad_hoc_fees')
+            .select(`
+              id,
+              custom_amount,
+              adjustment_reason,
+              campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year_id)
+            `)
+            .eq('student_id', studentData.id)
+        ]);
+
         const currentRate = Number(rateRes?.[0]?.rate_usd_to_htg || rateRes?.[0]?.rate || 135.0);
         setExchangeRate(currentRate);
-
-        // Fetch fee plan for the class
-        const { data: planData } = await supabase
-          .from('fee_plans')
-          .select('*')
-          .eq('class_id', studentData.class_id)
-          .eq('academic_year_id', activeYear.id)
-          .maybeSingle();
-        
         setFeePlan(planData);
-
-        // Fetch payments made by student (order by created_at)
-        const { data: paymentsData, error: paymentsErr } = await supabase
-          .from('payments')
-          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-          .eq('student_id', studentData.id)
-          .order('created_at', { ascending: false });
 
         if (paymentsErr) {
           console.error("Erreur chargement payments dans StudentFinanceView:", paymentsErr);
@@ -86,17 +98,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         });
 
         setPayments(validSessionPayments);
-
-        // Fetch student's assigned ad-hoc campaigns
-        const { data: campaignData, error: campaignErr } = await supabase
-          .from('student_ad_hoc_fees')
-          .select(`
-            id,
-            custom_amount,
-            adjustment_reason,
-            campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year_id)
-          `)
-          .eq('student_id', studentData.id);
 
         if (campaignErr) {
           console.error("Error fetching student campaigns: ", campaignErr);
