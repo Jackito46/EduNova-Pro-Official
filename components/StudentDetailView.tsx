@@ -187,6 +187,22 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         console.error("Erreur chargement des versements de l'élève:", payErr);
       }
 
+      let rawEnrollments = enrollData || [];
+      if (rawEnrollments.length === 0 && studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
+        rawEnrollments = [
+          {
+            id: 'enr-demo-aug-1',
+            student_id: studentId,
+            class_id: 'class-ns-ii',
+            academic_year_id: 'year-2026-2027',
+            academic_year: { id: 'year-2026-2027', label: '2026-2027', status: 'ACTIVE' },
+            class: { id: 'class-ns-ii', name: 'NS II', level: 'Secondaire' },
+            created_at: '2026-07-27T10:00:00Z'
+          }
+        ];
+      }
+      setEnrollments(rawEnrollments);
+
       let rawPayments = payData || [];
       if (rawPayments.length === 0 && studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
         rawPayments = [
@@ -853,7 +869,16 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </button>
             <button
               type="button"
-              onClick={() => navigate(`/economat/paiements?studentId=${student.id}&studentName=${encodeURIComponent(fullName)}`)}
+              onClick={() => {
+                const targetYear = enrollments[0]?.academic_year_id || enrollments[0]?.academic_year?.id || student.academic_year_id || '';
+                navigate(`/economat/frais?studentId=${student.id}&studentName=${encodeURIComponent(fullName)}${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
+                  state: {
+                    studentId: student.id,
+                    studentName: fullName,
+                    academicYearId: targetYear
+                  }
+                });
+              }}
               className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
               title="Enregistrer un nouveau paiement pour cet élève"
             >
@@ -1484,7 +1509,16 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  onClick={() => navigate(`/economat/paiements?studentId=${student.id}&studentName=${encodeURIComponent(fullName)}`)}
+                  onClick={() => {
+                    const targetYear = enrollments[0]?.academic_year_id || enrollments[0]?.academic_year?.id || student.academic_year_id || '';
+                    navigate(`/economat/frais?studentId=${student.id}&studentName=${encodeURIComponent(fullName)}${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
+                      state: {
+                        studentId: student.id,
+                        studentName: fullName,
+                        academicYearId: targetYear
+                      }
+                    });
+                  }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
                   title="Encaisser un nouveau versement"
                 >

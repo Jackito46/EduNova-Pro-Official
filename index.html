@@ -301,11 +301,17 @@
           <span>Chargement en cours...</span>
         </div>
 
-        <!-- Indicateur discret en cas de latence réseau prolongée -->
-        <div id="edunova-splash-fallback" style="display: none; margin-top: 20px; text-align: center; z-index: 10;">
-          <button id="edunova-splash-retry-btn" type="button" style="padding: 6px 14px; background: rgba(255, 255, 255, 0.08); color: #94a3b8; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 999px; font-size: 11px; font-weight: 500; cursor: pointer; transition: all 0.2s; font-family: inherit;">
-            Connexion au serveur... Cliquer pour réactualiser
+        <div id="edunova-splash-actions" style="display: none; margin-top: 24px; flex-direction: column; align-items: center; gap: 10px; max-width: 320px; width: 100%; z-index: 10;">
+          <button id="edunova-emergency-login" type="button" style="width: 100%; padding: 11px 18px; background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; border: none; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
+            <span>Accéder à la Page de Connexion</span>
+            <span style="font-size: 15px;">→</span>
           </button>
+          <button id="edunova-emergency-reload" type="button" style="width: 100%; padding: 9px 14px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;">
+            <span>Vider le cache &amp; Recharger</span>
+          </button>
+          <div id="edunova-splash-hint" style="font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.4;">
+            Initialisation du système EduNova Pro...
+          </div>
         </div>
       </div>
     </div>
@@ -568,8 +574,6 @@
     function isChunkOrVersionError(message) {
       if (!message) return false;
       var str = String(message).toLowerCase();
-      // Uniquement les véritables erreurs de chargement de modules/chunks Vite
-      // NE JAMAIS inclure '404' ou '/assets/' génériques qui génèrent des faux positifs sur images ou API
       return (
         str.includes('failed to fetch dynamically imported module') ||
         str.includes('unexpected token \'<\'') ||
@@ -577,12 +581,15 @@
         str.includes('loading chunk') ||
         str.includes('failed to load module script') ||
         str.includes('error loading dynamically imported module') ||
-        str.includes('importing a module script failed')
+        str.includes('importing a module script failed') ||
+        str.includes('/assets/') ||
+        str.includes('404')
       );
     }
 
     function performAutoHeal(reason) {
       if (window.__edunovaAppReady) return;
+      // L'auto-guérison par rechargement forcé n'est justifiée QUE lors d'une rupture critique de chunk
       if (!isChunkOrVersionError(reason)) {
         logDiag('AUTO_HEAL_IGNORED', 'Auto-guérison non requise pour motif non critique: ' + reason);
         return;
@@ -592,7 +599,7 @@
       var now = Date.now();
       // Protection anti-boucle : 1 rechargement transparent toutes les 30 secondes max
       if (lastHeal && (now - parseInt(lastHeal, 10)) < 30000) {
-        logDiag('AUTO_HEAL_SKIP', 'Auto-guérison déjà exécutée récemment. Attente...');
+        logDiag('AUTO_HEAL_SKIP', 'Auto-guérison déjà exécutée récemment. Affichage boutons de secours.');
         showEmergencyButtons(reason);
         return;
       }
@@ -629,7 +636,7 @@
     // Capture des erreurs de chargement de ressources en phase de capture (pour diagnostic)
     window.addEventListener('error', function(event) {
       var target = event.target;
-      if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK')) {
+      if (target && (target.tagName === 'SCRIPT' || target.tagName === 'LINK' || target.tagName === 'IMG')) {
         var srcOrHref = target.src || target.href || 'inconnu';
         var failure = {
           tagName: target.tagName,
@@ -638,9 +645,10 @@
           elapsedMs: Math.round(performance.now() - startTime)
         };
         window.__edunovaDiagnostics.resourceFailures.push(failure);
+        logDiag('RESOURCE_ERR', 'Avertissement ressource non bloquante', failure);
 
-        // Seuls les scripts JS /assets/*.js critiques en échec justifient une auto-guérison
-        if (target.tagName === 'SCRIPT' && srcOrHref.indexOf('/assets/') !== -1 && srcOrHref.indexOf('.js') !== -1) {
+        // Seuls les scripts JS /assets/*.js en 404 justifient une auto-guérison (jamais les images ou liens)
+        if (target.tagName === 'SCRIPT' && srcOrHref.indexOf('/assets/') !== -1) {
           performAutoHeal('Script compilé introuvable : ' + srcOrHref.split('/').pop());
         }
       } else {
@@ -653,20 +661,26 @@
           error: event.error ? (event.error.stack || event.error.message) : null
         };
         window.__edunovaDiagnostics.errors.push(errInfo);
+        logDiag('SCRIPT_ERR', 'Erreur script interceptée', errInfo);
 
+        // Détection immédiate d'une désynchronisation de version (HTML reçu à la place d'un chunk JS)
         if (isChunkOrVersionError(errMsg) || (event.error && isChunkOrVersionError(event.error.message))) {
           performAutoHeal('Discordance de chunk détectée : ' + errMsg);
         }
       }
     }, true);
 
-    // Capture des rejets de Promesses non gérés
+    // Capture des rejets de Promesses non gérés (diagnostic uniquement, ne tue jamais l'appli)
     window.addEventListener('unhandledrejection', function(event) {
       var reason = event.reason;
       var reasonStr = reason ? (reason.stack || reason.message || String(reason)) : 'Raison inconnue';
-      var rejInfo = { reason: reasonStr };
+      var rejInfo = {
+        reason: reasonStr
+      };
       window.__edunovaDiagnostics.errors.push(rejInfo);
+      logDiag('PROMISE_ERR', 'Rejet de promesse non intercepté (non bloquant)', rejInfo);
 
+      // Si l'erreur de promesse est liée à un import dynamique de module Vite périmé
       if (isChunkOrVersionError(reasonStr)) {
         event.preventDefault();
         performAutoHeal('Rejet import dynamique : ' + reasonStr);
@@ -674,31 +688,45 @@
     });
 
     function showEmergencyButtons(cause) {
-      var fallback = document.getElementById('edunova-splash-fallback');
-      if (fallback && !window.__edunovaAppReady) {
-        fallback.style.display = 'block';
-        var retryBtn = document.getElementById('edunova-splash-retry-btn');
-        if (retryBtn) retryBtn.onclick = clearStorageAndGoLogin;
+      var actions = document.getElementById('edunova-splash-actions');
+      if (actions && !window.__edunovaAppReady) {
+        actions.style.display = 'flex';
+        var hint = document.getElementById('edunova-splash-hint');
+        if (hint) {
+          hint.textContent = 'Chargement prolongé détecté. Vous pouvez forcer l’accès direct ci-dessous.';
+          hint.style.color = '#94a3b8';
+        }
+        var btnLogin = document.getElementById('edunova-emergency-login');
+        if (btnLogin) btnLogin.onclick = clearStorageAndGoLogin;
+        var btnReload = document.getElementById('edunova-emergency-reload');
+        if (btnReload) btnReload.onclick = clearStorageAndGoLogin;
       }
     }
 
-    // Gestionnaire de réactualisation sécurisé
+    // Gestionnaire de déblocage direct immédiat
     function clearStorageAndGoLogin() {
-      logDiag('ACTION', 'Nettoyage des caches et réactualisation forcée');
+      logDiag('ACTION', 'Déblocage direct manuel : retrait immédiat du splashscreen');
+      // Retirer le splashscreen sans délai
       window.__dismissEduNovaSplash();
+      var splash = document.getElementById('edunova-pwa-splash');
+      if (splash) {
+        splash.style.display = 'none';
+        if (splash.parentNode) splash.parentNode.removeChild(splash);
+      }
       window.__edunovaAppReady = true;
 
       try {
         localStorage.removeItem('edunova_user_profile');
         localStorage.removeItem('edunova-auth-token');
         localStorage.removeItem('supabase.auth.token');
+        localStorage.setItem('edunova_logged_out', 'true');
         sessionStorage.clear();
       } catch(e) {}
 
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(regs) {
           for (var i = 0; i < regs.length; i++) {
-            regs[i].unregister().catch(function() {});
+            regs[i].unregister();
           }
         });
       }
@@ -710,20 +738,19 @@
         });
       }
 
-      window.location.href = '/?r=' + Date.now() + '#/';
+      // Rediriger vers l'accueil / login
+      window.location.hash = '#/';
     }
 
-    // Failsafe auto-dismiss : garantit que l'écran de chargement disparaît toujours sans jamais bloquer l'accès
+    // Watchdog de sécurité passif (25000ms au lieu de 6000ms) : n'interrompt pas le chargement en cours
     setTimeout(function() {
       if (!window.__edunovaAppReady) {
-        logDiag('WATCHDOG', 'Délai d’attente limite : fermeture préventive du splashscreen pour révéler l’interface');
-        if (typeof window.__dismissEduNovaSplash === 'function') {
-          window.__dismissEduNovaSplash();
-        }
+        logDiag('WATCHDOG', 'Délai passif atteint (25s). Proposition des options de secours sans rechargement forcé.');
+        showEmergencyButtons('Délai d’attente');
       } else {
-        logDiag('WATCHDOG', 'Application opérationnelle');
+        logDiag('WATCHDOG', 'Vérification terminée : Application montée avec succès');
       }
-    }, 4500);
+    }, 25000);
   })();
 </script>
 <script type="module" src="/index.tsx"></script>

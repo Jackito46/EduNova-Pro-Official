@@ -52,6 +52,7 @@ import {
   CheckSquare
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
+import { normalizeUserRole } from './RoleGuard';
 import { motion } from 'framer-motion';
 import Modal from './Modal';
 import { ChangePasswordModal } from './ChangePasswordModal';
@@ -207,14 +208,16 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
   // Role-based access control for sidebar
   const adminRoles = [UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR];
   const financeRoles = [...adminRoles, UserRole.ACCOUNTANT];
-  const cashierRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY];
+  const cashierRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY, UserRole.SUPERVISOR];
   const hrRoles = [...adminRoles];
   const academicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
   const restrictedAcademicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.SUPERVISOR];
 
-  const hasAccess = React.useCallback((allowedRoles: UserRole[]) => {
+  const hasAccess = React.useCallback((allowedRoles: (UserRole | string)[]) => {
     if (user.role === UserRole.SUPER_ADMIN || user.is_super_admin) return true;
-    return allowedRoles.includes(user.role);
+    const normalizedUserRole = normalizeUserRole(user.role);
+    const normalizedAllowed = allowedRoles.map(r => normalizeUserRole(r));
+    return normalizedAllowed.includes(normalizedUserRole);
   }, [user.role, user.is_super_admin]);
 
   const schoolInfo = React.useMemo(() => ({
@@ -521,7 +524,7 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Gestion Payroll', path: '/economat/paie' }, true, Wallet)}
                   {isInventoryEnabled && renderNavLink({ name: 'Fournitures & Stocks', path: '/economat/fournitures' }, true, Package)}
                   {hasAccess(adminRoles) && renderNavLink({ name: 'Réévaluations', path: '/economat/derogations' }, true, RefreshCcw)}
-                  {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Diagnostic Barème USD', path: '/economat/diagnostic' }, true, Activity)}
+                  {isMultiCurrency && hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Diagnostic Barème USD', path: '/economat/diagnostic' }, true, Activity)}
                   {hasAccess([...adminRoles, UserRole.ACCOUNTANT]) && renderNavLink({ name: 'Campagnes & Événements', path: '/economat/frais-occasionnels' }, true, Rocket)}
                 </div>
               )}

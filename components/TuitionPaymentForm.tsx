@@ -658,7 +658,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           const active = finalYears.find(y => y.status === 'ACTIVE' || y.is_active) || finalYears[0];
           setActiveYear(active);
           
-          const requestedYearId = location.state?.academicYearId;
+          const searchParams = new URLSearchParams(location.search);
+          const requestedYearId = location.state?.academicYearId || searchParams.get('academicYearId') || searchParams.get('yearId');
           if (requestedYearId && finalYears.some(y => y.id === requestedYearId)) {
             setTargetYearId(requestedYearId);
           } else if (active) {
@@ -1648,10 +1649,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const queryStudentId = searchParams.get('studentId');
+    const queryStudentName = searchParams.get('studentName');
     const queryYearId = searchParams.get('academicYearId') || searchParams.get('yearId');
 
     const effectiveStudentId = location.state?.studentId || queryStudentId;
-    const effectiveYearId = location.state?.academicYearId || queryYearId || targetYearId;
+    const effectiveStudentName = location.state?.studentName || queryStudentName;
+    const effectiveYearId = location.state?.academicYearId || queryYearId || targetYearId || activeYear?.id;
+
+    if (effectiveStudentName && !selectedStudent) {
+      try {
+        setStudentSearch(decodeURIComponent(effectiveStudentName));
+      } catch (e) {
+        setStudentSearch(effectiveStudentName);
+      }
+    }
 
     if (effectiveStudentId) {
       if (effectiveYearId && effectiveYearId !== targetYearId) {
@@ -1659,9 +1670,28 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       if (effectiveYearId) {
         loadStudentDetails(effectiveStudentId, effectiveYearId);
+      } else {
+        // Fallback: fetch student's enrollment to obtain the target academic year
+        (async () => {
+          try {
+            const { data: enrs } = await supabase
+              .from('enrollments')
+              .select('academic_year_id')
+              .eq('student_id', effectiveStudentId)
+              .order('created_at', { ascending: false })
+              .limit(1);
+            const foundYear = enrs?.[0]?.academic_year_id || activeYear?.id;
+            if (foundYear) {
+              setTargetYearId(foundYear);
+              loadStudentDetails(effectiveStudentId, foundYear);
+            }
+          } catch (e) {
+            console.warn("Could not auto-resolve student academic year:", e);
+          }
+        })();
       }
     }
-  }, [location.state, location.search, loadStudentDetails]);
+  }, [location.state, location.search, targetYearId, activeYear?.id, loadStudentDetails]);
 
   // Recharger les détails si l'année cible change et qu'un étudiant est déjà sélectionné
   useEffect(() => {

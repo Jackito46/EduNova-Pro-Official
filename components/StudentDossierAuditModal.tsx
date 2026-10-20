@@ -27,7 +27,6 @@ import {
   TrendingUp,
   Banknote
 } from 'lucide-react';
-import { AcademicSessionPill } from './AcademicSessionPill';
 
 export interface SessionAuditDetail {
   academicYearId: string;
@@ -77,52 +76,32 @@ interface StudentDossierAuditModalProps {
  * Résolution experte du motif précis d'un paiement
  * Permet de distinguer immédiatement les Frais Divers Institutionnels récurrents (HTG)
  * des Frais Spécifiques / Campagnes / Stages (USD ou ponctuels).
-/**
- * Détection universelle et robuste des règlements de frais de campagne
  */
-export const isCampaignPayment = (tx: any): boolean => {
-  if (!tx) return false;
-  if (tx.ad_hoc_campaign_id || tx.campaign_id || tx.campaign?.id) return true;
-  const ft = (tx.fee_type || '').toUpperCase();
-  if (ft === 'AD_HOC' || ft === 'CAMPAGNE' || ft === 'CAMPAIGN') return true;
-  const rub = (tx.rubrique || '').toLowerCase();
-  if (rub.includes('campagne') || rub.includes('parascolaire')) return true;
-  const nat = (tx.nature || '').toLowerCase();
-  if (nat.includes('campagne') || nat.includes('parascolaire') || nat.includes('ad hoc') || nat.includes('ad_hoc')) return true;
-  const typ = (tx.type || '').toLowerCase();
-  if (typ.includes('campagne') || typ.includes('parascolaire')) return true;
-  const desc = (tx.description || '').toLowerCase();
-  if (desc.includes('campagne') || desc.includes('parascolaire')) return true;
-  return false;
-};
-
 export const resolvePaymentMotif = (tx: any, terminology: any) => {
   const natureStr = (tx.nature || '').trim();
   const typeStr = (tx.type || '').trim();
   const descStr = (tx.description || '').trim();
   const ft = (tx.fee_type || '').toUpperCase();
-  const genericTerms = ['frais divers', 'divers', 'scolarite', 'scolarité', 'inscription', 'droits de scolarité'];
+  const isUSD = tx.currency === 'USD';
 
-  // 1. Campagne Ad-Hoc rattachée explicitement ou identifiée par son libellé
-  if (tx.campaign?.name || isCampaignPayment(tx)) {
-    const title = tx.campaign?.name || (natureStr && !genericTerms.includes(natureStr.toLowerCase()) ? natureStr : (descStr || typeStr || 'Campagnes & Activités Parascolaires'));
+  // 1. Campagne Ad-Hoc rattachée explicitement
+  if (tx.campaign?.name) {
     return {
-      title,
-      category: 'Frais de Campagne & Activités',
+      title: tx.campaign.name,
+      category: 'Frais Spécifique / Campagne',
       badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
-      isSpecial: true,
-      isCampaign: true
+      isSpecial: true
     };
   }
 
   // 2. Si le champ type ou nature contient un libellé spécifique explicite (non générique)
+  const genericTerms = ['frais divers', 'divers', 'scolarite', 'scolarité', 'inscription', 'droits de scolarité'];
   if (natureStr && !genericTerms.includes(natureStr.toLowerCase())) {
     return {
       title: natureStr,
       category: natureStr.toLowerCase().includes('stage') ? 'Stage Académique' : 'Frais Spécifique',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      isSpecial: true,
-      isCampaign: false
+      isSpecial: true
     };
   }
 
@@ -131,8 +110,7 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: typeStr,
       category: typeStr.toLowerCase().includes('stage') ? 'Stage Académique' : 'Frais Spécifique',
       badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
-      isSpecial: true,
-      isCampaign: false
+      isSpecial: true
     };
   }
 
@@ -142,8 +120,7 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: "Frais d'Inscription / Régularisation d'Entrée",
       category: "Admission & Entrée",
       badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
-      isSpecial: false,
-      isCampaign: false
+      isSpecial: false
     };
   }
 
@@ -152,8 +129,7 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: `${terminology.tuition || 'Scolarité'} (Droits d'études)`,
       category: "Scolarité",
       badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
-      isSpecial: false,
-      isCampaign: false
+      isSpecial: false
     };
   }
 
@@ -162,8 +138,7 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: `Alimentation Portefeuille ${terminology.student || 'Élève'}`,
       category: "Portefeuille",
       badgeColor: 'bg-teal-100 text-teal-800 border-teal-200',
-      isSpecial: false,
-      isCampaign: false
+      isSpecial: false
     };
   }
 
@@ -174,8 +149,7 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
       title: descStr || typeStr || natureStr || 'Frais Divers Obligatoires',
       category: 'Frais Divers Obligatoires',
       badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      isSpecial: false,
-      isCampaign: false
+      isSpecial: false
     };
   }
 
@@ -183,8 +157,7 @@ export const resolvePaymentMotif = (tx: any, terminology: any) => {
     title: descStr || typeStr || natureStr || tx.fee_type || 'Frais Scolaires',
     category: 'Règlement',
     badgeColor: 'bg-slate-100 text-slate-800 border-slate-200',
-    isSpecial: false,
-    isCampaign: false
+    isSpecial: false
   };
 };
 
@@ -222,11 +195,6 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
 
     let miscPaidHTG = 0;
     let miscPaidUSD = 0;
-
-    let campaignsPaidHTG = 0;
-    let campaignsPaidUSD = 0;
-    let campaignsReceiptCount = 0;
-
     let miscSpecialPaidUSD = 0;
     let miscSpecialPaidHTG = 0;
 
@@ -245,34 +213,28 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       }
       totalPaidHTGEquiv += equiv;
 
-      const isCamp = isCampaignPayment(t);
       const motif = resolvePaymentMotif(t, terminology || {});
       const ft = (t?.fee_type || '').toUpperCase();
       const isMiscFee = ft === 'DIVERS' || (t?.nature || '').toLowerCase().includes('divers') || (t?.type || '').toLowerCase().includes('divers');
 
-      if (isCamp) {
-        campaignsReceiptCount++;
-        if (isUSD) campaignsPaidUSD += amt;
-        else campaignsPaidHTG += amt;
-      } else if (ft === 'INSCRIPTION') {
+      if (ft === 'INSCRIPTION') {
         if (isUSD) inscriptionPaidUSD += amt;
         else inscriptionPaidHTG += amt;
       } else if (ft === 'SCOLARITE') {
         if (isUSD) tuitionPaidUSD += amt;
         else tuitionPaidHTG += amt;
-      } else if (isMiscFee && !motif.isSpecial) {
+      } else if (isMiscFee && !motif.isSpecial && !t?.ad_hoc_campaign_id) {
         // Règlement bimonétaire (HTG & USD) des Frais Divers Obligatoires
         if (isUSD) miscPaidUSD += amt;
         else miscPaidHTG += amt;
       } else {
-        // Autres prestations spécifiques
+        // Campagnes ad-hoc ou prestations spécifiques
         if (isUSD) miscSpecialPaidUSD += amt;
         else miscSpecialPaidHTG += amt;
       }
     }
 
     const hasDualMiscFees = (miscPaidHTG > 0 && miscPaidUSD > 0) || validTxs.filter(t => (t?.fee_type || '').toUpperCase() === 'DIVERS').length >= 2;
-    const campaignsTotalHTGEquiv = campaignsPaidHTG + (campaignsPaidUSD * (currentExchangeRate || 135));
 
     return {
       totalPaidHTG,
@@ -284,10 +246,6 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
       tuitionPaidUSD,
       miscPaidHTG,
       miscPaidUSD,
-      campaignsPaidHTG,
-      campaignsPaidUSD,
-      campaignsReceiptCount,
-      campaignsTotalHTGEquiv,
       miscSpecialPaidUSD,
       miscSpecialPaidHTG,
       hasDualMiscFees,
@@ -299,16 +257,16 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const filteredTransactions = useMemo(() => {
     const safeTxs = transactions || [];
     return safeTxs.filter(tx => {
-      const isCamp = isCampaignPayment(tx);
       const motif = resolvePaymentMotif(tx, terminology || {});
+      const isUSD = tx?.currency === 'USD';
       const ft = (tx?.fee_type || '').toUpperCase();
       const isMiscFee = ft === 'DIVERS' || (tx?.nature || '').toLowerCase().includes('divers') || (tx?.type || '').toLowerCase().includes('divers');
 
       // Filtre catégorie
       if (txFilter === 'INSCRIPTION' && ft !== 'INSCRIPTION') return false;
-      if (txFilter === 'SCOLARITE' && (ft !== 'SCOLARITE' || isCamp)) return false;
-      if (txFilter === 'DIVERS' && (!isMiscFee || motif.isSpecial || isCamp)) return false;
-      if (txFilter === 'SPECIFIQUES' && (!isCamp && !motif.isSpecial)) return false;
+      if (txFilter === 'SCOLARITE' && ft !== 'SCOLARITE') return false;
+      if (txFilter === 'DIVERS' && (!isMiscFee || motif.isSpecial || tx?.ad_hoc_campaign_id)) return false;
+      if (txFilter === 'SPECIFIQUES' && (isMiscFee && !motif.isSpecial && !tx?.ad_hoc_campaign_id)) return false;
 
       // Filtre recherche textuelle
       if (searchTx.trim()) {
@@ -317,7 +275,8 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
         const refStr = String(tx?.reference_number || tx?.transaction_reference || tx?.id || '').toLowerCase();
         const motifTitle = (motif.title || '').toLowerCase();
         const methodStr = String(tx?.payment_method || '').toLowerCase();
-        const amountStr = String(tx?.amount ?? tx?.paid_amount ?? tx?.total_amount ?? '').toLowerCase();
+        const amountStr = String(tx?.amount || '');
+
         return dateStr.includes(q) || refStr.includes(q) || motifTitle.includes(q) || methodStr.includes(q) || amountStr.includes(q);
       }
 
@@ -332,43 +291,9 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
   const studentCode = student.code || student.reference_number || (student.id ? student.id.substring(0, 8) : 'N/A');
   const isNotEnrolledCurrent = Boolean(student.isNotEnrolledInTargetYear);
   const safeSessions = sessions || [];
-  const currentSession = safeSessions.find(s => s.academicYearId === activeYear?.id || s.isCurrentSession);
-  const pastSessions = safeSessions.filter(s => !s.isCurrentSession && !s.isFutureSession);
-  const futureSessions = safeSessions.filter(s => s.isFutureSession && !s.isCurrentSession);
+  const currentSession = safeSessions.find(s => s.isCurrentSession);
+  const pastSessions = safeSessions.filter(s => !s.isCurrentSession);
   const isSolventHistory = globalDebt === 0;
-
-  // Calculs spécifiques des campagnes & activités pour cet élève
-  const campaignPaidHTGEquiv = analysis.campaignsTotalHTGEquiv > 0 
-    ? analysis.campaignsTotalHTGEquiv 
-    : (analysis.miscSpecialPaidHTG + (analysis.miscSpecialPaidUSD * (currentExchangeRate || 135)));
-  const campaignExpectedHTG = Number(student?.campaignsFee || student?.adHocDue || currentSession?.adHocDue || (campaignPaidHTGEquiv > 0 ? campaignPaidHTGEquiv : 0));
-  const campaignRemainingHTG = Math.max(0, campaignExpectedHTG - campaignPaidHTGEquiv);
-  const isCampaignPaid = campaignExpectedHTG > 0 ? (campaignRemainingHTG <= 50) : (campaignPaidHTGEquiv > 0);
-
-  // Détection rigoureuse : Ancien élève réinscrit vs Nouvel élève (Première inscription)
-  const isReturningStudent = Boolean(
-    student.isReenrollment || 
-    student.hasPreviousEnrollment || 
-    (student.otherEnrollments && student.otherEnrollments.length > 0) ||
-    pastSessions.length > 0 ||
-    safeSessions.some(s => !s.isCurrentSession && !s.isFutureSession)
-  );
-
-  const admissionFeeDue = (student.inscriptionDue !== undefined && student.inscriptionDue !== null)
-    ? Number(student.inscriptionDue)
-    : (currentSession?.inscriptionDue !== undefined ? Number(currentSession.inscriptionDue) : 0);
-
-  const selectedSessionDue = currentSession?.totalDue !== undefined && currentSession.totalDue > 0
-    ? currentSession.totalDue 
-    : (student.totalDue || 0);
-
-  const selectedSessionPaid = currentSession?.totalPaid !== undefined && currentSession.totalPaid > 0
-    ? currentSession.totalPaid 
-    : (student.paid || 0);
-
-  const selectedSessionRemaining = currentSession?.remainingDebt !== undefined
-    ? currentSession.remainingDebt
-    : (student.totalRemaining || 0);
 
   // Nom de l'établissement et de l'annexe (Multi-tenant & Multi-annexe)
   const institutionName = school?.name || school?.school_name || 'Établissement';
@@ -398,7 +323,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
                     : 'bg-rose-50 text-rose-700 border-rose-200'
                 }`}>
-                  {isSolventHistory ? 'Historique Antérieur Soldé' : `Arriéré Passé : ${globalDebt.toLocaleString()} HTG`}
+                  {isSolventHistory ? 'Historique Soldé' : `Arriéré : ${globalDebt.toLocaleString()} HTG`}
                 </span>
                 {isNotEnrolledCurrent && (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-800 border border-amber-200">
@@ -444,84 +369,6 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
             >
               <X size={18} />
             </button>
-          </div>
-        </div>
-
-        {/* BANDEAU SESSION SÉLECTIONNÉE & MONTANTS DU GUICHET */}
-        <div className="px-4 sm:px-6 py-2.5 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 border-b border-slate-200/90 flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          {/* Sélecteur de session et badge Admission */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
-              <Calendar size={13} className="text-blue-600 shrink-0" />
-              <span>Session Sélectionnée :</span>
-            </div>
-            {academicYears && academicYears.length > 0 && onSelectYear ? (
-              <AcademicSessionPill
-                academicYears={academicYears}
-                selectedYearId={activeYear?.id || ''}
-                onSelectYear={(newYr) => onSelectYear(newYr)}
-                variant="compact"
-                size="xs"
-                colorScheme="blue"
-              />
-            ) : (
-              <span className="px-2.5 py-0.5 rounded-md bg-blue-100 text-blue-900 font-black text-xs border border-blue-200">
-                {activeYear?.label || 'Session Active'}
-              </span>
-            )}
-
-            {/* Distinction Réinscription (Ancien) vs Inscription (Nouveau) */}
-            {isReturningStudent ? (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100/90 text-emerald-800 border border-emerald-300 flex items-center gap-1 shadow-2xs">
-                <Sparkles size={10} className="text-emerald-600 shrink-0" />
-                <span>Réinscription (Ancien Élève)</span>
-              </span>
-            ) : (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-amber-100/90 text-amber-900 border border-amber-300 flex items-center gap-1 shadow-2xs">
-                <span>Nouvelle Inscription</span>
-              </span>
-            )}
-
-            {admissionFeeDue === 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">
-                Frais d'entrée : 0 HTG (Offert / Exonéré)
-              </span>
-            )}
-          </div>
-
-          {/* Chiffres clés pour la session sélectionnée */}
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap text-xs">
-            <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center gap-1.5" title="Montant total exigible pour la session sélectionnée">
-              <span className="text-[10px] text-slate-500 font-bold uppercase">Attendu Session :</span>
-              <span className="font-mono font-black text-slate-900">{selectedSessionDue.toLocaleString()} HTG</span>
-            </div>
-
-            <div className="px-2.5 py-1 bg-white rounded-lg border border-slate-200 shadow-2xs flex items-center gap-1.5" title="Montant total encaissé pour la session sélectionnée">
-              <span className="text-[10px] text-emerald-700 font-bold uppercase">Encaissé :</span>
-              <span className="font-mono font-black text-emerald-600">{selectedSessionPaid.toLocaleString()} HTG</span>
-            </div>
-
-            <div className={`px-2.5 py-1 rounded-lg border shadow-2xs flex items-center gap-1.5 ${
-              selectedSessionRemaining <= 0 
-                ? 'bg-emerald-50 text-emerald-800 border-emerald-200' 
-                : 'bg-rose-50 text-rose-800 border-rose-200'
-            }`} title="Solde restant pour la session sélectionnée">
-              <span className="text-[10px] font-bold uppercase opacity-80">Reste Session :</span>
-              <span className="font-mono font-black">
-                {selectedSessionRemaining <= 0 ? '0 HTG (Soldé)' : `${selectedSessionRemaining.toLocaleString()} HTG`}
-              </span>
-            </div>
-
-            <div className={`px-2.5 py-1 rounded-lg border shadow-2xs flex items-center gap-1.5 ${
-              globalDebt <= 0 
-                ? 'bg-slate-50 text-slate-600 border-slate-200' 
-                : 'bg-amber-50 text-amber-900 border-amber-200'
-            }`} title="Dette arriérée cumulée sur les sessions antérieures">
-              <span className="text-[10px] font-bold uppercase opacity-80">Arriérés :</span>
-              <span className="font-mono font-black">
-                {globalDebt <= 0 ? '0 HTG (À jour)' : `${globalDebt.toLocaleString()} HTG`}
-              </span>
-            </div>
           </div>
         </div>
 
@@ -585,16 +432,12 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
               {/* CARTES KPI VISUELLES : LES 4 POSTES DE FRAIS */}
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
                 
-                {/* 1. Inscription / Réinscription */}
+                {/* 1. Inscription / Entrée */}
                 <div className="bg-white p-3 rounded-xl border border-slate-200/90 shadow-2xs hover:border-slate-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">
-                        {isReturningStudent ? 'Réinscription' : 'Inscription'}
-                      </span>
-                      <span className="text-[9px] font-bold text-slate-400">
-                        {isReturningStudent ? 'Ancien Élève' : 'Entrée'}
-                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-amber-700">Inscription</span>
+                      <span className="text-[9px] font-bold text-slate-400">Entrée</span>
                     </div>
                     <div className="mt-1">
                       <p className="text-lg font-black font-mono text-slate-900 leading-none">
@@ -609,9 +452,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                   <div className="mt-2.5 pt-1.5 border-t border-slate-100 flex items-center justify-between text-[10.5px]">
                     <span className="text-slate-400">Attendu :</span>
-                    <span className="font-mono font-bold text-slate-700">
-                      {admissionFeeDue === 0 ? 'Exonéré (0 HTG)' : `${admissionFeeDue.toLocaleString()} HTG`}
-                    </span>
+                    <span className="font-mono font-bold text-slate-700">{(student.inscriptionDue || 2500).toLocaleString()} HTG</span>
                   </div>
                 </div>
 
@@ -664,55 +505,37 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </div>
                 </div>
 
-                {/* 4. Frais de Campagnes & Activités Parascolaires */}
-                <div className="bg-purple-50/40 p-3 rounded-xl border border-purple-200/90 shadow-2xs hover:border-purple-300 transition-all flex flex-col justify-between">
+                {/* 4. Frais Spécifiques (Campagnes & Options) */}
+                <div className="bg-purple-50/30 p-3 rounded-xl border border-purple-200/80 shadow-2xs hover:border-purple-300 transition-all flex flex-col justify-between">
                   <div>
                     <div className="flex items-center justify-between gap-1">
-                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-800">Campagnes & Activités</span>
-                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 rounded border ${
-                        isCampaignPaid 
-                          ? 'text-emerald-800 bg-emerald-100/90 border-emerald-300' 
-                          : 'text-purple-700 bg-purple-100/80 border-purple-200'
-                      }`}>
-                        {isCampaignPaid ? 'Soldé (Reçu Détecté)' : (campaignPaidHTGEquiv > 0 ? 'Partiel' : 'En attente')}
-                      </span>
+                      <span className="text-[10px] font-black uppercase tracking-wider text-purple-700">Frais Spécifiques</span>
+                      <span className="text-[9px] font-bold text-purple-700 bg-purple-100/80 px-1.5 py-0.2 rounded border border-purple-200">Campagnes & Options</span>
                     </div>
                     <div className="mt-1">
                       <p className="text-lg font-black font-mono text-purple-950 leading-none">
-                        {analysis.campaignsPaidHTG > 0 ? (
+                        {analysis.miscSpecialPaidUSD > 0 ? (
                           <>
-                            {analysis.campaignsPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
-                          </>
-                        ) : analysis.campaignsPaidUSD > 0 ? (
-                          <>
-                            ${analysis.campaignsPaidUSD.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">USD</span>
-                          </>
-                        ) : campaignPaidHTGEquiv > 0 ? (
-                          <>
-                            {campaignPaidHTGEquiv.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
+                            ${analysis.miscSpecialPaidUSD.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">USD</span>
                           </>
                         ) : (
                           <>
-                            0 <span className="text-xs font-sans font-semibold text-slate-400">HTG</span>
+                            {analysis.miscSpecialPaidHTG.toLocaleString()} <span className="text-xs font-sans font-semibold text-purple-600">HTG</span>
                           </>
                         )}
                       </p>
-                      {analysis.campaignsPaidUSD > 0 && analysis.campaignsPaidHTG > 0 && (
+                      {analysis.miscSpecialPaidUSD > 0 && analysis.miscSpecialPaidHTG > 0 && (
                         <p className="text-xs font-mono font-bold text-purple-800 mt-0.5">
-                          + ${analysis.campaignsPaidUSD.toLocaleString()} USD
+                          + {analysis.miscSpecialPaidHTG.toLocaleString()} HTG
                         </p>
                       )}
-                      <p className="text-[10px] text-purple-700 font-medium mt-0.5">
-                        {analysis.campaignsReceiptCount > 0 
-                          ? `${analysis.campaignsReceiptCount} reçu(s) de campagne scellé(s)` 
-                          : 'Activités & cotisations ciblées'}
-                      </p>
+                      <p className="text-[10px] text-purple-500/80 mt-0.5">Prestations optionnelles</p>
                     </div>
                   </div>
                   <div className="mt-2.5 pt-1.5 border-t border-purple-100 flex items-center justify-between text-[10.5px]">
-                    <span className="text-purple-700 font-medium">Attendu :</span>
+                    <span className="text-purple-600">Total :</span>
                     <span className="font-mono font-bold text-purple-950">
-                      {campaignExpectedHTG === 0 && campaignPaidHTGEquiv === 0 ? '0 HTG (Non assigné)' : `${campaignExpectedHTG.toLocaleString()} HTG`}
+                      {(analysis.miscSpecialPaidHTG + (analysis.miscSpecialPaidUSD * (currentExchangeRate || 135))).toLocaleString()} HTG
                     </span>
                   </div>
                 </div>
@@ -831,16 +654,14 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                   <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-200/80">
-                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">
-                      {isReturningStudent ? 'Frais de Réinscription' : "Frais d'Inscription"}
-                    </span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Frais d'Inscription</span>
                     <span className="text-sm font-black font-mono text-slate-900 mt-0.5 block">
-                      {admissionFeeDue === 0 ? 'Exonéré (0 HTG)' : `${admissionFeeDue.toLocaleString()} HTG`}
+                      {(student.inscriptionDue || 2500).toLocaleString()} HTG
                     </span>
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
-                      {admissionFeeDue === 0 ? "Offert / Sans frais" : (student.inscriptionIsPaid ? "Acquitté" : (isNotEnrolledCurrent ? "En attente" : "Solde en cours"))}
+                      {isNotEnrolledCurrent ? "En attente" : "Acquitté"}
                     </span>
                   </div>
 
@@ -861,16 +682,6 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                     </span>
                     <span className="text-[10px] text-slate-500 mt-0.5 block">
                       Payé : {(student.miscPaid || 0).toLocaleString()} HTG
-                    </span>
-                  </div>
-
-                  <div className="bg-purple-50/50 p-2.5 rounded-lg border border-purple-200/80">
-                    <span className="text-[9px] font-bold text-purple-700 uppercase tracking-wider block">Campagnes & Activités</span>
-                    <span className="text-sm font-black font-mono text-purple-950 mt-0.5 block">
-                      {campaignPaidHTGEquiv.toLocaleString()} HTG
-                    </span>
-                    <span className="text-[10px] text-purple-600 mt-0.5 block font-medium">
-                      {isCampaignPaid ? 'Soldé (Acquitté)' : `Dû : ${campaignRemainingHTG.toLocaleString()} HTG`}
                     </span>
                   </div>
 
@@ -947,63 +758,6 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                 )}
               </div>
 
-              {/* SESSIONS FUTURES (EN PRÉPARATION) */}
-              {futureSessions.length > 0 && (
-                <div className="space-y-2 pt-2 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Sparkles size={13} className="text-indigo-600" />
-                      <span className="text-xs font-bold text-indigo-950">
-                        Future(s) Session(s) — Pré-inscription ({futureSessions.length})
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full">
-                      Frais prévisionnels (Non exigibles avant rentrée)
-                    </span>
-                  </div>
-
-                  <div className="space-y-2">
-                    {futureSessions.map((session, idx) => (
-                      <div 
-                        key={session.academicYearId || idx}
-                        className="p-3 rounded-xl border border-indigo-200/90 bg-indigo-50/30 space-y-2"
-                      >
-                        <div className="flex items-center justify-between gap-2 border-b border-indigo-100 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span className="text-xs font-black text-indigo-950">{session.academicYearLabel}</span>
-                            <span className="text-[10px] font-bold text-indigo-700 bg-indigo-100/70 px-1.5 py-0.2 rounded font-mono">
-                              {session.className} ({session.level})
-                            </span>
-                          </div>
-                          <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase bg-indigo-100 text-indigo-800 border border-indigo-200">
-                            Session en Préparation
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
-                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase">Inscription / Réinsc.</span>
-                            <span className="font-mono font-bold text-slate-800 text-[11px]">{session.inscriptionDue.toLocaleString()} HTG</span>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
-                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase">Scolarité Prévue</span>
-                            <span className="font-mono font-bold text-slate-800 text-[11px]">{session.tuitionDue.toLocaleString()} HTG</span>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
-                            <span className="text-[8.5px] text-slate-400 font-bold block uppercase">Frais Divers</span>
-                            <span className="font-mono font-bold text-slate-800 text-[11px]">{session.miscDue.toLocaleString()} HTG</span>
-                          </div>
-                          <div className="bg-white/80 p-1.5 rounded border border-indigo-100">
-                            <span className="text-[8.5px] text-indigo-600 font-bold block uppercase">Total Prévisionnel</span>
-                            <span className="font-mono font-black text-indigo-900 text-[11px]">{session.totalDue.toLocaleString()} HTG</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
             </div>
           )}
 
@@ -1070,7 +824,7 @@ export const StudentDossierAuditModal: React.FC<StudentDossierAuditModalProps> =
                       txFilter === 'SPECIFIQUES' ? 'bg-purple-700 text-white' : 'bg-purple-50 text-purple-800 hover:bg-purple-100'
                     }`}
                   >
-                    Campagnes & Activités ({analysis.campaignsReceiptCount})
+                    Campagnes & Options
                   </button>
                 </div>
               </div>

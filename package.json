@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx server.ts",
     "keep-alive": "tsx scripts/keep_alive.ts",
-    "start": "node server.ts",
+    "start": "tsx server.ts",
     "build": "vite build",
     "generate-icons": "node scripts/generate-icons.js",
     "lint": "tsc --noEmit",

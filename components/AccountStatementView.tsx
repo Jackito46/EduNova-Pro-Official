@@ -797,42 +797,33 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!activeYearId || !user?.school_id) return;
     setLoading(true);
     try {
-      const { data: enrollment } = await supabase
-        .from('enrollments')
-        .select('*, class:classes(id, name)')
-        .eq('school_id', user.school_id)
-        .eq('student_id', student.id)
-        .eq('academic_year_id', activeYearId)
-        .maybeSingle();
-
-      const { data: plan } = await supabase
-        .from('fee_plans')
-        .select('*')
-        .eq('school_id', user.school_id)
-        .eq('class_id', enrollment?.class_id || student.class_id)
-        .eq('academic_year_id', activeYearId)
-        .maybeSingle();
-
-      const { data: rawPayments } = await supabase
-        .from('payments')
-        .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-        .eq('school_id', user.school_id)
-        .eq('student_id', student.id)
-        .order('created_at', { ascending: false });
-
-      const payments = rawPayments?.filter(p => !p.academic_year_id || p.academic_year_id === activeYearId) || [];
-
-      const { data: rateRes } = await supabase
-        .from('exchange_rates')
-        .select('rate_usd_to_htg')
-        .eq('school_id', user.school_id)
-        .order('effective_date', { ascending: false })
-        .limit(1);
-      const exchangeRate = rateRes?.[0]?.rate_usd_to_htg || 132.50;
-
-      let campaignData: any[] = [];
-      try {
-        const { data } = await supabase
+      // Exécution parallèle haute vitesse pour afficher l'audit financier et les paiements de l'élève sans attente
+      const [
+        { data: enrollment },
+        { data: rawPayments },
+        { data: rateRes },
+        { data: campaignResData }
+      ] = await Promise.all([
+        supabase
+          .from('enrollments')
+          .select('*, class:classes(id, name)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', student.id)
+          .eq('academic_year_id', activeYearId)
+          .maybeSingle(),
+        supabase
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+          .eq('school_id', user.school_id)
+          .eq('student_id', student.id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('exchange_rates')
+          .select('rate_usd_to_htg')
+          .eq('school_id', user.school_id)
+          .order('effective_date', { ascending: false })
+          .limit(1),
+        supabase
           .from('student_ad_hoc_fees')
           .select(`
             id,
@@ -841,11 +832,25 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             campaign:ad_hoc_campaigns!campaign_id(id, name, amount, currency, status, due_date, type, academic_year_id)
           `)
           .eq('school_id', user.school_id)
-          .eq('student_id', student.id);
-        campaignData = data || [];
-      } catch (err) {
-        console.error("Erreur chargement student_ad_hoc_fees:", err);
+          .eq('student_id', student.id)
+      ]);
+
+      const targetClassId = enrollment?.class_id || student.class_id;
+      let plan = null;
+      if (targetClassId) {
+        const { data: planData } = await supabase
+          .from('fee_plans')
+          .select('*')
+          .eq('school_id', user.school_id)
+          .eq('class_id', targetClassId)
+          .eq('academic_year_id', activeYearId)
+          .maybeSingle();
+        plan = planData;
       }
+
+      const payments = rawPayments?.filter(p => !p.academic_year_id || p.academic_year_id === activeYearId) || [];
+      const exchangeRate = rateRes?.[0]?.rate_usd_to_htg || 132.50;
+      const campaignData = campaignResData || [];
 
       const activeCampaigns = campaignData
         .map((fee: any) => {

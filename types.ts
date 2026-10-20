@@ -363,21 +363,7 @@ export interface School {
   nif?: string;
   foundation_year?: number;
   motto?: string;
-}
-
-export type PrinterConnectionType = 'USB' | 'Bluetooth' | 'Network';
-export type ReceiptPaperWidth = '58mm' | '80mm';
-
-export interface PrinterSettings {
-  printer_type: PrinterConnectionType;
-  paper_width: ReceiptPaperWidth;
-  printer_name?: string;
-  network_ip?: string;
-  network_port?: string;
-  auto_cut?: boolean;
-  header_message?: string;
-  footer_message?: string;
-  feed_lines?: number;
+  exchange_rate?: number;
 }
 
 export interface CourseEvaluation {
@@ -583,4 +569,20 @@ export interface HomeworkAudienceStats {
   completed_percentage: number;
   parent_acknowledged_count: number;
 }
+
+export type PrinterConnectionType = 'USB' | 'NETWORK' | 'BLUETOOTH' | 'Network' | 'Bluetooth';
+export type ReceiptPaperWidth = '58mm' | '80mm';
+
+export interface PrinterSettings {
+  printer_type: PrinterConnectionType;
+  paper_width: ReceiptPaperWidth;
+  printer_name?: string;
+  network_ip?: string;
+  network_port?: string;
+  auto_cut?: boolean;
+  header_message?: string;
+  footer_message?: string;
+  feed_lines?: number;
+}
+
 

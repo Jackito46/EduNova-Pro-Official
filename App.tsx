@@ -163,7 +163,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
   // Define role groups for easier management
   const adminRoles = [UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR];
   const financeRoles = [...adminRoles, UserRole.ACCOUNTANT];
-  const cashierRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY];
+  const cashierRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY, UserRole.SUPERVISOR];
   const hrRoles = [...adminRoles]; // Removed SECRETARY from hrRoles
   const studentMgmtRoles = [...adminRoles, UserRole.SECRETARY];
   const academicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
@@ -362,6 +362,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/economat" element={<ModuleGuard moduleId="finance" moduleName="Direction Économat" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><FinanceHub user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/frais" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/paiement" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/economat/paiements" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/factures" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/facture/:id" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/recus" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />

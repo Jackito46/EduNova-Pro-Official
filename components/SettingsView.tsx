@@ -67,8 +67,7 @@ import {
   Wrench,
   X,
   Search,
-  Activity,
-  Printer
+  Activity
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams, Link } from 'react-router-dom';
@@ -102,9 +101,8 @@ import { PaymentMethodManager } from './PaymentMethodManager';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { ApiCredentialsVault } from './ApiCredentialsVault';
 import { KobaraSettingsTab } from './KobaraSettingsTab';
-import { PrinterSettingsTab } from './PrinterSettingsTab';
 
-type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'printer' | 'kobara' | 'gateways' | 'security' | 'diagnostic';
+type SettingsTab = 'school' | 'campuses' | 'academic' | 'finance' | 'payment_methods' | 'kobara' | 'gateways' | 'security' | 'diagnostic';
 
 interface SettingsViewProps {
   user: UserProfile;
@@ -149,7 +147,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['school', 'campuses', 'academic', 'finance', 'payment_methods', 'printer', 'kobara', 'gateways', 'security', 'diagnostic'].includes(tabParam)) {
+    if (tabParam && ['school', 'campuses', 'academic', 'finance', 'payment_methods', 'kobara', 'gateways', 'security', 'diagnostic'].includes(tabParam)) {
       setActiveTab(tabParam as SettingsTab);
     }
   }, [searchParams]);
@@ -1406,30 +1404,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
             if (rpcError) throw rpcError;
           }
         }
-
-        // Synchronisation automatique de la classe des élèves réinscrits pour la session activée
-        try {
-          const { data: enrolledStudents } = await supabase
-            .from('enrollments')
-            .select('student_id, class_id')
-            .eq('academic_year_id', yearId)
-            .eq('school_id', user.school_id)
-            .not('class_id', 'is', null);
-
-          if (enrolledStudents && enrolledStudents.length > 0) {
-            for (const item of enrolledStudents) {
-              if (item.student_id && item.class_id) {
-                await supabase
-                  .from('students')
-                  .update({ class_id: item.class_id })
-                  .eq('id', item.student_id)
-                  .eq('school_id', user.school_id);
-              }
-            }
-          }
-        } catch (syncErr) {
-          console.warn("Synchronisation des classes lors de l'activation:", syncErr);
-        }
       } else {
         const { error } = await supabase
           .from('academic_years')
@@ -1958,14 +1932,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       labelTablet: 'Modes de Règlement',
       labelMobile: 'Règlements',
       icon: Wallet 
-    },
-    { 
-      id: 'printer', 
-      label: 'Imprimante & Tickets Reçus', 
-      labelDesktopCompact: 'Imprimante & Reçus',
-      labelTablet: 'Imprimante',
-      labelMobile: 'Imprimante',
-      icon: Printer 
     },
     { 
       id: 'gateways', 
@@ -3837,16 +3803,6 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
        )}
         {activeTab === 'payment_methods' && (
           <PaymentMethodManager
-            schoolData={schoolData}
-            setSchoolData={setSchoolData}
-            handleUpdateSchool={handleUpdateSchool}
-            saving={saving}
-            canManageAllCampuses={canManageAllCampuses}
-          />
-        )}
-
-        {activeTab === 'printer' && (
-          <PrinterSettingsTab
             schoolData={schoolData}
             setSchoolData={setSchoolData}
             handleUpdateSchool={handleUpdateSchool}
