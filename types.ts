@@ -518,6 +518,7 @@ export interface HomeworkAssignmentWithDetails extends HomeworkAssignment {
   subject_code?: string;
   teacher_name?: string;
   teacher_email?: string;
+  academic_year_label?: string;
   stats?: HomeworkAudienceStats;
   student_status?: HomeworkStudentRead;
 }

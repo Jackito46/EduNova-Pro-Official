@@ -16,7 +16,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   Cell, PieChart, Pie, Legend 
 } from 'recharts';
-import { UserProfile, UserRole, SchoolClass, Subject } from '../types';
+import { UserProfile, UserRole, SchoolClass, Subject, AcademicYear } from '../types';
 import { 
   HomeworkAssignment, 
   HomeworkAssignmentWithDetails, 
@@ -243,6 +243,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [assignments, setAssignments] = useState<HomeworkAssignmentWithDetails[]>([]);
   const [classes, setClasses] = useState<SchoolClass[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [academicYears, setAcademicYears] = useState<AcademicYear[]>([]);
   const [classSubjects, setClassSubjects] = useState<Array<{ id?: string; class_id: string; subject_id: string }>>([]);
   const [teacherStaffId, setTeacherStaffId] = useState<string | null>(null);
   const [teacherAssignments, setTeacherAssignments] = useState<Array<{ class_id?: string; class_name?: string; subject_id?: string; subject_name?: string }>>([]);
@@ -252,13 +253,15 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
   const [allReadsData, setAllReadsData] = useState<HomeworkStudentRead[]>([]);
   const [dbTableMissing, setDbTableMissing] = useState(false);
 
-  // Filters & Multi-Tenant / Multi-Campus Scope
+  // Filters & Multi-Tenant / Multi-Campus Scope & Session Académique
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedClassId, setSelectedClassId] = useState<string>('ALL');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string>('ALL');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>('ALL'); // ALL, PENDING, DUE_SOON, COMPLETED
+  const [selectedSessionFilter, setSelectedSessionFilter] = useState<string>('ACTIVE'); // ACTIVE, ALL, or academic_year_id
   const [selectedCampusFilter, setSelectedCampusFilter] = useState<string>(() => user.campus_id || currentCampusId || 'ALL');
   const [formCampusFilter, setFormCampusFilter] = useState<string>(() => user.campus_id || 'ALL');
+  const [formAcademicYearId, setFormAcademicYearId] = useState<string>(() => activeAcademicYear?.id || '');
 
   useEffect(() => {
     if (user.campus_id) {
@@ -415,17 +418,31 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       let csQuery = supabase.from('class_subjects').select('id, class_id, subject_id, school_id');
       if (effectiveSchoolId) csQuery = csQuery.or(`school_id.eq.${effectiveSchoolId},school_id.is.null`);
 
-      const [classRes, subjectRes, studentRes, csRes] = await Promise.all([
+      let yearQuery = supabase.from('academic_years').select('*');
+      if (effectiveSchoolId) yearQuery = yearQuery.eq('school_id', effectiveSchoolId);
+      yearQuery = yearQuery.order('created_at', { ascending: false });
+
+      const [classRes, subjectRes, studentRes, csRes, yearRes] = await Promise.all([
         classQuery, 
         subjectQuery, 
         studentQuery,
-        csQuery
+        csQuery,
+        yearQuery
       ]);
 
       if (classRes.data) setClasses(classRes.data);
       if (subjectRes.data) setSubjects(subjectRes.data);
       if (studentRes.data) setAllClassStudents(studentRes.data);
       if (csRes.data) setClassSubjects(csRes.data);
+      if (yearRes.data) {
+        setAcademicYears(yearRes.data);
+        if (!formAcademicYearId && activeAcademicYear) {
+          setFormAcademicYearId(activeAcademicYear.id);
+        } else if (!formAcademicYearId && yearRes.data.length > 0) {
+          const act = yearRes.data.find((y: any) => y.is_active || y.status === 'ACTIVE') || yearRes.data[0];
+          setFormAcademicYearId(act.id);
+        }
+      }
 
       // If user is a teacher, fetch their staff record and assigned classes & subjects
       if (isTeacher) {
@@ -528,6 +545,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
           const itemClass = classes.find(c => c.id === item.class_id);
           const effectiveCampusId = item.campus_id || item.classes?.campus_id || itemClass?.campus_id || null;
           const campusObj = campuses?.find(cp => cp.id === effectiveCampusId);
+          const sessionObj = academicYears.find(y => y.id === item.academic_year_id);
+          const sessionLabel = sessionObj?.label || (item.academic_year_id ? 'Session' : (activeAcademicYear?.label || 'Session en cours'));
           return {
             ...item,
             campus_id: effectiveCampusId,
@@ -535,7 +554,8 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             class_name: item.classes?.name || itemClass?.name || 'Classe non assignée',
             subject_name: item.subjects?.name || 'Matière générale',
             subject_code: item.subjects?.code || '',
-            teacher_name: item.profiles?.full_name || item.profiles?.email || 'Enseignant'
+            teacher_name: item.profiles?.full_name || item.profiles?.email || 'Enseignant',
+            academic_year_label: sessionLabel
           };
         });
         setAssignments(mapped);
@@ -559,7 +579,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     } finally {
       setLoading(false);
     }
-  }, [effectiveSchoolId, user.id, user.campus_id, isTeacher, isAdminOrDirector, selectedCampusFilter, canManageHomework, teacherAssignedClassIds, classes, campuses]);
+  }, [effectiveSchoolId, user.id, user.campus_id, isTeacher, isAdminOrDirector, selectedCampusFilter, canManageHomework, teacherAssignedClassIds, classes, campuses, academicYears, activeAcademicYear]);
 
   // Load student tracking status for current user (if student or parent)
   const fetchStudentReadStatus = useCallback(async () => {
@@ -921,6 +941,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
     const headers = [
       "ID Devoir",
+      "Session Scolaire",
       "Classe",
       "Matière",
       "Titre",
@@ -946,6 +967,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
       return [
         a.id.substring(0, 8),
+        `"${a.academic_year_label || 'Session en cours'}"`,
         `"${a.class_name || ''}"`,
         `"${a.subject_name || ''}"`,
         `"${(a.title || '').replace(/"/g, '""')}"`,
@@ -988,6 +1010,12 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
       ? 'Toutes les classes' 
       : (classes.find(c => c.id === selectedClassId)?.name || 'Classe');
 
+    const sessionFilterLabel = selectedSessionFilter === 'ACTIVE' 
+      ? (activeAcademicYear?.label ? `Session active (${activeAcademicYear.label})` : 'Session en cours')
+      : selectedSessionFilter === 'ALL' 
+      ? 'Toutes les sessions' 
+      : (academicYears.find(y => y.id === selectedSessionFilter)?.label || 'Session');
+
     const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
     const pageWidth = doc.internal.pageSize.getWidth();
 
@@ -1004,7 +1032,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
     doc.setFontSize(9);
     doc.setTextColor(100, 116, 139);
-    doc.text(`Classe ciblée : ${currentClassName} | Généré le : ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} par ${user.full_name || user.email}`, 14, 28);
+    doc.text(`Classe ciblée : ${currentClassName} | Session : ${sessionFilterLabel} | Généré le : ${new Date().toLocaleDateString('fr-FR', { day: '2-digit', month: 'long', year: 'numeric' })} par ${user.full_name || user.email}`, 14, 28);
 
     // Tableau des devoirs
     const tableBody = listToExport.map(a => {
@@ -1017,6 +1045,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
       return [
         new Date(a.due_date).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' }),
+        a.academic_year_label || '-',
         a.class_name || '-',
         a.subject_name || '-',
         a.title,
@@ -1028,7 +1057,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
     autoTable(doc, {
       startY: 33,
-      head: [['Échéance', 'Classe', 'Matière', 'Titre de l\'exercice', 'Consignes officielles', 'Enseignant', 'Modalité']],
+      head: [['Échéance', 'Session', 'Classe', 'Matière', 'Titre de l\'exercice', 'Consignes officielles', 'Enseignant', 'Modalité']],
       body: tableBody,
       theme: 'grid',
       headStyles: {
@@ -1372,10 +1401,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
     setSubmittingForm(true);
     try {
+      const targetSessionId = formAcademicYearId || activeAcademicYear?.id || null;
       const payload: any = {
         school_id: effectiveSchoolId,
         campus_id: targetCampusId,
-        academic_year_id: activeAcademicYear?.id || null,
+        academic_year_id: targetSessionId,
         class_id: formClassId,
         subject_id: formSubjectId,
         teacher_id: editingAssignment ? editingAssignment.teacher_id : user.id,
@@ -1707,6 +1737,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     }
 
     setFormClassId(initialClassId);
+    setFormAcademicYearId(activeAcademicYear?.id || academicYears.find(y => y.is_active || y.status === 'ACTIVE')?.id || '');
     setFormDuration(30);
     setFormSubmissionType('IN_CLASS');
     setFormStatus('PUBLISHED');
@@ -1727,6 +1758,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
     setFormTitle(assignment.title);
     setFormDescription(assignment.description);
     setFormClassId(assignment.class_id);
+    setFormAcademicYearId(assignment.academic_year_id || activeAcademicYear?.id || '');
     if (assignment.campus_id) {
       setFormCampusFilter(assignment.campus_id);
     }
@@ -1955,6 +1987,19 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
         if (!matchesCampus) return false;
       }
 
+      // Academic Session Filter (Session en cours / session spécifique / toutes les sessions)
+      if (selectedSessionFilter === 'ACTIVE') {
+        if (activeAcademicYear) {
+          // Devoirs rattachés à la session active, ou devoirs sans session explicite rattachés par défaut
+          const matchesActive = !a.academic_year_id || a.academic_year_id === activeAcademicYear.id;
+          if (!matchesActive) return false;
+        }
+      } else if (selectedSessionFilter !== 'ALL') {
+        if (a.academic_year_id !== selectedSessionFilter) {
+          return false;
+        }
+      }
+
       // Teacher filter: scope (all class homework vs only homework given by this teacher)
       if (isTeacher && !isAdminOrDirector && teacherScope === 'MINE_ONLY') {
         if (a.teacher_id !== user.id) return false;
@@ -1991,7 +2036,7 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
 
       return true;
     });
-  }, [assignments, searchQuery, selectedClassId, selectedSubjectId, selectedStatusFilter, studentReads, isTeacher, isAdminOrDirector, teacherScope, user.id, isStudent, isParent, hasMultipleCampuses, selectedCampusFilter, classes]);
+  }, [assignments, searchQuery, selectedClassId, selectedSubjectId, selectedStatusFilter, selectedSessionFilter, activeAcademicYear, studentReads, isTeacher, isAdminOrDirector, teacherScope, user.id, isStudent, isParent, hasMultipleCampuses, selectedCampusFilter, classes]);
 
   // Calculations for quick dashboard stats
   const statsOverview = useMemo(() => {
@@ -2211,9 +2256,17 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
             <BookOpen size={18} />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight truncate">
-              Gestion Centralisée des Devoirs
-            </h1>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-sm sm:text-base font-black text-slate-900 tracking-tight leading-tight truncate">
+                Gestion Centralisée des Devoirs
+              </h1>
+              {activeAcademicYear && (
+                <span className="inline-flex items-center gap-1.5 px-2 py-0.5 bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-200/80 text-indigo-800 text-[10px] font-black rounded-lg shadow-2xs" title={`Session scolaire en cours : ${activeAcademicYear.label}`}>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Session {activeAcademicYear.label}</span>
+                </span>
+              )}
+            </div>
             <p className="text-[11px] text-slate-500 font-medium whitespace-nowrap truncate">
               Cahier de textes & suivi des exercices
             </p>
@@ -2526,6 +2579,33 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                 title="Filtrer par matière"
               />
 
+              {/* Filtre de Session Scolaire / Année Académique */}
+              <SelectPill
+                options={[
+                  { 
+                    value: 'ACTIVE', 
+                    label: activeAcademicYear ? `Session active (${activeAcademicYear.label})` : 'Session en cours',
+                    color: 'indigo'
+                  },
+                  ...academicYears
+                    .filter(y => y.id !== activeAcademicYear?.id)
+                    .map(y => ({
+                      value: y.id,
+                      label: `Session ${y.label}${y.status === 'ARCHIVED' ? ' (Archivée)' : ''}`,
+                      color: y.status === 'ARCHIVED' ? 'slate' : 'violet'
+                    })),
+                  { value: 'ALL', label: 'Toutes les sessions' }
+                ]}
+                value={selectedSessionFilter}
+                onChange={(val) => setSelectedSessionFilter(val)}
+                variant="pill"
+                size="sm"
+                colorScheme="indigo"
+                icon={Calendar}
+                placeholder="Session"
+                title="Filtrer les devoirs par session scolaire"
+              />
+
               <SelectPill
                 options={[
                   { value: 'ALL', label: 'Tous les statuts' },
@@ -2645,6 +2725,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                           <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                             {assignment.class_name}
                           </span>
+                          {assignment.academic_year_label && (
+                            <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200/80 flex items-center gap-0.5" title={`Session scolaire : ${assignment.academic_year_label}`}>
+                              <span>🎓 {assignment.academic_year_label}</span>
+                            </span>
+                          )}
                           {hasMultipleCampuses && assignment.campus_name && (
                             <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200/80 flex items-center gap-0.5" title={`Annexe : ${assignment.campus_name}`}>
                               <Building2 size={10} className="text-sky-600" />
@@ -3039,6 +3124,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                     <h3 className="text-sm font-black text-slate-900 truncate">
                       {editingAssignment ? 'Modifier le Devoir' : 'Nouveau Devoir'}
                     </h3>
+                    {(activeAcademicYear || formAcademicYearId) && (
+                      <span className="text-[9.5px] font-black px-1.5 py-0.2 rounded bg-purple-50 text-purple-800 border border-purple-200" title="Session académique rattachée">
+                        🎓 Session {academicYears.find(y => y.id === formAcademicYearId)?.label || activeAcademicYear?.label || 'Session en cours'}
+                      </span>
+                    )}
                     {school?.name && (
                       <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200" title="Établissement (Multi-Tenant)">
                         🏢 {school.name}
@@ -3072,6 +3162,41 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
               
               {/* Row 1 : Classe & Matière (Multi-Tenant & Multi-Annexes) */}
               <div className="space-y-2 p-3 bg-slate-50/70 rounded-xl border border-slate-200/90">
+                {/* Sélecteur de Session Académique */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-slate-200/80">
+                  <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-slate-700">
+                    <Calendar size={12} className="text-indigo-600 shrink-0" />
+                    <span>Session académique :</span>
+                    {activeAcademicYear && (formAcademicYearId === activeAcademicYear.id || !formAcademicYearId) && (
+                      <span className="text-[9.5px] font-black px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 border border-emerald-200 flex items-center gap-0.5">
+                        <span className="w-1 h-1 rounded-full bg-emerald-600"></span>
+                        <span>Session active</span>
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    <SelectPill
+                      options={
+                        academicYears.length > 0
+                          ? academicYears.map(y => ({
+                              value: y.id,
+                              label: `${y.label}${y.id === activeAcademicYear?.id ? ' (Active)' : y.status === 'ARCHIVED' ? ' (Archivée)' : ''}`,
+                              color: y.id === activeAcademicYear?.id ? 'indigo' : undefined
+                            }))
+                          : [
+                              { value: activeAcademicYear?.id || 'active', label: activeAcademicYear?.label || 'Session en cours' }
+                            ]
+                      }
+                      value={formAcademicYearId || activeAcademicYear?.id || ''}
+                      onChange={(val) => setFormAcademicYearId(val)}
+                      variant="compact"
+                      size="xs"
+                      colorScheme="indigo"
+                      title="Associer ce devoir à une session scolaire"
+                    />
+                  </div>
+                </div>
                 {/* Sélecteur / Filtre d'annexe si multi-campus */}
                 {hasMultipleCampuses && (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 pb-2 border-b border-slate-200/80">
@@ -4570,6 +4695,11 @@ export const HomeworkManager: React.FC<HomeworkManagerProps> = ({ user, defaultT
                   <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
                     {activeDetailAssignment.class_name}
                   </span>
+                  {activeDetailAssignment.academic_year_label && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 flex items-center gap-1" title={`Session scolaire : ${activeDetailAssignment.academic_year_label}`}>
+                      <span>🎓 Session : {activeDetailAssignment.academic_year_label}</span>
+                    </span>
+                  )}
                   {activeDetailAssignment.campus_name && (
                     <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-sky-50 text-sky-800 border border-sky-200 flex items-center gap-1" title={`Annexe : ${activeDetailAssignment.campus_name}`}>
                       <Building2 size={11} className="text-sky-600" />

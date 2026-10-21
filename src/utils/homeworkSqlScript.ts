@@ -39,11 +39,16 @@ CREATE TABLE IF NOT EXISTS public.homework_assignments (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Index pour optimiser les requêtes fréquentes
+-- Index pour optimiser les requêtes fréquentes & isolation Multi-Tenant
 CREATE INDEX IF NOT EXISTS idx_homework_school_class ON public.homework_assignments (school_id, class_id);
+CREATE INDEX IF NOT EXISTS idx_homework_school_academic_year ON public.homework_assignments (school_id, academic_year_id);
 CREATE INDEX IF NOT EXISTS idx_homework_teacher ON public.homework_assignments (teacher_id);
 CREATE INDEX IF NOT EXISTS idx_homework_due_date ON public.homework_assignments (class_id, due_date);
 CREATE INDEX IF NOT EXISTS idx_homework_subject ON public.homework_assignments (subject_id);
+
+-- Migration idempotente si la table existait déjà sans ces colonnes
+ALTER TABLE public.homework_assignments ADD COLUMN IF NOT EXISTS academic_year_id UUID DEFAULT NULL;
+ALTER TABLE public.homework_assignments ADD COLUMN IF NOT EXISTS campus_id UUID DEFAULT NULL;
 
 
 -- 2. Table de Traçabilité des Lectures & Accusés de Réception (homework_student_reads)
