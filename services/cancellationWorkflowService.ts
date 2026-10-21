@@ -1,282 +1,38 @@
-import { supabase } from '../supabase';
+import { supabase, isValidUuid } from '../supabase';
 import { UserProfile, UserRole } from '../types';
+import { normalizeUserRole } from '../components/RoleGuard';
 import { AuditLogger } from '../utils/auditLogger';
 
-export type CancellationStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED';
-
-export interface CancellationMetadata {
-  status: CancellationStatus;
-  requested_by?: string;
-  requested_at?: string;
-  requested_by_name?: string;
-  reason?: string;
-  approved_by?: string;
-  approved_at?: string;
-  approved_by_name?: string;
-  rejected_by?: string;
-  rejected_at?: string;
-  rejection_reason?: string;
-}
-
-/**
- * Détermine si l'utilisateur a les prérogatives pour valider ou rejeter une annulation
- * (Rôles requis : Admin, School Admin, Super Admin, Direction, Directeur)
- */
-export function canUserApproveCancellation(user: UserProfile | null | undefined): boolean {
-  if (!user) return false;
-  if (user.is_super_admin) return true;
-  
-  const role = String(user.role || '').toUpperCase().trim();
-  const allowedRoles = [
-    'SUPER_ADMIN',
-    'SCHOOL_ADMIN',
-    'ADMIN',
-    'DIRECTOR',
-    'DIRECTEUR',
-    'DIRECTION',
-    'PRINCIPAL',
-    UserRole.SUPER_ADMIN,
-    UserRole.SCHOOL_ADMIN,
-    UserRole.DIRECTOR
-  ];
-
-  return allowedRoles.some(r => String(r).toUpperCase().trim() === role);
-}
-
-/**
- * Analyse le statut d'annulation d'un paiement de façon rétrocompatible et résiliente
- */
-export function parseCancellationInfo(payment: any): {
+export interface CancellationInfo {
   isPending: boolean;
   isCancelled: boolean;
-  isRejected: boolean;
-  reason: string;
-  requestedBy: string;
-  requestedByName: string;
-  requestedAt: string;
+  status: string;
+  reason?: string;
+  requestedBy?: string;
+  requestedByName?: string;
+  requestedAt?: string;
+  approvedBy?: string;
   approvedByName?: string;
+  approvedAt?: string;
+  rejectedBy?: string;
   rejectedByName?: string;
-  rejectionReason?: string;
-} {
-  if (!payment) {
-    return {
-      isPending: false,
-      isCancelled: false,
-      isRejected: false,
-      reason: '',
-      requestedBy: '',
-      requestedByName: '',
-      requestedAt: ''
-    };
-  }
-
-  // 1. Colonne explicite cancellation_status
-  const explicitStatus = String(payment.cancellation_status || '').toUpperCase();
-  const rawStatus = String(payment.status || '').toUpperCase();
-
-  // 2. Vérification dans cancel_reason ou notes si sérialisé en JSON
-  let parsedJson: any = null;
-  const rawReason = String(payment.cancel_reason || payment.cancellation_reason || '');
-  if (rawReason.startsWith('PENDING_APPROVAL:')) {
-    try {
-      parsedJson = JSON.parse(rawReason.replace('PENDING_APPROVAL:', ''));
-    } catch {}
-  } else if (rawReason.startsWith('REJECTED:')) {
-    try {
-      parsedJson = JSON.parse(rawReason.replace('REJECTED:', ''));
-    } catch {}
-  } else if (rawReason.startsWith('{') && rawReason.endsWith('}')) {
-    try {
-      parsedJson = JSON.parse(rawReason);
-    } catch {}
-  }
-
-  const isPending = 
-    explicitStatus === 'PENDING' || 
-    rawStatus === 'ANNULATION_DEMANDEE' || 
-    rawStatus === 'PENDING_CANCELLATION' ||
-    Boolean(parsedJson?.is_pending);
-
-  const isCancelled = rawStatus === 'ANNULE' || rawStatus === 'CANCELLED' || explicitStatus === 'APPROVED';
-  const isRejected = explicitStatus === 'REJECTED' || Boolean(parsedJson?.is_rejected) || rawReason.startsWith('REJECTED:');
-
-  const reason = payment.cancellation_reason || parsedJson?.reason || payment.cancel_reason || '';
-  const requestedBy = payment.cancellation_requested_by || parsedJson?.requested_by || '';
-  const requestedByName = payment.cancellation_requested_by_name || parsedJson?.requested_by_name || '';
-  const requestedAt = payment.cancellation_requested_at || parsedJson?.requested_at || payment.cancelled_at || '';
-  const approvedByName = payment.cancellation_approved_by_name || parsedJson?.approved_by_name;
-  const rejectedByName = payment.cancellation_rejected_by_name || parsedJson?.rejected_by_name;
-  const rejectionReason = payment.cancellation_rejection_reason || parsedJson?.rejection_reason;
-
-  return {
-    isPending,
-    isCancelled,
-    isRejected,
-    reason,
-    requestedBy,
-    requestedByName,
-    requestedAt,
-    approvedByName,
-    rejectedByName,
-    rejectionReason
-  };
+  rejectedAt?: string;
 }
 
-/**
- * Étape 1 : Un agent initie une demande d'annulation
- * Vérifie d'abord l'existence de la transaction dans le système.
- * Le solde de l'élève reste INTACT tant que la Direction/Admin n'a pas validé.
- */
-export async function requestPaymentCancellation({
-  paymentId,
-  sourceTable = 'payments',
-  reason,
-  user,
-  studentId,
-  paymentRef,
-  amount,
-  currency = 'HTG'
-}: {
+export interface RequestCancellationParams {
   paymentId: string;
-  sourceTable?: 'payments' | 'supply_payments' | 'school_supplies';
+  sourceTable?: 'payments' | 'school_supplies' | 'supply_payments' | string;
   reason: string;
   user: UserProfile;
   studentId?: string;
   paymentRef?: string;
   amount?: number;
   currency?: string;
-}): Promise<{ success: boolean; message: string; error?: string }> {
-  if (!paymentId) {
-    return { success: false, message: 'ID de transaction introuvable' };
-  }
-  if (!reason || !reason.trim()) {
-    return { success: false, message: "Le motif d'annulation est obligatoire." };
-  }
-
-  // Vérification rigoureuse de l'existence de la transaction dans la base
-  try {
-    const { data: existingPayment, error: checkError } = await supabase
-      .from(sourceTable)
-      .select('id, status, amount, student_id, cancellation_status')
-      .eq('id', paymentId)
-      .maybeSingle();
-
-    if (checkError || !existingPayment) {
-      return { 
-        success: false, 
-        message: "Impossible de créer la demande : la transaction spécifiée n'existe pas dans le système." 
-      };
-    }
-
-    if (existingPayment.status === 'ANNULE' && existingPayment.cancellation_status === 'APPROVED') {
-      return {
-        success: false,
-        message: "Cette transaction est déjà définitivement annulée."
-      };
-    }
-  } catch (err: any) {
-    console.warn("Vérification existence transaction:", err);
-  }
-
-  const now = new Date().toISOString();
-  const agentName = user.full_name || user.email || 'Agent de caisse';
-
-  const cancellationPayload = {
-    is_pending: true,
-    reason: reason.trim(),
-    requested_by: user.id,
-    requested_by_name: agentName,
-    requested_at: now,
-    student_id: studentId,
-    amount,
-    currency,
-    ref: paymentRef
-  };
-
-  const serializedReason = `PENDING_APPROVAL:${JSON.stringify(cancellationPayload)}`;
-
-  try {
-    // Tentative de mise à jour avec les colonnes étendues
-    let updatePayload: any = {
-      cancellation_status: 'PENDING',
-      cancellation_requested_by: user.id,
-      cancellation_requested_at: now,
-      cancellation_requested_by_name: agentName,
-      cancellation_reason: reason.trim(),
-      cancel_reason: serializedReason
-    };
-
-    const { error: primaryError } = await supabase
-      .from(sourceTable)
-      .update(updatePayload)
-      .eq('id', paymentId);
-
-    if (primaryError) {
-      // Si une colonne spécifique n'existe pas encore dans le schéma SQL,
-      // on enregistre de manière résiliente dans cancel_reason
-      const fallbackPayload = {
-        cancel_reason: serializedReason
-      };
-      const { error: fallbackError } = await supabase
-        .from(sourceTable)
-        .update(fallbackPayload)
-        .eq('id', paymentId);
-
-      if (fallbackError) {
-        throw new Error(fallbackError.message || primaryError.message);
-      }
-    }
-
-    // Journal d'audit pour traçabilité de la demande
-    await AuditLogger.log({
-      school_id: user.school_id || '',
-      user_id: user.id,
-      action: 'PAYMENT_CANCELLATION_REQUESTED',
-      entity_type: 'payment',
-      entity_id: paymentId,
-      details: {
-        reason: reason.trim(),
-        agent_name: agentName,
-        payment_ref: paymentRef,
-        amount,
-        currency,
-        source_table: sourceTable,
-        note: "Demande d'annulation saisie par un agent - En attente d'approbation Direction"
-      }
-    });
-
-    return {
-      success: true,
-      message: "Demande d'annulation transmise à la Direction. Le solde de l'élève reste inchangé jusqu'à validation."
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      message: "Erreur lors de la soumission de la demande d'annulation",
-      error: err.message || String(err)
-    };
-  }
 }
 
-/**
- * Étape 2 : Un utilisateur de niveau 'Admin' ou 'Direction' valide l'annulation
- * C'est à ce moment précis que le statut passe à 'ANNULE' et que le solde est mis à jour !
- * Vérifie d'abord l'existence de la transaction dans le système.
- */
-export async function approvePaymentCancellation({
-  paymentId,
-  sourceTable = 'payments',
-  approverUser,
-  studentId,
-  amount,
-  currency = 'HTG',
-  paymentMethod,
-  refundToWallet = false,
-  paymentRef,
-  existingReason
-}: {
+export interface ApproveCancellationParams {
   paymentId: string;
-  sourceTable?: 'payments' | 'supply_payments' | 'school_supplies';
+  sourceTable?: 'payments' | 'school_supplies' | 'supply_payments' | string;
   approverUser: UserProfile;
   studentId?: string;
   amount?: number;
@@ -285,289 +41,363 @@ export async function approvePaymentCancellation({
   refundToWallet?: boolean;
   paymentRef?: string;
   existingReason?: string;
-}): Promise<{ success: boolean; message: string; error?: string }> {
-  if (!canUserApproveCancellation(approverUser)) {
-    return {
-      success: false,
-      message: "Action non autorisée : Seul un utilisateur de niveau 'Admin' ou 'Direction' peut valider cette annulation."
-    };
-  }
-
-  if (!paymentId) {
-    return { success: false, message: "Identifiant de la transaction introuvable." };
-  }
-
-  // 1. Vérification préalable de l'existence de la transaction dans le système
-  let fetchedPayment: any = null;
-  try {
-    const { data, error: fetchErr } = await supabase
-      .from(sourceTable)
-      .select('*')
-      .eq('id', paymentId)
-      .maybeSingle();
-
-    if (fetchErr || !data) {
-      return {
-        success: false,
-        message: "Impossible de valider : la transaction à annuler n'existe pas ou a été supprimée."
-      };
-    }
-    fetchedPayment = data;
-  } catch (err: any) {
-    return {
-      success: false,
-      message: "Erreur lors de la vérification de l'existence de la transaction : " + (err.message || String(err))
-    };
-  }
-
-  if (fetchedPayment.status === 'ANNULE' && fetchedPayment.cancellation_status === 'APPROVED') {
-    return {
-      success: false,
-      message: "Cette transaction a déjà été définitivement validée comme annulée."
-    };
-  }
-
-  // Résolution automatique des métadonnées si omises par l'appelant
-  const effStudentId = studentId || fetchedPayment.student_id;
-  const effAmount = amount ?? Number(fetchedPayment.amount || 0);
-  const effCurrency = currency || fetchedPayment.currency || 'HTG';
-  const effPaymentMethod = paymentMethod || fetchedPayment.payment_method || '';
-  const effRef = paymentRef || fetchedPayment.ref || fetchedPayment.receipt_number || '';
-  const effFeeType = fetchedPayment.fee_type || '';
-
-  const now = new Date().toISOString();
-  const approverName = approverUser.full_name || approverUser.email || 'Direction / Administration';
-  const effectiveReason = existingReason || fetchedPayment.cancellation_reason || 'Annulation certifiée conforme par la Direction';
-
-  try {
-    // 2. Mise à jour du versement : statut passe définitivement à 'ANNULE'
-    let updatePayload: any = {
-      status: 'ANNULE',
-      cancelled_at: now,
-      cancelled_by: approverUser.id,
-      cancel_reason: effectiveReason,
-      cancellation_status: 'APPROVED',
-      cancellation_approved_by: approverUser.id,
-      cancellation_approved_at: now,
-      cancellation_approved_by_name: approverName
-    };
-
-    const { error: primaryError } = await supabase
-      .from(sourceTable)
-      .update(updatePayload)
-      .eq('id', paymentId);
-
-    if (primaryError) {
-      // Repli sur colonnes de base
-      const fallbackPayload = {
-        status: 'ANNULE',
-        cancelled_at: now,
-        cancelled_by: approverUser.id,
-        cancel_reason: effectiveReason
-      };
-      const { error: fallbackError } = await supabase
-        .from(sourceTable)
-        .update(fallbackPayload)
-        .eq('id', paymentId);
-
-      if (fallbackError) {
-        throw new Error(fallbackError.message || primaryError.message);
-      }
-    }
-
-    // 3. Mise à jour effective du solde / portefeuille si applicable
-    if (effStudentId && effAmount > 0) {
-      const isWalletReload = effFeeType === 'CREDIT_PORTEFEUILLE' || effPaymentMethod === 'CREDIT_PORTEFEUILLE';
-      const isPaidViaWallet = effPaymentMethod === 'Portefeuille' || effPaymentMethod?.toLowerCase().includes('portefeuille');
-      const shouldRefundToWallet = refundToWallet || isPaidViaWallet;
-
-      if (isWalletReload || shouldRefundToWallet) {
-        const { data: studentData, error: studentError } = await supabase
-          .from('students')
-          .select('wallet_balance_htg, wallet_balance_usd')
-          .eq('id', effStudentId)
-          .single();
-
-        if (!studentError && studentData) {
-          const updateField = effCurrency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
-          const currentBalance = Number(
-            effCurrency === 'USD' 
-              ? (studentData.wallet_balance_usd || 0) 
-              : (studentData.wallet_balance_htg || 0)
-          );
-
-          // Si c'était une recharge annulée, on retire le montant du wallet
-          // Si c'était un paiement effectué par wallet ou remboursé au wallet, on recrédite
-          const newBalance = isWalletReload 
-            ? Math.max(0, currentBalance - effAmount)
-            : (currentBalance + effAmount);
-
-          await supabase
-            .from('students')
-            .update({ 
-              [updateField]: newBalance,
-              updated_at: now
-            })
-            .eq('id', effStudentId);
-        }
-      }
-    }
-
-    // 4. Journal d'audit officiel
-    await AuditLogger.log({
-      school_id: approverUser.school_id || '',
-      user_id: approverUser.id,
-      action: 'PAYMENT_CANCELLATION_APPROVED',
-      entity_type: 'payment',
-      entity_id: paymentId,
-      details: {
-        reason: effectiveReason,
-        approver_name: approverName,
-        payment_ref: effRef,
-        amount: effAmount,
-        currency: effCurrency,
-        refunded_to_wallet: refundToWallet || effPaymentMethod === 'Portefeuille',
-        source_table: sourceTable,
-        note: "Deuxième validation approuvée par Direction/Admin. Statut passé à ANNULÉ et solde mis à jour."
-      }
-    });
-
-    return {
-      success: true,
-      message: "Annulation validée avec succès par la Direction. Le solde de l'élève a été actualisé."
-    };
-  } catch (err: any) {
-    return {
-      success: false,
-      message: "Erreur lors de la validation de l'annulation",
-      error: err.message || String(err)
-    };
-  }
 }
 
-/**
- * Rejet d'une demande d'annulation par un utilisateur de niveau Admin ou Direction
- * Vérifie l'existence de la transaction dans le système.
- */
-export async function rejectPaymentCancellation({
-  paymentId,
-  sourceTable = 'payments',
-  rejecterUser,
-  rejectionReason,
-  paymentRef
-}: {
+export interface RejectCancellationParams {
   paymentId: string;
-  sourceTable?: 'payments' | 'supply_payments' | 'school_supplies';
+  sourceTable?: 'payments' | 'school_supplies' | 'supply_payments' | string;
   rejecterUser: UserProfile;
   rejectionReason: string;
   paymentRef?: string;
-}): Promise<{ success: boolean; message: string; error?: string }> {
-  if (!canUserApproveCancellation(rejecterUser)) {
+}
+
+/**
+ * Vérifie si l'utilisateur possède les privilèges hiérarchiques
+ * pour approuver ou rejeter une demande d'annulation (Super Admin, Direction, Administrateur).
+ */
+export function canUserApproveCancellation(user: UserProfile | null | undefined): boolean {
+  if (!user) return false;
+  if (user.is_super_admin) return true;
+  const role = normalizeUserRole(user.role);
+  return role === UserRole.SUPER_ADMIN || role === UserRole.SCHOOL_ADMIN || role === UserRole.DIRECTOR;
+}
+
+/**
+ * Analyse et extrait les métadonnées d'annulation d'un paiement ou d'une transaction de fourniture.
+ */
+export function parseCancellationInfo(item: any): CancellationInfo {
+  if (!item) {
     return {
-      success: false,
-      message: "Action non autorisée : Seul un utilisateur de niveau 'Admin' ou 'Direction' peut rejeter une annulation."
+      isPending: false,
+      isCancelled: false,
+      status: 'VALID'
     };
   }
 
-  if (!paymentId) {
-    return { success: false, message: "Identifiant de la transaction introuvable." };
-  }
+  const rawStatus = String(item.status || '').trim().toUpperCase();
+  const rawCancelStatus = String(item.cancellation_status || item.cancel_status || '').trim().toUpperCase();
+  const rawReason = String(item.cancel_reason || item.cancellation_reason || '').trim();
 
-  // Vérification préalable de l'existence de la transaction dans la base
-  try {
-    const { data: existingPayment, error: fetchErr } = await supabase
-      .from(sourceTable)
-      .select('id, status, ref')
-      .eq('id', paymentId)
-      .maybeSingle();
+  const isPendingPrefix = rawReason.startsWith('[DEMANDE_ANNULATION]') || rawReason.startsWith('[DEMANDE]');
+  const isPending = 
+    rawCancelStatus === 'PENDING' ||
+    rawStatus === 'ANNULATION_DEMANDEE' ||
+    rawStatus === 'ANNULATIONS À VALIDER' ||
+    rawStatus === 'ANNULATIONS A VALIDER' ||
+    isPendingPrefix;
 
-    if (fetchErr || !existingPayment) {
-      return {
-        success: false,
-        message: "Impossible de rejeter : la transaction spécifiée n'existe pas dans le système."
-      };
+  const isCancelled = 
+    rawStatus === 'ANNULE' ||
+    rawStatus === 'ANNULÉ' ||
+    rawStatus === 'CANCELLED' ||
+    rawCancelStatus === 'APPROVED';
+
+  // Extraction du motif lisible sans préfixe technique
+  let cleanReason = rawReason;
+  let requestedByName = item.cancel_requested_by_name || '';
+  let requestedAt = item.cancel_requested_at || '';
+
+  if (isPendingPrefix) {
+    // Ex: "[DEMANDE_ANNULATION] Motif: Erreur de classe (Demandé par: Marie)"
+    const motifMatch = rawReason.match(/Motif\s*:\s*([^()]+)/i);
+    if (motifMatch && motifMatch[1]) {
+      cleanReason = motifMatch[1].trim();
+    } else {
+      cleanReason = rawReason.replace(/^\[DEMANDE(?:_ANNULATION)?\]\s*/i, '').trim();
     }
-  } catch (err: any) {
-    return {
-      success: false,
-      message: "Erreur lors de la vérification de la transaction : " + (err.message || String(err))
-    };
+
+    const byMatch = rawReason.match(/Demandé(?:\s*le\s*[^)]+)?\s*par\s*:\s*([^)]+)/i);
+    if (byMatch && byMatch[1] && !requestedByName) {
+      requestedByName = byMatch[1].trim();
+    }
   }
 
-  const now = new Date().toISOString();
-  const rejecterName = rejecterUser.full_name || rejecterUser.email || 'Direction';
+  return {
+    isPending,
+    isCancelled,
+    status: isCancelled ? 'ANNULE' : isPending ? 'PENDING' : 'VALIDE',
+    reason: cleanReason || undefined,
+    requestedBy: item.cancelled_by || item.cancel_requested_by || undefined,
+    requestedByName: requestedByName || undefined,
+    requestedAt: requestedAt || item.created_at || undefined,
+    approvedBy: item.cancelled_by || undefined,
+    approvedByName: item.cancelled_by_name || undefined,
+    approvedAt: item.cancelled_at || undefined,
+    rejectedBy: item.cancel_rejected_by || undefined,
+    rejectedByName: item.cancel_rejected_by_name || undefined,
+    rejectedAt: item.cancel_rejected_at || undefined
+  };
+}
 
+/**
+ * Soumet une demande d'annulation de transaction par un agent de caisse ou comptable.
+ * Le solde financier de l'élève reste INTACT jusqu'à validation par la Direction.
+ */
+export async function requestPaymentCancellation(
+  params: RequestCancellationParams
+): Promise<{ success: boolean; message: string; data?: any }> {
   try {
-    const serializedInfo = `REJECTED:{"rejected_by":"${rejecterUser.id}","rejected_by_name":"${rejecterName}","rejected_at":"${now}","rejection_reason":"${rejectionReason || 'Non justifié'}"}`;
+    const { paymentId, sourceTable = 'payments', reason, user, studentId, paymentRef, amount, currency } = params;
 
-    let updatePayload: any = {
-      status: 'VALIDE',
-      cancellation_status: 'REJECTED',
-      cancellation_rejected_by: rejecterUser.id,
-      cancellation_rejected_at: now,
-      cancellation_rejection_reason: rejectionReason || 'Rejeté par la Direction',
-      cancel_reason: serializedInfo
+    if (!paymentId) {
+      throw new Error("Identifiant de transaction manquant.");
+    }
+    if (!reason || !reason.trim()) {
+      throw new Error("Veuillez indiquer un motif d'annulation.");
+    }
+
+    const formattedReason = `[DEMANDE_ANNULATION] Motif: ${reason.trim()} (Demandé le ${new Date().toLocaleDateString('fr-FR')} par ${user.full_name || user.email || 'Agent'})`;
+    const targetTable = sourceTable === 'school_supplies' ? 'school_supplies' : sourceTable === 'supply_payments' ? 'supply_payments' : 'payments';
+
+    // Tentative 1 : Mise à jour avec colonnes de workflow complètes
+    const updatePayloadWithWorkflow: any = {
+      cancel_reason: formattedReason,
+      cancellation_status: 'PENDING',
+      cancel_requested_by: isValidUuid(user.id) ? user.id : null,
+      cancel_requested_at: new Date().toISOString()
     };
 
-    const { error: primaryError } = await supabase
-      .from(sourceTable)
-      .update(updatePayload)
+    let { error } = await supabase
+      .from(targetTable)
+      .update(updatePayloadWithWorkflow)
       .eq('id', paymentId);
 
-    if (primaryError) {
-      const fallbackPayload = {
-        status: 'VALIDE',
-        cancel_reason: serializedInfo
+    // Fallback 1 : Si la colonne cancellation_status n'existe pas en schéma, on enregistre dans cancel_reason
+    if (error && (error.code === '42703' || error.message?.includes('column'))) {
+      const fallbackPayload: any = {
+        cancel_reason: formattedReason
       };
-      await supabase.from(sourceTable).update(fallbackPayload).eq('id', paymentId);
+      const fallbackRes = await supabase
+        .from(targetTable)
+        .update(fallbackPayload)
+        .eq('id', paymentId);
+      error = fallbackRes.error;
     }
 
-    await AuditLogger.log({
-      school_id: rejecterUser.school_id || '',
-      user_id: rejecterUser.id,
-      action: 'PAYMENT_CANCELLATION_REJECTED',
-      entity_type: 'payment',
+    if (error) {
+      console.error(`Erreur soumission demande annulation (${targetTable}):`, error);
+      throw new Error(error.message || "Échec de l'enregistrement de la demande.");
+    }
+
+    // Journalisation d'audit
+    AuditLogger.log({
+      school_id: user.school_id,
+      user_id: user.id,
+      action: 'PAYMENT_CANCELLATION_REQUESTED',
+      entity_type: targetTable === 'school_supplies' || targetTable === 'supply_payments' ? 'supply' : 'payment',
       entity_id: paymentId,
       details: {
-        rejection_reason: rejectionReason,
-        rejecter_name: rejecterName,
         payment_ref: paymentRef,
-        source_table: sourceTable,
-        note: "Demande d'annulation rejetée par la Direction. Le paiement demeure valide."
+        student_id: studentId,
+        reason: reason.trim(),
+        amount,
+        currency,
+        requested_by_name: user.full_name || user.email
       }
-    });
+    }).catch(() => {});
 
     return {
       success: true,
-      message: "Demande d'annulation rejetée. Le versement reste valide et inchangé."
+      message: "Demande d'annulation transmise avec succès à la Direction. Le solde restera inchangé jusqu'à validation."
     };
   } catch (err: any) {
     return {
       success: false,
-      message: "Erreur lors du rejet de la demande",
-      error: err.message || String(err)
+      message: err.message || "Erreur lors de la soumission de la demande d'annulation."
     };
   }
 }
 
 /**
- * Récupère le nombre de demandes d'annulation en attente pour l'établissement
+ * Approuve définitivement l'annulation d'un paiement par un utilisateur de niveau Direction / Admin.
+ * Met à jour le statut en 'ANNULE' et recrédite éventuellement le portefeuille élève.
  */
-export async function getPendingCancellationsCount(schoolId?: string): Promise<number> {
+export async function approvePaymentCancellation(
+  params: ApproveCancellationParams
+): Promise<{ success: boolean; message: string; data?: any }> {
   try {
-    let query = supabase
-      .from('payments')
-      .select('id, cancellation_status, status, cancel_reason');
+    const { 
+      paymentId, 
+      sourceTable = 'payments', 
+      approverUser, 
+      studentId, 
+      amount = 0, 
+      currency = 'HTG', 
+      refundToWallet = false, 
+      paymentRef, 
+      existingReason 
+    } = params;
 
-    if (schoolId) {
-      query = query.eq('school_id', schoolId);
+    if (!paymentId) {
+      throw new Error("Identifiant de transaction manquant.");
     }
 
-    const { data, error } = await query;
-    if (error || !data) return 0;
+    const targetTable = sourceTable === 'school_supplies' ? 'school_supplies' : sourceTable === 'supply_payments' ? 'supply_payments' : 'payments';
 
-    return data.filter((p: any) => parseCancellationInfo(p).isPending).length;
-  } catch {
-    return 0;
+    const cleanReason = existingReason
+      ? existingReason.replace(/^\[DEMANDE(?:_ANNULATION)?\]\s*/i, '').trim()
+      : "Annulation approuvée par la Direction";
+
+    const updatePayload: any = {
+      status: 'ANNULE',
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: isValidUuid(approverUser.id) ? approverUser.id : null,
+      cancel_reason: cleanReason,
+      cancellation_status: 'APPROVED'
+    };
+
+    let { error } = await supabase
+      .from(targetTable)
+      .update(updatePayload)
+      .eq('id', paymentId);
+
+    // Fallback si cancellation_status n'existe pas dans la table
+    if (error && (error.code === '42703' || error.message?.includes('column'))) {
+      delete updatePayload.cancellation_status;
+      const fallbackRes = await supabase
+        .from(targetTable)
+        .update(updatePayload)
+        .eq('id', paymentId);
+      error = fallbackRes.error;
+    }
+
+    if (error) {
+      console.error(`Erreur approbation annulation (${targetTable}):`, error);
+      throw new Error(error.message || "Échec de la validation de l'annulation.");
+    }
+
+    // Remboursement optionnel vers le portefeuille de l'élève
+    if (refundToWallet && studentId && isValidUuid(studentId) && amount > 0) {
+      try {
+        const { data: studentData, error: sErr } = await supabase
+          .from('students')
+          .select('wallet_balance_htg, wallet_balance_usd')
+          .eq('id', studentId)
+          .single();
+
+        if (!sErr && studentData) {
+          const isUSD = String(currency).toUpperCase() === 'USD';
+          const updateWallet: any = {};
+          if (isUSD) {
+            updateWallet.wallet_balance_usd = Number(studentData.wallet_balance_usd || 0) + Number(amount);
+          } else {
+            updateWallet.wallet_balance_htg = Number(studentData.wallet_balance_htg || 0) + Number(amount);
+          }
+
+          await supabase
+            .from('students')
+            .update(updateWallet)
+            .eq('id', studentId);
+        }
+      } catch (walletErr) {
+        console.warn("Avertissement recrédit portefeuille suite à annulation:", walletErr);
+      }
+    }
+
+    // Journalisation d'audit
+    AuditLogger.log({
+      school_id: approverUser.school_id,
+      user_id: approverUser.id,
+      action: 'PAYMENT_CANCELLATION_APPROVED',
+      entity_type: targetTable === 'school_supplies' || targetTable === 'supply_payments' ? 'supply' : 'payment',
+      entity_id: paymentId,
+      details: {
+        payment_ref: paymentRef,
+        student_id: studentId,
+        amount,
+        currency,
+        refundToWallet,
+        reason: cleanReason,
+        approved_by_name: approverUser.full_name || approverUser.email
+      }
+    }).catch(() => {});
+
+    return {
+      success: true,
+      message: refundToWallet
+        ? `Transaction annulée avec succès. Montant de ${amount} ${currency} recrédité sur le portefeuille de l'élève.`
+        : "Annulation définitivement validée par la Direction. Le solde financier a été mis à jour."
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Erreur lors de la validation de l'annulation."
+    };
+  }
+}
+
+/**
+ * Rejette une demande d'annulation. La transaction reste valide.
+ */
+export async function rejectPaymentCancellation(
+  params: RejectCancellationParams
+): Promise<{ success: boolean; message: string; data?: any }> {
+  try {
+    const { paymentId, sourceTable = 'payments', rejecterUser, rejectionReason, paymentRef } = params;
+
+    if (!paymentId) {
+      throw new Error("Identifiant de transaction manquant.");
+    }
+
+    const targetTable = sourceTable === 'school_supplies' ? 'school_supplies' : sourceTable === 'supply_payments' ? 'supply_payments' : 'payments';
+
+    const cleanRejection = rejectionReason && rejectionReason.trim()
+      ? `[REJET_ANNULATION] ${rejectionReason.trim()} (Direction: ${rejecterUser.full_name || rejecterUser.email})`
+      : `[REJET_ANNULATION] Demande rejetée par la Direction (${rejecterUser.full_name || rejecterUser.email})`;
+
+    const updatePayload: any = {
+      status: 'VALIDE',
+      cancellation_status: 'REJECTED',
+      cancel_reason: cleanRejection,
+      cancel_rejected_by: isValidUuid(rejecterUser.id) ? rejecterUser.id : null,
+      cancel_rejected_at: new Date().toISOString()
+    };
+
+    let { error } = await supabase
+      .from(targetTable)
+      .update(updatePayload)
+      .eq('id', paymentId);
+
+    // Fallback si cancellation_status ou colonnes complémentaires n'existent pas
+    if (error && (error.code === '42703' || error.message?.includes('column'))) {
+      const fallbackPayload: any = {
+        status: 'VALIDE',
+        cancel_reason: cleanRejection
+      };
+      const fallbackRes = await supabase
+        .from(targetTable)
+        .update(fallbackPayload)
+        .eq('id', paymentId);
+      error = fallbackRes.error;
+    }
+
+    if (error) {
+      console.error(`Erreur rejet annulation (${targetTable}):`, error);
+      throw new Error(error.message || "Échec du rejet de l'annulation.");
+    }
+
+    // Journalisation d'audit
+    AuditLogger.log({
+      school_id: rejecterUser.school_id,
+      user_id: rejecterUser.id,
+      action: 'PAYMENT_CANCELLATION_REJECTED',
+      entity_type: targetTable === 'school_supplies' || targetTable === 'supply_payments' ? 'supply' : 'payment',
+      entity_id: paymentId,
+      details: {
+        payment_ref: paymentRef,
+        rejection_reason: rejectionReason,
+        rejected_by_name: rejecterUser.full_name || rejecterUser.email
+      }
+    }).catch(() => {});
+
+    return {
+      success: true,
+      message: "Demande d'annulation rejetée. La transaction reste active et validée."
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      message: err.message || "Erreur lors du rejet de la demande d'annulation."
+    };
   }
 }
