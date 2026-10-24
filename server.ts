@@ -55,19 +55,47 @@ async function startServer() {
   app.disable('x-powered-by');
 
   // =========================================================================
-  // MIDDLEWARE CORS & EN-TÊTES DE SÉCURITÉ HTTP
+  // MIDDLEWARE CORS & EN-TÊTES DE SÉCURITÉ HTTP (DURCISSEMENT DÉFENSIF)
   // =========================================================================
+  const allowedOriginPatterns = [
+    /^https?:\/\/localhost(:\d+)?$/,
+    /^https?:\/\/127\.0\.0\.1(:\d+)?$/,
+    /^https:\/\/.*\.run\.app$/,
+    /^https:\/\/.*\.google\.com$/,
+    /^https:\/\/.*\.aistudio\.google\.com$/,
+    /^https:\/\/.*\.onrender\.com$/
+  ];
+
   app.use((req, res, next) => {
     const origin = req.headers.origin;
+    let isOriginAllowed = false;
+
     if (origin) {
+      isOriginAllowed = allowedOriginPatterns.some(pattern => pattern.test(origin));
+      if (!isOriginAllowed) {
+        const configuredUrl = process.env.APP_URL || process.env.RENDER_EXTERNAL_URL || process.env.VITE_APP_URL;
+        if (configuredUrl) {
+          try {
+            const parsedConfigured = new URL(configuredUrl).origin;
+            if (parsedConfigured === origin) {
+              isOriginAllowed = true;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (origin && isOriginAllowed) {
       res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Vary', 'Origin');
-    } else {
+    } else if (!origin) {
+      // Requêtes sans en-tête origin (ex: healthchecks, curl, appels serveurs internes)
       res.setHeader('Access-Control-Allow-Origin', '*');
     }
+
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
     res.setHeader('Access-Control-Max-Age', '86400');
 
     // En-têtes de durcissement défensif (Anti-MIME Sniffing, Anti-XSS, Isolation)
@@ -2762,6 +2790,12 @@ async function startServer() {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    // Protection RBAC stricte : Seul un administrateur habilité de cet établissement peut envoyer des SMS
+    const auth = await authorizeSchoolAdmin(req, schoolId);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
+    }
+
     try {
       if (!supabase) {
         return res.status(500).json({ error: 'Supabase client not initialized on server' });
@@ -2904,6 +2938,12 @@ async function startServer() {
 
     if (!schoolId || !recipients || !content) {
       return res.status(400).json({ error: 'Champs requis manquants' });
+    }
+
+    // Protection RBAC stricte : Seul un administrateur habilité de cet établissement peut envoyer des messages WhatsApp
+    const auth = await authorizeSchoolAdmin(req, schoolId);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ error: auth.error });
     }
 
     try {
