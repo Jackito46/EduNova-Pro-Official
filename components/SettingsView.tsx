@@ -3955,6 +3955,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                 setMoncashConfig={setMoncashConfig}
                 onSaveMoncashLegacy={handleUpdateMoncash}
                 savingLegacy={saving}
+                isGatewaysEnabledForSchool={Boolean(schoolData.has_api_gateways ?? school?.has_api_gateways)}
               />
             )}
           </div>

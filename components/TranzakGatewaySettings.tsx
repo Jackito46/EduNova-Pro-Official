@@ -32,6 +32,7 @@ export interface TranzakGatewaySettingsProps {
   user: UserProfile;
   canManageAllCampuses: boolean;
   isActiveGateway?: boolean;
+  isGatewaysEnabledForSchool?: boolean;
   onMakeActiveGateway?: () => void;
 }
 
@@ -39,6 +40,7 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
   user,
   canManageAllCampuses,
   isActiveGateway = false,
+  isGatewaysEnabledForSchool = true,
   onMakeActiveGateway
 }) => {
   const { school } = useSchool();
@@ -238,20 +240,31 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
     <div className="space-y-3">
       {/* BANDEAU D'ÉTAT D'ACTIVITÉ EN DIRECT */}
       <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-        isActiveGateway 
+        !isGatewaysEnabledForSchool
+          ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+          : isActiveGateway 
           ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-2xs' 
           : 'bg-slate-50 border-slate-200 text-slate-800'
       }`}>
         <div className="flex items-center gap-2.5 min-w-0">
           <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-            isActiveGateway ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-600'
+            !isGatewaysEnabledForSchool
+              ? 'bg-amber-500 text-white'
+              : isActiveGateway 
+              ? 'bg-emerald-600 text-white shadow-xs' 
+              : 'bg-slate-200 text-slate-600'
           }`}>
             <Layers size={16} />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
               <span className="text-xs font-black tracking-tight">Passerelle Tranzak :</span>
-              {isActiveGateway ? (
+              {!isGatewaysEnabledForSchool ? (
+                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-amber-500 text-white flex items-center gap-1">
+                  <Lock size={10} />
+                  <span>SUSPENDU (GOUVERNANCE SAAS)</span>
+                </span>
+              ) : isActiveGateway ? (
                 <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-2xs flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                   <span>EN SERVICE • ACTIVE</span>
@@ -263,14 +276,16 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
               )}
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 truncate">
-              {isActiveGateway 
+              {!isGatewaysEnabledForSchool
+                ? "Passerelles API désactivées par le Super Admin pour cette école. Mode manuel actif."
+                : isActiveGateway 
                 ? 'Tranzak traite en direct tous les encaissements MonCash & NatCash.' 
                 : 'Passerelle sauvegardée. Une autre passerelle est prioritaire.'}
             </p>
           </div>
         </div>
 
-        {!isActiveGateway && onMakeActiveGateway && (
+        {isGatewaysEnabledForSchool && !isActiveGateway && onMakeActiveGateway && (
           <button
             type="button"
             onClick={onMakeActiveGateway}

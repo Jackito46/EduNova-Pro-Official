@@ -30,7 +30,8 @@ import {
   Wallet,
   ChevronDown,
   ChevronUp,
-  Layers
+  Layers,
+  Coins
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { ApiVaultService } from '../services/apiVaultService';
@@ -47,6 +48,7 @@ interface ApiCredentialsVaultProps {
   setMoncashConfig: React.Dispatch<React.SetStateAction<any>>;
   onSaveMoncashLegacy: () => Promise<void>;
   savingLegacy: boolean;
+  isGatewaysEnabledForSchool?: boolean;
 }
 
 type VaultTab = 'tranzak' | 'kobara' | 'moncash' | 'natcash';
@@ -57,10 +59,11 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   moncashConfig,
   setMoncashConfig,
   onSaveMoncashLegacy,
-  savingLegacy
+  savingLegacy,
+  isGatewaysEnabledForSchool = true
 }) => {
   const [activeTab, setActiveTab] = useState<VaultTab>('tranzak');
-  // Passerelle Mobile Money active pour l'établissement ('tranzak' | 'kobara' | 'moncash')
+  // Passerelle Mobile Money active pour l'établissement ('tranzak' | 'kobara' | 'moncash' | 'none')
   const [activeGateway, setActiveGateway] = useState<MobileMoneyGateway>('tranzak');
   const [isSwitchingGateway, setIsSwitchingGateway] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -217,7 +220,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         MobilePaymentRouterService.getActiveGateway(user.school_id)
       ]);
 
-      if (currentGateway) {
+      if (!isGatewaysEnabledForSchool) {
+        setActiveGateway('none');
+      } else if (currentGateway) {
         setActiveGateway(currentGateway);
       }
 
@@ -259,19 +264,33 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       toast.error("Seule la direction générale peut modifier la passerelle active de l'établissement.");
       return;
     }
-    if (targetGateway === activeGateway) {
-      setActiveTab(targetGateway);
+    if (!isGatewaysEnabledForSchool && targetGateway !== 'none') {
+      toast.error("Les passerelles d'API sont désactivées pour cet établissement par le Super Admin (Gouvernance SaaS).");
       return;
     }
 
+    // Bascule intelligente : recliquer sur la passerelle active désactive toutes les passerelles (Mode Manuel)
+    const newGateway: MobileMoneyGateway = targetGateway === activeGateway ? 'none' : targetGateway;
+
     setIsSwitchingGateway(true);
-    const toastId = toast.loading(`Bascule de passerelle vers ${targetGateway.toUpperCase()}...`);
+    const toastId = toast.loading(
+      newGateway === 'none'
+        ? "Désactivation des passerelles mobiles (Passage en Mode Manuel)..."
+        : `Bascule de passerelle vers ${newGateway.toUpperCase()}...`
+    );
     try {
-      const res = await MobilePaymentRouterService.setActiveGateway(user.school_id || '', targetGateway);
+      const res = await MobilePaymentRouterService.setActiveGateway(user.school_id || '', newGateway);
       if (res.success) {
-        setActiveGateway(targetGateway);
-        setActiveTab(targetGateway);
-        toast.success(res.message || `Passerelle active basculée sur : ${targetGateway.toUpperCase()}`, { id: toastId });
+        setActiveGateway(newGateway);
+        if (newGateway !== 'none') {
+          setActiveTab(newGateway as VaultTab);
+        }
+        toast.success(
+          newGateway === 'none'
+            ? "Toutes les passerelles mobiles sont désormais désactivées (Mode Manuel Uniquement)."
+            : (res.message || `Passerelle active basculée sur : ${newGateway.toUpperCase()}`),
+          { id: toastId }
+        );
       } else {
         toast.error(res.error || "Impossible de basculer la passerelle", { id: toastId });
       }
@@ -284,7 +303,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
   useEffect(() => {
     loadVaultData();
-  }, [user.school_id]);
+  }, [user.school_id, isGatewaysEnabledForSchool]);
 
   // Copier dans le presse-papier
   const copyToClipboard = (text: string, keyName: string) => {
@@ -550,17 +569,33 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 <h3 className="text-xs sm:text-sm font-black text-white tracking-tight">
                   Passerelle Active (Encaissements)
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-2xs">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider flex items-center gap-1 shadow-2xs ${
+                  !isGatewaysEnabledForSchool
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
+                    : activeGateway === 'none'
+                    ? 'bg-slate-500/20 text-slate-300 border border-slate-500/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${
+                    !isGatewaysEnabledForSchool
+                      ? 'bg-amber-400'
+                      : activeGateway === 'none'
+                      ? 'bg-slate-400'
+                      : 'bg-emerald-400 animate-pulse'
+                  }`}></span>
                   <span>
-                    {activeGateway === 'tranzak' && 'Tranzak Active'}
-                    {activeGateway === 'kobara' && 'Kobara Active'}
-                    {activeGateway === 'moncash' && 'MonCash Direct Active'}
+                    {!isGatewaysEnabledForSchool && 'Passerelles Désactivées (SaaS) • Mode Manuel'}
+                    {isGatewaysEnabledForSchool && activeGateway === 'none' && 'Mode Manuel Exclusif'}
+                    {isGatewaysEnabledForSchool && activeGateway === 'tranzak' && 'Tranzak Active'}
+                    {isGatewaysEnabledForSchool && activeGateway === 'kobara' && 'Kobara Active'}
+                    {isGatewaysEnabledForSchool && activeGateway === 'moncash' && 'MonCash Direct Active'}
                   </span>
                 </span>
               </div>
               <p className="text-[11px] text-slate-300">
-                Sélectionnez le canal prioritaire pour les règlements parents (MonCash &amp; NatCash).
+                {!isGatewaysEnabledForSchool
+                  ? "Gouvernance SaaS : toutes les passerelles automatiques sont désactivées pour cette école."
+                  : "Sélectionnez le canal prioritaire pour les règlements parents (MonCash, NatCash ou Manuel)."}
               </p>
             </div>
           </div>
@@ -573,13 +608,27 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           )}
         </div>
 
-        {/* 3 CARTES DE BASCULE INTERACTIVES COMPACTES */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
+        {!isGatewaysEnabledForSchool && (
+          <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-start gap-2 text-amber-200 text-xs">
+            <Lock size={15} className="text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-amber-300">Gouvernance Super Admin : Passerelles API désactivées</p>
+              <p className="text-[11px] text-amber-200/80 mt-0.5">
+                Cet établissement est actuellement en <strong>Mode Manuel Exclusif</strong>. Tous les formulaires de paiement mobile en ligne renvoient vers le comptoir. Pour réautoriser les encaissements mobiles, réactivez les passerelles dans le panneau Super Admin.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* 4 CARTES DE BASCULE INTERACTIVES COMPACTES */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
           {/* OPTION 1 : TRANZAK */}
           <div
             onClick={() => handleSwitchActiveGateway('tranzak')}
             className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
-              activeGateway === 'tranzak'
+              !isGatewaysEnabledForSchool
+                ? 'opacity-60 bg-white/5 border-white/10'
+                : activeGateway === 'tranzak'
                 ? 'bg-blue-950/80 border-blue-400 ring-2 ring-blue-500/40 shadow-md shadow-blue-500/20'
                 : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
@@ -587,7 +636,11 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${activeGateway === 'tranzak' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+                    isGatewaysEnabledForSchool && activeGateway === 'tranzak'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white/10 text-slate-300'
+                  }`}>
                     <Layers size={13} />
                   </div>
                   <div>
@@ -598,7 +651,12 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   </div>
                 </div>
 
-                {activeGateway === 'tranzak' ? (
+                {!isGatewaysEnabledForSchool ? (
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1">
+                    <Lock size={9} />
+                    <span>Suspendu</span>
+                  </span>
+                ) : activeGateway === 'tranzak' ? (
                   <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
@@ -626,7 +684,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           <div
             onClick={() => handleSwitchActiveGateway('kobara')}
             className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
-              activeGateway === 'kobara'
+              !isGatewaysEnabledForSchool
+                ? 'opacity-60 bg-white/5 border-white/10'
+                : activeGateway === 'kobara'
                 ? 'bg-orange-950/80 border-orange-400 ring-2 ring-orange-500/40 shadow-md shadow-orange-500/20'
                 : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
@@ -634,7 +694,11 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${activeGateway === 'kobara' ? 'bg-orange-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+                    isGatewaysEnabledForSchool && activeGateway === 'kobara'
+                      ? 'bg-orange-600 text-white shadow-xs'
+                      : 'bg-white/10 text-slate-300'
+                  }`}>
                     <CreditCard size={13} />
                   </div>
                   <div>
@@ -645,7 +709,12 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   </div>
                 </div>
 
-                {activeGateway === 'kobara' ? (
+                {!isGatewaysEnabledForSchool ? (
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1">
+                    <Lock size={9} />
+                    <span>Suspendu</span>
+                  </span>
+                ) : activeGateway === 'kobara' ? (
                   <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
@@ -673,7 +742,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           <div
             onClick={() => handleSwitchActiveGateway('moncash')}
             className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
-              activeGateway === 'moncash'
+              !isGatewaysEnabledForSchool
+                ? 'opacity-60 bg-white/5 border-white/10'
+                : activeGateway === 'moncash'
                 ? 'bg-red-950/80 border-red-400 ring-2 ring-red-500/40 shadow-md shadow-red-500/20'
                 : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
@@ -681,7 +752,11 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${activeGateway === 'moncash' ? 'bg-red-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+                    isGatewaysEnabledForSchool && activeGateway === 'moncash'
+                      ? 'bg-red-600 text-white shadow-xs'
+                      : 'bg-white/10 text-slate-300'
+                  }`}>
                     <Smartphone size={13} />
                   </div>
                   <div>
@@ -692,7 +767,12 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   </div>
                 </div>
 
-                {activeGateway === 'moncash' ? (
+                {!isGatewaysEnabledForSchool ? (
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1">
+                    <Lock size={9} />
+                    <span>Suspendu</span>
+                  </span>
+                ) : activeGateway === 'moncash' ? (
                   <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
@@ -715,6 +795,57 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
               <span className="font-bold text-red-300">MonCash Unique</span>
             </div>
           </div>
+
+          {/* OPTION 4 : MODE MANUEL EXCLUSIF */}
+          <div
+            onClick={() => handleSwitchActiveGateway('none')}
+            className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
+              !isGatewaysEnabledForSchool || activeGateway === 'none'
+                ? 'bg-amber-950/40 border-amber-500/50 ring-2 ring-amber-500/40 shadow-md shadow-amber-500/10'
+                : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+            }`}
+          >
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-1.5">
+                <div className="flex items-center gap-2">
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+                    !isGatewaysEnabledForSchool || activeGateway === 'none'
+                      ? 'bg-amber-500 text-slate-950 shadow-xs'
+                      : 'bg-white/10 text-slate-300'
+                  }`}>
+                    <Coins size={13} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                      <span>Mode Manuel</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-200 font-black">COMPTOIR</span>
+                    </h4>
+                  </div>
+                </div>
+
+                {!isGatewaysEnabledForSchool || activeGateway === 'none' ? (
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs flex items-center gap-1">
+                    <CheckCircle2 size={10} />
+                    <span>En Service</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-amber-300 hover:text-white flex items-center gap-0.5">
+                    <span>Activer</span>
+                    <ArrowRight size={10} />
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[10.5px] text-slate-300 leading-snug">
+                Encaissements physiques exclusifs • Espèces, Chèques, Virements bancaires
+              </p>
+            </div>
+
+            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px]">
+              <span className="text-slate-400">Canal :</span>
+              <span className="font-bold text-amber-300">Comptoir &amp; Caisse</span>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -731,10 +862,14 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <Layers size={13} />
           <span>Tranzak (MonCash & NatCash)</span>
-          {activeGateway === 'tranzak' ? (
+          {isGatewaysEnabledForSchool && activeGateway === 'tranzak' ? (
             <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-slate-950 font-black uppercase flex items-center gap-0.5">
               <span className="w-1 h-1 rounded-full bg-slate-950"></span>
               <span>Actif</span>
+            </span>
+          ) : !isGatewaysEnabledForSchool ? (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 font-bold uppercase">
+              Inactif
             </span>
           ) : (
             <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-700 font-bold uppercase">
@@ -754,10 +889,14 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <CreditCard size={13} />
           <span>Kobara</span>
-          {activeGateway === 'kobara' ? (
+          {isGatewaysEnabledForSchool && activeGateway === 'kobara' ? (
             <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-slate-950 font-black uppercase flex items-center gap-0.5">
               <span className="w-1 h-1 rounded-full bg-slate-950"></span>
               <span>Actif</span>
+            </span>
+          ) : !isGatewaysEnabledForSchool ? (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 font-bold uppercase">
+              Inactif
             </span>
           ) : (
             <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-orange-100 text-orange-800 font-bold uppercase">
@@ -780,12 +919,16 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <Smartphone size={13} />
           <span>MonCash</span>
-          {activeGateway === 'moncash' && (
+          {isGatewaysEnabledForSchool && activeGateway === 'moncash' ? (
             <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-slate-950 font-black uppercase flex items-center gap-0.5">
               <span className="w-1 h-1 rounded-full bg-slate-950"></span>
               <span>Actif</span>
             </span>
-          )}
+          ) : !isGatewaysEnabledForSchool ? (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-700 font-bold uppercase">
+              Inactif
+            </span>
+          ) : null}
           {vaultData.moncash.validation_status === 'VALID' && (
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="API MonCash validée"></span>
           )}
@@ -810,7 +953,8 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         <TranzakGatewaySettings 
           user={user} 
           canManageAllCampuses={canManageAllCampuses} 
-          isActiveGateway={activeGateway === 'tranzak'}
+          isActiveGateway={isGatewaysEnabledForSchool && activeGateway === 'tranzak'}
+          isGatewaysEnabledForSchool={isGatewaysEnabledForSchool}
           onMakeActiveGateway={() => handleSwitchActiveGateway('tranzak')}
         />
       )}
@@ -854,20 +998,31 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
             {/* BANDEAU STATUT PASSERELLE KOBARA */}
             <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
-              activeGateway === 'kobara'
+              !isGatewaysEnabledForSchool
+                ? 'bg-amber-50/80 border-amber-200 text-amber-950'
+                : activeGateway === 'kobara'
                 ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-2xs'
                 : 'bg-slate-50 border-slate-200 text-slate-800'
             }`}>
               <div className="flex items-center gap-2.5">
                 <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
-                  activeGateway === 'kobara' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                  !isGatewaysEnabledForSchool
+                    ? 'bg-amber-500 text-white'
+                    : activeGateway === 'kobara'
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-slate-200 text-slate-600'
                 }`}>
                   <CreditCard size={15} />
                 </div>
                 <div>
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-xs font-black">Statut opérationnel :</span>
-                    {activeGateway === 'kobara' ? (
+                    {!isGatewaysEnabledForSchool ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase bg-amber-500 text-white flex items-center gap-1 shadow-2xs">
+                        <Lock size={10} />
+                        <span>SUSPENDU (GOUVERNANCE SAAS)</span>
+                      </span>
+                    ) : activeGateway === 'kobara' ? (
                       <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase bg-emerald-600 text-white flex items-center gap-1 shadow-2xs">
                         <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                         <span>EN SERVICE • ACTIVE</span>
@@ -879,14 +1034,16 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                     )}
                   </div>
                   <p className="text-[11px] text-slate-600 mt-0.5">
-                    {activeGateway === 'kobara'
+                    {!isGatewaysEnabledForSchool
+                      ? "Passerelles API désactivées par le Super Admin pour cette école. Mode manuel actif."
+                      : activeGateway === 'kobara'
                       ? "Kobara traite actuellement les encaissements mobiles et reverse les montants sur vos numéros."
                       : "Tranzak ou MonCash Direct est actuellement la passerelle sélectionnée pour les encaissements."}
                   </p>
                 </div>
               </div>
 
-              {activeGateway !== 'kobara' && (
+              {isGatewaysEnabledForSchool && activeGateway !== 'kobara' && (
                 <button
                   type="button"
                   onClick={() => handleSwitchActiveGateway('kobara')}

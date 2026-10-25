@@ -1,7 +1,7 @@
 import { supabase } from '../supabase';
 import { TranzakService, TranzakPaymentRequest, TranzakPaymentResponse } from './tranzakService';
 
-export type MobileMoneyGateway = 'tranzak' | 'kobara' | 'moncash';
+export type MobileMoneyGateway = 'tranzak' | 'kobara' | 'moncash' | 'none';
 
 export interface MobilePaymentDispatchParams {
   schoolId: string;
@@ -39,12 +39,37 @@ export class MobilePaymentRouterService {
    * Récupère la passerelle Mobile Money actuellement configurée et active pour l'école
    */
   static async getActiveGateway(schoolId: string): Promise<MobileMoneyGateway> {
-    if (!schoolId) return 'tranzak';
+    if (!schoolId) return 'none';
 
     // Cache court de 5 secondes pour éviter le spam de requêtes
     const now = Date.now();
     if (cachedGateway && cachedGateway.schoolId === schoolId && (now - cachedGateway.timestamp) < 5000) {
       return cachedGateway.gateway;
+    }
+
+    // 1. Vérification prioritaire : statut d'activation SaaS des passerelles pour cet établissement
+    try {
+      const { data: schoolRow } = await supabase
+        .from('schools')
+        .select('has_api_gateways, global_settings')
+        .eq('id', schoolId)
+        .maybeSingle();
+
+      if (schoolRow && schoolRow.has_api_gateways === false) {
+        cachedGateway = { schoolId, gateway: 'none', timestamp: now };
+        return 'none';
+      }
+
+      if (schoolRow?.global_settings) {
+        const gs = typeof schoolRow.global_settings === 'string' ? JSON.parse(schoolRow.global_settings) : schoolRow.global_settings;
+        if (gs?.active_mobile_money_gateway) {
+          const gw = gs.active_mobile_money_gateway as MobileMoneyGateway;
+          cachedGateway = { schoolId, gateway: gw, timestamp: now };
+          return gw;
+        }
+      }
+    } catch (e) {
+      console.warn('[MobilePaymentRouterService] Erreur lecture statut école:', e);
     }
 
     try {
@@ -67,25 +92,6 @@ export class MobilePaymentRouterService {
       console.warn('[MobilePaymentRouterService] Erreur interrogation serveur:', err);
     }
 
-    // Repli direct Supabase si le serveur est inaccessible
-    try {
-      const { data: sRow } = await supabase
-        .from('schools')
-        .select('global_settings')
-        .eq('id', schoolId)
-        .maybeSingle();
-
-      if (sRow?.global_settings) {
-        const gs = typeof sRow.global_settings === 'string' ? JSON.parse(sRow.global_settings) : sRow.global_settings;
-        if (gs?.active_mobile_money_gateway) {
-          const gw = gs.active_mobile_money_gateway as MobileMoneyGateway;
-          cachedGateway = { schoolId, gateway: gw, timestamp: now };
-          return gw;
-        }
-      }
-    } catch (e) {}
-
-    // Par défaut, Tranzak si configuré, sinon Kobara
     return 'tranzak';
   }
 
@@ -156,6 +162,16 @@ export class MobilePaymentRouterService {
     const effectiveOrderId = params.orderId || `ORD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
     console.log(`[MobilePaymentRouterService] Aiguillage transaction ${effectiveOrderId} vers passerelle active :`, activeGateway);
+
+    if (activeGateway === 'none') {
+      return {
+        success: false,
+        gateway: 'none',
+        operator: effectiveOperator,
+        orderId: effectiveOrderId,
+        error: "Les passerelles électroniques sont désactivées pour cet établissement. L'établissement fonctionne en mode manuel uniquement (Cash, Dépôt Bancaire, Chèque)."
+      };
+    }
 
     // 1. ROUTAGE TRANZAK
     if (activeGateway === 'tranzak') {
