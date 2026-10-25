@@ -52,7 +52,7 @@ import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { UserProfile } from '../types';
 import { RetryableError } from './RetryableError';
 import { MonCashService } from '../services/moncashService';
-import { MobilePaymentRouterService } from '../services/mobilePaymentRouterService';
+import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobilePaymentRouterService';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
@@ -238,6 +238,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [currentExchangeRate, setCurrentExchangeRate] = useState<number>(132.50);
   const [refError, setRefError] = useState<string | null>(null);
   const [isCheckingRef, setIsCheckingRef] = useState(false);
+  const [activeGateway, setActiveGateway] = useState<MobileMoneyGateway>('tranzak');
+
+  useEffect(() => {
+    let isMounted = true;
+    const sId = user?.school_id || school?.id;
+    if (sId) {
+      MobilePaymentRouterService.getActiveGateway(sId)
+        .then(gw => {
+          if (isMounted) setActiveGateway(gw);
+        })
+        .catch(() => {});
+    }
+    return () => { isMounted = false; };
+  }, [user?.school_id, school?.id, (school as any)?.global_settings]);
 
   // État QR Code unique de certification d'authenticité pour le reçu
   const [receiptQrDataUrl, setReceiptQrDataUrl] = useState<string>('');
@@ -3640,6 +3654,42 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     />
                   </div>
                 </div>
+
+                {/* Détection automatique et affichage clair de la passerelle active pour les paiements mobiles */}
+                {(paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && (
+                  <div className="p-2.5 bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-slate-200/90 rounded-xl text-xs space-y-1 animate-in fade-in duration-200">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Zap size={14} className={
+                          activeGateway === 'tranzak' ? 'text-blue-600' :
+                          activeGateway === 'kobara' ? 'text-orange-600' :
+                          activeGateway === 'moncash' ? 'text-red-600' :
+                          'text-slate-500'
+                        } />
+                        <span className="font-bold text-slate-800 text-[11px] truncate">
+                          Passerelle Mobile Détectée :
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider shadow-2xs ${
+                        activeGateway === 'tranzak' ? 'bg-blue-600 text-white' :
+                        activeGateway === 'kobara' ? 'bg-orange-600 text-white' :
+                        activeGateway === 'moncash' ? 'bg-red-600 text-white' :
+                        'bg-slate-700 text-white'
+                      }`}>
+                        {activeGateway === 'tranzak' && 'Tranzak (Direct)'}
+                        {activeGateway === 'kobara' && 'Kobara (Agrégateur)'}
+                        {activeGateway === 'moncash' && 'Digicel MonCash'}
+                        {activeGateway === 'none' && 'Mode Manuel'}
+                      </span>
+                    </div>
+                    <p className="text-[10.5px] text-slate-600 leading-snug">
+                      {activeGateway === 'tranzak' && 'Aiguillage automatique vers Tranzak. Traitement sécurisé des règlements MonCash & NatCash.'}
+                      {activeGateway === 'kobara' && 'Aiguillage automatique vers Kobara. Reversement direct sur vos numéros de téléphone déclarés.'}
+                      {activeGateway === 'moncash' && 'Aiguillage direct vers la passerelle officielle Digicel MonCash.'}
+                      {activeGateway === 'none' && 'Mode Manuel actif : saisissez manuellement la référence du SMS reçu par le parent.'}
+                    </p>
+                  </div>
+                )}
 
                 {/* Information de compte pour la méthode active */}
                 {currentMethodConfig?.account_info && (

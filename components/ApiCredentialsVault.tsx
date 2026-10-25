@@ -681,7 +681,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         )}
 
         {/* 4 CARTES DE BASCULE INTERACTIVES COMPACTES */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-2.5">
           {/* OPTION 1 : TRANZAK */}
           <div
             onClick={() => handleSwitchActiveGateway('tranzak')}
@@ -694,35 +694,35 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             }`}
           >
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-1.5">
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     isGatewaysEnabledForSchool && activeGateway === 'tranzak'
                       ? 'bg-blue-600 text-white shadow-xs'
                       : 'bg-white/10 text-slate-300'
                   }`}>
                     <Layers size={13} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                  <div className="min-w-0 truncate">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
                       <span>Tranzak</span>
-                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-blue-500/30 text-blue-200 font-black">DIRECT</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-blue-500/30 text-blue-200 font-black shrink-0">DIRECT</span>
                     </h4>
                   </div>
                 </div>
 
                 {!isGatewaysEnabledForSchool ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <Lock size={9} />
                     <span>Suspendu</span>
                   </span>
                 ) : activeGateway === 'tranzak' ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold text-blue-300 hover:text-white flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold text-blue-300 hover:text-white flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                     <span>Activer</span>
                     <ArrowRight size={10} />
                   </span>
@@ -752,35 +752,35 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             }`}
           >
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-1.5">
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     isGatewaysEnabledForSchool && activeGateway === 'kobara'
                       ? 'bg-orange-600 text-white shadow-xs'
                       : 'bg-white/10 text-slate-300'
                   }`}>
                     <CreditCard size={13} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                  <div className="min-w-0 truncate">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
                       <span>Kobara</span>
-                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-orange-500/30 text-orange-200 font-black">AGRÉGATEUR</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-orange-500/30 text-orange-200 font-black shrink-0">AGRÉGATEUR</span>
                     </h4>
                   </div>
                 </div>
 
                 {!isGatewaysEnabledForSchool ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <Lock size={9} />
                     <span>Suspendu</span>
                   </span>
                 ) : activeGateway === 'kobara' ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold text-orange-300 hover:text-white flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold text-orange-300 hover:text-white flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                     <span>Activer</span>
                     <ArrowRight size={10} />
                   </span>
@@ -810,35 +810,35 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             }`}
           >
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-1.5">
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     isGatewaysEnabledForSchool && activeGateway === 'moncash'
                       ? 'bg-red-600 text-white shadow-xs'
                       : 'bg-white/10 text-slate-300'
                   }`}>
                     <Smartphone size={13} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                  <div className="min-w-0 truncate">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
                       <span>MonCash Direct</span>
-                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-red-500/30 text-red-200 font-black">DIGICEL</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-red-500/30 text-red-200 font-black shrink-0">DIGICEL</span>
                     </h4>
                   </div>
                 </div>
 
                 {!isGatewaysEnabledForSchool ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/30 text-amber-300 border border-amber-500/40 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <Lock size={9} />
                     <span>Suspendu</span>
                   </span>
                 ) : activeGateway === 'moncash' ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold text-red-300 hover:text-white flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold text-red-300 hover:text-white flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                     <span>Activer</span>
                     <ArrowRight size={10} />
                   </span>
@@ -866,30 +866,30 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             }`}
           >
             <div className="space-y-1.5">
-              <div className="flex items-center justify-between gap-1.5">
-                <div className="flex items-center gap-2">
-                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
+              <div className="flex items-center justify-between gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     !isGatewaysEnabledForSchool || activeGateway === 'none'
                       ? 'bg-amber-500 text-slate-950 shadow-xs'
                       : 'bg-white/10 text-slate-300'
                   }`}>
                     <Coins size={13} />
                   </div>
-                  <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
+                  <div className="min-w-0 truncate">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
                       <span>Mode Manuel</span>
-                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-200 font-black">COMPTOIR</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-200 font-black shrink-0">COMPTOIR</span>
                     </h4>
                   </div>
                 </div>
 
                 {!isGatewaysEnabledForSchool || activeGateway === 'none' ? (
-                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-400 text-slate-950 shadow-xs flex items-center gap-1 shrink-0 whitespace-nowrap">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
                 ) : (
-                  <span className="text-[10px] font-bold text-amber-300 hover:text-white flex items-center gap-0.5">
+                  <span className="text-[10px] font-bold text-amber-300 hover:text-white flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                     <span>Activer</span>
                     <ArrowRight size={10} />
                   </span>
