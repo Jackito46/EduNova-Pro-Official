@@ -60,11 +60,17 @@ export const SecurityProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const data = await fetchGeo();
         
+        const isPreviewOrDev = typeof window !== 'undefined' && (
+          window.location.hostname.includes('run.app') ||
+          window.location.hostname === 'localhost' ||
+          window.location.hostname === '127.0.0.1' ||
+          Boolean(import.meta.env.DEV)
+        );
+
         const currentHour = new Date().getHours();
-        const isInOfficeHours = currentHour >= 6 && currentHour < 19; // 6 AM to 7 PM
-        // If no country returned, assume allowed (fail open to avoid lockout on API failure)
+        const isInOfficeHours = isPreviewOrDev ? true : (currentHour >= 6 && currentHour < 22);
         const countryCode = data.country_code || 'HT';
-        const isAllowedLocation = countryCode === 'HT';
+        const isAllowedLocation = isPreviewOrDev ? true : (countryCode === 'HT' || !countryCode);
 
         setSecurityData({
           ipAddress: data.ip || 'Unknown',

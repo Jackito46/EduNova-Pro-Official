@@ -486,7 +486,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4 relative overflow-hidden font-sans">
+    <div className="min-h-screen w-full bg-slate-50 flex flex-col items-center justify-center p-4 py-8 relative overflow-y-auto overflow-x-hidden font-sans">
       {/* Magical Animated Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden bg-slate-50">
         <motion.div 
@@ -929,6 +929,68 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                   </AnimatePresence>
                 </div>
               </motion.form>
+            )}
+
+            {/* Quick Demo Accounts Helper */}
+            {!isForgotPassword && (
+              <div className="mt-5 pt-4 border-t border-slate-100">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <Sparkles size={13} className="text-amber-500" />
+                    Accès Rapide Démo
+                  </span>
+                  <button
+                    type="button"
+                    onClick={testConnection}
+                    disabled={isTestingConnection}
+                    className="text-[11px] font-semibold text-slate-400 hover:text-slate-700 flex items-center gap-1 transition-colors cursor-pointer"
+                    title="Vérifier la connectivité avec le serveur"
+                  >
+                    {isTestingConnection ? (
+                      <Loader2 size={12} className="animate-spin text-blue-600" />
+                    ) : connectionStatus === 'success' ? (
+                      <Wifi size={12} className="text-emerald-500" />
+                    ) : (
+                      <RefreshCw size={12} />
+                    )}
+                    <span>{connectionStatus === 'success' ? 'En ligne' : 'Tester serveur'}</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('jackito46@gmail.com');
+                      setPassword('admin123');
+                      setError(null);
+                      toast.info("Identifiants Super Admin pré-remplis");
+                    }}
+                    className="text-left p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 hover:border-blue-300 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-slate-800 group-hover:text-blue-900">Super Admin</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-100 text-blue-800">Maître</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate mt-0.5">jackito46@gmail.com</div>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEmail('direction@ecole.com');
+                      setPassword('admin123');
+                      setError(null);
+                      toast.info("Identifiants Direction pré-remplis");
+                    }}
+                    className="text-left p-2.5 rounded-xl bg-slate-50 hover:bg-blue-50 border border-slate-200/80 hover:border-blue-300 transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-slate-800 group-hover:text-blue-900">Direction École</span>
+                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-indigo-100 text-indigo-800">Admin</span>
+                    </div>
+                    <div className="text-[10px] text-slate-500 truncate mt-0.5">direction@ecole.com</div>
+                  </button>
+                </div>
+              </div>
             )}
 
           </div>

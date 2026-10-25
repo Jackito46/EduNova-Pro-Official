@@ -29,11 +29,13 @@ import {
   PhoneCall,
   Wallet,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Layers
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { ApiVaultService } from '../services/apiVaultService';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
+import { TranzakGatewaySettings } from './TranzakGatewaySettings';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
 
@@ -46,7 +48,7 @@ interface ApiCredentialsVaultProps {
   savingLegacy: boolean;
 }
 
-type VaultTab = 'kobara' | 'moncash' | 'natcash';
+type VaultTab = 'tranzak' | 'kobara' | 'moncash' | 'natcash';
 
 export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   user,
@@ -56,7 +58,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   onSaveMoncashLegacy,
   savingLegacy
 }) => {
-  const [activeTab, setActiveTab] = useState<VaultTab>('kobara');
+  const [activeTab, setActiveTab] = useState<VaultTab>('tranzak');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -497,6 +499,22 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar border-b border-slate-200">
         <button
           type="button"
+          onClick={() => setActiveTab('tranzak')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+            activeTab === 'tranzak'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-2xs'
+              : 'bg-white text-slate-700 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Layers size={13} />
+          <span>Tranzak (MonCash & NatCash)</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/30 text-white font-black uppercase">
+            Passerelle Directe
+          </span>
+        </button>
+
+        <button
+          type="button"
           onClick={() => setActiveTab('kobara')}
           className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
             activeTab === 'kobara'
@@ -543,6 +561,11 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           <span>Natcash</span>
         </button>
       </div>
+
+      {/* ===================== ONGLET TRANZAK ===================== */}
+      {activeTab === 'tranzak' && (
+        <TranzakGatewaySettings user={user} canManageAllCampuses={canManageAllCampuses} />
+      )}
 
       {/* ===================== ONGLET KOBARA ===================== */}
       {activeTab === 'kobara' && (

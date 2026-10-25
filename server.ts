@@ -188,7 +188,12 @@ async function startServer() {
   // Application du rate limiter global sur l'ensemble des routes API
   app.use('/api', apiGeneralLimiter);
 
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ 
+    limit: '50mb',
+    verify: (req: any, _res, buf) => {
+      req.rawBody = buf;
+    }
+  }));
   app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
   // =========================================================================
@@ -1089,6 +1094,19 @@ async function startServer() {
           api_key_configured: Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY.trim().length > 5),
           masked_key: process.env.GEMINI_API_KEY ? maskSecret(process.env.GEMINI_API_KEY) : '',
           status: Boolean(process.env.GEMINI_API_KEY) ? 'VALID' : 'UNCONFIGURED'
+        },
+        tranzak: {
+          api_key: process.env.TRANZAK_API_KEY ? maskSecret(process.env.TRANZAK_API_KEY) : '',
+          has_key: Boolean(process.env.TRANZAK_API_KEY),
+          is_key_encrypted: false,
+          webhook_secret: process.env.TRANZAK_WEBHOOK_SECRET ? maskSecret(process.env.TRANZAK_WEBHOOK_SECRET) : '',
+          has_webhook_secret: Boolean(process.env.TRANZAK_WEBHOOK_SECRET),
+          is_webhook_secret_encrypted: false,
+          mode: process.env.TRANZAK_MODE === 'test' ? 'test' : 'live',
+          is_active: true,
+          validation_status: 'UNTESTED',
+          last_validated_at: null,
+          validation_message: ''
         }
       };
 
@@ -1168,6 +1186,34 @@ async function startServer() {
               result.kobara.last_validated_at = c.last_validated_at;
               result.kobara.validation_message = c.validation_message;
             }
+          } else if (c.service_name === 'tranzak') {
+            if (c.key_name === 'TRANZAK_API_KEY') {
+              const val = c.encrypted_value || c.key_value || '';
+              if (val) {
+                result.tranzak.api_key = maskSecret(val);
+                result.tranzak.has_key = true;
+                result.tranzak.is_key_encrypted = isEncrypted(val);
+              }
+            }
+            if (c.key_name === 'TRANZAK_WEBHOOK_SECRET') {
+              const val = c.encrypted_value || c.key_value || '';
+              if (val) {
+                result.tranzak.webhook_secret = maskSecret(val);
+                result.tranzak.has_webhook_secret = true;
+                result.tranzak.is_webhook_secret_encrypted = isEncrypted(val);
+              }
+            }
+            if (c.key_name === 'TRANZAK_MODE') {
+              result.tranzak.mode = c.key_value === 'test' ? 'test' : 'live';
+            }
+            if (c.is_active !== undefined && c.is_active !== null) {
+              result.tranzak.is_active = c.is_active;
+            }
+            if (c.validation_status && c.validation_status !== 'UNTESTED') {
+              result.tranzak.validation_status = c.validation_status;
+              result.tranzak.last_validated_at = c.last_validated_at;
+              result.tranzak.validation_message = c.validation_message;
+            }
           }
         }
       }
@@ -1234,6 +1280,24 @@ async function startServer() {
             result.kobara.validation_status = localSchoolVault.kobara.validation_status;
             result.kobara.last_validated_at = localSchoolVault.kobara.last_validated_at;
             result.kobara.validation_message = localSchoolVault.kobara.validation_message;
+          }
+        }
+        if (localSchoolVault.tranzak) {
+          if (localSchoolVault.tranzak.TRANZAK_API_KEY && !result.tranzak.has_key) {
+            result.tranzak.api_key = maskSecret(localSchoolVault.tranzak.TRANZAK_API_KEY);
+            result.tranzak.has_key = true;
+            result.tranzak.is_key_encrypted = isEncrypted(localSchoolVault.tranzak.TRANZAK_API_KEY);
+          }
+          if (localSchoolVault.tranzak.TRANZAK_WEBHOOK_SECRET && !result.tranzak.has_webhook_secret) {
+            result.tranzak.webhook_secret = maskSecret(localSchoolVault.tranzak.TRANZAK_WEBHOOK_SECRET);
+            result.tranzak.has_webhook_secret = true;
+            result.tranzak.is_webhook_secret_encrypted = isEncrypted(localSchoolVault.tranzak.TRANZAK_WEBHOOK_SECRET);
+          }
+          if (localSchoolVault.tranzak.TRANZAK_MODE) {
+            result.tranzak.mode = localSchoolVault.tranzak.TRANZAK_MODE;
+          }
+          if (localSchoolVault.tranzak.is_active !== undefined) {
+            result.tranzak.is_active = localSchoolVault.tranzak.is_active;
           }
         }
       }
@@ -1310,6 +1374,74 @@ async function startServer() {
       }
       if (!localEncryptedVault[school_id][service_name]) {
         localEncryptedVault[school_id][service_name] = {};
+      }
+
+      if (service_name === 'tranzak') {
+        const rawApiKey = (credentials.api_key || credentials.TRANZAK_API_KEY || '').trim();
+        const rawWebhookSecret = (credentials.webhook_secret || credentials.TRANZAK_WEBHOOK_SECRET || '').trim();
+        const mode = (credentials.mode || credentials.TRANZAK_MODE || environment || 'live') === 'test' ? 'test' : 'live';
+
+        if (!localEncryptedVault[school_id].tranzak) {
+          localEncryptedVault[school_id].tranzak = {};
+        }
+
+        let finalApiKeyToStore: string | null = null;
+        if (rawApiKey && !rawApiKey.includes('••••')) {
+          finalApiKeyToStore = isEncrypted(rawApiKey) ? rawApiKey : encryptSecret(rawApiKey);
+          localEncryptedVault[school_id].tranzak.TRANZAK_API_KEY = finalApiKeyToStore;
+        }
+
+        let finalWebhookSecretToStore: string | null = null;
+        if (rawWebhookSecret && !rawWebhookSecret.includes('••••')) {
+          finalWebhookSecretToStore = isEncrypted(rawWebhookSecret) ? rawWebhookSecret : encryptSecret(rawWebhookSecret);
+          localEncryptedVault[school_id].tranzak.TRANZAK_WEBHOOK_SECRET = finalWebhookSecretToStore;
+        }
+
+        localEncryptedVault[school_id].tranzak.TRANZAK_MODE = mode;
+        localEncryptedVault[school_id].tranzak.is_active = is_active;
+
+        if (finalApiKeyToStore) {
+          await supabase.from('api_credentials').upsert({
+            school_id,
+            service_name: 'tranzak',
+            key_name: 'TRANZAK_API_KEY',
+            encrypted_value: finalApiKeyToStore,
+            environment: mode === 'test' ? 'test' : 'production',
+            is_active,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'school_id,service_name,key_name' });
+          savedKeys.push('TRANZAK_API_KEY');
+        }
+
+        if (finalWebhookSecretToStore) {
+          await supabase.from('api_credentials').upsert({
+            school_id,
+            service_name: 'tranzak',
+            key_name: 'TRANZAK_WEBHOOK_SECRET',
+            encrypted_value: finalWebhookSecretToStore,
+            environment: mode === 'test' ? 'test' : 'production',
+            is_active,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'school_id,service_name,key_name' });
+          savedKeys.push('TRANZAK_WEBHOOK_SECRET');
+        }
+
+        await supabase.from('api_credentials').upsert({
+          school_id,
+          service_name: 'tranzak',
+          key_name: 'TRANZAK_MODE',
+          key_value: mode,
+          environment: mode === 'test' ? 'test' : 'production',
+          is_active,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'school_id,service_name,key_name' });
+        savedKeys.push('TRANZAK_MODE');
+
+        return res.json({
+          success: true,
+          message: 'Identifiants Tranzak enregistrés et chiffrés avec succès dans le coffre-fort.',
+          savedKeys
+        });
       }
 
       if (service_name === 'moncash') {
@@ -2069,6 +2201,454 @@ async function startServer() {
         success: false,
         error: error?.message || 'Erreur interne du serveur lors du traitement du webhook MonCash'
       });
+    }
+  });
+
+  // =========================================================================
+  // TRANZAK PAYMENT GATEWAY (MONCASH & NATCASH) INTEGRATION
+  // =========================================================================
+
+  async function getTranzakConfigForSchool(schoolId: string) {
+    let apiKey = process.env.TRANZAK_API_KEY || '';
+    let webhookSecret = process.env.TRANZAK_WEBHOOK_SECRET || '';
+    let mode = (process.env.TRANZAK_MODE || 'live') === 'test' ? 'test' : 'live';
+    let isActive = true;
+
+    if (schoolId) {
+      if (localEncryptedVault[schoolId]?.tranzak?.TRANZAK_API_KEY) {
+        apiKey = decryptSecret(localEncryptedVault[schoolId].tranzak.TRANZAK_API_KEY);
+      }
+      if (localEncryptedVault[schoolId]?.tranzak?.TRANZAK_WEBHOOK_SECRET) {
+        webhookSecret = decryptSecret(localEncryptedVault[schoolId].tranzak.TRANZAK_WEBHOOK_SECRET);
+      }
+      if (localEncryptedVault[schoolId]?.tranzak?.TRANZAK_MODE) {
+        mode = localEncryptedVault[schoolId].tranzak.TRANZAK_MODE;
+      }
+      if (localEncryptedVault[schoolId]?.tranzak?.is_active !== undefined) {
+        isActive = localEncryptedVault[schoolId].tranzak.is_active;
+      }
+
+      try {
+        const { data: dbCreds } = await supabase
+          .from('api_credentials')
+          .select('key_name, key_value, encrypted_value, is_active')
+          .eq('school_id', schoolId)
+          .eq('service_name', 'tranzak');
+
+        if (dbCreds && dbCreds.length > 0) {
+          for (const row of dbCreds) {
+            if (row.key_name === 'TRANZAK_API_KEY') {
+              const raw = row.encrypted_value || row.key_value || '';
+              apiKey = isEncrypted(raw) ? decryptSecret(raw) : raw;
+            }
+            if (row.key_name === 'TRANZAK_WEBHOOK_SECRET') {
+              const raw = row.encrypted_value || row.key_value || '';
+              webhookSecret = isEncrypted(raw) ? decryptSecret(raw) : raw;
+            }
+            if (row.key_name === 'TRANZAK_MODE') {
+              mode = row.key_value === 'test' ? 'test' : 'live';
+            }
+            if (row.is_active !== undefined) {
+              isActive = row.is_active;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Erreur lecture api_credentials pour Tranzak:', e);
+      }
+    }
+
+    return { apiKey, webhookSecret, mode, isActive };
+  }
+
+  // API Route pour tester la connectivité et la clé API Tranzak
+  app.post('/api/tranzak/test-connection', async (req, res) => {
+    const auth = await authenticateRequest(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
+    const { school_id, api_key, mode } = req.body;
+    let effectiveKey = (api_key || '').trim();
+
+    if (!effectiveKey && school_id) {
+      const cfg = await getTranzakConfigForSchool(school_id);
+      effectiveKey = cfg.apiKey;
+    }
+    if (!effectiveKey) {
+      effectiveKey = process.env.TRANZAK_API_KEY || '';
+    }
+
+    if (!effectiveKey) {
+      return res.status(400).json({ success: false, error: 'Clé API Tranzak manquante.' });
+    }
+
+    if (!effectiveKey.startsWith('tk_live_') && !effectiveKey.startsWith('tk_test_') && effectiveKey.length < 15) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Format de clé Tranzak invalide. La clé doit commencer par tk_live_ ou tk_test_.' 
+      });
+    }
+
+    try {
+      // 1. Essayer la lecture GET /api/gateway/v1/payments documentée dans docs.tranzak.co
+      const listRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=1', {
+        headers: {
+          'X-Api-Key': effectiveKey,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (listRes.ok) {
+        return res.json({
+          success: true,
+          message: `Authentification réussie auprès de Tranzak (${effectiveKey.startsWith('tk_live_') ? 'Production Live' : 'Test Sandbox'}). Clé API active et opérationnelle.`
+        });
+      }
+
+      if (listRes.status === 401 || listRes.status === 403) {
+        const body = await listRes.json().catch(() => ({}));
+        return res.status(401).json({
+          success: false,
+          error: body.message || 'Clé API Tranzak non autorisée ou expirée.'
+        });
+      }
+
+      // 2. Repli de validation via POST
+      const testRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments', {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': effectiveKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          amount: 1,
+          currency: 'HTG',
+          payment_method: 'moncash',
+          customer_name: 'Test Connectivity'
+        })
+      });
+
+      const responseBody = await testRes.json().catch(() => ({}));
+
+      if (testRes.status === 401 || testRes.status === 403) {
+        return res.status(401).json({
+          success: false,
+          error: responseBody.message || 'Clé API Tranzak non autorisée ou expirée.'
+        });
+      }
+
+      // Si le statut est 400 avec un message métier (ex: amount_too_low ou min 20 HTG),
+      // cela prouve que la clé API a été validée avec succès par Tranzak
+      const isAuthValid = testRes.ok || (testRes.status === 400 && !responseBody.message?.includes('API Key'));
+      
+      if (isAuthValid) {
+        return res.json({
+          success: true,
+          message: `Authentification réussie auprès de la passerelle Tranzak (${effectiveKey.startsWith('tk_live_') ? 'Production Live' : 'Test Sandbox'}).`
+        });
+      } else {
+        return res.status(testRes.status).json({
+          success: false,
+          error: responseBody.message || responseBody.error || `Erreur Tranzak HTTP ${testRes.status}`
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({
+        success: false,
+        error: `Erreur réseau avec Tranzak : ${err.message || 'Serveur distant injoignable'}`
+      });
+    }
+  });
+
+  // API Route pour créer une session de paiement Tranzak (MonCash / NatCash)
+  app.post('/api/tranzak/create-payment', async (req, res) => {
+    try {
+      const {
+        schoolId,
+        amount,
+        currency = 'HTG',
+        operator = 'moncash',
+        customerName,
+        customerEmail,
+        customerPhone,
+        reference,
+        description,
+        studentId,
+        studentName,
+        feeType = 'SCOLARITE',
+        campaignId
+      } = req.body;
+
+      if (!schoolId) {
+        return res.status(400).json({ success: false, error: 'Identifiant d’établissement (schoolId) obligatoire.' });
+      }
+
+      if (!amount || Number(amount) <= 0) {
+        return res.status(400).json({ success: false, error: 'Montant invalide.' });
+      }
+
+      const tranzakConfig = await getTranzakConfigForSchool(schoolId);
+      if (!tranzakConfig.apiKey) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Passerelle Tranzak non configurée. Veuillez renseigner votre clé API dans les Paramètres.' 
+        });
+      }
+
+      // Conversion USD -> HTG si nécessaire car Tranzak requiert HTG
+      let finalAmountHTG = Number(amount);
+      if (currency === 'USD') {
+        let exchangeRate = 132.5;
+        try {
+          const { data: rateRow } = await supabase
+            .from('exchange_rates')
+            .select('rate_usd_to_htg, rate')
+            .eq('school_id', schoolId)
+            .order('effective_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          if (rateRow?.rate_usd_to_htg || rateRow?.rate) {
+            exchangeRate = Number(rateRow.rate_usd_to_htg || rateRow.rate);
+          }
+        } catch (e) {}
+        finalAmountHTG = Math.round(finalAmountHTG * exchangeRate);
+      }
+
+      // Règle Tranzak : Minimum 20 HTG
+      if (finalAmountHTG < 20) {
+        return res.status(400).json({
+          success: false,
+          error: 'Le montant minimum requis par Tranzak pour MonCash/NatCash est de 20 HTG.'
+        });
+      }
+
+      const orderRef = reference || `TRZ-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      const effectiveOperator = (operator === 'natcash') ? 'natcash' : 'moncash';
+
+      const payload = {
+        amount: Math.round(finalAmountHTG),
+        currency: 'HTG',
+        payment_method: effectiveOperator,
+        customer_name: customerName || studentName || 'Client EduNova',
+        customer_email: customerEmail || undefined,
+        customer_phone: customerPhone || undefined,
+        reference: orderRef,
+        description: description || `Paiement ${effectiveOperator === 'natcash' ? 'NatCash' : 'MonCash'} - ${customerName || 'EduNova PRO'}`,
+        metadata: {
+          school_id: schoolId,
+          student_id: studentId || null,
+          student_name: studentName || null,
+          fee_type: feeType,
+          campaign_id: campaignId || null,
+          order_id: orderRef,
+          operator: effectiveOperator
+        }
+      };
+
+      const tranzakRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments', {
+        method: 'POST',
+        headers: {
+          'X-Api-Key': tranzakConfig.apiKey,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const responseData = await tranzakRes.json().catch(() => ({}));
+
+      if (!tranzakRes.ok) {
+        console.error('[Tranzak API Error]:', responseData);
+        return res.status(tranzakRes.status).json({
+          success: false,
+          error: responseData.message || responseData.error || `Erreur Tranzak (HTTP ${tranzakRes.status})`
+        });
+      }
+
+      const paymentUrl = responseData?.data?.payment_url || responseData?.payment_url;
+      const transactionId = responseData?.data?.transaction_id || responseData?.transaction_id || orderRef;
+
+      // Enregistrement préventif en attente dans la table payments
+      try {
+        await supabase.from('payments').insert([{
+          school_id: schoolId,
+          student_id: studentId || null,
+          amount: finalAmountHTG,
+          amount_htg_equivalent: finalAmountHTG,
+          currency: 'HTG',
+          payment_method: effectiveOperator === 'natcash' ? 'NatCash' : 'MonCash',
+          method: effectiveOperator === 'natcash' ? 'NatCash (Tranzak)' : 'MonCash (Tranzak)',
+          fee_type: feeType,
+          nature: 'Scolarite',
+          type: 'Revenu',
+          reference_number: orderRef,
+          moncash_order_id: orderRef,
+          status: 'EN_ATTENTE',
+          moncash_status: 'PENDING',
+          notes: `Paiement initié via Tranzak (${effectiveOperator}) • Réf: ${orderRef} • Tx: ${transactionId}`,
+          created_at: new Date().toISOString()
+        }]);
+      } catch (dbErr) {
+        console.warn('Notice insertion préventive Tranzak:', dbErr);
+      }
+
+      return res.json({
+        success: true,
+        payment_url: paymentUrl,
+        transaction_id: transactionId,
+        reference: orderRef
+      });
+    } catch (err: any) {
+      console.error('[Tranzak create-payment error]:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || 'Erreur interne lors de la création du paiement Tranzak'
+      });
+    }
+  });
+
+  // API Route pour les Webhooks Asynchrones Tranzak
+  app.post('/api/tranzak/webhook', async (req, res) => {
+    try {
+      const payload = req.body;
+      const rawSignature = (req.headers['x-tranzak-signature'] || req.headers['signature'] || '') as string;
+      const eventType = req.headers['x-tranzak-event'] || payload?.event || 'payment.success';
+
+      const data = payload?.data || payload;
+      const transactionId = data?.transaction_id || data?.id || '';
+      const orderRef = data?.reference || data?.metadata?.order_id || '';
+      const status = String(data?.status || '').toLowerCase();
+      const rawOperator = String(data?.payment_method || data?.operator || 'moncash').toLowerCase();
+      const operator = rawOperator.includes('natcash') ? 'NatCash' : 'MonCash';
+      const amount = Number(data?.amount) || 0;
+      const currency = data?.currency || 'HTG';
+
+      const schoolId = data?.metadata?.school_id || '';
+      const studentId = data?.metadata?.student_id || null;
+      const feeType = data?.metadata?.fee_type || 'SCOLARITE';
+
+      // Validation de la signature HMAC-SHA256 si configurée
+      if (schoolId && rawSignature) {
+        const config = await getTranzakConfigForSchool(schoolId);
+        if (config.webhookSecret) {
+          const rawBuffer = (req as any).rawBody || Buffer.from(JSON.stringify(payload));
+          const expected = crypto.createHmac('sha256', config.webhookSecret).update(rawBuffer).digest('hex');
+          if (rawSignature !== expected && rawSignature !== `sha256=${expected}`) {
+            console.warn(`[Tranzak Webhook] Signature HMAC rejetée pour school ${schoolId}`);
+            return res.status(403).json({ success: false, error: 'Signature invalide.' });
+          }
+        }
+      }
+
+      const isSuccess = eventType === 'payment.success' || status === 'completed' || status === 'successful';
+
+      if (isSuccess && (orderRef || transactionId)) {
+        let existingPayment: any = null;
+        try {
+          const { data: pList } = await supabase
+            .from('payments')
+            .select('*')
+            .or(`reference_number.eq.${orderRef},moncash_order_id.eq.${orderRef},reference_number.eq.${transactionId}`)
+            .limit(1);
+          if (pList && pList.length > 0) {
+            existingPayment = pList[0];
+          }
+        } catch (e) {}
+
+        const receiptNumber = `REC-${Date.now().toString().slice(-6)}`;
+
+        if (existingPayment) {
+          await supabase
+            .from('payments')
+            .update({
+              status: 'VALIDE',
+              moncash_status: 'COMPLETED',
+              receipt_number: existingPayment.receipt_number || receiptNumber,
+              notes: `${existingPayment.notes || ''} [Confirmé Tranzak Tx: ${transactionId}]`,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', existingPayment.id);
+        } else if (schoolId && amount > 0) {
+          await supabase.from('payments').insert([{
+            school_id: schoolId,
+            student_id: studentId,
+            amount: amount,
+            amount_htg_equivalent: amount,
+            currency: currency,
+            payment_method: operator,
+            method: `${operator} (Tranzak)`,
+            fee_type: feeType,
+            nature: 'Scolarite',
+            type: 'Revenu',
+            reference_number: orderRef || transactionId,
+            moncash_order_id: orderRef,
+            receipt_number: receiptNumber,
+            status: 'VALIDE',
+            moncash_status: 'COMPLETED',
+            notes: `Paiement ${operator} confirmé via Webhook Tranzak • Réf: ${orderRef} • Tx: ${transactionId}`,
+            created_at: new Date().toISOString()
+          }]);
+        }
+
+        try {
+          await sendMonCashPaymentPushNotification({
+            schoolId: schoolId || existingPayment?.school_id || '',
+            studentId: studentId || existingPayment?.student_id,
+            paymentId: existingPayment?.id,
+            orderId: orderRef,
+            transactionId: transactionId,
+            amount: amount || existingPayment?.amount || 0,
+            currency: currency,
+            payerPhone: data?.customer?.phone || ''
+          }, {
+            supabaseClient: supabase,
+            webpushClient: webpush
+          });
+        } catch (pushErr) {
+          console.warn('Push notification Tranzak err:', pushErr);
+        }
+      } else if (eventType === 'payment.failed' || status === 'failed') {
+        if (orderRef) {
+          await supabase
+            .from('payments')
+            .update({
+              status: 'ECHOUE',
+              moncash_status: 'FAILED',
+              notes: `Paiement refusé ou expiré sur Tranzak`
+            })
+            .or(`reference_number.eq.${orderRef},moncash_order_id.eq.${orderRef}`);
+        }
+      }
+
+      return res.status(200).json({ received: true, success: true });
+    } catch (err: any) {
+      console.error('[Tranzak Webhook Exception]:', err);
+      return res.status(500).json({ received: false, error: err.message });
+    }
+  });
+
+  // API Route pour vérifier le statut d'une transaction Tranzak
+  app.get('/api/tranzak/payment-status/:id', async (req, res) => {
+    try {
+      const transactionId = req.params.id;
+      const schoolId = (req.query.school_id as string) || '';
+
+      const tranzakConfig = await getTranzakConfigForSchool(schoolId);
+      if (!tranzakConfig.apiKey) {
+        return res.status(400).json({ success: false, error: 'Passerelle Tranzak non configurée.' });
+      }
+
+      const statusRes = await fetch(`https://api.tranzak.co/api/gateway/v1/payments/${encodeURIComponent(transactionId)}`, {
+        headers: {
+          'X-Api-Key': tranzakConfig.apiKey,
+          'Accept': 'application/json'
+        }
+      });
+
+      const data = await statusRes.json().catch(() => ({}));
+      return res.status(statusRes.status).json(data);
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

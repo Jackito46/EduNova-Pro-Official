@@ -429,6 +429,11 @@ const App: React.FC = () => {
     try {
       const isLoggedOut = window.localStorage.getItem('edunova_logged_out') === 'true';
       if (isLoggedOut) return null;
+      // If there is no stored auth token, do not restore cached profile
+      if (!hasStoredAuthToken()) {
+        try { window.localStorage.removeItem('edunova_user_profile'); } catch (e) {}
+        return null;
+      }
       const cached = window.localStorage.getItem('edunova_user_profile');
       if (cached) {
         return JSON.parse(cached);
