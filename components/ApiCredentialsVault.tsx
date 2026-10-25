@@ -36,6 +36,7 @@ import { UserProfile } from '../types';
 import { ApiVaultService } from '../services/apiVaultService';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { TranzakGatewaySettings } from './TranzakGatewaySettings';
+import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobilePaymentRouterService';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
 
@@ -59,6 +60,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   savingLegacy
 }) => {
   const [activeTab, setActiveTab] = useState<VaultTab>('tranzak');
+  // Passerelle Mobile Money active pour l'établissement ('tranzak' | 'kobara' | 'moncash')
+  const [activeGateway, setActiveGateway] = useState<MobileMoneyGateway>('tranzak');
+  const [isSwitchingGateway, setIsSwitchingGateway] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
@@ -208,7 +212,15 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
     if (!user.school_id) return;
     setLoading(true);
     try {
-      const res = await ApiVaultService.getCredentials(user.school_id);
+      const [res, currentGateway] = await Promise.all([
+        ApiVaultService.getCredentials(user.school_id),
+        MobilePaymentRouterService.getActiveGateway(user.school_id)
+      ]);
+
+      if (currentGateway) {
+        setActiveGateway(currentGateway);
+      }
+
       if (res.success && res.credentials) {
         setVaultData(prev => ({
           ...prev,
@@ -238,6 +250,35 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       console.error('Erreur chargement ApiCredentialsVault:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Basculer la passerelle active (Master Switch)
+  const handleSwitchActiveGateway = async (targetGateway: MobileMoneyGateway) => {
+    if (!canManageAllCampuses) {
+      toast.error("Seule la direction générale peut modifier la passerelle active de l'établissement.");
+      return;
+    }
+    if (targetGateway === activeGateway) {
+      setActiveTab(targetGateway);
+      return;
+    }
+
+    setIsSwitchingGateway(true);
+    const toastId = toast.loading(`Bascule de passerelle vers ${targetGateway.toUpperCase()}...`);
+    try {
+      const res = await MobilePaymentRouterService.setActiveGateway(user.school_id || '', targetGateway);
+      if (res.success) {
+        setActiveGateway(targetGateway);
+        setActiveTab(targetGateway);
+        toast.success(res.message || `Passerelle active basculée sur : ${targetGateway.toUpperCase()}`, { id: toastId });
+      } else {
+        toast.error(res.error || "Impossible de basculer la passerelle", { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Erreur lors de la bascule", { id: toastId });
+    } finally {
+      setIsSwitchingGateway(false);
     }
   };
 
@@ -495,7 +536,192 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         </div>
       </div>
 
-      {/* 2. SÉLECTEUR D'ONGLETS COMPACT */}
+      {/* ========================================================================= */}
+      {/* 1.5 AIGUILLEUR CENTRAL : PASSERELLE MOBILE MONEY ACTIVE (MASTER SWITCH) */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-indigo-500/30 shadow-xl space-y-3.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
+              <Sliders size={20} className="text-white" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-sm sm:text-base font-black text-white tracking-tight">
+                  Passerelle Mobile Money en Service (Encaissements)
+                </h3>
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-2xs">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span>
+                    {activeGateway === 'tranzak' && 'Tranzak Active (Prioritaire)'}
+                    {activeGateway === 'kobara' && 'Kobara Active (Prioritaire)'}
+                    {activeGateway === 'moncash' && 'MonCash Direct Active'}
+                  </span>
+                </span>
+              </div>
+              <p className="text-xs text-slate-300 mt-0.5">
+                Cliquez sur une passerelle ci-dessous pour la définir comme canal prioritaire d’encaissement (MonCash &amp; NatCash).
+              </p>
+            </div>
+          </div>
+
+          {isSwitchingGateway && (
+            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-bold animate-pulse">
+              <Loader2 size={13} className="animate-spin" />
+              <span>Bascule en cours...</span>
+            </div>
+          )}
+        </div>
+
+        {/* 3 CARTES DE BASCULE INTERACTIVES */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+          {/* OPTION 1 : TRANZAK */}
+          <div
+            onClick={() => handleSwitchActiveGateway('tranzak')}
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+              activeGateway === 'tranzak'
+                ? 'bg-blue-950/70 border-blue-400 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/10'
+                : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+            }`}
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeGateway === 'tranzak' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                    <Layers size={14} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Tranzak</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 font-black">DIRECT</span>
+                    </h4>
+                    <p className="text-[10px] text-slate-300">MonCash &amp; NatCash</p>
+                  </div>
+                </div>
+
+                {activeGateway === 'tranzak' ? (
+                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                    <CheckCircle2 size={10} />
+                    <span>En Service</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-blue-300 hover:text-white flex items-center gap-0.5">
+                    <span>Activer</span>
+                    <ArrowRight size={10} />
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                Passerelle moderne unifiée. Clé API unique, webhooks signés HMAC-SHA256 et encaissement direct.
+              </p>
+            </div>
+
+            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10.5px]">
+              <span className="text-slate-400">Opérateurs :</span>
+              <span className="font-bold text-blue-300">MonCash + NatCash</span>
+            </div>
+          </div>
+
+          {/* OPTION 2 : KOBARA */}
+          <div
+            onClick={() => handleSwitchActiveGateway('kobara')}
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+              activeGateway === 'kobara'
+                ? 'bg-orange-950/70 border-orange-400 ring-2 ring-orange-500/50 shadow-lg shadow-orange-500/10'
+                : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+            }`}
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeGateway === 'kobara' ? 'bg-orange-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                    <CreditCard size={14} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Kobara</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-orange-500/30 text-orange-200 font-black">AGRÉGATEUR</span>
+                    </h4>
+                    <p className="text-[10px] text-slate-300">Reversement Téléphone</p>
+                  </div>
+                </div>
+
+                {activeGateway === 'kobara' ? (
+                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                    <CheckCircle2 size={10} />
+                    <span>En Service</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-orange-300 hover:text-white flex items-center gap-0.5">
+                    <span>Activer</span>
+                    <ArrowRight size={10} />
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                Agrégateur national haïtien avec reversement automatique des fonds directement sur vos numéros marchands.
+              </p>
+            </div>
+
+            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10.5px]">
+              <span className="text-slate-400">Reversement :</span>
+              <span className="font-bold text-orange-300">Numéros Téléphone Auto</span>
+            </div>
+          </div>
+
+          {/* OPTION 3 : MONCASH DIRECT DIGICEL */}
+          <div
+            onClick={() => handleSwitchActiveGateway('moncash')}
+            className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+              activeGateway === 'moncash'
+                ? 'bg-red-950/70 border-red-400 ring-2 ring-red-500/50 shadow-lg shadow-red-500/10'
+                : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+            }`}
+          >
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeGateway === 'moncash' ? 'bg-red-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                    <Smartphone size={14} />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>MonCash Direct</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-500/30 text-red-200 font-black">DIGICEL</span>
+                    </h4>
+                    <p className="text-[10px] text-slate-300">Bouton Officiel Digicel</p>
+                  </div>
+                </div>
+
+                {activeGateway === 'moncash' ? (
+                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                    <CheckCircle2 size={10} />
+                    <span>En Service</span>
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-red-300 hover:text-white flex items-center gap-0.5">
+                    <span>Activer</span>
+                    <ArrowRight size={10} />
+                  </span>
+                )}
+              </div>
+
+              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
+                Connexion directe à la plateforme marchande Digicel Haïti via identifiants Client ID et Business Key.
+              </p>
+            </div>
+
+            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10.5px]">
+              <span className="text-slate-400">Opérateur :</span>
+              <span className="font-bold text-red-300">MonCash Unique</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. SÉLECTEUR D'ONGLETS COMPACT AVEC INDICATEUR D'ÉTAT */}
       <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar border-b border-slate-200">
         <button
           type="button"
@@ -508,9 +734,16 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <Layers size={13} />
           <span>Tranzak (MonCash & NatCash)</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/30 text-white font-black uppercase">
-            Passerelle Directe
-          </span>
+          {activeGateway === 'tranzak' ? (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-slate-950 font-black uppercase flex items-center gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-slate-950"></span>
+              <span>Actif</span>
+            </span>
+          ) : (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-700 font-bold uppercase">
+              Direct
+            </span>
+          )}
         </button>
 
         <button
@@ -524,11 +757,18 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <CreditCard size={13} />
           <span>Kobara</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/20 text-white font-black uppercase">
-            Recommandé
-          </span>
+          {activeGateway === 'kobara' ? (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-slate-950 font-black uppercase flex items-center gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-slate-950"></span>
+              <span>Actif</span>
+            </span>
+          ) : (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-orange-100 text-orange-800 font-bold uppercase">
+              Agrégateur
+            </span>
+          )}
           {vaultData.kobara.validation_status === 'VALID' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="API Kobara validée"></span>
           )}
         </button>
 
@@ -543,8 +783,14 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <Smartphone size={13} />
           <span>MonCash</span>
+          {activeGateway === 'moncash' && (
+            <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-400 text-slate-950 font-black uppercase flex items-center gap-0.5">
+              <span className="w-1 h-1 rounded-full bg-slate-950"></span>
+              <span>Actif</span>
+            </span>
+          )}
           {vaultData.moncash.validation_status === 'VALID' && (
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" title="API MonCash validée"></span>
           )}
         </button>
 
@@ -564,7 +810,12 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
 
       {/* ===================== ONGLET TRANZAK ===================== */}
       {activeTab === 'tranzak' && (
-        <TranzakGatewaySettings user={user} canManageAllCampuses={canManageAllCampuses} />
+        <TranzakGatewaySettings 
+          user={user} 
+          canManageAllCampuses={canManageAllCampuses} 
+          isActiveGateway={activeGateway === 'tranzak'}
+          onMakeActiveGateway={() => handleSwitchActiveGateway('tranzak')}
+        />
       )}
 
       {/* ===================== ONGLET KOBARA ===================== */}
@@ -602,6 +853,52 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   </div>
                 )}
               </div>
+            </div>
+
+            {/* BANDEAU STATUT PASSERELLE KOBARA */}
+            <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+              activeGateway === 'kobara'
+                ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-2xs'
+                : 'bg-slate-50 border-slate-200 text-slate-800'
+            }`}>
+              <div className="flex items-center gap-2.5">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  activeGateway === 'kobara' ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'
+                }`}>
+                  <CreditCard size={15} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-xs font-black">Statut opérationnel :</span>
+                    {activeGateway === 'kobara' ? (
+                      <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase bg-emerald-600 text-white flex items-center gap-1 shadow-2xs">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                        <span>EN SERVICE • ACTIVE</span>
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase bg-slate-200 text-slate-700">
+                        En veille
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    {activeGateway === 'kobara'
+                      ? "Kobara traite actuellement les encaissements mobiles et reverse les montants sur vos numéros."
+                      : "Tranzak ou MonCash Direct est actuellement la passerelle sélectionnée pour les encaissements."}
+                  </p>
+                </div>
+              </div>
+
+              {activeGateway !== 'kobara' && (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchActiveGateway('kobara')}
+                  className="px-3 py-1.5 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all flex items-center gap-1 cursor-pointer shrink-0 self-start sm:self-center"
+                >
+                  <CheckCircle2 size={13} />
+                  <span>Activer Kobara en 1 clic</span>
+                </button>
+              )}
             </div>
 
             {/* WEBHOOK KOBARA */}

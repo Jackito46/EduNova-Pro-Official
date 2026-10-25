@@ -1345,10 +1345,103 @@ async function startServer() {
         }
       } catch (pgErr) {}
 
-      res.json({ success: true, credentials: result });
+      // Récupération de la passerelle Mobile Money active pour l'établissement (Tranzak, Kobara ou MonCash)
+      let activeMobileMoneyGateway: 'tranzak' | 'kobara' | 'moncash' = 'tranzak';
+      try {
+        const { data: sRow } = await supabase
+          .from('schools')
+          .select('global_settings')
+          .eq('id', schoolId)
+          .maybeSingle();
+
+        if (sRow?.global_settings) {
+          const gs = typeof sRow.global_settings === 'string' ? JSON.parse(sRow.global_settings) : sRow.global_settings;
+          if (gs?.active_mobile_money_gateway) {
+            activeMobileMoneyGateway = gs.active_mobile_money_gateway;
+          }
+        }
+      } catch (e) {}
+
+      res.json({ 
+        success: true, 
+        credentials: result,
+        active_mobile_money_gateway: activeMobileMoneyGateway 
+      });
     } catch (err: any) {
       console.error('Erreur API api-credentials:', err);
       res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  // POST /api/settings/active-gateway : Bascule maître (Master Switch) de la passerelle Mobile Money active
+  app.post('/api/settings/active-gateway', async (req, res) => {
+    try {
+      const { school_id, active_gateway } = req.body;
+      if (!school_id || !active_gateway) {
+        return res.status(400).json({ success: false, error: 'school_id et active_gateway obligatoires' });
+      }
+
+      if (!['tranzak', 'kobara', 'moncash'].includes(active_gateway)) {
+        return res.status(400).json({ 
+          success: false, 
+          error: 'Passerelle invalide. Valeurs supportées : tranzak, kobara, moncash' 
+        });
+      }
+
+      const auth = await authorizeSchoolAdmin(req, school_id);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+
+      // 1. Sauvegarde dans schools.global_settings
+      const { data: schoolRow } = await supabase
+        .from('schools')
+        .select('global_settings')
+        .eq('id', school_id)
+        .maybeSingle();
+
+      let sSettings: any = {};
+      if (schoolRow?.global_settings) {
+        sSettings = typeof schoolRow.global_settings === 'string' ? JSON.parse(schoolRow.global_settings) : schoolRow.global_settings;
+      }
+      sSettings.active_mobile_money_gateway = active_gateway;
+
+      await supabase
+        .from('schools')
+        .update({ global_settings: sSettings })
+        .eq('id', school_id);
+
+      // 2. Synchronisation de is_active dans api_credentials
+      try {
+        await supabase
+          .from('api_credentials')
+          .update({ is_active: false })
+          .eq('school_id', school_id)
+          .in('service_name', ['tranzak', 'kobara', 'moncash']);
+
+        await supabase
+          .from('api_credentials')
+          .update({ is_active: true })
+          .eq('school_id', school_id)
+          .eq('service_name', active_gateway);
+      } catch (credSyncErr) {
+        console.warn('api_credentials sync warning for active-gateway:', credSyncErr);
+      }
+
+      const gatewayLabels: Record<string, string> = {
+        tranzak: 'Tranzak (MonCash & NatCash Direct)',
+        kobara: 'Kobara (Agrégateur National)',
+        moncash: 'MonCash Direct (Digicel)'
+      };
+
+      return res.json({ 
+        success: true, 
+        active_gateway, 
+        message: `Passerelle active basculée sur : ${gatewayLabels[active_gateway] || active_gateway.toUpperCase()}` 
+      });
+    } catch (err: any) {
+      console.error('Erreur API active-gateway:', err);
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

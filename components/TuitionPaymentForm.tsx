@@ -52,6 +52,7 @@ import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { UserProfile } from '../types';
 import { RetryableError } from './RetryableError';
 import { MonCashService } from '../services/moncashService';
+import { MobilePaymentRouterService } from '../services/mobilePaymentRouterService';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
@@ -2327,13 +2328,23 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           
           let redirectUrl: string | null = null;
           try {
-            redirectUrl = await MonCashService.initiatePayment(user.school_id, {
+            const dispatchRes = await MobilePaymentRouterService.dispatchPayment({
+              schoolId: user.school_id,
               amount: amount,
+              currency: currency as any,
+              operator: 'moncash',
               orderId: moncashOrderId,
-              description: `Paiement ${feeType} - ${studentFullName}`
+              payerPhone: referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
+              studentId: selectedStudent.id,
+              studentName: studentFullName,
+              customerName: studentFullName,
+              customerPhone: referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
+              description: `Paiement ${feeType} - ${studentFullName}`,
+              feeType: feeType
             });
+            redirectUrl = dispatchRes.paymentUrl || dispatchRes.redirectUrl || null;
           } catch (err: any) {
-            console.warn("MonCash Initiation Warning:", err);
+            console.warn("Mobile Payment Initiation Warning:", err);
           }
 
           // Initialisation officielle de la card récapitulative MonCash

@@ -31,11 +31,15 @@ import { supabase } from '../supabase';
 export interface TranzakGatewaySettingsProps {
   user: UserProfile;
   canManageAllCampuses: boolean;
+  isActiveGateway?: boolean;
+  onMakeActiveGateway?: () => void;
 }
 
 export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
   user,
-  canManageAllCampuses
+  canManageAllCampuses,
+  isActiveGateway = false,
+  onMakeActiveGateway
 }) => {
   const { school } = useSchool();
   const currentSchoolId = user.school_id || school?.id || '';
@@ -232,6 +236,52 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
 
   return (
     <div className="space-y-4">
+      {/* BANDEAU D'ÉTAT D'ACTIVITÉ EN DIRECT */}
+      <div className={`p-4 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+        isActiveGateway 
+          ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-2xs' 
+          : 'bg-slate-50 border-slate-200 text-slate-800'
+      }`}>
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
+            isActiveGateway ? 'bg-emerald-600 text-white shadow-xs' : 'bg-slate-200 text-slate-600'
+          }`}>
+            <Layers size={18} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-xs font-black tracking-tight">Statut de la passerelle :</span>
+              {isActiveGateway ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-2xs flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
+                  <span>EN SERVICE • ACTIVE</span>
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700">
+                  En Veille (Inactive)
+                </span>
+              )}
+            </div>
+            <p className="text-[11.5px] text-slate-600 mt-0.5">
+              {isActiveGateway 
+                ? "Tranzak traite en direct tous les paiements MonCash et NatCash de votre établissement." 
+                : "Une autre passerelle est actuellement prioritaire. Vos clés Tranzak restent sauvegardées et chiffrées."}
+            </p>
+          </div>
+        </div>
+
+        {!isActiveGateway && onMakeActiveGateway && (
+          <button
+            type="button"
+            onClick={onMakeActiveGateway}
+            className="px-3.5 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0 self-start sm:self-center"
+          >
+            <CheckCircle2 size={14} />
+            <span>Activer Tranzak en 1 clic</span>
+          </button>
+        )}
+      </div>
+
       {/* 1. Carte Guide de Remplissage Tranzak Dashboard */}
       <div className="bg-gradient-to-br from-blue-950 via-slate-900 to-indigo-950 text-white rounded-2xl p-5 border border-blue-900/40 shadow-lg relative overflow-hidden">
         <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />

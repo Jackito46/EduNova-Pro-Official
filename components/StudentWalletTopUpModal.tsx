@@ -23,6 +23,7 @@ import { MonCashSummaryModal } from './MonCashSummaryModal';
 import { useSchool } from '../contexts/SchoolContext';
 import { getTerminology } from '../lib/terminology';
 import { isWalletPaymentActive, isMonCashPaymentActive } from '../lib/paymentMethods';
+import { MobilePaymentRouterService } from '../services/mobilePaymentRouterService';
 
 export interface StudentWalletTopUpModalProps {
   isOpen: boolean;
@@ -154,27 +155,29 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       setActivePaymentId(paymentRecord?.id || orderId);
       setActiveTransactionRef(orderId);
 
-      // 3. Appel de l'API MonCash côté serveur pour déclencher le paiement
+      // 3. Déclenchement du paiement via la passerelle Mobile Money active (Tranzak, Kobara ou MonCash)
       try {
-        const response = await fetch('/api/moncash/create-payment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            amount: effectiveAmount,
-            orderId,
-            schoolId: effectiveSchoolId,
-            payerPhone: displayPhone,
-            description: `Recharge Portefeuille ${student.first_name} ${student.last_name}`
-          })
+        const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+        const dispatchRes = await MobilePaymentRouterService.dispatchPayment({
+          schoolId: effectiveSchoolId,
+          amount: effectiveAmount,
+          currency: 'HTG',
+          operator: 'moncash',
+          orderId,
+          payerPhone: displayPhone,
+          studentId: student.id,
+          studentName: studentFullName,
+          customerName: studentFullName,
+          customerPhone: displayPhone,
+          description: `Recharge Portefeuille ${studentFullName}`,
+          feeType: 'RECHARGE_PORTEFEUILLE'
         });
 
-        const data = await response.json();
-        if (data.redirect_url) {
-          // Si l'API renvoie un lien direct MonCash
-          console.log('[MonCash TopUp] Redirection MonCash reçue:', data.redirect_url);
+        if (dispatchRes.paymentUrl || dispatchRes.redirectUrl) {
+          console.log(`[TopUp] Session ${dispatchRes.gateway} initiée :`, dispatchRes.paymentUrl || dispatchRes.redirectUrl);
         }
       } catch (apiErr) {
-        console.warn('[MonCash TopUp] API serveur en mode veille, bascule sur surveillance polling:', apiErr);
+        console.warn('[TopUp] API serveur en mode veille, bascule sur surveillance polling:', apiErr);
       }
 
       // 4. Ouvrir la modale d'attente MonCash avec détection en temps réel
