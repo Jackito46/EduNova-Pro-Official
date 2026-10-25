@@ -39,6 +39,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ReevaluationModal, ReevaluatedStudentItem } from './ReevaluationModal';
 import { GatewayWebhookSimulatorModal } from './GatewayWebhookSimulatorModal';
+import { GatewayDiagnosticModal } from './GatewayDiagnosticModal';
 import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
 import { ApiVaultService } from '../services/apiVaultService';
 
@@ -47,6 +48,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { terminology, currentCampusId, campuses, school, activeAcademicYear } = useSchool();
   const [isClosureModalOpen, setIsClosureModalOpen] = useState(false);
   const [isWebhookSimulatorOpen, setIsWebhookSimulatorOpen] = useState(false);
+  const [isGatewayDiagnosticOpen, setIsGatewayDiagnosticOpen] = useState(false);
   const [exchangeRate, setExchangeRate] = useState<number>(132.50);
   
   const [todayCollection, setTodayCollection] = useState(0);
@@ -1048,10 +1050,10 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
       allowedRoles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT, UserRole.SECRETARY]
     },
     { 
-      title: 'Simulateur Webhook Passerelles', 
-      desc: 'Tests notifications MonCash & Natcash', 
+      title: 'Diagnostic Passerelles & API', 
+      desc: 'Simulation MonCash & Kobara (Zéro impact)', 
       icon: Radio, 
-      isSimulatorModal: true,
+      isGatewayDiagnosticModal: true,
       color: 'bg-purple-600', 
       shadow: 'shadow-purple-200',
       allowedRoles: [UserRole.SUPER_ADMIN, UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR, UserRole.ACCOUNTANT]
@@ -1083,8 +1085,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute right-1/3 -top-10 w-40 h-40 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-3.5 sm:gap-4.5">
-          <div className="space-y-1.5 min-w-0">
+        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="space-y-1 sm:space-y-1.5 min-w-0">
             <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
               <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-500/20 border border-indigo-400/30 text-indigo-300 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide backdrop-blur-md">
                 <Building2 size={12} className="text-emerald-400 shrink-0" />
@@ -1102,64 +1104,75 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             </p>
           </div>
 
-          {/* 3 ACTION BUTTONS - DYNAMICALLY RESPONSIVE, ZERO OVERFLOW */}
-          <div className="w-full lg:w-auto grid grid-cols-1 sm:grid-cols-3 lg:flex lg:flex-nowrap items-center gap-2 sm:gap-2.5 shrink-0 pt-1 lg:pt-0">
-            {/* Button 1: Réévaluer Objectif */}
+          {/* DYNAMICALLY RESPONSIVE ACTION TOOLBAR - ADAPTS SEAMLESSLY TO 14" LAPTOP, TABLET & MOBILE */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full xl:w-auto xl:justify-end pt-2 xl:pt-0 shrink-0">
+            {/* Action 1: Encaisser (Action primaire mise en avant) */}
             <button
               type="button"
-              onClick={() => setIsReevaluationModalOpen(true)}
-              className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-indigo-600/90 hover:bg-indigo-600 text-white font-bold text-xs sm:text-xs md:text-sm rounded-xl transition-all shadow-xs hover:shadow-indigo-500/25 flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-400/30 whitespace-nowrap cursor-pointer"
-              title={`Recalculer l'objectif net après déduction des bourses et réductions de ${terminology.tuition}`}
+              onClick={() => navigate('/economat/frais')}
+              className="h-9 px-3 sm:px-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs rounded-xl transition-all shadow-sm hover:shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-[0.98] border border-emerald-400/40 whitespace-nowrap cursor-pointer shrink-0"
+              title={`Encaisser un versement de ${terminology.tuition} ou autre frais`}
             >
-              <Calculator size={15} className="shrink-0 text-indigo-200" />
-              <span className="whitespace-nowrap">Réévaluer</span>
+              <PlusCircle size={15} className="shrink-0 text-slate-950" />
+              <span>Encaisser</span>
             </button>
 
-            {/* Button 2: Clôture de Caisse */}
+            {/* Action 2: Clôture de Caisse */}
             <button
               type="button"
               onClick={() => setIsClosureModalOpen(true)}
-              className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-xs md:text-sm rounded-xl transition-all shadow-xs hover:shadow-emerald-500/25 flex items-center justify-center gap-1.5 active:scale-[0.98] border border-emerald-400/40 whitespace-nowrap cursor-pointer"
+              className="h-9 px-3 sm:px-3.5 bg-slate-800/90 hover:bg-slate-800 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-slate-700/80 whitespace-nowrap cursor-pointer shrink-0"
               title="Rapport officiel de clôture et audit de caisse journalière"
             >
-              <ShieldCheck size={15} className="shrink-0 text-slate-950" />
-              <span className="whitespace-nowrap">Clôture Caisse</span>
+              <ShieldCheck size={15} className="shrink-0 text-emerald-400" />
+              <span>Clôture Caisse</span>
             </button>
 
-            {/* Button: Diagnostic Barème USD (Visible uniquement pour écoles avec 2 devises activées) */}
+            {/* Action 3: Diagnostic Passerelles API (MonCash & Kobara) */}
+            <button
+              type="button"
+              onClick={() => setIsGatewayDiagnosticOpen(true)}
+              className="h-9 px-3 sm:px-3.5 bg-purple-600/80 hover:bg-purple-600 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-purple-400/40 whitespace-nowrap cursor-pointer backdrop-blur-md shrink-0"
+              title="Diagnostic en temps réel des clés API MonCash & Kobara sans impacter les soldes des élèves"
+            >
+              <Radio size={14} className="shrink-0 text-purple-200" />
+              <span>Passerelles & API</span>
+            </button>
+
+            {/* Action 4: Réévaluer Objectif */}
+            <button
+              type="button"
+              onClick={() => setIsReevaluationModalOpen(true)}
+              className="h-9 px-2.5 sm:px-3 bg-indigo-600/70 hover:bg-indigo-600 text-indigo-100 font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-400/30 whitespace-nowrap cursor-pointer shrink-0"
+              title={`Recalculer l'objectif net après déduction des bourses et réductions de ${terminology.tuition}`}
+            >
+              <Calculator size={14} className="shrink-0 text-indigo-300" />
+              <span>Réévaluer</span>
+            </button>
+
+            {/* Action 5: Diagnostic Barème USD (Visible uniquement pour écoles avec 2 devises activées) */}
             {isMultiCurrency && (
               <button
                 type="button"
                 onClick={() => setIsDiagnosticModalOpen(true)}
-                className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-indigo-500/30 hover:bg-indigo-500/50 text-white font-bold text-xs sm:text-xs md:text-sm rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-400/40 whitespace-nowrap cursor-pointer backdrop-blur-md"
+                className="h-9 px-2.5 sm:px-3 bg-indigo-500/30 hover:bg-indigo-500/50 text-indigo-200 font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-400/30 whitespace-nowrap cursor-pointer backdrop-blur-md shrink-0"
                 title="Diagnostic comparatif du Total Dû théorique (barème USD) vs montant réellement enregistré dans l'engagement"
               >
-                <Activity size={15} className="shrink-0 text-indigo-300" />
-                <span className="whitespace-nowrap">Diagnostic Barème USD</span>
+                <Activity size={14} className="shrink-0 text-indigo-300" />
+                <span>Barème USD</span>
               </button>
             )}
 
-            {/* Button 3: Encaisser un Frais */}
-            <button
-              type="button"
-              onClick={() => navigate('/economat/frais')}
-              className="w-full sm:w-auto min-h-[38px] px-3 sm:px-3.5 py-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-xs md:text-sm rounded-xl transition-all border border-white/20 flex items-center justify-center gap-1.5 active:scale-[0.98] backdrop-blur-md whitespace-nowrap cursor-pointer"
-              title={`Encaisser un versement de ${terminology.tuition} ou autre frais`}
-            >
-              <PlusCircle size={15} className="shrink-0 text-indigo-300" />
-              <span className="whitespace-nowrap">Encaisser</span>
-            </button>
-
-            {/* Button 4: Rafraîchir instantané */}
+            {/* Action 6: Rafraîchir instantané (Bouton carré ergonomique) */}
             <button
               type="button"
               onClick={() => fetchFinanceData(false)}
               disabled={isRefreshing || loading}
-              className="w-full sm:w-auto min-h-[38px] px-2.5 sm:px-3 py-2 bg-white/5 hover:bg-white/15 text-slate-300 hover:text-white font-medium text-xs sm:text-xs rounded-xl transition-all border border-white/15 flex items-center justify-center gap-1.5 active:scale-[0.98] backdrop-blur-md whitespace-nowrap cursor-pointer"
-              title="Rafraîchir les données en temps réel"
+              className="h-9 w-9 p-0 bg-white/10 hover:bg-white/20 text-slate-200 hover:text-white font-medium text-xs rounded-xl transition-all border border-white/20 flex items-center justify-center active:scale-[0.98] backdrop-blur-md cursor-pointer shrink-0"
+              title="Rafraîchir les données financières en temps réel"
+              aria-label="Rafraîchir"
             >
-              <RefreshCcw size={14} className={`shrink-0 text-slate-300 ${(isRefreshing || loading) ? 'animate-spin text-indigo-400' : ''}`} />
-              <span className="hidden xl:inline">Rafraîchir</span>
+              <RefreshCcw size={14} className={`shrink-0 ${(isRefreshing || loading) ? 'animate-spin text-indigo-300' : ''}`} />
             </button>
           </div>
         </div>
@@ -1334,6 +1347,8 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
             onClick={() => {
               if (action.isModal) {
                 setIsClosureModalOpen(true);
+              } else if ((action as any).isGatewayDiagnosticModal) {
+                setIsGatewayDiagnosticOpen(true);
               } else if ((action as any).isSimulatorModal) {
                 setIsWebhookSimulatorOpen(true);
               } else if (action.path) {
@@ -1784,6 +1799,14 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
           currentExchangeRate={148}
         />
       )}
+
+      <GatewayDiagnosticModal
+        isOpen={isGatewayDiagnosticOpen}
+        onClose={() => setIsGatewayDiagnosticOpen(false)}
+        user={user}
+        initialGateway="moncash"
+        initialOperator={simulatorOperator}
+      />
 
       {user?.school_id && (
         <GatewayWebhookSimulatorModal

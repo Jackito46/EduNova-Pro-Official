@@ -35,6 +35,9 @@ node_modules
 data/backups/*.json
 !data/backups/.gitkeep
 
-bun.lock
+# Build output
+dist
+build
+.output
 
 

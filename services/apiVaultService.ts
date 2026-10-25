@@ -272,4 +272,78 @@ export class ApiVaultService {
       return { success: false, error: err.message };
     }
   }
+
+  /**
+   * Lance un diagnostic complet et une simulation de test en direct pour MonCash ou Kobara
+   * Sanctuarisation totale : Zéro impact sur les soldes des élèves & isolation multi-tenant stricte
+   */
+  static async runGatewayDiagnostic(params: {
+    schoolId: string;
+    gateway: 'moncash' | 'kobara';
+    operator?: 'moncash' | 'natcash';
+    mode?: 'sandbox' | 'live' | 'test';
+    testAmount?: number;
+    testPhone?: string;
+    testStudentId?: string;
+    overrideCredentials?: Record<string, any>;
+  }): Promise<GatewayDiagnosticResult> {
+    try {
+      const authHeaders = await getAuthHeaders();
+      const res = await fetch('/api/finance/gateway-diagnostic', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...authHeaders
+        },
+        body: JSON.stringify({
+          school_id: params.schoolId,
+          gateway: params.gateway,
+          operator: params.operator || 'moncash',
+          mode: params.mode || 'sandbox',
+          test_amount: params.testAmount ?? 250,
+          test_phone: params.testPhone || '50937123456',
+          test_student_id: params.testStudentId,
+          override_credentials: params.overrideCredentials
+        })
+      });
+      const data = await res.json();
+      return data;
+    } catch (err: any) {
+      console.error('Erreur ApiVaultService.runGatewayDiagnostic:', err);
+      return {
+        success: false,
+        error: err.message || 'Erreur réseau lors du diagnostic de la passerelle'
+      };
+    }
+  }
+}
+
+export interface GatewayDiagnosticCheck {
+  name: string;
+  category: 'credentials' | 'network' | 'signature' | 'multi_tenant' | 'student_balance';
+  status: 'pass' | 'fail' | 'warn';
+  message: string;
+  details?: string;
+}
+
+export interface GatewayDiagnosticResult {
+  success: boolean;
+  school_id?: string;
+  school_name?: string;
+  gateway?: 'moncash' | 'kobara';
+  operator?: 'moncash' | 'natcash';
+  mode?: string;
+  latency_ms?: number;
+  overall_status?: 'OPERATIONAL' | 'CONFIG_REQUIRED' | 'WARNING' | 'ERROR';
+  student_impact?: {
+    impacted: boolean;
+    balance_change: number;
+    payments_inserted: number;
+    message: string;
+  };
+  checks?: GatewayDiagnosticCheck[];
+  receiver_info?: any;
+  simulated_payload?: any;
+  timestamp?: string;
+  error?: string;
 }
