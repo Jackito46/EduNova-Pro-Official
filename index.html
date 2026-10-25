@@ -4,12 +4,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#2563eb">
+    <meta name="theme-color" content="#f8fafc">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="EduNova Pro">
     <meta name="application-name" content="EduNova Pro">
-    <meta name="msapplication-TileColor" content="#0b132b">
+    <meta name="msapplication-TileColor" content="#2563eb">
     <meta name="msapplication-TileImage" content="/pwa-144x144.png?v=4.0">
     <meta name="msapplication-config" content="/browserconfig.xml">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
@@ -78,7 +78,8 @@
         --brand-indigo: #6366f1;
       }
       body {
-        background-color: #0b132b;
+        background-color: #f8fafc;
+        color: #0f172a;
         margin: 0;
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
         overflow-x: hidden;
@@ -138,8 +139,8 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: radial-gradient(circle at 50% 45%, #0f1c3f 0%, #0b132b 65%, #070d1e 100%);
-        color: #ffffff;
+        background: radial-gradient(circle at 50% 40%, #ffffff 0%, #f8fafc 55%, #eef2ff 100%);
+        color: #0f172a;
         z-index: 99999;
         font-family: 'Inter', system-ui, -apple-system, sans-serif;
         padding: 24px;
@@ -151,10 +152,10 @@
         inset: 0;
         pointer-events: none;
         background-image: 
-          radial-gradient(1px 1px at 20px 30px, rgba(255, 255, 255, 0.12), transparent),
-          radial-gradient(1px 1px at 80px 70px, rgba(56, 189, 248, 0.15), transparent);
-        background-size: 60px 60px;
-        opacity: 0.35;
+          radial-gradient(1.5px 1.5px at 20px 30px, rgba(99, 102, 241, 0.08), transparent),
+          radial-gradient(1.5px 1.5px at 80px 70px, rgba(37, 99, 235, 0.06), transparent);
+        background-size: 50px 50px;
+        opacity: 0.85;
       }
       .edunova-logo-pod {
         position: relative;
@@ -166,33 +167,33 @@
       }
       .edunova-aura-back {
         position: absolute;
-        width: 140px;
-        height: 140px;
+        width: 150px;
+        height: 150px;
         border-radius: 50%;
-        background: radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, rgba(37, 99, 235, 0.2) 40%, rgba(11, 19, 43, 0) 70%);
-        filter: blur(20px);
+        background: radial-gradient(circle, rgba(99, 102, 241, 0.16) 0%, rgba(56, 189, 248, 0.12) 40%, rgba(248, 250, 252, 0) 70%);
+        filter: blur(22px);
         animation: edunovaAuraPulse 3s ease-in-out infinite;
       }
       .edunova-orbit-ring {
         position: absolute;
-        width: 104px;
-        height: 104px;
+        width: 106px;
+        height: 106px;
         border-radius: 28px;
-        border: 1px dashed rgba(56, 189, 248, 0.25);
+        border: 1.5px dashed rgba(99, 102, 241, 0.25);
         animation: edunovaOrbit 20s linear infinite;
       }
       .edunova-icon-box {
-        width: 80px;
-        height: 80px;
+        width: 82px;
+        height: 82px;
         border-radius: 22px;
-        background: linear-gradient(145deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
-        backdrop-filter: blur(12px);
-        -webkit-backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: #ffffff;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(226, 232, 240, 0.95);
         box-shadow: 
-          0 20px 40px -10px rgba(0, 0, 0, 0.7),
-          0 0 30px -5px rgba(37, 99, 235, 0.3),
-          inset 0 1px 1px 0 rgba(255, 255, 255, 0.2);
+          0 20px 35px -10px rgba(99, 102, 241, 0.14),
+          0 4px 12px -2px rgba(15, 23, 42, 0.05),
+          inset 0 1px 1px 0 #ffffff;
         position: relative;
         z-index: 2;
         overflow: hidden;
@@ -207,29 +208,28 @@
         font-weight: 800;
         letter-spacing: -0.03em;
         margin-bottom: 6px;
-        color: #ffffff;
+        color: #0f172a;
         display: flex;
         align-items: center;
         gap: 6px;
-        text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
       }
       .edunova-tagline {
         font-size: 11px;
         font-weight: 600;
-        color: #94a3b8;
+        color: #64748b;
         text-transform: uppercase;
         letter-spacing: 0.22em;
         margin-bottom: 28px;
-        opacity: 0.85;
+        opacity: 0.9;
       }
       .edunova-progress-track {
         width: 150px;
-        height: 3px;
-        background: rgba(255, 255, 255, 0.08);
+        height: 4px;
+        background: #e2e8f0;
         border-radius: 999px;
         overflow: hidden;
         position: relative;
-        box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.06);
       }
       .edunova-progress-indicator {
         position: absolute;
@@ -237,9 +237,9 @@
         left: 0;
         height: 100%;
         width: 45%;
-        background: linear-gradient(90deg, #2563eb, #38bdf8, #818cf8);
+        background: linear-gradient(90deg, #2563eb, #38bdf8, #6366f1);
         border-radius: 999px;
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.75);
+        box-shadow: 0 0 10px rgba(37, 99, 235, 0.4);
         animation: edunovaBarShimmer 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
       }
       .edunova-status-badge {
@@ -247,25 +247,26 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        padding: 4px 10px;
+        padding: 4px 12px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        font-size: 10.5px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        font-size: 11px;
         font-weight: 500;
         color: #64748b;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.01em;
+        box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
       }
       .edunova-pulse-dot {
-        width: 5px;
-        height: 5px;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
-        background-color: #38bdf8;
-        box-shadow: 0 0 8px #38bdf8;
+        background-color: #2563eb;
+        box-shadow: 0 0 8px rgba(37, 99, 235, 0.45);
       }
     </style>
 </head>
-<body style="background-color: #0b132b; color: #ffffff;">
+<body style="background-color: #f8fafc; color: #0f172a;">
     <div id="root">
       <div id="edunova-pwa-splash" class="edunova-splash-container">
         <div class="edunova-ambient-mesh"></div>
@@ -286,7 +287,7 @@
         
         <div class="edunova-title-text">
           <span>EduNova</span>
-          <span style="color: #38bdf8; font-weight: 600;">Pro</span>
+          <span style="color: #2563eb; font-weight: 700;">Pro</span>
         </div>
 
         <div class="edunova-tagline">
@@ -303,14 +304,14 @@
         </div>
 
         <div id="edunova-splash-actions" style="display: none; margin-top: 24px; flex-direction: column; align-items: center; gap: 10px; max-width: 320px; width: 100%; z-index: 10;">
-          <button id="edunova-emergency-login" type="button" style="width: 100%; padding: 11px 18px; background: linear-gradient(135deg, #0284c7, #2563eb); color: #ffffff; border: none; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.4); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
+          <button id="edunova-emergency-login" type="button" style="width: 100%; padding: 11px 18px; background: linear-gradient(135deg, #2563eb, #1d4ed8); color: #ffffff; border: none; border-radius: 12px; font-size: 13px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3); display: flex; align-items: center; justify-content: center; gap: 8px; font-family: inherit;">
             <span>Accéder à la Page de Connexion</span>
             <span style="font-size: 15px;">→</span>
           </button>
-          <button id="edunova-emergency-reload" type="button" style="width: 100%; padding: 9px 14px; background: rgba(255, 255, 255, 0.08); color: #cbd5e1; border: 1px solid rgba(255, 255, 255, 0.15); border-radius: 12px; font-size: 12px; font-weight: 500; cursor: pointer; font-family: inherit;">
+          <button id="edunova-emergency-reload" type="button" style="width: 100%; padding: 9px 14px; background: #ffffff; color: #475569; border: 1px solid #cbd5e1; border-radius: 12px; font-size: 12px; font-weight: 500; cursor: pointer; box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05); font-family: inherit;">
             <span>Vider le cache &amp; Recharger</span>
           </button>
-          <div id="edunova-splash-hint" style="font-size: 11px; color: #94a3b8; text-align: center; line-height: 1.4;">
+          <div id="edunova-splash-hint" style="font-size: 11px; color: #64748b; text-align: center; line-height: 1.4;">
             Initialisation du système EduNova Pro...
           </div>
         </div>

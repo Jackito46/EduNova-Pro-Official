@@ -4,6 +4,6 @@
         <smalltileimage src="/mstile-70x70.png"/>
         <square150x150logo src="/mstile-150x150.png"/>
         <square310x310logo src="/mstile-310x310.png"/>
-        <TileColor>#0b132b</TileColor>
+        <TileColor>#2563eb</TileColor>
     </msapplication>
 </browserconfig>
