@@ -41,7 +41,7 @@ export interface GatewayDiagnosticModalProps {
   isOpen: boolean;
   onClose: () => void;
   user: UserProfile;
-  initialGateway?: 'moncash' | 'kobara';
+  initialGateway?: 'tranzak' | 'kobara' | 'moncash';
   initialOperator?: 'moncash' | 'natcash';
 }
 
@@ -51,7 +51,7 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
   isOpen,
   onClose,
   user,
-  initialGateway = 'moncash',
+  initialGateway = 'tranzak',
   initialOperator = 'moncash'
 }) => {
   const navigate = useNavigate();
@@ -63,9 +63,9 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
   const [activeTab, setActiveTab] = useState<TabType>('diagnostic');
   
   // Configuration de test
-  const [selectedGateway, setSelectedGateway] = useState<'moncash' | 'kobara'>(initialGateway);
+  const [selectedGateway, setSelectedGateway] = useState<'tranzak' | 'kobara' | 'moncash'>(initialGateway);
   const [selectedOperator, setSelectedOperator] = useState<'moncash' | 'natcash'>(initialOperator);
-  const [mode, setMode] = useState<'sandbox' | 'live' | 'test'>('sandbox');
+  const [mode, setMode] = useState<'sandbox' | 'live' | 'test'>('live');
   const [testAmount, setTestAmount] = useState<number>(250);
   const [testPhone, setTestPhone] = useState<string>('50937889900');
   const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -84,6 +84,9 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
     if (selectedGateway === 'moncash') {
       setMode(prev => (prev === 'live' ? 'live' : 'sandbox'));
       setTestPhone('50937889900');
+    } else if (selectedGateway === 'tranzak') {
+      setMode(prev => (prev === 'test' ? 'test' : 'live'));
+      setTestPhone(selectedOperator === 'natcash' ? '50922445566' : '50937889900');
     } else {
       setMode(prev => (prev === 'live' ? 'live' : 'test'));
       setTestPhone(selectedOperator === 'natcash' ? '50922445566' : '50937889900');
@@ -230,13 +233,14 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
           <div className="flex items-start sm:items-center gap-2 text-emerald-900 font-medium leading-relaxed">
             <ShieldCheck size={16} className="text-emerald-600 shrink-0 mt-0.5 sm:mt-0" />
             <span>
-              <strong>Environnement de Test Isolé :</strong> Interrogation directe des serveurs MonCash et Kobara sans impacter la dette ni les versements de l'élève.
+              <strong>Environnement de Test Isolé :</strong> Interrogation directe des serveurs Tranzak, Kobara et MonCash sans impacter la dette ni les versements de l'élève.
             </span>
           </div>
           <button
+            type="button"
             onClick={() => {
               onClose();
-              navigate('/parametres?tab=api_vault');
+              navigate('/settings/ecole?tab=gateways');
             }}
             className="text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-white px-2.5 py-1 rounded-lg border border-indigo-200/70 hover:border-indigo-300 shadow-2xs transition-all flex items-center gap-1 self-start sm:self-center shrink-0 cursor-pointer"
           >
@@ -340,77 +344,115 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
               </div>
             </div>
 
-            {/* CHOIX DE LA PASSERELLE */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* CARTE MONCASH */}
+            {/* CHOIX DE LA PASSERELLE (TRANZAK, KOBARA, MONCASH) */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
+              {/* CARTE TRANZAK DIRECT */}
               <div
-                onClick={() => setSelectedGateway('moncash')}
-                className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between ${
-                  selectedGateway === 'moncash'
-                    ? 'border-rose-500 bg-rose-50/40 shadow-xs'
+                onClick={() => setSelectedGateway('tranzak')}
+                className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                  selectedGateway === 'tranzak'
+                    ? 'border-emerald-500 bg-emerald-50/50 shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
-                    selectedGateway === 'moncash' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'
+                <div className="flex items-center justify-between">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${
+                    selectedGateway === 'tranzak' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
-                    MC
+                    TRZ
                   </div>
-                  <div>
-                    <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                      Digicel MonCash Direct
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      OAuth 2.0 • Validation directe avec les serveurs Digicel
-                    </p>
-                  </div>
+                  {selectedGateway === 'tranzak' ? (
+                    <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+                  ) : (
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold">
+                      Direct
+                    </span>
+                  )}
                 </div>
-                {selectedGateway === 'moncash' && (
-                  <CheckCircle2 size={18} className="text-rose-600 shrink-0" />
-                )}
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-xs font-black text-slate-900">
+                      Tranzak Direct
+                    </h4>
+                    <span className="text-[9px] bg-emerald-100 text-emerald-800 px-1.5 py-0.2 rounded font-bold">
+                      Principal
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                    MonCash & NatCash Direct • HMAC SHA-256
+                  </p>
+                </div>
               </div>
 
               {/* CARTE KOBARA UNIFIÉE */}
               <div
                 onClick={() => setSelectedGateway('kobara')}
-                className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between ${
+                className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2 ${
                   selectedGateway === 'kobara'
-                    ? 'border-indigo-600 bg-indigo-50/40 shadow-xs'
+                    ? 'border-indigo-600 bg-indigo-50/50 shadow-xs'
                     : 'border-slate-200 hover:border-slate-300 bg-white'
                 }`}
               >
-                <div className="flex items-center gap-3">
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-xs ${
+                <div className="flex items-center justify-between">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${
                     selectedGateway === 'kobara' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'
                   }`}>
                     KBR
                   </div>
-                  <div>
-                    <div className="flex items-center gap-1.5">
-                      <h4 className="text-xs sm:text-sm font-black text-slate-900">
-                        Passerelle Unifiée Kobara
-                      </h4>
-                      <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-bold">
-                        MonCash & Natcash
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-slate-500">
-                      Bearer Secret • Webhooks HMAC • Routage Économat
-                    </p>
-                  </div>
+                  {selectedGateway === 'kobara' && (
+                    <CheckCircle2 size={16} className="text-indigo-600 shrink-0" />
+                  )}
                 </div>
-                {selectedGateway === 'kobara' && (
-                  <CheckCircle2 size={18} className="text-indigo-600 shrink-0" />
-                )}
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-xs font-black text-slate-900">
+                      Passerelle Kobara
+                    </h4>
+                    <span className="text-[9px] bg-indigo-100 text-indigo-700 px-1.5 py-0.2 rounded font-bold">
+                      Unifié
+                    </span>
+                  </div>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                    MonCash & Natcash • Routage Économat
+                  </p>
+                </div>
+              </div>
+
+              {/* CARTE MONCASH DIRECT */}
+              <div
+                onClick={() => setSelectedGateway('moncash')}
+                className={`p-3 rounded-xl border-2 transition-all cursor-pointer flex flex-col justify-between gap-2 ${
+                  selectedGateway === 'moncash'
+                    ? 'border-rose-500 bg-rose-50/50 shadow-xs'
+                    : 'border-slate-200 hover:border-slate-300 bg-white'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center font-black text-xs ${
+                    selectedGateway === 'moncash' ? 'bg-rose-600 text-white' : 'bg-slate-100 text-slate-600'
+                  }`}>
+                    MC
+                  </div>
+                  {selectedGateway === 'moncash' && (
+                    <CheckCircle2 size={16} className="text-rose-600 shrink-0" />
+                  )}
+                </div>
+                <div>
+                  <h4 className="text-xs font-black text-slate-900">
+                    Digicel MonCash Direct
+                  </h4>
+                  <p className="text-[10px] text-slate-500 mt-0.5 leading-snug">
+                    OAuth 2.0 • Serveurs Digicel Direct
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* SOUS-CHOIX OPÉRATEUR POUR KOBARA */}
-            {selectedGateway === 'kobara' && (
+            {/* SOUS-CHOIX OPÉRATEUR POUR TRANZAK OU KOBARA */}
+            {(selectedGateway === 'tranzak' || selectedGateway === 'kobara') && (
               <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between flex-wrap gap-2 text-xs">
                 <span className="text-slate-600 font-medium">
-                  Opérateur simulé via Kobara :
+                  Opérateur simulé via {selectedGateway === 'tranzak' ? 'Tranzak' : 'Kobara'} :
                 </span>
                 <div className="flex items-center gap-2">
                   <button
@@ -450,7 +492,7 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
                     <span>Lancer la vérification en temps réel</span>
                   </h3>
                   <p className="text-[11px] sm:text-xs text-slate-300">
-                    Interroge en direct l'API {selectedGateway === 'moncash' ? 'Digicel MonCash' : 'Kobara'} avec les identifiants de l'établissement sans modifier les soldes élèves.
+                    Interroge en direct l'API {selectedGateway === 'tranzak' ? 'Tranzak Direct' : selectedGateway === 'moncash' ? 'Digicel MonCash' : 'Kobara'} avec les identifiants de l'établissement sans modifier les soldes élèves.
                   </p>
                 </div>
 
@@ -511,7 +553,20 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 text-xs">
+                    <div className="flex items-center gap-2 sm:gap-3 text-xs flex-wrap">
+                      {!diagnosticResult.success && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            onClose();
+                            navigate('/settings/ecole?tab=gateways');
+                          }}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1.5 rounded-lg border border-indigo-500 text-[11px] font-bold flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
+                        >
+                          <Lock size={12} />
+                          <span>Ouvrir Coffre-Fort Clés API</span>
+                        </button>
+                      )}
                       {diagnosticResult.latency_ms !== undefined && (
                         <div className="bg-white/80 px-2.5 py-1.5 rounded-lg border border-slate-200 font-mono text-[11px] flex items-center gap-1.5">
                           <Clock size={12} className="text-indigo-600" />

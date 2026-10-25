@@ -404,6 +404,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/communication/push" element={<RoleGuard user={user} allowedRoles={adminRoles}><PushModule user={user} /></RoleGuard>} />
               
               {/* Settings Routes */}
+              <Route path="/settings" element={<Navigate to="/settings/ecole" replace />} />
+              <Route path="/parametres" element={<Navigate to="/settings/ecole" replace />} />
               <Route path="/settings/ecole" element={<RoleGuard user={user} allowedRoles={adminRoles}><SettingsView user={user} /></RoleGuard>} />
               <Route path="/settings/utilisateurs" element={<RoleGuard user={user} allowedRoles={adminRoles}><UserManagementView currentUser={user} /></RoleGuard>} />
               <Route path="/settings/audit" element={<RoleGuard user={user} allowedRoles={adminRoles}><AuditLogsView user={user} /></RoleGuard>} />

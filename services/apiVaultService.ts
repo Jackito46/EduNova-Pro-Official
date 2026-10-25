@@ -274,12 +274,12 @@ export class ApiVaultService {
   }
 
   /**
-   * Lance un diagnostic complet et une simulation de test en direct pour MonCash ou Kobara
+   * Lance un diagnostic complet et une simulation de test en direct pour Tranzak, MonCash ou Kobara
    * Sanctuarisation totale : Zéro impact sur les soldes des élèves & isolation multi-tenant stricte
    */
   static async runGatewayDiagnostic(params: {
     schoolId: string;
-    gateway: 'moncash' | 'kobara';
+    gateway: 'tranzak' | 'moncash' | 'kobara';
     operator?: 'moncash' | 'natcash';
     mode?: 'sandbox' | 'live' | 'test';
     testAmount?: number;
@@ -330,7 +330,7 @@ export interface GatewayDiagnosticResult {
   success: boolean;
   school_id?: string;
   school_name?: string;
-  gateway?: 'moncash' | 'kobara';
+  gateway?: 'tranzak' | 'moncash' | 'kobara';
   operator?: 'moncash' | 'natcash';
   mode?: string;
   latency_ms?: number;

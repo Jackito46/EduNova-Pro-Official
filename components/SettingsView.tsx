@@ -140,6 +140,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
       if (tabParam === 'diagnostic') return 'diagnostic';
+      if (tabParam === 'api_vault' || tabParam === 'coffre_fort' || tabParam === 'passerelles' || tabParam === 'gateways' || tabParam === 'kobara') return 'gateways';
       if (window.location.hash === '#diagnostic') return 'diagnostic';
     }
     return 'school';
@@ -147,8 +148,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
   useEffect(() => {
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['school', 'campuses', 'academic', 'finance', 'payment_methods', 'kobara', 'gateways', 'security', 'diagnostic'].includes(tabParam)) {
-      setActiveTab(tabParam as SettingsTab);
+    if (tabParam) {
+      if (tabParam === 'api_vault' || tabParam === 'coffre_fort' || tabParam === 'passerelles' || tabParam === 'gateways' || tabParam === 'kobara') {
+        setActiveTab('gateways');
+      } else if (['school', 'campuses', 'academic', 'finance', 'payment_methods', 'security', 'diagnostic'].includes(tabParam)) {
+        setActiveTab(tabParam as SettingsTab);
+      }
     }
   }, [searchParams]);
 

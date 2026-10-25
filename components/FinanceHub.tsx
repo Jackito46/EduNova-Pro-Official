@@ -1051,7 +1051,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
     },
     { 
       title: 'Diagnostic Passerelles & API', 
-      desc: 'Simulation MonCash & Kobara (Zéro impact)', 
+      desc: 'Simulation Tranzak, Kobara & MonCash (Zéro impact)', 
       icon: Radio, 
       isGatewayDiagnosticModal: true,
       color: 'bg-purple-600', 
@@ -1128,12 +1128,12 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               <span>Clôture Caisse</span>
             </button>
 
-            {/* Action 3: Diagnostic Passerelles API (MonCash & Kobara) */}
+            {/* Action 3: Diagnostic Passerelles API (Tranzak, Kobara & MonCash) */}
             <button
               type="button"
               onClick={() => setIsGatewayDiagnosticOpen(true)}
               className="h-9 px-3 sm:px-3.5 bg-purple-600/80 hover:bg-purple-600 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-purple-400/40 whitespace-nowrap cursor-pointer backdrop-blur-md shrink-0"
-              title="Diagnostic en temps réel des clés API MonCash & Kobara sans impacter les soldes des élèves"
+              title="Diagnostic en temps réel des clés API Tranzak, Kobara & MonCash sans impacter les soldes des élèves"
             >
               <Radio size={14} className="shrink-0 text-purple-200" />
               <span>Passerelles & API</span>
@@ -1804,7 +1804,7 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         isOpen={isGatewayDiagnosticOpen}
         onClose={() => setIsGatewayDiagnosticOpen(false)}
         user={user}
-        initialGateway="moncash"
+        initialGateway="tranzak"
         initialOperator={simulatorOperator}
       />
 
