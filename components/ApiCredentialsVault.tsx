@@ -539,68 +539,67 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       {/* ========================================================================= */}
       {/* 1.5 AIGUILLEUR CENTRAL : PASSERELLE MOBILE MONEY ACTIVE (MASTER SWITCH) */}
       {/* ========================================================================= */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-indigo-500/30 shadow-xl space-y-3.5">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 shrink-0">
-              <Sliders size={20} className="text-white" />
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-xl p-3 sm:p-3.5 text-white border border-indigo-500/30 shadow-md space-y-2.5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center shadow-md shadow-indigo-500/20 shrink-0">
+              <Sliders size={16} className="text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm sm:text-base font-black text-white tracking-tight">
-                  Passerelle Mobile Money en Service (Encaissements)
+                <h3 className="text-xs sm:text-sm font-black text-white tracking-tight">
+                  Passerelle Active (Encaissements)
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-2xs">
+                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 flex items-center gap-1 shadow-2xs">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   <span>
-                    {activeGateway === 'tranzak' && 'Tranzak Active (Prioritaire)'}
-                    {activeGateway === 'kobara' && 'Kobara Active (Prioritaire)'}
+                    {activeGateway === 'tranzak' && 'Tranzak Active'}
+                    {activeGateway === 'kobara' && 'Kobara Active'}
                     {activeGateway === 'moncash' && 'MonCash Direct Active'}
                   </span>
                 </span>
               </div>
-              <p className="text-xs text-slate-300 mt-0.5">
-                Cliquez sur une passerelle ci-dessous pour la définir comme canal prioritaire d’encaissement (MonCash &amp; NatCash).
+              <p className="text-[11px] text-slate-300">
+                Sélectionnez le canal prioritaire pour les règlements parents (MonCash &amp; NatCash).
               </p>
             </div>
           </div>
 
           {isSwitchingGateway && (
-            <div className="flex items-center gap-2 px-3 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-bold animate-pulse">
-              <Loader2 size={13} className="animate-spin" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-500/20 border border-indigo-400/30 text-indigo-200 text-xs font-bold animate-pulse self-start sm:self-auto">
+              <Loader2 size={12} className="animate-spin" />
               <span>Bascule en cours...</span>
             </div>
           )}
         </div>
 
-        {/* 3 CARTES DE BASCULE INTERACTIVES */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
+        {/* 3 CARTES DE BASCULE INTERACTIVES COMPACTES */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
           {/* OPTION 1 : TRANZAK */}
           <div
             onClick={() => handleSwitchActiveGateway('tranzak')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+            className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
               activeGateway === 'tranzak'
-                ? 'bg-blue-950/70 border-blue-400 ring-2 ring-blue-500/50 shadow-lg shadow-blue-500/10'
+                ? 'bg-blue-950/80 border-blue-400 ring-2 ring-blue-500/40 shadow-md shadow-blue-500/20'
                 : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
           >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeGateway === 'tranzak' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
-                    <Layers size={14} />
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${activeGateway === 'tranzak' ? 'bg-blue-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                    <Layers size={13} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
                       <span>Tranzak</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-blue-500/30 text-blue-200 font-black">DIRECT</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-blue-500/30 text-blue-200 font-black">DIRECT</span>
                     </h4>
-                    <p className="text-[10px] text-slate-300">MonCash &amp; NatCash</p>
                   </div>
                 </div>
 
                 {activeGateway === 'tranzak' ? (
-                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
@@ -612,13 +611,13 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 )}
               </div>
 
-              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                Passerelle moderne unifiée. Clé API unique, webhooks signés HMAC-SHA256 et encaissement direct.
+              <p className="text-[10.5px] text-slate-300 leading-snug">
+                Clé unique • MonCash &amp; NatCash directs • HMAC-SHA256
               </p>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10.5px]">
-              <span className="text-slate-400">Opérateurs :</span>
+            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px]">
+              <span className="text-slate-400">Canal :</span>
               <span className="font-bold text-blue-300">MonCash + NatCash</span>
             </div>
           </div>
@@ -626,29 +625,28 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           {/* OPTION 2 : KOBARA */}
           <div
             onClick={() => handleSwitchActiveGateway('kobara')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+            className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
               activeGateway === 'kobara'
-                ? 'bg-orange-950/70 border-orange-400 ring-2 ring-orange-500/50 shadow-lg shadow-orange-500/10'
+                ? 'bg-orange-950/80 border-orange-400 ring-2 ring-orange-500/40 shadow-md shadow-orange-500/20'
                 : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
           >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeGateway === 'kobara' ? 'bg-orange-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
-                    <CreditCard size={14} />
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${activeGateway === 'kobara' ? 'bg-orange-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                    <CreditCard size={13} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
                       <span>Kobara</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-orange-500/30 text-orange-200 font-black">AGRÉGATEUR</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-orange-500/30 text-orange-200 font-black">AGRÉGATEUR</span>
                     </h4>
-                    <p className="text-[10px] text-slate-300">Reversement Téléphone</p>
                   </div>
                 </div>
 
                 {activeGateway === 'kobara' ? (
-                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
@@ -660,13 +658,13 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 )}
               </div>
 
-              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                Agrégateur national haïtien avec reversement automatique des fonds directement sur vos numéros marchands.
+              <p className="text-[10.5px] text-slate-300 leading-snug">
+                Agrégateur national • Reversement automatique sur mobile
               </p>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10.5px]">
-              <span className="text-slate-400">Reversement :</span>
+            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px]">
+              <span className="text-slate-400">Canal :</span>
               <span className="font-bold text-orange-300">Numéros Téléphone Auto</span>
             </div>
           </div>
@@ -674,29 +672,28 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           {/* OPTION 3 : MONCASH DIRECT DIGICEL */}
           <div
             onClick={() => handleSwitchActiveGateway('moncash')}
-            className={`p-3.5 rounded-xl border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between ${
+            className={`p-2.5 sm:p-3 rounded-xl border transition-all cursor-pointer relative flex flex-col justify-between ${
               activeGateway === 'moncash'
-                ? 'bg-red-950/70 border-red-400 ring-2 ring-red-500/50 shadow-lg shadow-red-500/10'
+                ? 'bg-red-950/80 border-red-400 ring-2 ring-red-500/40 shadow-md shadow-red-500/20'
                 : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
             }`}
           >
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between gap-1.5">
                 <div className="flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${activeGateway === 'moncash' ? 'bg-red-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
-                    <Smartphone size={14} />
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center ${activeGateway === 'moncash' ? 'bg-red-600 text-white shadow-xs' : 'bg-white/10 text-slate-300'}`}>
+                    <Smartphone size={13} />
                   </div>
                   <div>
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1.5">
+                    <h4 className="text-xs font-bold text-white flex items-center gap-1">
                       <span>MonCash Direct</span>
-                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-red-500/30 text-red-200 font-black">DIGICEL</span>
+                      <span className="text-[8.5px] px-1 py-0.2 rounded bg-red-500/30 text-red-200 font-black">DIGICEL</span>
                     </h4>
-                    <p className="text-[10px] text-slate-300">Bouton Officiel Digicel</p>
                   </div>
                 </div>
 
                 {activeGateway === 'moncash' ? (
-                  <span className="px-2 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
+                  <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500 text-slate-950 shadow-xs flex items-center gap-1">
                     <CheckCircle2 size={10} />
                     <span>En Service</span>
                   </span>
@@ -708,13 +705,13 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                 )}
               </div>
 
-              <p className="text-[11px] text-slate-300 line-clamp-2 leading-relaxed">
-                Connexion directe à la plateforme marchande Digicel Haïti via identifiants Client ID et Business Key.
+              <p className="text-[10.5px] text-slate-300 leading-snug">
+                Plateforme officielle Digicel • Client ID &amp; Business Key
               </p>
             </div>
 
-            <div className="mt-3 pt-2.5 border-t border-white/10 flex items-center justify-between text-[10.5px]">
-              <span className="text-slate-400">Opérateur :</span>
+            <div className="mt-2 pt-1.5 border-t border-white/10 flex items-center justify-between text-[10px]">
+              <span className="text-slate-400">Canal :</span>
               <span className="font-bold text-red-300">MonCash Unique</span>
             </div>
           </div>

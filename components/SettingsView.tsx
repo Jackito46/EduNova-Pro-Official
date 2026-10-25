@@ -5042,84 +5042,87 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
          onClose={() => setIsGatewaysSchoolModalOpen(false)}
          title="Activation des Passerelles API par Établissement"
          hideDefaultActions={true}
-         containerClassName="max-w-2xl sm:max-w-3xl"
+         containerClassName="max-w-2xl sm:max-w-3xl h-[85vh] max-h-[640px] flex flex-col overflow-hidden"
+         contentClassName="!p-0 !overflow-hidden flex flex-col flex-1 min-h-0"
        >
-         <div className="space-y-4">
-           {/* Header info */}
-           <div className="bg-slate-900 text-white p-3.5 sm:p-4 rounded-2xl flex items-start justify-between gap-3 border border-slate-800 shadow-sm">
-             <div className="flex items-center gap-3">
-               <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
-                 <Smartphone size={20} />
+         <div className="flex flex-col flex-1 min-h-0 overflow-hidden bg-white">
+           {/* Header info & Filter bar (Pinned at top) */}
+           <div className="shrink-0 p-3 sm:p-3.5 bg-slate-50/90 border-b border-slate-200 space-y-2.5">
+             <div className="bg-slate-900 text-white p-2.5 sm:p-3 rounded-xl flex items-center justify-between gap-3 border border-slate-800 shadow-2xs">
+               <div className="flex items-center gap-2.5 min-w-0">
+                 <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
+                   <Smartphone size={16} />
+                 </div>
+                 <div className="min-w-0">
+                   <h4 className="text-xs sm:text-sm font-bold text-white truncate">
+                     Supervision Multi-Établissements (MonCash / Natcash / API)
+                   </h4>
+                   <p className="text-[11px] text-slate-400 truncate">
+                     Basculez en temps réel l'activation des passerelles école par école.
+                   </p>
+                 </div>
                </div>
-               <div>
-                 <h4 className="text-xs sm:text-sm font-bold text-white">
-                   Supervision Multi-Établissements (MonCash / Natcash / API)
-                 </h4>
-                 <p className="text-[11px] text-slate-400 font-medium mt-0.5">
-                   Basculez en temps réel l'activation des passerelles dans la base de données école par école.
-                 </p>
+               <div className="text-right shrink-0 bg-white/5 px-2.5 py-1 rounded-lg border border-white/10">
+                 <span className="text-xs font-black text-emerald-400">
+                   {allSchoolsForGateways.filter(s => s.has_api_gateways).length} / {allSchoolsForGateways.length}
+                 </span>
+                 <p className="text-[9.5px] text-slate-400 font-bold uppercase tracking-wider">Actives</p>
                </div>
              </div>
-             <div className="text-right shrink-0">
-               <span className="text-xs font-black text-emerald-400">
-                 {allSchoolsForGateways.filter(s => s.has_api_gateways).length} / {allSchoolsForGateways.length}
-               </span>
-               <p className="text-[10px] text-slate-400 font-medium">Actives</p>
+
+             {/* Search & Filter bar */}
+             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+               <div className="relative flex-1">
+                 <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                 <input
+                   type="text"
+                   placeholder="Rechercher une école par nom..."
+                   value={gatewaysSearchQuery}
+                   onChange={e => setGatewaysSearchQuery(e.target.value)}
+                   className="w-full pl-8 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal"
+                 />
+               </div>
+
+               <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
+                 <button
+                   type="button"
+                   onClick={() => setGatewaysStatusFilter('ALL')}
+                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                     gatewaysStatusFilter === 'ALL'
+                       ? 'bg-slate-900 text-white shadow-2xs'
+                       : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                   }`}
+                 >
+                   Tous ({allSchoolsForGateways.length})
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => setGatewaysStatusFilter('ACTIVE')}
+                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                     gatewaysStatusFilter === 'ACTIVE'
+                       ? 'bg-emerald-600 text-white shadow-2xs'
+                       : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200'
+                   }`}
+                 >
+                   Actives ({allSchoolsForGateways.filter(s => s.has_api_gateways).length})
+                 </button>
+                 <button
+                   type="button"
+                   onClick={() => setGatewaysStatusFilter('INACTIVE')}
+                   className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                     gatewaysStatusFilter === 'INACTIVE'
+                       ? 'bg-slate-700 text-white shadow-2xs'
+                       : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                   }`}
+                 >
+                   Inactives ({allSchoolsForGateways.filter(s => !s.has_api_gateways).length})
+                 </button>
+               </div>
              </div>
            </div>
 
-           {/* Search & Filter bar */}
-           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-             <div className="relative flex-1">
-               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-               <input
-                 type="text"
-                 placeholder="Rechercher une école par nom..."
-                 value={gatewaysSearchQuery}
-                 onChange={e => setGatewaysSearchQuery(e.target.value)}
-                 className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold text-slate-900 outline-none focus:border-indigo-600 focus:ring-2 focus:ring-indigo-100 transition-all placeholder:font-normal"
-               />
-             </div>
-
-             <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
-               <button
-                 type="button"
-                 onClick={() => setGatewaysStatusFilter('ALL')}
-                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                   gatewaysStatusFilter === 'ALL'
-                     ? 'bg-slate-900 text-white shadow-2xs'
-                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                 }`}
-               >
-                 Tous ({allSchoolsForGateways.length})
-               </button>
-               <button
-                 type="button"
-                 onClick={() => setGatewaysStatusFilter('ACTIVE')}
-                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                   gatewaysStatusFilter === 'ACTIVE'
-                     ? 'bg-emerald-600 text-white shadow-2xs'
-                     : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
-                 }`}
-               >
-                 Actives ({allSchoolsForGateways.filter(s => s.has_api_gateways).length})
-               </button>
-               <button
-                 type="button"
-                 onClick={() => setGatewaysStatusFilter('INACTIVE')}
-                 className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-                   gatewaysStatusFilter === 'INACTIVE'
-                     ? 'bg-slate-700 text-white shadow-2xs'
-                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                 }`}
-               >
-                 Inactives ({allSchoolsForGateways.filter(s => !s.has_api_gateways).length})
-               </button>
-             </div>
-           </div>
-
-           {/* Schools List */}
-           <div className="border border-slate-200 rounded-2xl overflow-hidden max-h-[420px] overflow-y-auto divide-y divide-slate-100 custom-scrollbar">
+           {/* Schools List (Sole scrollable container) */}
+           <div className="flex-1 min-h-0 overflow-y-auto divide-y divide-slate-100 custom-scrollbar p-1.5 sm:p-2.5">
              {loadingAllSchools ? (
                <div className="p-8 text-center text-slate-400">
                  <Loader2 size={24} className="animate-spin mx-auto mb-2 text-indigo-600" />
@@ -5229,15 +5232,15 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
              })()}
            </div>
 
-           {/* Footer */}
-           <div className="pt-2 flex items-center justify-between text-xs text-slate-500">
-             <span className="text-[11px]">
-               Modification instantanée enregistrée dans la base de données.
+           {/* Footer (Pinned at bottom) */}
+           <div className="shrink-0 px-4 py-2.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
+             <span className="text-[11px] font-medium text-slate-500">
+               Enregistrement instantané en base de données.
              </span>
              <button
                type="button"
                onClick={() => setIsGatewaysSchoolModalOpen(false)}
-               className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold rounded-xl transition-colors cursor-pointer"
+               className="px-3.5 py-1.5 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-lg transition-colors cursor-pointer shadow-2xs"
              >
                Fermer
              </button>
