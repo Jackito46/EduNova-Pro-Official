@@ -40,6 +40,8 @@ import { TranzakGatewaySettings } from './TranzakGatewaySettings';
 import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobilePaymentRouterService';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
+import { useSchool } from '../contexts/SchoolContext';
+import { isMonCashPaymentActive, getSchoolPaymentMethods } from '../lib/paymentMethods';
 
 interface ApiCredentialsVaultProps {
   user: UserProfile;
@@ -62,6 +64,9 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   savingLegacy,
   isGatewaysEnabledForSchool = true
 }) => {
+  const { school, refreshSchool } = useSchool();
+  const isMoncashCashierActive = isMonCashPaymentActive(school);
+
   const [activeTab, setActiveTab] = useState<VaultTab>('tranzak');
   // Passerelle Mobile Money active pour l'établissement ('tranzak' | 'kobara' | 'moncash' | 'none')
   const [activeGateway, setActiveGateway] = useState<MobileMoneyGateway>('tranzak');
@@ -284,6 +289,29 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         setActiveGateway(newGateway);
         if (newGateway !== 'none') {
           setActiveTab(newGateway as VaultTab);
+          // Si le mode de règlement MonCash est encore inactif pour le guichet, l'activer automatiquement
+          if (!isMonCashPaymentActive(school)) {
+            try {
+              const allMethods = getSchoolPaymentMethods(school);
+              const updated = allMethods.map(m => {
+                if (m.id === 'MONCASH' || m.code === 'MonCash') {
+                  return { ...m, enabled: true };
+                }
+                return m;
+              });
+              const nextSettings = {
+                ...(school?.global_settings || {}),
+                payment_methods: updated
+              };
+              await supabase
+                .from('schools')
+                .update({ global_settings: nextSettings })
+                .eq('id', user.school_id || school?.id);
+              if (refreshSchool) await refreshSchool();
+            } catch (syncErr) {
+              console.warn("Auto-sync MonCash method error:", syncErr);
+            }
+          }
         }
         toast.success(
           newGateway === 'none'
@@ -298,6 +326,38 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
       toast.error(err?.message || "Erreur lors de la bascule", { id: toastId });
     } finally {
       setIsSwitchingGateway(false);
+    }
+  };
+
+  // Activation manuelle en 1 clic de MonCash pour le Guichet d'Encaissement
+  const handleEnableMonCashInCashier = async () => {
+    const targetSchoolId = user.school_id || school?.id;
+    if (!targetSchoolId) return;
+    const toastId = toast.loading("Activation de MonCash pour le Guichet d'Encaissement...");
+    try {
+      const allMethods = getSchoolPaymentMethods(school);
+      const updated = allMethods.map(m => {
+        if (m.id === 'MONCASH' || m.code === 'MonCash') {
+          return { ...m, enabled: true };
+        }
+        return m;
+      });
+
+      const nextSettings = {
+        ...(school?.global_settings || {}),
+        payment_methods: updated
+      };
+
+      const { error } = await supabase
+        .from('schools')
+        .update({ global_settings: nextSettings })
+        .eq('id', targetSchoolId);
+
+      if (error) throw error;
+      if (refreshSchool) await refreshSchool();
+      toast.success("Mode de règlement MonCash activé et disponible au Guichet d'Encaissement !", { id: toastId });
+    } catch (err: any) {
+      toast.error("Impossible d'activer MonCash : " + (err?.message || "Erreur"), { id: toastId });
     }
   };
 
@@ -847,6 +907,35 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             </div>
           </div>
         </div>
+
+        {/* ALERTE DE SYNCHRONISATION ENTRE LA PASSERELLE TECHNIQUE ET LE GUICHET MÉTIER */}
+        {isGatewaysEnabledForSchool && activeGateway !== 'none' && !isMoncashCashierActive && (
+          <div className="p-2.5 rounded-lg bg-blue-500/15 border border-blue-400/40 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs text-blue-100 shadow-sm animate-in fade-in">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div className="w-7 h-7 rounded-lg bg-blue-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                <Smartphone size={15} />
+              </div>
+              <div className="min-w-0">
+                <p className="font-bold text-white flex items-center gap-1.5 truncate">
+                  <span>Passerelle électronique active, mais le mode « MonCash » est inactif au Guichet</span>
+                </p>
+                <p className="text-[11px] text-blue-200 mt-0.5">
+                  Les caissiers ne voient pas encore l'option MonCash lors des encaissements d'élèves. Activez-le pour le rendre disponible.
+                </p>
+              </div>
+            </div>
+            {canManageAllCampuses && (
+              <button
+                type="button"
+                onClick={handleEnableMonCashInCashier}
+                className="px-3 py-1.5 bg-emerald-500 hover:bg-emerald-400 active:bg-emerald-600 text-slate-950 font-black text-xs rounded-lg transition-all shadow-md shrink-0 self-start sm:self-auto cursor-pointer flex items-center gap-1.5"
+              >
+                <CheckCircle2 size={13} />
+                <span>Activer MonCash au Guichet</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* 2. SÉLECTEUR D'ONGLETS COMPACT AVEC INDICATEUR D'ÉTAT */}

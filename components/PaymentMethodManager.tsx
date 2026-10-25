@@ -23,7 +23,8 @@ import {
   EyeOff,
   Sparkles,
   HelpCircle,
-  Building
+  Building,
+  AlertCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
@@ -32,6 +33,8 @@ import {
   getSchoolPaymentMethods,
   DEFAULT_PAYMENT_METHODS
 } from '../lib/paymentMethods';
+import { useSchool } from '../contexts/SchoolContext';
+import { supabase } from '../supabase';
 
 export interface PaymentMethodManagerProps {
   schoolData: any;
@@ -53,6 +56,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
   canManageAllCampuses,
   initialTab = 'unified'
 }) => {
+  const { school, refreshSchool } = useSchool();
+  const schoolId = schoolData?.id || school?.id;
+
   // Navigation & Tabs
   const [activeTab, setActiveTab] = useState<TabType>(initialTab);
   const [methodFilter, setMethodFilter] = useState<MethodFilter>('all');
@@ -116,8 +122,48 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
   const activeMethodsCount = methods.filter(m => m.enabled).length;
   const customMethodsCount = methods.filter(m => m.is_custom).length;
 
+  // Persistance immédiate en base de données pour synchroniser le guichet en temps réel
+  const persistPaymentMethods = async (updatedMethods: PaymentMethodConfig[]) => {
+    if (!schoolId) return;
+    try {
+      const { data: currentSchool, error: fetchError } = await supabase
+        .from('schools')
+        .select('global_settings')
+        .eq('id', schoolId)
+        .single();
+
+      if (fetchError) throw fetchError;
+
+      let currentSettings: any = {};
+      if (typeof currentSchool?.global_settings === 'string') {
+        try { currentSettings = JSON.parse(currentSchool.global_settings); } catch { currentSettings = {}; }
+      } else {
+        currentSettings = currentSchool?.global_settings || {};
+      }
+
+      const nextSettings = {
+        ...currentSettings,
+        payment_methods: updatedMethods
+      };
+
+      const { error: updateError } = await supabase
+        .from('schools')
+        .update({ global_settings: nextSettings })
+        .eq('id', schoolId);
+
+      if (updateError) throw updateError;
+
+      if (refreshSchool) {
+        await refreshSchool();
+      }
+    } catch (err) {
+      console.error('Erreur sauvegarde directe modes de paiement:', err);
+      throw err;
+    }
+  };
+
   // Toggle method active status
-  const toggleMethodActive = (methodId: string) => {
+  const toggleMethodActive = async (methodId: string) => {
     if (!canManageAllCampuses) {
       toast.error('Modification réservée au Siège Social');
       return;
@@ -143,8 +189,19 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
       payment_methods: updated
     };
     setSchoolData({ ...schoolData, global_settings: updatedSettings });
-    toast.success(`${target.name} ${!target.enabled ? 'activé' : 'désactivé'} au guichet`);
     setOpenMethodMenuId(null);
+
+    const willBeEnabled = !target.enabled;
+    const toastId = toast.loading(`${target.name} : mise à jour...`);
+    try {
+      await persistPaymentMethods(updated);
+      toast.success(
+        `${target.name} ${willBeEnabled ? 'activé et disponible au Guichet d\'Encaissement !' : 'désactivé du Guichet d\'Encaissement.'}`,
+        { id: toastId }
+      );
+    } catch (e) {
+      toast.error(`Erreur lors de la mise à jour de ${target.name}`, { id: toastId });
+    }
   };
 
   // Toggle currency support
@@ -809,6 +866,25 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                           </span>
                         )}
                       </div>
+
+                      {/* Notice explicative si la méthode mobile est inactive au guichet */}
+                      {!method.enabled && (method.id === 'MONCASH' || method.id === 'NATCASH') && (
+                        <div className="p-2 rounded-lg bg-amber-50/90 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-amber-950">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <AlertCircle size={13} className="text-amber-600 shrink-0" />
+                            <span className="truncate">Inactif au guichet : ce moyen de règlement est masqué pour les caissiers.</span>
+                          </div>
+                          {canManageAllCampuses && (
+                            <button
+                              type="button"
+                              onClick={() => toggleMethodActive(method.id)}
+                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold text-[10.5px] shrink-0 transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
+                            >
+                              Activer au Guichet
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                       {/* In-Card Config Form */}
                       {isEditing ? (
