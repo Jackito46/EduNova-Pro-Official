@@ -2200,7 +2200,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           currency: currency,
           payment_method: finalPaymentMethod,
           bank_name: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') ? bankName : null,
-          reference_number: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash') ? referenceNumber : null,
+          reference_number: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash') ? (referenceNumber || moncashOrderId) : null,
           deposit_date: paymentMethod === 'Dépôt Bancaire' ? depositDate : null,
           status: isPending ? 'EN_ATTENTE' : 'VALIDE',
           amount_htg_equivalent: currency === 'USD' ? Math.round((amount * currentExchangeRate) * 100) / 100 : amount,
@@ -3748,15 +3748,22 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     
                     {Boolean(currentMethodConfig?.requires_reference || paymentMethod === 'MonCash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
                       <div className="space-y-1 min-w-0">
-                        <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title={paymentMethod === 'MonCash' ? 'ID Transaction MonCash' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}>
-                          {paymentMethod === 'MonCash' ? 'ID Transaction' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
-                        </label>
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title={paymentMethod === 'MonCash' ? 'ID Transaction MonCash' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}>
+                            {paymentMethod === 'MonCash' ? 'ID Transaction (si déjà payé) ou Tél.' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
+                          </label>
+                          {paymentMethod === 'MonCash' && (
+                            <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
+                              Optionnel en direct
+                            </span>
+                          )}
+                        </div>
                         <div className="relative">
                           <input 
                             type="text" 
-                            required 
+                            required={paymentMethod !== 'MonCash'} 
                             className={`w-full px-3.5 py-2.5 sm:py-3 border ${refError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10'} bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl text-xs sm:text-sm outline-none transition-all font-medium`} 
-                            placeholder={paymentMethod === 'MonCash' ? 'Ex: MC-839201...' : 'Ex: DEP-94829...'}
+                            placeholder={paymentMethod === 'MonCash' ? 'Laisser vide pour paiement direct (ou Ex: MC-839201...)' : 'Ex: DEP-94829...'}
                             value={referenceNumber} 
                             onChange={(e) => {
                               const val = e.target.value.toUpperCase();
@@ -3767,6 +3774,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           {isCheckingRef && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" size={15} />}
                         </div>
                         {refError && <p className="text-[10.5px] text-rose-600 font-medium mt-0.5">{refError}</p>}
+                        {paymentMethod === 'MonCash' && (
+                          <p className="text-[10.5px] text-slate-500 mt-1 leading-snug">
+                            💡 <strong>Paiement direct en ligne :</strong> Laissez ce champ vide et cliquez sur <em>Vérifier & Payer</em>. L'ID de transaction sera généré et scellé automatiquement dès validation du code PIN sur le téléphone du payeur.
+                          </p>
+                        )}
                       </div>
                     )}
 
