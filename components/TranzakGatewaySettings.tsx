@@ -43,8 +43,8 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [testing, setTesting] = useState(false);
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [showWebhookSecret, setShowWebhookSecret] = useState(false);
+  const [showApiKey, setShowApiKey] = useState(true);
+  const [showWebhookSecret, setShowWebhookSecret] = useState(true);
   const [copiedField, setCopiedField] = useState<string | null>(null);
 
   const [config, setConfig] = useState<{
@@ -363,30 +363,30 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
       </div>
 
       {/* 2. Formulaire des Identifiants Tranzak (Clé API & Webhook Secret) */}
-      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+      <div className="bg-white rounded-2xl border-2 border-slate-200 shadow-xs p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center justify-center shrink-0">
               <Smartphone size={20} />
             </div>
             <div>
-              <h4 className="text-sm font-bold text-slate-900">
-                Clés API Tranzak (MonCash & NatCash)
+              <h4 className="text-sm font-black text-slate-950">
+                Clés API Tranzak (MonCash &amp; NatCash)
               </h4>
-              <p className="text-xs text-slate-500 font-medium">
+              <p className="text-xs text-slate-700 font-semibold mt-0.5">
                 Passerelle unifiée permettant d'encaisser MonCash et NatCash avec une seule clé d'API.
               </p>
             </div>
           </div>
 
           {/* Toggle Actif / Inactif */}
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-slate-600">Activer Tranzak :</span>
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-black text-slate-950">Activer Tranzak :</span>
             <button
               type="button"
               onClick={() => setConfig(prev => ({ ...prev, is_active: !prev.is_active }))}
               className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
-                config.is_active ? 'bg-emerald-600' : 'bg-slate-300'
+                config.is_active ? 'bg-emerald-600' : 'bg-slate-400'
               }`}
             >
               <span className={`block w-4 h-4 rounded-full bg-white transition-transform transform ${
@@ -397,16 +397,16 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
         </div>
 
         {/* Sélection de l'environnement (Live vs Test) */}
-        <div className="flex items-center gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
-          <span className="text-xs font-bold text-slate-700">Environnement Tranzak :</span>
+        <div className="flex items-center gap-3 bg-slate-100/90 p-3 rounded-xl border border-slate-300">
+          <span className="text-xs font-black text-slate-950">Environnement Tranzak :</span>
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setConfig(prev => ({ ...prev, mode: 'live' }))}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
                 config.mode === 'live' 
-                  ? 'bg-emerald-600 text-white shadow-xs' 
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  ? 'bg-emerald-700 text-white shadow-xs ring-2 ring-emerald-500/30' 
+                  : 'bg-white text-slate-800 hover:bg-slate-50 border border-slate-300 font-bold'
               }`}
             >
               🟢 Production (Live - tk_live_...)
@@ -414,10 +414,10 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
             <button
               type="button"
               onClick={() => setConfig(prev => ({ ...prev, mode: 'test' }))}
-              className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
                 config.mode === 'test' 
-                  ? 'bg-amber-600 text-white shadow-xs' 
-                  : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+                  ? 'bg-amber-600 text-white shadow-xs ring-2 ring-amber-500/30' 
+                  : 'bg-white text-slate-800 hover:bg-slate-50 border border-slate-300 font-bold'
               }`}
             >
               🟡 Test (Sandbox - tk_test_...)
@@ -429,11 +429,11 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Tranzak API Key */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+            <label className="text-xs font-black text-slate-950 flex items-center justify-between">
               <span>Clé API Tranzak (X-Api-Key) *</span>
               {config.has_key && (
-                <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                  <ShieldCheck size={12} /> Configurée
+                <span className="text-[11px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 border border-emerald-300">
+                  <ShieldCheck size={13} className="text-emerald-700" /> Configurée &amp; Active
                 </span>
               )}
             </label>
@@ -447,29 +447,30 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
                   setConfig(prev => ({ ...prev, api_key: val, mode: detectedMode }));
                 }}
                 placeholder={config.has_key ? '••••••••••••••••••••••••••••••••' : (config.mode === 'live' ? 'tk_live_xxxxxxxxxxxxxxxx' : 'tk_test_xxxxxxxxxxxxxxxx')}
-                className="w-full pl-9 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border-2 border-slate-300 focus:border-blue-600 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-950 placeholder:text-slate-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all shadow-2xs"
               />
-              <Key size={14} className="absolute left-3 top-2.5 text-slate-400" />
+              <Key size={16} className="absolute left-3 top-3 text-slate-600 pointer-events-none" />
               <button
                 type="button"
                 onClick={() => setShowApiKey(!showApiKey)}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-3 top-2.5 text-slate-600 hover:text-slate-950 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                title={showApiKey ? "Masquer la clé" : "Afficher la clé"}
               >
-                {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showApiKey ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            <p className="text-[10px] text-slate-500">
-              Disponible directement dans votre dashboard Tranzak sous <strong>Developer → Websites</strong>.
+            <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+              Disponible directement dans votre dashboard Tranzak sous <strong className="font-bold text-slate-950 underline decoration-slate-400">Developer → Websites</strong>.
             </p>
           </div>
 
           {/* Webhook Secret */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 flex items-center justify-between">
+            <label className="text-xs font-black text-slate-950 flex items-center justify-between">
               <span>Secret Webhook (Signature HMAC-SHA256)</span>
               {config.has_webhook_secret && (
-                <span className="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
-                  <ShieldCheck size={12} /> Configuré
+                <span className="text-[11px] text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md font-bold flex items-center gap-1 border border-emerald-300">
+                  <ShieldCheck size={13} className="text-emerald-700" /> Configuré &amp; Actif
                 </span>
               )}
             </label>
@@ -479,53 +480,56 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
                 value={config.webhook_secret}
                 onChange={e => setConfig(prev => ({ ...prev, webhook_secret: e.target.value }))}
                 placeholder={config.has_webhook_secret ? '••••••••••••••••••••••••••••••••' : 'whsec_xxxxxxxxxxxxxxxx'}
-                className="w-full pl-9 pr-10 py-2 bg-white border border-slate-300 rounded-xl text-xs font-mono focus:ring-2 focus:ring-blue-500 focus:outline-none"
+                className="w-full pl-10 pr-10 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border-2 border-slate-300 focus:border-blue-600 rounded-xl text-xs sm:text-sm font-mono font-bold text-slate-950 placeholder:text-slate-500 focus:ring-4 focus:ring-blue-500/10 focus:outline-none transition-all shadow-2xs"
               />
-              <Lock size={14} className="absolute left-3 top-2.5 text-slate-400" />
+              <Lock size={16} className="absolute left-3 top-3 text-slate-600 pointer-events-none" />
               <button
                 type="button"
                 onClick={() => setShowWebhookSecret(!showWebhookSecret)}
-                className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-3 top-2.5 text-slate-600 hover:text-slate-950 p-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
+                title={showWebhookSecret ? "Masquer le secret" : "Afficher le secret"}
               >
-                {showWebhookSecret ? <EyeOff size={14} /> : <Eye size={14} />}
+                {showWebhookSecret ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
-            <p className="text-[10px] text-slate-500">
-              Permet de valider cryptographiquement l'authenticité des notifications de paiement.
+            <p className="text-xs text-slate-700 font-semibold leading-relaxed">
+              Permet de valider cryptographiquement l'authenticité des notifications de paiement HMAC-SHA256.
             </p>
           </div>
         </div>
 
         {/* Résultat du test */}
         {testResult && (
-          <div className={`p-3 rounded-xl text-xs flex items-center gap-2.5 ${
+          <div className={`p-3.5 rounded-xl text-xs flex items-center gap-2.5 ${
             testResult.status === 'success' 
-              ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' 
-              : 'bg-rose-50 text-rose-800 border border-rose-200'
+              ? 'bg-emerald-50 text-emerald-950 border-2 border-emerald-300 shadow-2xs' 
+              : 'bg-rose-50 text-rose-950 border-2 border-rose-300 shadow-2xs'
           }`}>
             {testResult.status === 'success' ? (
-              <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
+              <CheckCircle2 size={18} className="text-emerald-700 shrink-0" />
             ) : (
-              <AlertCircle size={16} className="text-rose-600 shrink-0" />
+              <AlertCircle size={18} className="text-rose-700 shrink-0" />
             )}
             <div className="flex-1 min-w-0">
-              <p className="font-semibold">{testResult.message}</p>
+              <p className="font-black text-sm text-slate-950">{testResult.message}</p>
               {testResult.timestamp && (
-                <span className="text-[10px] opacity-75 font-mono">Test effectué à {testResult.timestamp}</span>
+                <span className="text-xs font-bold text-emerald-800 font-mono block mt-0.5">
+                  Test effectué à {testResult.timestamp}
+                </span>
               )}
             </div>
           </div>
         )}
 
         {/* Boutons d'action */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-100">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-200">
           <button
             type="button"
             onClick={handleTestConnection}
             disabled={testing || (!config.api_key && !config.has_key)}
-            className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
           >
-            {testing ? <Loader2 size={14} className="animate-spin text-blue-600" /> : <RefreshCw size={14} />}
+            {testing ? <Loader2 size={15} className="animate-spin text-blue-400" /> : <RefreshCw size={15} />}
             <span>Tester la connexion Tranzak</span>
           </button>
 
@@ -533,31 +537,31 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
             type="button"
             onClick={handleSave}
             disabled={saving || !canManageAllCampuses}
-            className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+            className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all flex items-center justify-center gap-2 shadow-md shadow-blue-500/25 cursor-pointer disabled:opacity-50"
           >
-            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
             <span>Enregistrer dans le Coffre-fort</span>
           </button>
         </div>
       </div>
 
       {/* 3. Règles et fonctionnement Tranzak */}
-      <div className="bg-slate-50 border border-slate-200/90 rounded-2xl p-4 text-xs space-y-2.5">
-        <h5 className="font-bold text-slate-800 flex items-center gap-2">
-          <Coins size={15} className="text-amber-600" />
-          Règles Opérationnelles Tranzak (MonCash & NatCash)
+      <div className="bg-slate-100/90 border border-slate-300 rounded-2xl p-4 text-xs space-y-3">
+        <h5 className="font-black text-slate-950 flex items-center gap-2 text-sm">
+          <Coins size={16} className="text-amber-600" />
+          Règles Opérationnelles Tranzak (MonCash &amp; NatCash)
         </h5>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-600">
-          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
-            <strong className="text-slate-800 block mb-0.5">Devise Gourdes (HTG) :</strong>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-slate-700">
+          <div className="bg-white p-3 rounded-xl border-2 border-slate-200 shadow-2xs">
+            <strong className="text-slate-950 font-black block mb-1">Devise Gourdes (HTG) :</strong>
             Les montants en USD sont automatiquement convertis en HTG au taux de change configuré avant transmission.
           </div>
-          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
-            <strong className="text-slate-800 block mb-0.5">Montant Minimum :</strong>
+          <div className="bg-white p-3 rounded-xl border-2 border-slate-200 shadow-2xs">
+            <strong className="text-slate-950 font-black block mb-1">Montant Minimum :</strong>
             20 HTG minimum par transaction exigé par l'API Tranzak.
           </div>
-          <div className="bg-white p-2.5 rounded-xl border border-slate-200/80">
-            <strong className="text-slate-800 block mb-0.5">Confirmation Instantanée :</strong>
+          <div className="bg-white p-3 rounded-xl border-2 border-slate-200 shadow-2xs">
+            <strong className="text-slate-950 font-black block mb-1">Confirmation Instantanée :</strong>
             Dès validation par le parent, le reçu de paiement est généré et la balance est mise à jour immédiatement.
           </div>
         </div>
