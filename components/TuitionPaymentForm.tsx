@@ -58,6 +58,7 @@ import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
 import { MonCashSummaryModal } from './MonCashSummaryModal';
+import { PaymentConfirmationModal } from './PaymentConfirmationModal';
 import { MonCashTransactionCard, MonCashTransactionInfo } from './MonCashTransactionCard';
 import { 
   PaymentWhatsAppShare, 
@@ -183,6 +184,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   
   // État pour le numéro de téléphone personnalisé du parent pour le partage WhatsApp
   const [parentPhoneCustom, setParentPhoneCustom] = useState<string>('');
+  // Numéro de téléphone spécifique pour le prélèvement Mobile Money (MonCash / NatCash)
+  const [payerPhoneCustom, setPayerPhoneCustom] = useState<string>('');
+  // Modal de confirmation pré-encaissement généralisé pour éviter les erreurs de saisie
+  const [showConfirmationModal, setShowConfirmationModal] = useState<boolean>(false);
   const [copiedRef, setCopiedRef] = useState(false);
 
   // Format thermique du reçu POS : 80mm (Standard POS) ou 58mm (Mobile POS) avec mémorisation
@@ -1651,6 +1656,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           isReturning: isReturning
         });
         setParentPhoneCustom(data.parent_phone || data.phone || '');
+        setPayerPhoneCustom(data.parent_phone || data.phone || '');
         setIsLocked(true);
         auditStudentDossierInDepth(data, yearId, enrollment, otherEnrollments, allStudentPayments, plan, campaignsList);
       }
@@ -1968,6 +1974,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setFeeType('SCOLARITE');
     setPaymentMethod('Cash');
     setParentPhoneCustom('');
+    setPayerPhoneCustom('');
+    setShowConfirmationModal(false);
     setMoncashTransactionData(null);
   };
 
@@ -2157,10 +2165,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
-        // VÉRIFICATION PRÉ-PAIEMENT MONCASH : Afficher le modal récapitulatif avec confirmation active de l'élève
-        if (paymentMethod === 'MonCash' && !bypassSummary) {
+        // VÉRIFICATION PRÉ-PAIEMENT : Afficher le modal récapitulatif pour TOUS les modes de paiement afin d'éviter les erreurs de saisie
+        if (!bypassSummary) {
           setIsSubmitting(false);
-          setShowMonCashSummary(true);
+          setShowConfirmationModal(true);
           return;
         }
 
@@ -2348,11 +2356,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               currency: currency as any,
               operator: 'moncash',
               orderId: moncashOrderId,
-              payerPhone: referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
+              payerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
               studentId: selectedStudent.id,
               studentName: studentFullName,
               customerName: studentFullName,
-              customerPhone: referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
+              customerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
               description: `Paiement ${feeType} - ${studentFullName}`,
               feeType: feeType
             });
@@ -2371,7 +2379,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             serverStatusRaw: data.status || 'EN_ATTENTE',
             amount: amount,
             currency: currency,
-            payerPhone: referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
+            payerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
             studentName: studentFullName,
             studentClass: selectedStudent.classe || selectedStudent.class?.name,
             feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
@@ -2391,7 +2399,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             studentCode: selectedStudent.code,
             studentClass: selectedStudent.class?.name,
             feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
-            payerPhone: referenceNumber,
+            payerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
             initiatedAt: exactInitiatedDate.toISOString()
           });
           setShowMonCashWaiting(true);
@@ -3746,11 +3754,35 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
                     )}
                     
+                    {paymentMethod === 'MonCash' && (
+                      <div className="space-y-1.5 min-w-0 sm:col-span-2 bg-rose-50/70 border border-rose-200/90 rounded-2xl p-3.5 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-rose-950 flex items-center gap-1.5">
+                            <Phone size={13} className="text-rose-600" />
+                            <span>Numéro de Téléphone Débité (Mobile Money)</span>
+                          </label>
+                          <span className="text-[9.5px] font-black text-rose-700 bg-white px-2 py-0.5 rounded-full border border-rose-200 shadow-2xs">
+                            Reçoit le Prompt USSD / PIN
+                          </span>
+                        </div>
+                        <input
+                          type="tel"
+                          value={payerPhoneCustom}
+                          onChange={(e) => setPayerPhoneCustom(e.target.value)}
+                          placeholder="Ex: 50937889900 ou 50922445566"
+                          className="w-full px-3.5 py-2.5 bg-white border border-rose-300 focus:border-rose-600 focus:ring-4 focus:ring-rose-500/10 text-slate-900 rounded-xl text-xs sm:text-sm outline-none transition-all font-mono font-bold"
+                        />
+                        <p className="text-[10.5px] text-rose-800 leading-relaxed mt-0.5">
+                          🔒 <strong>Sécurité PIN :</strong> Le titulaire de ce compte recevra l'invite USSD sur ce téléphone et y tapera son <strong>code PIN secret</strong> en toute confidentialité. Vous pouvez modifier ce numéro pour ce paiement sans impacter le dossier permanent de l'élève.
+                        </p>
+                      </div>
+                    )}
+
                     {Boolean(currentMethodConfig?.requires_reference || paymentMethod === 'MonCash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
                       <div className="space-y-1 min-w-0">
                         <div className="flex items-center justify-between">
                           <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title={paymentMethod === 'MonCash' ? 'ID Transaction MonCash' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}>
-                            {paymentMethod === 'MonCash' ? 'ID Transaction (si déjà payé) ou Tél.' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
+                            {paymentMethod === 'MonCash' ? 'ID Transaction (si déjà payé)' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
                           </label>
                           {paymentMethod === 'MonCash' && (
                             <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
@@ -3776,7 +3808,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         {refError && <p className="text-[10.5px] text-rose-600 font-medium mt-0.5">{refError}</p>}
                         {paymentMethod === 'MonCash' && (
                           <p className="text-[10.5px] text-slate-500 mt-1 leading-snug">
-                            💡 <strong>Paiement direct en ligne :</strong> Laissez ce champ vide et cliquez sur <em>Vérifier & Payer</em>. L'ID de transaction sera généré et scellé automatiquement dès validation du code PIN sur le téléphone du payeur.
+                            💡 <strong>Paiement direct :</strong> Laisser vide si le parent va payer maintenant (l'ID sera généré par Tranzak après validation du PIN).
                           </p>
                         )}
                       </div>
@@ -4137,10 +4169,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       )}
 
       {selectedStudent && (
-        <MonCashSummaryModal
-          isOpen={showMonCashSummary}
-          onClose={() => setShowMonCashSummary(false)}
+        <PaymentConfirmationModal
+          isOpen={showConfirmationModal || showMonCashSummary}
+          onClose={() => {
+            setShowConfirmationModal(false);
+            setShowMonCashSummary(false);
+          }}
           onConfirm={() => {
+            setShowConfirmationModal(false);
             setShowMonCashSummary(false);
             handleValidation(undefined, authorizedSuperiorName || undefined, true);
           }}
@@ -4149,21 +4185,32 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             id: selectedStudent.id,
             first_name: selectedStudent.first_name,
             last_name: selectedStudent.last_name,
+            fullName: selectedStudent.fullName,
             code: selectedStudent.code,
             reference_number: selectedStudent.reference_number,
             class_name: selectedStudent.class?.name,
+            classe: selectedStudent.classe,
             photo_url: selectedStudent.photo_url,
             parent_name: selectedStudent.parent_name,
-            parent_phone: selectedStudent.parent_phone
+            parent_phone: selectedStudent.parent_phone,
+            phone: selectedStudent.phone
           }}
           feeLabel={feeTypeOptions.find(o => o.value === feeType)?.label || (feeType.startsWith('ADHOC_') ? (selectedStudent?.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Frais Ad Hoc') : feeType)}
           feeCategory={feeType === 'SCOLARITE' ? terminology.tuition : feeType === 'INSCRIPTION' ? 'Inscription' : feeType === 'CREDIT_PORTEFEUILLE' ? 'Portefeuille' : 'Frais Scolaires'}
           amount={parseFloat(montantReel) || 0}
           currency={currency}
           amountHTG={currency === 'USD' ? Math.round((parseFloat(montantReel) || 0) * (currentExchangeRate || 140)) : parseFloat(montantReel) || 0}
-          payerPhone={referenceNumber || selectedStudent.parent_phone}
-          schoolName={school?.name}
-          academicYear={activeYear?.name}
+          amountUSD={currency === 'USD' ? (parseFloat(montantReel) || 0) : ((currentExchangeRate > 0) ? Math.round(((parseFloat(montantReel) || 0) / currentExchangeRate) * 100) / 100 : 0)}
+          exchangeRate={currentExchangeRate}
+          paymentMethod={paymentMethod}
+          activeGateway={activeGateway}
+          referenceNumber={referenceNumber}
+          bankName={bankName}
+          depositDate={depositDate}
+          payerPhone={payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone}
+          onPayerPhoneChange={(newPhone) => setPayerPhoneCustom(newPhone)}
+          schoolName={schoolDetails?.name || school?.name}
+          academicYearLabel={activeYear?.label || activeYear?.name}
           campusName={campuses.find(c => c.id === (selectedStudent.campus_id || currentCampusId))?.name}
           terminology={terminology}
         />
