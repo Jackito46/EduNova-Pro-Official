@@ -2365,6 +2365,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               feeType: feeType
             });
             redirectUrl = dispatchRes.paymentUrl || dispatchRes.redirectUrl || null;
+            if (dispatchRes.success && dispatchRes.is_simulated) {
+              toast.info("💡 Mode Simulation Sandbox actif pour la passerelle Mobile Money.");
+            } else if (!dispatchRes.success && dispatchRes.error) {
+              toast.error(dispatchRes.error, { duration: 5000 });
+            }
           } catch (err: any) {
             console.warn("Mobile Payment Initiation Warning:", err);
           }

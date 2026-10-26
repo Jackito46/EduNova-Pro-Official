@@ -30,6 +30,7 @@ export interface MobilePaymentDispatchResult {
   redirectUrl?: string;
   error?: string;
   message?: string;
+  is_simulated?: boolean;
 }
 
 let cachedGateway: { schoolId: string; gateway: MobileMoneyGateway; timestamp: number } | null = null;
@@ -202,7 +203,10 @@ export class MobilePaymentRouterService {
           transactionId: tranzakRes.transaction_id,
           paymentUrl: tranzakRes.payment_url,
           redirectUrl: tranzakRes.payment_url,
-          message: 'Session Tranzak initialisée avec succès'
+          is_simulated: tranzakRes.is_simulated,
+          message: tranzakRes.is_simulated 
+            ? 'Session Tranzak Sandbox simulée avec succès' 
+            : 'Session Tranzak initialisée avec succès'
         };
       }
 

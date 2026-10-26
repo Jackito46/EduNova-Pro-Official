@@ -22,6 +22,7 @@ export interface TranzakPaymentResponse {
   transaction_id?: string;
   reference?: string;
   error?: string;
+  is_simulated?: boolean;
 }
 
 /**
@@ -63,14 +64,19 @@ export class TranzakService {
         body: JSON.stringify(req)
       });
 
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || `Erreur Tranzak (${res.status})`);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.success === false) {
+        const errorMsg = data.error || data.message || `Erreur Tranzak (${res.status})`;
+        console.warn('[TranzakService.createPayment] Résultat:', errorMsg);
+        return {
+          success: false,
+          error: errorMsg
+        };
       }
 
       return data;
     } catch (err: any) {
-      console.error('[TranzakService.createPayment] Erreur:', err);
+      console.warn('[TranzakService.createPayment] Exception réseau:', err?.message);
       return {
         success: false,
         error: err.message || 'Impossible d’initialiser le paiement Tranzak'
