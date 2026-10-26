@@ -3940,47 +3940,43 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
               </div>
             )}
 
-            {/* Non-Super Admin: If gateways are disabled, show friendly informative locked screen */}
-            {!isSuperAdmin && !(schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
-              <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs p-6 sm:p-8 text-center max-w-xl mx-auto space-y-4">
-                <div className="w-14 h-14 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center mx-auto shadow-xs">
-                  <Smartphone size={28} />
-                </div>
-                <div className="space-y-1.5">
-                  <span className="px-2.5 py-0.5 bg-amber-100 text-amber-800 font-bold text-xs rounded-full uppercase tracking-wider">
-                    Module Optionnel Non Souscrit
-                  </span>
-                  <h3 className="text-base sm:text-lg font-black text-slate-900">
-                    Passerelles MonCash & Clés API Inactives
-                  </h3>
-                  <p className="text-xs text-slate-600 leading-relaxed font-medium">
-                    L'intégration directe des passerelles électroniques (MonCash Digicel, Natcash Natcom) et la synchronisation automatique des transactions par Webhooks ne sont pas activées pour votre établissement.
-                  </p>
-                </div>
-                <div className="p-3.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600 space-y-1 text-left">
-                  <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <Info size={14} className="text-blue-600 shrink-0" />
-                    Comment fonctionne votre établissement actuellement ?
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-relaxed">
-                    Les encaissements s'effectuent normalement via les modes classiques (Espèces, Chèques, Dépôts bancaires avec bordereaux). Si un parent paye par MonCash, le caissier saisit la référence manuellement.
-                  </p>
-                  <p className="text-[11px] text-indigo-700 font-semibold pt-1">
-                    Pour activer la validation automatique des paiements par Webhook, contactez votre administrateur de plateforme EduNova.
-                  </p>
+            {/* Bannière d'isolation et d'autonomie marchande de l'établissement */}
+            <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 -mt-6 -mr-6 w-40 h-40 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-400/30 flex items-center justify-center shrink-0 shadow-inner">
+                    <ShieldCheck size={22} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
+                        Isolation Établissement
+                      </span>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-400/20 text-blue-200 border border-blue-400/30">
+                        Tranzak &amp; Kobara
+                      </span>
+                      <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">
+                        Coffre-fort Paiement — {school?.name || schoolData.name || 'Votre Établissement'}
+                      </h4>
+                    </div>
+                    <p className="text-xs text-slate-300 font-medium mt-1 leading-relaxed">
+                      Configurez ici vos clés d'API Tranzak (MonCash direct &amp; Natcash) ou Kobara propres à cet établissement. Vos clés sont chiffrées en AES-256 et ont priorité absolue sur la configuration globale de la plateforme pour isoler vos encaissements et versements.
+                    </p>
+                  </div>
                 </div>
               </div>
-            ) : (
-              <ApiCredentialsVault
-                user={user}
-                canManageAllCampuses={canManageAllCampuses}
-                moncashConfig={moncashConfig}
-                setMoncashConfig={setMoncashConfig}
-                onSaveMoncashLegacy={handleUpdateMoncash}
-                savingLegacy={saving}
-                isGatewaysEnabledForSchool={Boolean(schoolData.has_api_gateways ?? school?.has_api_gateways)}
-              />
-            )}
+            </div>
+
+            <ApiCredentialsVault
+              user={user}
+              canManageAllCampuses={canManageAllCampuses}
+              moncashConfig={moncashConfig}
+              setMoncashConfig={setMoncashConfig}
+              onSaveMoncashLegacy={handleUpdateMoncash}
+              savingLegacy={saving}
+              isGatewaysEnabledForSchool={true}
+            />
           </div>
         )}
 

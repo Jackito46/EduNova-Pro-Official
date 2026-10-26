@@ -586,17 +586,20 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-1.5">
               <h3 className="text-sm sm:text-base font-bold tracking-tight text-white truncate">
-                Passerelles & Clés API
+                Coffre-fort Paiement — Clés d'Établissement
               </h3>
               <span className="px-1.5 py-0.2 rounded text-[9px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-center gap-1">
                 <Lock size={9} /> AES-256-GCM
+              </span>
+              <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-blue-500/20 text-blue-300 border border-blue-500/30 hidden sm:inline-flex items-center gap-1">
+                <Building size={9} /> Isolation École
               </span>
               <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hidden sm:inline-flex items-center gap-1">
                 <Database size={9} /> Supabase Vault
               </span>
             </div>
             <p className="text-[11px] text-slate-400 font-medium truncate">
-              Chiffrement matériel et validation en temps réel
+              Identifiants marchands Tranzak et Kobara spécifiques à l'établissement (priorité sur la plateforme globale)
             </p>
           </div>
         </div>
@@ -1142,6 +1145,17 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   <span>Activer Kobara en 1 clic</span>
                 </button>
               )}
+            </div>
+
+            {/* NOTICE ISOLATION KOBARA POUR L'ÉCOLE */}
+            <div className="p-2.5 rounded-lg bg-blue-50/80 border border-blue-200/90 text-xs flex items-start gap-2.5 text-blue-900">
+              <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
+              <div className="min-w-0">
+                <span className="font-bold text-blue-950">Configuration Dédiée à l'Établissement ({school?.name || 'Votre École'})</span>
+                <p className="text-[11px] text-blue-800/90 leading-relaxed mt-0.5">
+                  Les clés et numéros de reversement saisis ci-dessous sont rattachés spécifiquement à votre établissement. Ils ont priorité absolue sur la configuration globale de la plateforme EduNova et dirigent les fonds directement vers vos portefeuilles marchands.
+                </p>
+              </div>
             </div>
 
             {/* WEBHOOK KOBARA */}

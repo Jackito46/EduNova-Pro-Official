@@ -297,6 +297,17 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
         )}
       </div>
 
+      {/* NOTICE ISOLATION TRANZAK POUR L'ÉCOLE */}
+      <div className="p-2.5 rounded-lg bg-blue-50/80 border border-blue-200/90 text-xs flex items-start gap-2.5 text-blue-900">
+        <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <span className="font-bold text-blue-950">Clés Tranzak Propres à l'Établissement ({school?.name || 'Votre École'})</span>
+          <p className="text-[11px] text-blue-800/90 leading-relaxed mt-0.5">
+            Les clés API renseignées ci-dessous sont enregistrées avec l'identifiant de votre école (<code className="font-mono bg-blue-100/60 px-1 py-0.2 rounded text-[10px]">{currentSchoolId || 'school_id'}</code>). Elles se substituent aux clés globales de la plateforme et dirigent tous les encaissements MonCash &amp; NatCash directement sur votre compte marchand Tranzak.
+          </p>
+        </div>
+      </div>
+
       {/* 1. GUIDE D'INTÉGRATION COMPACT TRANZAK DASHBOARD */}
       <div className="bg-slate-900 text-white rounded-xl p-3 sm:p-3.5 border border-slate-800 shadow-2xs space-y-2.5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-white/10">
