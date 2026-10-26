@@ -1384,9 +1384,15 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         });
         
         const validPayments = currentPayments?.filter((p: any) => 
+          (p.status === 'VALIDE' || p.status === 'CONFIRMED' || p.moncash_status === 'COMPLETED' || (!p.status && !p.payment_method?.includes('EN ATTENTE') && !p.moncash_status)) &&
+          p.status !== 'ANNULE' &&
+          p.status !== 'EN_ATTENTE' &&
+          p.status !== 'REJETE' &&
+          p.status !== 'ECHEC' &&
+          p.moncash_status !== 'PENDING' &&
+          p.moncash_status !== 'CANCELLED' &&
           !p.payment_method?.includes('EN ATTENTE') && 
-          !p.payment_method?.includes('REJETÉ') &&
-          p.status !== 'ANNULE'
+          !p.payment_method?.includes('REJETÉ')
         ) || [];
 
         const admissionPayments = validPayments.filter(p => !isCampaignPayment(p) && isAdmissionPayment(p));
@@ -2277,70 +2283,77 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       if (paymentRecord) {
         const data = paymentRecord;
-        if (paymentMethod === 'Portefeuille') {
-          const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
-          const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
-          const newBalance = walletBalance - amount;
-          await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
-        } else if (feeType === 'CREDIT_PORTEFEUILLE') {
-          const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
-          const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
-          const newBalance = walletBalance + amount;
-          await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
-        }
+        const isMobilePending = paymentMethod === 'MonCash';
 
-        // AUTO-ENROLLMENT LOGIC: Si l'étudiant n'était pas inscrit, on l'inscrit automatiquement
-        if (selectedStudent.isNotEnrolledInTargetYear) {
-          try {
-            const enrollPayload: any = {
-              school_id: user.school_id,
-              student_id: selectedStudent.id,
-              class_id: selectedStudent.class_id || selectedStudent.class?.id,
-              enrollment_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
-              status: 'ACTIVE'
-            };
-            if (targetYearId) enrollPayload.academic_year_id = targetYearId;
-
-            const { error: enrollErr } = await supabase.from('enrollments').insert(enrollPayload);
-            
-            if (enrollErr && enrollErr.code === '42703') {
-              const { academic_year_id, ...fallback } = enrollPayload;
-              await supabase.from('enrollments').insert(fallback);
-            }
-            console.log(`${terminology.student} auto-inscrit avec succès suite au paiement.`);
-          } catch (enrollErr) {
-            console.error("Erreur lors de l'auto-inscription:", enrollErr);
+        // Pour les paiements directs immédiats (Cash, Virement, Dépôt, Portefeuille) :
+        // Mettre à jour le solde et les statuts immédiatement.
+        // Pour MonCash, ces actions se feront EXCLUSIVEMENT après validation réelle du débit dans onConfirmed.
+        if (!isMobilePending) {
+          if (paymentMethod === 'Portefeuille') {
+            const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
+            const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+            const newBalance = walletBalance - amount;
+            await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+          } else if (feeType === 'CREDIT_PORTEFEUILLE') {
+            const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
+            const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+            const newBalance = walletBalance + amount;
+            await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
           }
-        }
 
-        setTransactionRef(`RCP-${data.id.substring(0, 8).toUpperCase()}`);
-        
-        // SYNC STATUS LOGIC: Update student and enrollment status based on results
-        try {
-          const { data: newDebt } = await supabase.rpc('get_student_global_debt', { p_student_id: selectedStudent.id });
-          const debtValue = Number(newDebt || 0);
+          // AUTO-ENROLLMENT LOGIC: Si l'étudiant n'était pas inscrit, on l'inscrit automatiquement
+          if (selectedStudent.isNotEnrolledInTargetYear) {
+            try {
+              const enrollPayload: any = {
+                school_id: user.school_id,
+                student_id: selectedStudent.id,
+                class_id: selectedStudent.class_id || selectedStudent.class?.id,
+                enrollment_date: new Date(new Date().getTime() - new Date().getTimezoneOffset() * 60000).toISOString().split('T')[0],
+                status: 'ACTIVE'
+              };
+              if (targetYearId) enrollPayload.academic_year_id = targetYearId;
 
-          // We only auto-promote students who are currently En Attente, Actif or Reliquat
-          // We don't touch Inactif or Radié students automatically
-          const statusesToSync = ['Actif', 'Reliquat', 'En attente', 'En Attente', 'WAITING_PAYMENT'];
+              const { error: enrollErr } = await supabase.from('enrollments').insert(enrollPayload);
+              
+              if (enrollErr && enrollErr.code === '42703') {
+                const { academic_year_id, ...fallback } = enrollPayload;
+                await supabase.from('enrollments').insert(fallback);
+              }
+              console.log(`${terminology.student} auto-inscrit avec succès suite au paiement.`);
+            } catch (enrollErr) {
+              console.error("Erreur lors de l'auto-inscription:", enrollErr);
+            }
+          }
+
+          setTransactionRef(`RCP-${data.id.substring(0, 8).toUpperCase()}`);
           
-          if (statusesToSync.includes(selectedStudent.status) || !selectedStudent.status) {
-            let nextStatus = debtValue > 5 ? 'Reliquat' : 'Actif';
-            await supabase.from('students').update({ status: nextStatus }).eq('id', selectedStudent.id);
+          // SYNC STATUS LOGIC: Update student and enrollment status based on results
+          try {
+            const { data: newDebt } = await supabase.rpc('get_student_global_debt', { p_student_id: selectedStudent.id });
+            const debtValue = Number(newDebt || 0);
+
+            // We only auto-promote students who are currently En Attente, Actif or Reliquat
+            // We don't touch Inactif or Radié students automatically
+            const statusesToSync = ['Actif', 'Reliquat', 'En attente', 'En Attente', 'WAITING_PAYMENT'];
             
-            // If the student is now fully cleared (Actif), enforce enrollment activation
-            if (nextStatus === 'Actif') {
-              await supabase.from('enrollments')
-                .update({ status: 'ACTIVE' })
-                .eq('student_id', selectedStudent.id)
-                .eq('academic_year_id', targetYearId);
-              console.log("Dossier d'inscription activé car l'élève est à jour.");
+            if (statusesToSync.includes(selectedStudent.status) || !selectedStudent.status) {
+              let nextStatus = debtValue > 5 ? 'Reliquat' : 'Actif';
+              await supabase.from('students').update({ status: nextStatus }).eq('id', selectedStudent.id);
+              
+              // If the student is now fully cleared (Actif), enforce enrollment activation
+              if (nextStatus === 'Actif') {
+                await supabase.from('enrollments')
+                  .update({ status: 'ACTIVE' })
+                  .eq('student_id', selectedStudent.id)
+                  .eq('academic_year_id', targetYearId);
+                console.log("Dossier d'inscription activé car l'élève est à jour.");
+              }
+              
+              console.log(`Statut étudiant synchronisé: ${nextStatus} (Dette: ${debtValue})`);
             }
-            
-            console.log(`Statut étudiant synchronisé: ${nextStatus} (Dette: ${debtValue})`);
+          } catch (syncErr) {
+            console.error("Erreur de synchronisation des statuts:", syncErr);
           }
-        } catch (syncErr) {
-          console.error("Erreur de synchronisation des statuts:", syncErr);
         }
         
         // Si MonCash, on initie la requête et on active immédiatement l'état d'Attente de confirmation avec Polling
@@ -4237,7 +4250,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           payerPhone={monCashPendingData.payerPhone}
           schoolId={user.school_id}
           initiatedAt={monCashPendingData.initiatedAt}
-          onConfirmed={(confirmedPayment) => {
+          onConfirmed={async (confirmedPayment) => {
             if (confirmedPayment?.id) {
               setTransactionRef(`RCP-${confirmedPayment.id.substring(0, 8).toUpperCase()}`);
             }
@@ -4270,18 +4283,38 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 schoolId: user.school_id
               };
             });
+
+            // Post-validation: Alimentation portefeuille si applicable
+            if (feeType === 'CREDIT_PORTEFEUILLE' && selectedStudent) {
+              try {
+                const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
+                const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+                const newBalance = walletBalance + (parseFloat(montantReel) || monCashPendingData.amount);
+                await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+              } catch (wErr) {
+                console.warn('Wallet balance sync warning:', wErr);
+              }
+            }
+
+            if (selectedStudent?.id && targetYearId) {
+              await loadStudentDetails(selectedStudent.id, targetYearId);
+            }
+
             setShowMonCashWaiting(false);
             setShowReceipt(true);
           }}
           onFailed={(errMsg) => {
             console.warn('[MonCash Payment Failed]', errMsg);
           }}
-          onCancelled={(cancelledOrderId) => {
+          onCancelled={async (cancelledOrderId) => {
             setShowMonCashWaiting(false);
             setMonCashPendingData(null);
             setMoncashTransactionData(null);
             setIsSubmitting(false);
-            toast.info("Transaction MonCash annulée. Vous pouvez sélectionner un autre mode de paiement.");
+            if (selectedStudent?.id && targetYearId) {
+              await loadStudentDetails(selectedStudent.id, targetYearId);
+            }
+            toast.info("Transaction MonCash annulée. Aucun débit n'a été appliqué au compte de l'élève.");
           }}
         />
       )}

@@ -776,7 +776,7 @@ export async function confirmMonCashPaymentManually(params: {
   const { paymentId, orderId, transactionReference, supabaseClient, confirmedBy } = params;
 
   try {
-    let query = supabaseClient.from('payments').select('id, notes');
+    let query = supabaseClient.from('payments').select('id, description');
     if (paymentId) {
       query = query.eq('id', paymentId);
     } else if (orderId) {
@@ -792,7 +792,7 @@ export async function confirmMonCashPaymentManually(params: {
       };
     }
 
-    const updatedNotes = `${record.notes || ''} | Validé manuellement au guichet (Réf SMS: ${transactionReference}${confirmedBy ? `, par: ${confirmedBy}` : ''})`.trim();
+    const updatedDesc = `${record.description || ''} [Validé manuellement au guichet Réf: ${transactionReference}${confirmedBy ? `, par: ${confirmedBy}` : ''}]`.trim();
 
     const { data: updated, error: updateError } = await supabaseClient
       .from('payments')
@@ -801,7 +801,7 @@ export async function confirmMonCashPaymentManually(params: {
         moncash_status: 'COMPLETED',
         transaction_reference: transactionReference,
         reference_number: transactionReference,
-        notes: updatedNotes,
+        description: updatedDesc,
         updated_at: new Date().toISOString()
       })
       .eq('id', record.id)
@@ -821,7 +821,7 @@ export async function confirmMonCashPaymentManually(params: {
 /**
  * Permet d'annuler une transaction MonCash non aboutie (abandonnée par le parent,
  * refus de saisie du PIN, erreur de numéro ou choix d'un autre mode d'encaissement).
- * Met à jour le paiement en statut 'ANNULE' et 'CANCELLED' avec traçabilité d'audit.
+ * Supprime le paiement préventif non abouti ou le bascule en 'ANNULE' pour ne jamais affecter le solde de l'élève.
  */
 export async function cancelMonCashPayment(params: {
   paymentId?: string;
@@ -833,7 +833,7 @@ export async function cancelMonCashPayment(params: {
   const { paymentId, orderId, supabaseClient, cancelledBy, reason } = params;
 
   try {
-    let query = supabaseClient.from('payments').select('id, notes, status, moncash_status');
+    let query = supabaseClient.from('payments').select('id, description, status, moncash_status');
     if (paymentId) {
       query = query.eq('id', paymentId);
     } else if (orderId) {
@@ -858,15 +858,27 @@ export async function cancelMonCashPayment(params: {
       };
     }
 
+    // Si la transaction était encore en attente (non encaissée), la supprimer complètement
+    // pour garantir une intégrité comptable totale et ne jamais fausser le solde de l'élève
+    const { error: deleteError } = await supabaseClient
+      .from('payments')
+      .delete()
+      .eq('id', record.id);
+
+    if (!deleteError) {
+      return { success: true, paymentRecord: null };
+    }
+
+    // Repli de secours : si la suppression directe est bloquée par RLS, basculer en statut ANNULE
     const cancelReason = reason || 'Annulé au guichet par l\'opérateur';
-    const updatedNotes = `${record.notes || ''} | Transaction MonCash non aboutie annulée (${cancelReason}${cancelledBy ? `, par: ${cancelledBy}` : ''} à ${new Date().toLocaleTimeString('fr-FR')})`.trim();
+    const updatedDesc = `${record.description || ''} [Annulé: ${cancelReason}${cancelledBy ? `, par: ${cancelledBy}` : ''}]`.trim();
 
     const { data: updated, error: updateError } = await supabaseClient
       .from('payments')
       .update({
         status: 'ANNULE',
         moncash_status: 'CANCELLED',
-        notes: updatedNotes,
+        description: updatedDesc,
         updated_at: new Date().toISOString()
       })
       .eq('id', record.id)

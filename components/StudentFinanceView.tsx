@@ -143,7 +143,15 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     );
   }
 
-  const validPayments = payments.filter(p => p.status !== 'ANNULE');
+  const validPayments = payments.filter(p => 
+    p.status !== 'ANNULE' && 
+    p.status !== 'EN_ATTENTE' && 
+    p.status !== 'REJETE' && 
+    p.status !== 'ECHEC' &&
+    p.moncash_status !== 'PENDING' &&
+    p.moncash_status !== 'CANCELLED' &&
+    !p.payment_method?.includes('EN ATTENTE')
+  );
 
   // Classification des versements
   const isAdmissionPayment = (p: any) => {

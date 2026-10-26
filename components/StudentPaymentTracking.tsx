@@ -470,9 +470,15 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
       };
 
       const validPayments = payments?.filter(p => 
+        (p.status === 'VALIDE' || p.status === 'CONFIRMED' || p.moncash_status === 'COMPLETED' || (!p.status && !p.payment_method?.includes('EN ATTENTE') && !p.moncash_status)) &&
+        p.status !== 'ANNULE' && 
+        p.status !== 'EN_ATTENTE' && 
+        p.status !== 'REJETE' && 
+        p.status !== 'ECHEC' && 
+        p.moncash_status !== 'PENDING' && 
+        p.moncash_status !== 'CANCELLED' && 
         !p.payment_method?.includes('EN ATTENTE') && 
-        !p.payment_method?.includes('REJETÉ') &&
-        p.status !== 'ANNULE'
+        !p.payment_method?.includes('REJETÉ')
       ) || [];
 
       const admissionPayments = validPayments.filter(p => !isCampaignPayment(p) && isAdmissionPayment(p));

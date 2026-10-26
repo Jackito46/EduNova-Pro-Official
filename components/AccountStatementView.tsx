@@ -948,6 +948,11 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       const validPayments = payments?.filter(p => 
         p.status !== 'ANNULE' && 
+        p.status !== 'EN_ATTENTE' && 
+        p.status !== 'REJETE' && 
+        p.status !== 'ECHEC' && 
+        p.moncash_status !== 'PENDING' && 
+        p.moncash_status !== 'CANCELLED' && 
         !p.payment_method?.includes('REJETÉ') &&
         !p.payment_method?.includes('EN ATTENTE') &&
         isPaymentInDateRange(p, startDate, endDate)
