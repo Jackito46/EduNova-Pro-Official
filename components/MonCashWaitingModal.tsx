@@ -17,8 +17,12 @@ import {
   Share2,
   Ban,
   AlertTriangle,
-  Printer
+  Printer,
+  QrCode,
+  Info,
+  HelpCircle
 } from 'lucide-react';
+import QRCode from 'qrcode';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
 import { 
@@ -87,6 +91,28 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualSmsReference, setManualSmsReference] = useState('');
   const [isSubmittingManual, setIsSubmittingManual] = useState(false);
+
+  // QR Code pour paiement sur smartphone du parent
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+  const [showQrModal, setShowQrModal] = useState(false);
+
+  // Génération du QR Code Digicel MonCash dès que redirectUrl est prêt
+  useEffect(() => {
+    if (redirectUrl) {
+      QRCode.toDataURL(redirectUrl, {
+        width: 240,
+        margin: 2,
+        color: {
+          dark: '#b91c1c', // Rouge Digicel MonCash
+          light: '#ffffff'
+        }
+      })
+      .then(url => setQrCodeDataUrl(url))
+      .catch(err => console.warn('[QR Code Generation Error]', err));
+    } else {
+      setQrCodeDataUrl(null);
+    }
+  }, [redirectUrl]);
 
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const countdownIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -323,16 +349,16 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
               </div>
 
               {/* Badge de statut institutionnel */}
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 border border-amber-200/80 rounded-full text-amber-800 text-[11px] font-bold uppercase tracking-wider mb-2">
-                <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping shrink-0" />
-                <span>En attente de validation MonCash</span>
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-red-50 border border-red-200/80 rounded-full text-red-800 text-[11px] font-bold uppercase tracking-wider mb-2">
+                <span className="w-2 h-2 rounded-full bg-red-600 animate-ping shrink-0" />
+                <span>Passerelle Sécurisée Digicel MonCash • Tranzak</span>
               </div>
 
               <h2 id="moncash-modal-title" className="text-lg sm:text-xl font-black text-slate-900 tracking-tight">
-                Attente du code PIN du parent
+                Finalisation du Paiement MonCash
               </h2>
-              <p className="text-slate-500 text-xs sm:text-sm mt-1 max-w-sm">
-                Le parent doit approuver le débit sur son téléphone Digicel en saisissant son code PIN secret.
+              <p className="text-slate-500 text-xs sm:text-sm mt-1 max-w-md">
+                Le parent autorise le débit de <strong className="text-slate-900 font-bold font-mono">{Math.round(amount).toLocaleString()} HTG</strong> sur la page officielle chiffrée Digicel.
               </p>
 
               {/* Panneau de confirmation d'annulation inline */}
@@ -376,71 +402,162 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
                   </div>
                 </div>
               ) : (
-                /* Carte Récapitulative Complète avec Traçabilité */
-                <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 my-4 text-left space-y-3">
-                  {/* Montant */}
-                  <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60">
-                    <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Montant à régler</span>
-                    <div className="text-right">
-                      <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
-                        {Math.round(amount).toLocaleString()}
-                      </span>
-                      <span className="text-xs font-bold text-red-600 ml-1.5 uppercase">HTG</span>
-                    </div>
-                  </div>
-
-                  {/* Élève & Frais */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                    <div>
-                      <span className="text-slate-400 block font-medium text-[11px]">Élève bénéficiaire</span>
-                      <span className="font-bold text-slate-800 truncate block">{studentName}</span>
-                      {studentClass && (
-                        <span className="text-[11px] text-slate-500">{studentClass}</span>
-                      )}
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block font-medium text-[11px]">Motif du paiement</span>
-                      <span className="font-bold text-slate-800 truncate block">{feeTypeLabel}</span>
-                    </div>
-                  </div>
-
-                  {/* IDENTIFIANTS DE TRAÇABILITÉ (ORDER ID VS TRANSACTION ID) */}
-                  <div className="pt-2 border-t border-slate-200/60 space-y-2 text-xs">
-                    {/* N° Commande d'Initiation */}
-                    <div className="bg-white p-2.5 rounded-xl border border-slate-200">
-                      <div className="flex items-center justify-between gap-1 mb-1">
-                        <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">
-                          <span>N° Commande d'Initiation (Order ID)</span>
+                <div className="w-full my-4 space-y-3">
+                  {/* SECTION PRINCIPALE : PASSERELLE DIGICEL (BOUTON OU QR CODE) */}
+                  {redirectUrl ? (
+                    <div className="bg-gradient-to-br from-red-50/80 via-white to-rose-50/50 border-2 border-red-200 rounded-2xl p-4 text-left shadow-sm space-y-3.5">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-xl bg-red-600 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+                            MC
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-black uppercase tracking-wider text-red-600 block">
+                              Passerelle Officielle Digicel
+                            </span>
+                            <span className="text-xs sm:text-sm font-bold text-slate-900">
+                              Valider le prélèvement de {Math.round(amount).toLocaleString()} HTG
+                            </span>
+                          </div>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => handleCopyText(orderId, true)}
-                          className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
-                          title="Copier le N° de commande"
-                        >
-                          {copiedOrder ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
-                        </button>
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[10px] font-bold border border-emerald-200">
+                          Session Prête
+                        </span>
                       </div>
-                      <div className="font-mono text-xs sm:text-sm font-black text-slate-900 truncate">
-                        {orderId}
+
+                      {/* 2 MOYENS DE VALIDATION POUR LE PARENT */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                        {/* Option 1: Bouton Ouvrir Page Digicel */}
+                        <div className="bg-white p-3 rounded-xl border border-red-100 flex flex-col justify-between space-y-2">
+                          <div>
+                            <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                              Option 1 : Sur cet écran
+                            </span>
+                            <p className="text-[11.5px] text-slate-700 mt-1 leading-snug">
+                              Ouvrir la page sécurisée Digicel pour que le parent saisisse son numéro et son PIN.
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => window.open(redirectUrl, '_blank', 'noopener,noreferrer')}
+                            className="w-full py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black text-xs shadow-md shadow-red-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer min-h-[42px]"
+                          >
+                            <ExternalLink size={15} />
+                            <span>Ouvrir la page Digicel</span>
+                          </button>
+                        </div>
+
+                        {/* Option 2: Scan QR Code avec Smartphone */}
+                        <div className="bg-white p-3 rounded-xl border border-red-100 flex flex-col items-center justify-center text-center space-y-2">
+                          <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block">
+                            Option 2 : Sur son téléphone
+                          </span>
+                          {qrCodeDataUrl ? (
+                            <div className="relative group cursor-pointer" onClick={() => setShowQrModal(true)} title="Cliquer pour agrandir le QR Code">
+                              <img 
+                                src={qrCodeDataUrl} 
+                                alt="QR Code MonCash Digicel" 
+                                className="w-24 h-24 rounded-lg border border-red-200 shadow-2xs mx-auto"
+                              />
+                              <div className="text-[10px] font-bold text-red-700 mt-1 flex items-center justify-center gap-1">
+                                <QrCode size={11} /> Scanner avec l'appareil photo
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="w-24 h-24 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 text-xs">
+                              Génération QR...
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[10px] text-slate-400 mt-1 leading-tight">
-                        * Référence d'ordre générée par l'établissement. L'authentique ID Transaction Digicel sera scellé sur le reçu après validation du code PIN par le parent.
-                      </p>
+
+                      {/* NOTICE PÉDAGOGIQUE HAÏTI : DÉMYSTIFICATION DE "SAGACETECH" ET DU PIN */}
+                      <div className="bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-left space-y-1.5">
+                        <div className="flex items-center gap-1.5 text-amber-900 font-bold text-xs">
+                          <Info size={14} className="text-amber-600 shrink-0" />
+                          <span>Précisions essentielles sur la page Digicel :</span>
+                        </div>
+                        <ul className="text-[11px] text-amber-900/90 space-y-1 pl-4 list-disc leading-relaxed">
+                          <li>
+                            <strong>SAGACETECH</strong> : C'est le nom officiel de l'opérateur agréé <em>Tranzak</em> en Haïti. Vous n'avez pas besoin d'un compte marchand Digicel personnel : Tranzak perçoit pour l'école et crédite votre solde.
+                          </li>
+                          <li>
+                            <strong>Numéro & PIN demandés</strong> : Le parent saisit simplement son numéro personnel MonCash (ex: <span className="font-mono font-bold">48123456</span>) et son <strong>code PIN secret à 4 chiffres</strong>, puis clique sur <strong>Pay</strong>.
+                          </li>
+                          <li>
+                            <strong>Protection Anti-Fraude</strong> : Digicel n'envoie pas de menu USSD automatique sans ouverture préalable de cette page chiffrée afin d'éviter tout débit non sollicité.
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {/* Carte Récapitulative Complète avec Traçabilité */}
+                  <div className="w-full bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 sm:p-4 text-left space-y-3">
+                    {/* Montant */}
+                    <div className="flex items-center justify-between pb-2.5 border-b border-slate-200/60">
+                      <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Montant à régler</span>
+                      <div className="text-right">
+                        <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
+                          {Math.round(amount).toLocaleString()}
+                        </span>
+                        <span className="text-xs font-bold text-red-600 ml-1.5 uppercase">HTG</span>
+                      </div>
                     </div>
 
-                    {/* Date d'initiative & Statut */}
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500 pt-1">
-                      {initiatedAt && (
-                        <span className="flex items-center gap-1">
-                          <Clock size={12} className="text-amber-600" />
-                          <span>Initié le : <strong className="font-mono text-slate-700">{new Date(initiatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></span>
+                    {/* Élève & Frais */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-400 block font-medium text-[11px]">Élève bénéficiaire</span>
+                        <span className="font-bold text-slate-800 truncate block">{studentName}</span>
+                        {studentClass && (
+                          <span className="text-[11px] text-slate-500">{studentClass}</span>
+                        )}
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block font-medium text-[11px]">Motif du paiement</span>
+                        <span className="font-bold text-slate-800 truncate block">{feeTypeLabel}</span>
+                      </div>
+                    </div>
+
+                    {/* IDENTIFIANTS DE TRAÇABILITÉ (ORDER ID VS TRANSACTION ID) */}
+                    <div className="pt-2 border-t border-slate-200/60 space-y-2 text-xs">
+                      {/* N° Commande d'Initiation */}
+                      <div className="bg-white p-2.5 rounded-xl border border-slate-200">
+                        <div className="flex items-center justify-between gap-1 mb-1">
+                          <div className="flex items-center gap-1.5 text-[10.5px] font-bold text-slate-600 uppercase tracking-wider">
+                            <span>N° Commande d'Initiation (Order ID)</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(orderId, true)}
+                            className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded transition-colors"
+                            title="Copier le N° de commande"
+                          >
+                            {copiedOrder ? <Check size={13} className="text-emerald-600" /> : <Copy size={13} />}
+                          </button>
+                        </div>
+                        <div className="font-mono text-xs sm:text-sm font-black text-slate-900 truncate">
+                          {orderId}
+                        </div>
+                        <p className="text-[10px] text-slate-400 mt-1 leading-tight">
+                          * Référence d'ordre générée par l'établissement. Dès que le parent valide sur Digicel, l'ID Transaction définitif sera scellé automatiquement sur le reçu.
+                        </p>
+                      </div>
+
+                      {/* Date d'initiative & Statut */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500 pt-1">
+                        {initiatedAt && (
+                          <span className="flex items-center gap-1">
+                            <Clock size={12} className="text-amber-600" />
+                            <span>Initié le : <strong className="font-mono text-slate-700">{new Date(initiatedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</strong></span>
+                          </span>
+                        )}
+                        <span className="flex items-center gap-1 font-semibold text-amber-700">
+                          <ShieldCheck size={12} />
+                          <span>Statut : En attente du débit mobile</span>
                         </span>
-                      )}
-                      <span className="flex items-center gap-1 font-semibold text-amber-700">
-                        <ShieldCheck size={12} />
-                        <span>Statut : En attente du débit mobile</span>
-                      </span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -449,17 +566,17 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
               {/* Barre de polling active (Synchronisation automatique toutes les 5s) */}
               {!showCancelConfirm && (
                 <>
-                  <div className="w-full bg-amber-500/10 border border-amber-300/40 rounded-xl p-2.5 sm:p-3 flex items-center justify-between text-xs text-amber-900 mb-3">
+                  <div className="w-full bg-emerald-500/10 border border-emerald-300/40 rounded-xl p-2.5 sm:p-3 flex items-center justify-between text-xs text-emerald-900 mb-3">
                     <div className="flex items-center gap-2">
                       <RefreshCw 
                         size={14} 
-                        className={`text-amber-600 ${isManualChecking ? 'animate-spin' : ''}`} 
+                        className={`text-emerald-600 ${isManualChecking ? 'animate-spin' : ''}`} 
                       />
                       <span className="text-[11.5px] sm:text-xs">
                         Synchronisation automatique en direct <strong className="font-bold">({countdown}s)</strong>
                       </span>
                     </div>
-                    <div className="text-[10.5px] text-amber-700 font-medium">
+                    <div className="text-[10.5px] text-emerald-700 font-medium">
                       {checkCount > 0 ? `${checkCount} vérif.` : 'En écoute...'}
                     </div>
                   </div>
@@ -476,18 +593,6 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
                         <RefreshCw size={14} className={isManualChecking ? 'animate-spin' : ''} />
                         <span>{isManualChecking ? 'Vérification...' : 'Vérifier maintenant'}</span>
                       </button>
-
-                      {redirectUrl && (
-                        <button
-                          type="button"
-                          onClick={() => window.open(redirectUrl, '_blank')}
-                          className="w-full sm:w-auto flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs border border-red-200 transition-colors min-h-[44px] cursor-pointer"
-                          title="Ouvrir la passerelle web MonCash"
-                        >
-                          <ExternalLink size={14} />
-                          <span>Portail Web MonCash</span>
-                        </button>
-                      )}
 
                       {/* BOUTON D'ANNULATION PROÉMINENT */}
                       <button
@@ -724,6 +829,52 @@ export const MonCashWaitingModal: React.FC<MonCashWaitingModalProps> = ({
             </div>
           )}
         </div>
+
+        {/* Modal d'agrandissement du QR Code pour scan à distance */}
+        {showQrModal && qrCodeDataUrl && (
+          <div className="fixed inset-0 z-60 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 animate-in fade-in duration-150">
+            <div className="bg-white rounded-3xl p-6 max-w-sm w-full text-center space-y-4 shadow-2xl border border-red-200">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+                <div className="text-left">
+                  <span className="text-[10px] font-black uppercase text-red-600 tracking-wider">Passerelle Digicel</span>
+                  <h4 className="text-sm font-black text-slate-900">Scanner pour Payer</h4>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowQrModal(false)}
+                  className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+
+              <div className="bg-gradient-to-b from-red-50 to-white p-4 rounded-2xl border border-red-100">
+                <img
+                  src={qrCodeDataUrl}
+                  alt="QR Code MonCash Agrandissement"
+                  className="w-64 h-64 mx-auto rounded-xl shadow-sm"
+                />
+              </div>
+
+              <div className="text-xs text-slate-600 space-y-1">
+                <div className="font-bold text-slate-900">
+                  Montant à régler : <span className="font-mono text-red-600 font-black text-sm">{Math.round(amount).toLocaleString()} HTG</span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Pointez l'appareil photo du smartphone vers le code. La page chiffrée Digicel MonCash s'ouvrira immédiatement.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowQrModal(false)}
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs cursor-pointer transition-colors"
+              >
+                Fermer l'agrandissement
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

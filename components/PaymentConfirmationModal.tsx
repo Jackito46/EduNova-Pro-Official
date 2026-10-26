@@ -316,7 +316,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
                 <div className="bg-rose-50/70 border border-rose-200/60 rounded-lg p-2.5 text-[11px] text-rose-900 flex items-start gap-2">
                   <Lock size={14} className="text-rose-600 mt-0.5 shrink-0" />
                   <p className="leading-relaxed">
-                    <strong>Sécurité PIN :</strong> Le titulaire recevra l'invite USSD / OTP sur ce numéro et tapera son <strong>code PIN secret</strong> en toute confidentialité sur son téléphone. Vous n'avez pas besoin de connaître son PIN.
+                    <strong>Paiement Sécurisé Digicel MonCash :</strong> La passerelle officielle Digicel (opérée par l'agrégateur Tranzak / SAGACETECH) s'ouvrira pour que le parent valide le débit avec son numéro et son <strong>code PIN secret</strong> en toute confidentialité. Aucun compte marchand Digicel supplémentaire n'est requis pour votre école.
                   </p>
                 </div>
 
