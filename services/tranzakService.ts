@@ -100,4 +100,24 @@ export class TranzakService {
       return { success: false, error: e.message };
     }
   }
+
+  /**
+   * Annule une commande Tranzak non aboutie auprès du serveur
+   */
+  static async cancelPayment(orderId: string, reason?: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const res = await fetch('/api/tranzak/cancel-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ order_id: orderId, reason })
+      });
+      return await res.json();
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
 }

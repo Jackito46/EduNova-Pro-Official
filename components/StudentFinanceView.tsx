@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
+import { isPaymentCompleted } from '../src/utils/payment';
 
 interface StudentFinanceViewProps {
   user: UserProfile;
@@ -143,15 +144,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     );
   }
 
-  const validPayments = payments.filter(p => 
-    p.status !== 'ANNULE' && 
-    p.status !== 'EN_ATTENTE' && 
-    p.status !== 'REJETE' && 
-    p.status !== 'ECHEC' &&
-    p.moncash_status !== 'PENDING' &&
-    p.moncash_status !== 'CANCELLED' &&
-    !p.payment_method?.includes('EN ATTENTE')
-  );
+  const validPayments = payments.filter(isPaymentCompleted);
 
   // Classification des versements
   const isAdmissionPayment = (p: any) => {
@@ -225,7 +218,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   // Campagnes ad-hoc
   const campaignBreakdowns = adHocCampaigns.map(camp => {
     const campPayments = payments.filter((p: any) => {
-      if (p.status === 'ANNULE') return false;
+      if (!isPaymentCompleted(p)) return false;
       if (p.ad_hoc_campaign_id === camp.id) return true;
       if (p.campaign?.id === camp.id) return true;
       const campName = (camp.name || '').toLowerCase();

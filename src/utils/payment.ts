@@ -819,6 +819,68 @@ export async function confirmMonCashPaymentManually(params: {
 }
 
 /**
+ * Vérification universelle et stricte pour déterminer si une transaction est RÉELLEMENT validée et encaissée.
+ * Exclut formellement les paiements en attente (EN_ATTENTE, PENDING), annulés (ANNULE, ANNULÉ, CANCELLED), 
+ * échoués (ECHOUE, FAILED) ou rejetés (REJETE, REJETÉ).
+ */
+export function isPaymentCompleted(p: any): boolean {
+  if (!p) return false;
+  
+  const st = String(p.status || '').toUpperCase().trim();
+  const mst = String(p.moncash_status || '').toUpperCase().trim();
+  const meth = String(p.payment_method || p.method || '').toUpperCase().trim();
+
+  // 1. Exclusions formelles absolues
+  if (
+    st === 'EN_ATTENTE' || 
+    st === 'PENDING' || 
+    st === 'ANNULE' || 
+    st === 'ANNULÉ' || 
+    st === 'CANCELLED' || 
+    st === 'CANCELED' ||
+    st === 'REJETE' || 
+    st === 'REJETÉ' || 
+    st === 'ECHOUE' || 
+    st === 'ÉCHOUÉ' ||
+    st === 'FAILED' || 
+    st === 'ECHEC' ||
+    st === 'ÉCHEC'
+  ) {
+    return false;
+  }
+
+  if (
+    mst === 'PENDING' || 
+    mst === 'CANCELLED' || 
+    mst === 'CANCELED' || 
+    mst === 'FAILED' || 
+    mst === 'REJECTED' ||
+    mst === 'REJETE'
+  ) {
+    return false;
+  }
+
+  if (
+    meth.includes('EN ATTENTE') || 
+    meth.includes('REJETÉ') || 
+    meth.includes('REJETE') || 
+    meth.includes('ANNUL')
+  ) {
+    return false;
+  }
+
+  // 2. Si c'est un paiement mobile (MonCash, NatCash, Tranzak, Kobara),
+  // il DOIT être explicitement confirmé pour être comptabilisé
+  const isMobile = meth.includes('MONCASH') || meth.includes('NATCASH') || meth.includes('TRANZAK') || meth.includes('KOBARA');
+  if (isMobile) {
+    return st === 'VALIDE' || st === 'VALIDÉ' || st === 'CONFIRMED' || mst === 'COMPLETED';
+  }
+
+  // 3. Pour les autres méthodes traditionnelles (Cash, etc.), si statut non spécifié ou VALIDE
+  return st === 'VALIDE' || st === 'VALIDÉ' || st === 'CONFIRMED' || !st;
+}
+
+/**
  * Permet d'annuler une transaction MonCash non aboutie (abandonnée par le parent,
  * refus de saisie du PIN, erreur de numéro ou choix d'un autre mode d'encaissement).
  * Supprime le paiement préventif non abouti ou le bascule en 'ANNULE' pour ne jamais affecter le solde de l'élève.
@@ -833,63 +895,50 @@ export async function cancelMonCashPayment(params: {
   const { paymentId, orderId, supabaseClient, cancelledBy, reason } = params;
 
   try {
-    let query = supabaseClient.from('payments').select('id, description, status, moncash_status');
-    if (paymentId) {
-      query = query.eq('id', paymentId);
-    } else if (orderId) {
-      query = query.or(`moncash_order_id.eq.${orderId},transaction_reference.eq.${orderId}`);
-    }
-
-    const { data: record, error: findError } = await query.limit(1).maybeSingle();
-
-    if (findError || !record) {
-      // Si l'enregistrement n'a pas encore été persisté ou est introuvable, annulation locale réussie
-      return {
-        success: true,
-        error: undefined
-      };
-    }
-
-    // Sécurité : Ne pas annuler une transaction déjà validée/payée
-    if (record.status === 'VALIDE' || record.moncash_status === 'COMPLETED') {
-      return {
-        success: false,
-        error: 'Cette transaction a déjà été confirmée et validée par MonCash. Elle ne peut plus être annulée comme non aboutie.'
-      };
-    }
-
-    // Si la transaction était encore en attente (non encaissée), la supprimer complètement
-    // pour garantir une intégrité comptable totale et ne jamais fausser le solde de l'élève
-    const { error: deleteError } = await supabaseClient
-      .from('payments')
-      .delete()
-      .eq('id', record.id);
-
-    if (!deleteError) {
-      return { success: true, paymentRecord: null };
-    }
-
-    // Repli de secours : si la suppression directe est bloquée par RLS, basculer en statut ANNULE
     const cancelReason = reason || 'Annulé au guichet par l\'opérateur';
-    const updatedDesc = `${record.description || ''} [Annulé: ${cancelReason}${cancelledBy ? `, par: ${cancelledBy}` : ''}]`.trim();
+    const timestamp = new Date().toISOString();
 
-    const { data: updated, error: updateError } = await supabaseClient
-      .from('payments')
-      .update({
-        status: 'ANNULE',
-        moncash_status: 'CANCELLED',
-        description: updatedDesc,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', record.id)
-      .select()
-      .single();
+    // 1. Mise à jour préventive immédiate de TOUS les enregistrements correspondants en statut 'ANNULE'
+    const updatePayload: any = {
+      status: 'ANNULE',
+      moncash_status: 'CANCELLED',
+      notes: `Paiement annulé (${cancelReason}${cancelledBy ? `, par: ${cancelledBy}` : ''}) • ${timestamp}`,
+      updated_at: timestamp
+    };
+
+    let updateQuery = supabaseClient.from('payments').update(updatePayload);
+    if (paymentId && orderId) {
+      updateQuery = updateQuery.or(`id.eq.${paymentId},moncash_order_id.eq.${orderId},reference_number.eq.${orderId}`);
+    } else if (paymentId) {
+      updateQuery = updateQuery.eq('id', paymentId);
+    } else if (orderId) {
+      updateQuery = updateQuery.or(`moncash_order_id.eq.${orderId},reference_number.eq.${orderId}`);
+    } else {
+      return { success: true };
+    }
+
+    // Filtrer pour ne jamais écraser une transaction déjà payée / validée
+    updateQuery = updateQuery.neq('status', 'VALIDE').neq('moncash_status', 'COMPLETED');
+    const { error: updateError } = await updateQuery;
 
     if (updateError) {
-      return { success: false, error: updateError.message };
+      console.warn('[cancelMonCashPayment] Notice update status:', updateError.message);
     }
 
-    return { success: true, paymentRecord: updated };
+    // 2. Tenter également une suppression propre de l'enregistrement temporaire EN_ATTENTE
+    try {
+      let deleteQuery = supabaseClient.from('payments').delete().or(`status.eq.EN_ATTENTE,status.eq.ANNULE`);
+      if (paymentId) {
+        deleteQuery = deleteQuery.eq('id', paymentId);
+      } else if (orderId) {
+        deleteQuery = deleteQuery.or(`moncash_order_id.eq.${orderId},reference_number.eq.${orderId}`);
+      }
+      await deleteQuery;
+    } catch (delErr) {
+      // Ignorer si la suppression échoue, la mise à jour en ANNULE suffit pour l'intégrité
+    }
+
+    return { success: true };
   } catch (err: any) {
     return { success: false, error: err?.message || 'Erreur inattendue lors de l\'annulation' };
   }

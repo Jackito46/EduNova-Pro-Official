@@ -77,6 +77,7 @@ import {
   isWalletPaymentActive
 } from '../lib/paymentMethods';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
+import { isPaymentCompleted, cancelMonCashPayment } from '../src/utils/payment';
 
 const getReceiptFeeText = (
   feeType: string,
@@ -255,6 +256,34 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         })
         .catch(() => {});
     }
+
+    // Détection du retour d'annulation de la passerelle Tranzak
+    const handleGatewayUrlReturn = async () => {
+      try {
+        const fullUrl = window.location.href;
+        if (fullUrl.includes('payment=cancel')) {
+          const matchRef = fullUrl.match(/ref=([^&#]+)/);
+          const orderRef = matchRef ? decodeURIComponent(matchRef[1]) : '';
+          
+          if (orderRef) {
+            console.log('[Tranzak Return] Annulation détectée pour référence:', orderRef);
+            await cancelMonCashPayment({
+              orderId: orderRef,
+              supabaseClient: supabase,
+              cancelledBy: 'Système Tranzak',
+              reason: 'Annulé sur la passerelle Tranzak'
+            });
+            toast.info("Paiement Tranzak/MonCash annulé. Aucun montant n'a été débité ni affecté au compte.", { duration: 5000 });
+          }
+          const cleanUrl = fullUrl.replace(/[?&]payment=cancel(&ref=[^&#]*)?/, '').replace(/[?&]ref=[^&#]*/, '');
+          window.history.replaceState({}, document.title, cleanUrl);
+        }
+      } catch (err) {
+        console.warn('Notice traitement URL Tranzak:', err);
+      }
+    };
+    handleGatewayUrlReturn();
+
     return () => { isMounted = false; };
   }, [user?.school_id, school?.id, (school as any)?.global_settings]);
 
@@ -795,11 +824,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (p.academic_year_id === targetYearId) return true;
         if (!p.academic_year_id && !hasPrior) return true;
         return false;
-      }).filter((p: any) => 
-        !p.payment_method?.includes('EN ATTENTE') && 
-        !p.payment_method?.includes('REJETÉ') &&
-        p.status !== 'ANNULE'
-      );
+      }).filter(isPaymentCompleted);
 
       const isCampPay = (p: any) => Boolean(
         p.ad_hoc_campaign_id || 
@@ -943,11 +968,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         const pastPayments = (allPayments || []).filter((p: any) => {
           if (p.academic_year_id === enr.academic_year_id) return true;
           return false;
-        }).filter((p: any) => 
-          !p.payment_method?.includes('EN ATTENTE') && 
-          !p.payment_method?.includes('REJETÉ') &&
-          p.status !== 'ANNULE'
-        );
+        }).filter(isPaymentCompleted);
 
         // Frais ad-hoc passés filtrés en mémoire
         let pastAdHocDue = 0;
@@ -1383,17 +1404,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           return false;
         });
         
-        const validPayments = currentPayments?.filter((p: any) => 
-          (p.status === 'VALIDE' || p.status === 'CONFIRMED' || p.moncash_status === 'COMPLETED' || (!p.status && !p.payment_method?.includes('EN ATTENTE') && !p.moncash_status)) &&
-          p.status !== 'ANNULE' &&
-          p.status !== 'EN_ATTENTE' &&
-          p.status !== 'REJETE' &&
-          p.status !== 'ECHEC' &&
-          p.moncash_status !== 'PENDING' &&
-          p.moncash_status !== 'CANCELLED' &&
-          !p.payment_method?.includes('EN ATTENTE') && 
-          !p.payment_method?.includes('REJETÉ')
-        ) || [];
+        const validPayments = currentPayments?.filter(isPaymentCompleted) || [];
 
         const admissionPayments = validPayments.filter(p => !isCampaignPayment(p) && isAdmissionPayment(p));
         const campaignPayments = validPayments.filter(p => isCampaignPayment(p));
@@ -2171,6 +2182,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
 
+        if ((paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && !referenceNumber?.trim()) {
+          toast.error(`Veuillez renseigner le numéro de transaction ou la référence ${paymentMethod} reçu par SMS.`);
+          setIsSubmitting(false);
+          return;
+        }
+
         // VÉRIFICATION PRÉ-PAIEMENT : Afficher le modal récapitulatif pour TOUS les modes de paiement afin d'éviter les erreurs de saisie
         if (!bypassSummary) {
           setIsSubmitting(false);
@@ -2178,9 +2195,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           return;
         }
 
-        const isPending = paymentMethod === 'Chèque' || paymentMethod === 'MonCash';
+        const isPending = paymentMethod === 'Chèque';
         const finalPaymentMethod = paymentMethod; // On garde la valeur pure
-        const moncashOrderId = paymentMethod === 'MonCash' ? `TC-${Date.now()}` : null;
+        const moncashOrderId = (paymentMethod === 'MonCash' || paymentMethod === 'Natcash') ? (referenceNumber || `TC-${Date.now()}`) : null;
   
         const isAdHoc = feeType.startsWith('ADHOC_');
         const adHocCampaignId = isAdHoc ? feeType.replace('ADHOC_', '') : null;
@@ -2214,14 +2231,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           currency: currency,
           payment_method: finalPaymentMethod,
           bank_name: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') ? bankName : null,
-          reference_number: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash') ? (referenceNumber || moncashOrderId) : null,
+          reference_number: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash' || paymentMethod === 'Natcash') ? (referenceNumber || moncashOrderId) : null,
           deposit_date: paymentMethod === 'Dépôt Bancaire' ? depositDate : null,
           status: isPending ? 'EN_ATTENTE' : 'VALIDE',
           amount_htg_equivalent: currency === 'USD' ? Math.round((amount * currentExchangeRate) * 100) / 100 : amount,
           amount_usd_equivalent: currency === 'USD' ? amount : (currentExchangeRate > 0 ? Math.round((amount / currentExchangeRate) * 100) / 100 : 0),
           exchange_rate_applied: currentExchangeRate || 140,
           moncash_order_id: moncashOrderId,
-          moncash_status: paymentMethod === 'MonCash' ? 'PENDING' : null
+          moncash_status: (paymentMethod === 'MonCash' || paymentMethod === 'Natcash') ? 'COMPLETED' : null
         };
 
       if (targetYearId) {
@@ -2283,11 +2300,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       if (paymentRecord) {
         const data = paymentRecord;
-        const isMobilePending = paymentMethod === 'MonCash';
+        const isMobilePending = false; // Les règlements Mobile Money au guichet avec référence SMS sont immédiatement certifiés et valides
 
-        // Pour les paiements directs immédiats (Cash, Virement, Dépôt, Portefeuille) :
+        // Pour tous les paiements réguliers (Cash, Virement, Dépôt, MonCash certifié, Portefeuille) :
         // Mettre à jour le solde et les statuts immédiatement.
-        // Pour MonCash, ces actions se feront EXCLUSIVEMENT après validation réelle du débit dans onConfirmed.
         if (!isMobilePending) {
           if (paymentMethod === 'Portefeuille') {
             const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
@@ -2325,7 +2341,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             }
           }
 
-          setTransactionRef(`RCP-${data.id.substring(0, 8).toUpperCase()}`);
+          setTransactionRef(referenceNumber ? referenceNumber : `RCP-${data.id.substring(0, 8).toUpperCase()}`);
           
           // SYNC STATUS LOGIC: Update student and enrollment status based on results
           try {
@@ -2356,73 +2372,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           }
         }
         
-        // Si MonCash, on initie la requête et on active immédiatement l'état d'Attente de confirmation avec Polling
-        if (paymentMethod === 'MonCash' && moncashOrderId) {
-          const exactInitiatedDate = new Date();
-          const studentFullName = selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim();
-          
-          let redirectUrl: string | null = null;
-          try {
-            const dispatchRes = await MobilePaymentRouterService.dispatchPayment({
-              schoolId: user.school_id,
-              amount: amount,
-              currency: currency as any,
-              operator: 'moncash',
-              orderId: moncashOrderId,
-              payerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
-              studentId: selectedStudent.id,
-              studentName: studentFullName,
-              customerName: studentFullName,
-              customerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
-              description: `Paiement ${feeType} - ${studentFullName}`,
-              feeType: feeType
-            });
-            redirectUrl = dispatchRes.paymentUrl || dispatchRes.redirectUrl || null;
-            if (dispatchRes.success && dispatchRes.is_simulated) {
-              toast.info("💡 Mode Simulation Sandbox actif pour la passerelle Mobile Money.");
-            } else if (!dispatchRes.success && dispatchRes.error) {
-              toast.error(dispatchRes.error, { duration: 5000 });
-            }
-          } catch (err: any) {
-            console.warn("Mobile Payment Initiation Warning:", err);
-          }
-
-          // Initialisation officielle de la card récapitulative MonCash
-          const moncashSummary: MonCashTransactionInfo = {
-            orderId: moncashOrderId,
-            transactionId: referenceNumber || undefined,
-            paymentId: data.id,
-            initiatedAt: exactInitiatedDate.toISOString(),
-            serverStatus: data.status || 'EN_ATTENTE',
-            serverStatusRaw: data.status || 'EN_ATTENTE',
-            amount: amount,
-            currency: currency,
-            payerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
-            studentName: studentFullName,
-            studentClass: selectedStudent.classe || selectedStudent.class?.name,
-            feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
-            verificationMethod: 'Webhook MonCash & Polling Supabase',
-            schoolId: user.school_id
-          };
-
-          setMoncashTransactionData(moncashSummary);
-
-          setMonCashPendingData({
-            paymentId: data.id,
-            orderId: moncashOrderId,
-            amount: amount,
-            currency: currency,
-            redirectUrl: redirectUrl,
-            studentName: studentFullName,
-            studentCode: selectedStudent.code,
-            studentClass: selectedStudent.class?.name,
-            feeTypeLabel: feeTypeOptions.find(o => o.value === feeType)?.label || feeType,
-            payerPhone: payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone || '',
-            initiatedAt: exactInitiatedDate.toISOString()
-          });
-          setShowMonCashWaiting(true);
-        } else {
-          setShowReceipt(true);
+        setShowReceipt(true);
+        if (paymentMethod === 'MonCash' || paymentMethod === 'Natcash') {
+          toast.success(`Paiement ${paymentMethod} validé avec succès ! Reçu officiel émis.`);
+        }
+        if (selectedStudent?.id && targetYearId) {
+          loadStudentDetails(selectedStudent.id, targetYearId);
         }
         
         AuditLogger.log({
@@ -3681,39 +3636,25 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
 
-                {/* Détection automatique et affichage clair de la passerelle active pour les paiements mobiles */}
+                {/* Information claire pour les paiements mobiles */}
                 {(paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && (
-                  <div className="p-2.5 bg-gradient-to-r from-slate-50 to-indigo-50/40 border border-slate-200/90 rounded-xl text-xs space-y-1 animate-in fade-in duration-200">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <Zap size={14} className={
-                          activeGateway === 'tranzak' ? 'text-blue-600' :
-                          activeGateway === 'kobara' ? 'text-orange-600' :
-                          activeGateway === 'moncash' ? 'text-red-600' :
-                          'text-slate-500'
-                        } />
-                        <span className="font-bold text-slate-800 text-[11px] truncate">
-                          Passerelle Mobile Détectée :
+                  <div className="p-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs flex items-center justify-between gap-2 animate-in fade-in duration-200">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={`w-7 h-7 rounded-lg ${paymentMethod === 'Natcash' ? 'bg-blue-600' : 'bg-red-600'} text-white font-black text-[11px] flex items-center justify-center shrink-0 shadow-2xs`}>
+                        {paymentMethod === 'Natcash' ? 'NC' : 'MC'}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="font-bold text-slate-800 text-xs block truncate">
+                          Règlement {paymentMethod === 'Natcash' ? 'NatCash' : 'Digicel MonCash'}
+                        </span>
+                        <span className="text-[10.5px] text-slate-500 block truncate">
+                          {activeGateway === 'tranzak' ? 'Passerelle Tranzak agréée Haïti' : 'Enregistrement direct au guichet'}
                         </span>
                       </div>
-                      <span className={`px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider shadow-2xs ${
-                        activeGateway === 'tranzak' ? 'bg-blue-600 text-white' :
-                        activeGateway === 'kobara' ? 'bg-orange-600 text-white' :
-                        activeGateway === 'moncash' ? 'bg-red-600 text-white' :
-                        'bg-slate-700 text-white'
-                      }`}>
-                        {activeGateway === 'tranzak' && 'Tranzak (Direct)'}
-                        {activeGateway === 'kobara' && 'Kobara (Agrégateur)'}
-                        {activeGateway === 'moncash' && 'Digicel MonCash'}
-                        {activeGateway === 'none' && 'Mode Manuel'}
-                      </span>
                     </div>
-                    <p className="text-[10.5px] text-slate-600 leading-snug">
-                      {activeGateway === 'tranzak' && 'Aiguillage automatique vers Tranzak. Traitement sécurisé des règlements MonCash & NatCash.'}
-                      {activeGateway === 'kobara' && 'Aiguillage automatique vers Kobara. Reversement direct sur vos numéros de téléphone déclarés.'}
-                      {activeGateway === 'moncash' && 'Aiguillage direct vers la passerelle officielle Digicel MonCash.'}
-                      {activeGateway === 'none' && 'Mode Manuel actif : saisissez manuellement la référence du SMS reçu par le parent.'}
-                    </p>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                      Guichet Caisse
+                    </span>
                   </div>
                 )}
 
@@ -3728,7 +3669,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </span>
                   </div>
                 )}
-                {currentMethodConfig?.instructions && paymentMethod !== 'MonCash' && (
+                {currentMethodConfig?.instructions && paymentMethod !== 'MonCash' && paymentMethod !== 'Natcash' && (
                   <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600 leading-relaxed">
                     {currentMethodConfig.instructions}
                   </div>
@@ -3747,7 +3688,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 )}
                 
                 {/* Additional fields for methods requiring bank or reference */}
-                {Boolean(currentMethodConfig?.requires_reference || currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash') && (
+                {Boolean(currentMethodConfig?.requires_reference || currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire' || paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 relative z-15 animate-in fade-in zoom-in-95 duration-200">
                     {Boolean(currentMethodConfig?.requires_bank || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
                       <div className="space-y-1 min-w-0">
@@ -3771,49 +3712,23 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         />
                       </div>
                     )}
-                    
-                    {paymentMethod === 'MonCash' && (
-                      <div className="space-y-1.5 min-w-0 sm:col-span-2 bg-rose-50/70 border border-rose-200/90 rounded-2xl p-3.5 shadow-2xs">
-                        <div className="flex items-center justify-between">
-                          <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-rose-950 flex items-center gap-1.5">
-                            <Phone size={13} className="text-rose-600" />
-                            <span>Numéro de Téléphone Débité (Mobile Money)</span>
-                          </label>
-                          <span className="text-[9.5px] font-black text-rose-700 bg-white px-2 py-0.5 rounded-full border border-rose-200 shadow-2xs">
-                            Reçoit le Prompt USSD / PIN
-                          </span>
-                        </div>
-                        <input
-                          type="tel"
-                          value={payerPhoneCustom}
-                          onChange={(e) => setPayerPhoneCustom(e.target.value)}
-                          placeholder="Ex: 50937889900 ou 50922445566"
-                          className="w-full px-3.5 py-2.5 bg-white border border-rose-300 focus:border-rose-600 focus:ring-4 focus:ring-rose-500/10 text-slate-900 rounded-xl text-xs sm:text-sm outline-none transition-all font-mono font-bold"
-                        />
-                        <p className="text-[10.5px] text-rose-800 leading-relaxed mt-0.5">
-                          🔒 <strong>Sécurité PIN :</strong> Le titulaire de ce compte recevra l'invite USSD sur ce téléphone et y tapera son <strong>code PIN secret</strong> en toute confidentialité. Vous pouvez modifier ce numéro pour ce paiement sans impacter le dossier permanent de l'élève.
-                        </p>
-                      </div>
-                    )}
 
-                    {Boolean(currentMethodConfig?.requires_reference || paymentMethod === 'MonCash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
-                      <div className="space-y-1 min-w-0">
+                    {Boolean(currentMethodConfig?.requires_reference || paymentMethod === 'MonCash' || paymentMethod === 'Natcash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') && (
+                      <div className={`space-y-1 min-w-0 ${(paymentMethod === 'MonCash' || paymentMethod === 'Natcash' || paymentMethod === 'Dépôt Bancaire') ? 'sm:col-span-2' : ''}`}>
                         <div className="flex items-center justify-between">
-                          <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title={paymentMethod === 'MonCash' ? 'ID Transaction MonCash' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}>
-                            {paymentMethod === 'MonCash' ? 'ID Transaction (si déjà payé)' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
+                          <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate block" title={paymentMethod === 'MonCash' ? 'ID Transaction MonCash' : paymentMethod === 'Natcash' ? 'ID Transaction NatCash' : paymentMethod === 'Chèque' ? 'Numéro du chèque' : 'Numéro du bordereau / transaction / référence'}>
+                            {paymentMethod === 'MonCash' ? 'ID Transaction / Référence MonCash' : paymentMethod === 'Natcash' ? 'ID Transaction / Référence NatCash' : paymentMethod === 'Chèque' ? 'N° Chèque' : 'N° Bordereau / Réf.'}
                           </label>
-                          {paymentMethod === 'MonCash' && (
-                            <span className="text-[10px] text-indigo-600 font-bold bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-200">
-                              Optionnel en direct
-                            </span>
-                          )}
+                          <span className="text-[10px] text-slate-500 font-bold bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                            {paymentMethod === 'MonCash' || paymentMethod === 'Natcash' ? 'Preuve SMS Reçu' : paymentMethod === 'Chèque' ? 'Obligatoire' : 'Bordereau'}
+                          </span>
                         </div>
                         <div className="relative">
                           <input 
                             type="text" 
-                            required={paymentMethod !== 'MonCash'} 
-                            className={`w-full px-3.5 py-2.5 sm:py-3 border ${refError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10'} bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl text-xs sm:text-sm outline-none transition-all font-medium`} 
-                            placeholder={paymentMethod === 'MonCash' ? 'Laisser vide pour paiement direct (ou Ex: MC-839201...)' : 'Ex: DEP-94829...'}
+                            required={paymentMethod === 'MonCash' || paymentMethod === 'Natcash' || paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire'} 
+                            className={`w-full px-3.5 py-2.5 sm:py-3 border ${refError ? 'border-rose-500 focus:border-rose-500 focus:ring-rose-500/20' : 'border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10'} bg-slate-50/70 focus:bg-white text-slate-900 rounded-xl text-xs sm:text-sm outline-none transition-all font-mono font-bold tracking-wide`} 
+                            placeholder={paymentMethod === 'MonCash' ? 'Ex: 839201948 ou MC-48920...' : paymentMethod === 'Natcash' ? 'Ex: NC-728194...' : paymentMethod === 'Chèque' ? 'Ex: CHQ-00123' : 'Ex: DEP-94829...'}
                             value={referenceNumber} 
                             onChange={(e) => {
                               const val = e.target.value.toUpperCase();
@@ -3824,9 +3739,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           {isCheckingRef && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-slate-400" size={15} />}
                         </div>
                         {refError && <p className="text-[10.5px] text-rose-600 font-medium mt-0.5">{refError}</p>}
-                        {paymentMethod === 'MonCash' && (
+                        {(paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && (
                           <p className="text-[10.5px] text-slate-500 mt-1 leading-snug">
-                            💡 <strong>Paiement direct :</strong> Laisser vide si le parent va payer maintenant (l'ID sera généré par Tranzak après validation du PIN).
+                            Saisir le numéro de transaction ou la référence reçu par SMS par le parent suite à son règlement {paymentMethod}.
                           </p>
                         )}
                       </div>
@@ -4307,6 +4222,23 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             console.warn('[MonCash Payment Failed]', errMsg);
           }}
           onCancelled={async (cancelledOrderId) => {
+            const effectivePaymentId = monCashPendingData?.paymentId;
+            const effectiveOrderId = cancelledOrderId || monCashPendingData?.orderId;
+            
+            if (effectivePaymentId || effectiveOrderId) {
+              try {
+                await cancelMonCashPayment({
+                  paymentId: effectivePaymentId,
+                  orderId: effectiveOrderId,
+                  supabaseClient: supabase,
+                  cancelledBy: (user as any)?.name || user?.email || 'Guichetier',
+                  reason: 'Annulation au guichet'
+                });
+              } catch (cancelErr) {
+                console.warn('[onCancelled Error]', cancelErr);
+              }
+            }
+
             setShowMonCashWaiting(false);
             setMonCashPendingData(null);
             setMoncashTransactionData(null);

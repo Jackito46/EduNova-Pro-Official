@@ -38,6 +38,7 @@ import {
   normalizeStudentDocuments,
   calculateDocumentsCompleteness 
 } from '../utils/documentRequirements';
+import { isPaymentCompleted } from '../src/utils/payment';
 
 const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { id } = useParams<{ id: string }>();
@@ -450,10 +451,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Calculs financiers synthétiques pour la mise en avant immédiate (Solde, Paiements, Solvabilité)
   const validPayments = useMemo(() => {
-    return (payments || []).filter((p: any) => {
-      const st = String(p.status || '').toUpperCase();
-      return !st.includes('ANNUL') && !st.includes('REJET');
-    });
+    return (payments || []).filter(isPaymentCompleted);
   }, [payments]);
 
   const totalPaidHTG = useMemo(() => {
@@ -1410,7 +1408,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
                     {(() => {
                       const campPayments = payments.filter((p: any) => {
-                        if (p.status === 'ANNULE') return false;
+                        if (!isPaymentCompleted(p)) return false;
                         if (p.ad_hoc_campaign_id && (p.ad_hoc_campaign_id === camp.id || p.ad_hoc_campaign_id === camp.fee_id)) return true;
                         if (p.campaign_id && (p.campaign_id === camp.id || p.campaign_id === camp.fee_id)) return true;
                         if (p.campaign?.id === camp.id) return true;

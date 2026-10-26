@@ -272,59 +272,16 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
 
             {/* SI PAIEMENT MONCASH / TRANZAK / NATCASH */}
             {isMonCash && (
-              <div className="bg-white border border-rose-200/80 rounded-xl p-3 space-y-2.5">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <span className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
-                    <Phone size={13} className="text-rose-600" />
-                    <span>Numéro de Téléphone Débité :</span>
+              <div className="bg-white border border-rose-200/90 rounded-xl p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-slate-600 font-medium">N° Transaction / Référence MonCash :</span>
+                  <span className="font-mono text-xs font-black text-rose-800 bg-rose-50 px-2.5 py-1 rounded-md border border-rose-200">
+                    {referenceNumber || 'Non renseigné'}
                   </span>
-                  
-                  {!isEditingPhone ? (
-                    <div className="flex items-center gap-2">
-                      <span className="font-mono font-black text-xs text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                        {phoneOverride ? phoneOverride : (student.parent_phone || student.phone || 'Non renseigné')}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingPhone(true)}
-                        className="text-[10.5px] font-bold text-indigo-600 hover:text-indigo-800 underline cursor-pointer"
-                      >
-                        Modifier
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={phoneOverride}
-                        onChange={(e) => handlePhoneChange(e.target.value)}
-                        placeholder="Ex: 50937889900"
-                        className="px-2 py-1 text-xs font-mono font-bold border border-indigo-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 bg-white"
-                        autoFocus
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setIsEditingPhone(false)}
-                        className="px-2 py-1 bg-indigo-600 text-white rounded-lg text-[10.5px] font-bold cursor-pointer"
-                      >
-                        Valider
-                      </button>
-                    </div>
-                  )}
                 </div>
-
-                <div className="bg-rose-50/70 border border-rose-200/60 rounded-lg p-2.5 text-[11px] text-rose-900 flex items-start gap-2">
-                  <Lock size={14} className="text-rose-600 mt-0.5 shrink-0" />
-                  <p className="leading-relaxed">
-                    <strong>Paiement Sécurisé Digicel MonCash :</strong> La passerelle officielle Digicel (opérée par l'agrégateur Tranzak / SAGACETECH) s'ouvrira pour que le parent valide le débit avec son numéro et son <strong>code PIN secret</strong> en toute confidentialité. Aucun compte marchand Digicel supplémentaire n'est requis pour votre école.
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between text-xs pt-1 border-t border-slate-100">
-                  <span className="text-slate-500">ID Transaction :</span>
-                  <span className="font-mono text-[11px] font-bold text-slate-700">
-                    {referenceNumber ? referenceNumber : 'Génération automatique via Tranzak'}
-                  </span>
+                <div className="flex items-center gap-1.5 text-[11px] text-slate-500 pt-1 border-t border-slate-100">
+                  <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
+                  <span>Règlement certifié par SMS. Reçu officiel avec QR code d'authenticité généré immédiatement dès validation.</span>
                 </div>
               </div>
             )}

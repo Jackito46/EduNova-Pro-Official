@@ -68,6 +68,7 @@ import { NotificationBanner } from './NotificationBanner';
 import { AutonomousAdminWarningBanner } from './AutonomousAdminWarningBanner';
 import { PayrollSensitiveNotificationListener } from './PayrollSensitiveNotificationListener';
 import { AiQuotaAlertBanner } from './AiQuotaAlertBanner';
+import { isPaymentCompleted } from '../src/utils/payment';
 import { AddressBarInstallHint } from './AddressBarInstallHint';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ParentDashboardView } from './ParentDashboardView';
@@ -645,12 +646,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       });
 
-      const validPayments = fetchedPayments.filter(p => 
-        p.status !== 'ANNULE' && 
-        !p.payment_method?.includes('EN ATTENTE') && 
-        !p.payment_method?.includes('REJETÉ') &&
-        p.moncash_status !== 'PENDING'
-      );
+      const validPayments = fetchedPayments.filter(isPaymentCompleted);
 
       const validSupplies = suppliesRes.data?.filter(s => 
         s.status !== 'ANNULE' && 

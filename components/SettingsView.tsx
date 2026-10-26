@@ -140,7 +140,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
       const params = new URLSearchParams(window.location.search);
       const tabParam = params.get('tab');
       if (tabParam === 'diagnostic') return 'diagnostic';
-      if (tabParam === 'api_vault' || tabParam === 'coffre_fort' || tabParam === 'passerelles' || tabParam === 'gateways' || tabParam === 'kobara') return 'gateways';
+      if (
+        tabParam === 'payment_vault' || 
+        tabParam === 'coffre_fort' || 
+        tabParam === 'coffre-fort' || 
+        tabParam === 'coffre_fort_paiement' || 
+        tabParam === 'api_vault' || 
+        tabParam === 'passerelles' || 
+        tabParam === 'gateways' || 
+        tabParam === 'kobara' ||
+        tabParam === 'tranzak'
+      ) return 'gateways';
       if (window.location.hash === '#diagnostic') return 'diagnostic';
     }
     return 'school';
@@ -149,7 +159,17 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
   useEffect(() => {
     const tabParam = searchParams.get('tab');
     if (tabParam) {
-      if (tabParam === 'api_vault' || tabParam === 'coffre_fort' || tabParam === 'passerelles' || tabParam === 'gateways' || tabParam === 'kobara') {
+      if (
+        tabParam === 'payment_vault' || 
+        tabParam === 'coffre_fort' || 
+        tabParam === 'coffre-fort' || 
+        tabParam === 'coffre_fort_paiement' || 
+        tabParam === 'api_vault' || 
+        tabParam === 'passerelles' || 
+        tabParam === 'gateways' || 
+        tabParam === 'kobara' ||
+        tabParam === 'tranzak'
+      ) {
         setActiveTab('gateways');
       } else if (['school', 'campuses', 'academic', 'finance', 'payment_methods', 'security', 'diagnostic'].includes(tabParam)) {
         setActiveTab(tabParam as SettingsTab);
@@ -1940,11 +1960,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
     },
     { 
       id: 'gateways', 
-      label: 'Passerelles de Paiement & Clés API', 
-      labelDesktopCompact: 'Passerelles & Clés API',
-      labelTablet: 'Passerelles & API',
-      labelMobile: 'Passerelles API',
-      icon: Key 
+      label: 'Coffre-fort Paiement', 
+      labelDesktopCompact: 'Coffre-fort Paiement',
+      labelTablet: 'Coffre-fort',
+      labelMobile: 'Coffre-fort',
+      icon: ShieldCheck 
     },
     { 
       id: 'security', 
@@ -2021,13 +2041,11 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
            </div>
            {item.id === 'gateways' && (
              <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider shrink-0 hidden sm:inline-block ${
-               (schoolData?.has_api_gateways ?? school?.has_api_gateways)
-                 ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
-                 : activeTab === 'gateways'
-                   ? 'bg-amber-400/20 text-amber-300 border border-amber-400/30'
-                   : 'bg-slate-100 text-slate-500 border border-slate-200'
+               activeTab === 'gateways'
+                 ? 'bg-emerald-400/20 text-emerald-300 border border-emerald-400/30'
+                 : 'bg-indigo-50 text-indigo-700 border border-indigo-200'
              }`}>
-               {(schoolData?.has_api_gateways ?? school?.has_api_gateways) ? 'Actif' : 'Inactif'}
+               École
              </span>
            )}
           </button>

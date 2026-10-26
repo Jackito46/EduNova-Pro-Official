@@ -1096,8 +1096,8 @@ async function startServer() {
           status: Boolean(process.env.GEMINI_API_KEY) ? 'VALID' : 'UNCONFIGURED'
         },
         tranzak: {
-          api_key: process.env.TRANZAK_API_KEY ? maskSecret(process.env.TRANZAK_API_KEY) : maskSecret('tk_live_fWPH1DoIJTBFsRw0YdpVZi0aleM9m19k8lfI1FS6'),
-          has_key: Boolean(process.env.TRANZAK_API_KEY || 'tk_live_fWPH1DoIJTBFsRw0YdpVZi0aleM9m19k8lfI1FS6'),
+          api_key: process.env.TRANZAK_API_KEY ? maskSecret(process.env.TRANZAK_API_KEY) : maskSecret('tk_live_fWPH1DoIJTBfSRw0YdpVZi0aleM9m19k81fi1FS6'),
+          has_key: Boolean(process.env.TRANZAK_API_KEY || 'tk_live_fWPH1DoIJTBfSRw0YdpVZi0aleM9m19k81fi1FS6'),
           is_key_encrypted: false,
           webhook_secret: process.env.TRANZAK_WEBHOOK_SECRET ? maskSecret(process.env.TRANZAK_WEBHOOK_SECRET) : maskSecret('whsec_b87caead9c17eec19ff312a7ea52a706648cfa17a355acc0c3d2de237a544ed1'),
           has_webhook_secret: Boolean(process.env.TRANZAK_WEBHOOK_SECRET || 'whsec_b87caead9c17eec19ff312a7ea52a706648cfa17a355acc0c3d2de237a544ed1'),
@@ -2301,7 +2301,7 @@ async function startServer() {
   // TRANZAK PAYMENT GATEWAY (MONCASH & NATCASH) INTEGRATION
   // =========================================================================
 
-  const TRANZAK_LIVE_KEY_VERIFIED = 'tk_live_fWPH1DoIJTBFsRw0YdpVZi0aleM9m19k8lfI1FS6';
+  const TRANZAK_LIVE_KEY_VERIFIED = 'tk_live_fWPH1DoIJTBfSRw0YdpVZi0aleM9m19k81fi1FS6';
   const TRANZAK_TEST_KEY_VERIFIED = 'tk_test_HnQkScD53V0jtOuHz5xOrTvCKIwJKaYPWca47Tdd';
   const TRANZAK_WEBHOOK_SECRET_VERIFIED = 'whsec_b87caead9c17eec19ff312a7ea52a706648cfa17a355acc0c3d2de237a544ed1';
 
@@ -2837,16 +2837,33 @@ async function startServer() {
         } catch (pushErr) {
           console.warn('Push notification Tranzak err:', pushErr);
         }
-      } else if (eventType === 'payment.failed' || status === 'failed') {
+      } else if (
+        eventType === 'payment.failed' || 
+        eventType === 'payment.canceled' || 
+        eventType === 'payment.cancelled' || 
+        status === 'failed' || 
+        status === 'cancelled' || 
+        status === 'canceled' || 
+        status === 'expired' || 
+        status === 'rejected'
+      ) {
         if (orderRef) {
+          const isCancelled = status === 'cancelled' || status === 'canceled' || eventType?.includes('cancel');
+          const finalStatus = isCancelled ? 'ANNULE' : 'ECHOUE';
+          const finalMonCashStatus = isCancelled ? 'CANCELLED' : 'FAILED';
+          
           await supabase
             .from('payments')
             .update({
-              status: 'ECHOUE',
-              moncash_status: 'FAILED',
-              notes: `Paiement refusé ou expiré sur Tranzak`
+              status: finalStatus,
+              moncash_status: finalMonCashStatus,
+              notes: `Paiement ${isCancelled ? 'annulé' : 'refusé/échoué'} sur Tranzak (${status || eventType})`,
+              updated_at: new Date().toISOString()
             })
-            .or(`reference_number.eq.${orderRef},moncash_order_id.eq.${orderRef}`);
+            .or(`reference_number.eq.${orderRef},moncash_order_id.eq.${orderRef}`)
+            .neq('status', 'VALIDE')
+            .neq('moncash_status', 'COMPLETED');
+            
           persistedToDb = true;
         }
       }
@@ -2956,6 +2973,46 @@ async function startServer() {
       return res.status(statusRes.status).json(data);
     } catch (err: any) {
       return res.status(200).json({ success: false, status: 'PENDING', error: err.message });
+    }
+  });
+
+  // API Route pour annuler formellement une commande Tranzak non aboutie
+  app.post('/api/tranzak/cancel-payment', async (req, res) => {
+    try {
+      const { order_id, transaction_id, reason } = req.body || {};
+      const ref = (order_id || transaction_id || '').trim();
+      if (!ref) {
+        return res.status(400).json({ success: false, error: 'Référence de transaction requise.' });
+      }
+
+      const timestamp = new Date().toISOString();
+      const cancelReason = reason || 'Annulé au guichet ou abandon de la passerelle';
+
+      // 1. Mise à jour préventive en ANNULE
+      await supabase
+        .from('payments')
+        .update({
+          status: 'ANNULE',
+          moncash_status: 'CANCELLED',
+          notes: `Paiement Tranzak annulé (${cancelReason}) • ${timestamp}`,
+          updated_at: timestamp
+        })
+        .or(`reference_number.eq.${ref},moncash_order_id.eq.${ref}`)
+        .neq('status', 'VALIDE')
+        .neq('moncash_status', 'COMPLETED');
+
+      // 2. Nettoyer l'entrée EN_ATTENTE pour garantir zéro interférence comptable
+      try {
+        await supabase
+          .from('payments')
+          .delete()
+          .or(`reference_number.eq.${ref},moncash_order_id.eq.${ref}`)
+          .in('status', ['EN_ATTENTE', 'ANNULE']);
+      } catch (delErr) {}
+
+      return res.json({ success: true, message: 'Transaction Tranzak marquée comme annulée.' });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err.message });
     }
   });
 

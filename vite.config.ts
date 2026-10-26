@@ -165,7 +165,7 @@ export default defineConfig(({ mode }) => {
             short_name: 'EduNova Pro',
             description: 'Système complet de Gestion Académique, Pédagogique et Financière pour Établissements Scolaires',
             theme_color: '#2563eb',
-            background_color: '#0b132b',
+            background_color: '#f8fafc',
             display: 'standalone',
             display_override: ['window-controls-overlay', 'standalone', 'minimal-ui', 'browser'],
             start_url: '/',

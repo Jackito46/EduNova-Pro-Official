@@ -359,6 +359,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               <Route path="/personnel/pointage" element={<RoleGuard user={user} allowedRoles={hrRoles}><StaffAttendanceView user={user} /></RoleGuard>} />
               
               {/* Finance Routes */}
+              <Route path="/fees" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat" element={<ModuleGuard moduleId="finance" moduleName="Direction Économat" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><FinanceHub user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/frais" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
               <Route path="/economat/paiement" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />

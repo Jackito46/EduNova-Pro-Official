@@ -51,6 +51,7 @@ import { useSecurity } from './SecurityGuard';
 import { addSecurityWatermark } from '../utils/pdfWatermark';
 import { fixOklchForCanvas } from '../utils/pdfFix';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
+import { isPaymentCompleted } from '../src/utils/payment';
 
 const getFeeRowDetails = (
   nativeHTG: number,
@@ -532,12 +533,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             // Filtre d'année académique souple
             if (p.academic_year_id && p.academic_year_id !== selectedYear) return false;
 
-            // Exclusion des paiements annulés ou rejetés
-            const pStatus = String(p.status || '').toUpperCase();
-            if (pStatus.includes('ANNUL') || pStatus.includes('REJET') || pStatus.includes('CANCEL')) return false;
-
-            const pMethod = String(p.payment_method || '').toUpperCase();
-            if (pMethod.includes('REJETÉ') || pMethod.includes('REJETE') || pMethod.includes('EN ATTENTE')) return false;
+            // Exclusion formelle des paiements annulés, rejetés ou en attente non aboutis
+            if (!isPaymentCompleted(p)) return false;
 
             // Plage de dates
             return isPaymentInDateRange(p, startDate, endDate);
@@ -637,7 +634,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         setAuditDiagnosticInfo({
           totalPaymentsFetched: payments.length,
-          totalValidPayments: payments.filter(p => !String(p.status || '').toUpperCase().includes('ANNUL')).length,
+          totalValidPayments: payments.filter(isPaymentCompleted).length,
           totalStudentsProcessed: balances.length,
           matchedPaymentsCount: matchedPaymentsCount,
           unmatchedPaymentsCount: unmatchedPaymentsCount,

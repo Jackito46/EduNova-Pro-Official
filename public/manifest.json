@@ -12,7 +12,7 @@
     "minimal-ui",
     "browser"
   ],
-  "background_color": "#0b132b",
+  "background_color": "#f8fafc",
   "theme_color": "#2563eb",
   "orientation": "any",
   "lang": "fr",

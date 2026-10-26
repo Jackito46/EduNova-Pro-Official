@@ -38,6 +38,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { supabase } from '../supabase';
 import { UserProfile } from '../types';
 import { AuditLogger } from '../utils/auditLogger';
+import { isPaymentCompleted } from '../src/utils/payment';
 import { formatStudentName } from '../utils/formatters';
 import Modal from './Modal';
 import { FluidLoadingState, SkeletonTable } from './SkeletonLoader';
@@ -410,11 +411,8 @@ const DiscountManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       .eq('student_id', student.id)
       .eq('academic_year_id', activeYear.id);
 
-    const paidAmount = payments?.filter(p => 
-      !p.payment_method?.includes('EN ATTENTE') && 
-      !p.payment_method?.includes('REJETÉ') &&
-      p.status !== 'ANNULE'
-    ).reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * exchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0) || 0;
+    const paidAmount = payments?.filter(isPaymentCompleted)
+      .reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * exchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0) || 0;
 
     const existingDiscountAmount = Number(student.discount_amount || 0) + Number(currentEnrollment?.tuition_discount || 0);
     const hasExistingDiscount = existingDiscountAmount > 0;
