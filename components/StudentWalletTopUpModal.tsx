@@ -77,6 +77,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
 
   // État du modal d'attente MonCash
   const [isWaitingModalOpen, setIsWaitingModalOpen] = useState(false);
+  const [activePaymentUrl, setActivePaymentUrl] = useState<string | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string>('');
   const [activePaymentId, setActivePaymentId] = useState<string>('');
   const [activeTransactionRef, setActiveTransactionRef] = useState<string>('');
@@ -115,6 +116,43 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
     }
 
     setShowSummaryModal(true);
+  };
+
+  // Simulation directe de test via l'API Tranzak (SAGACETECH)
+  const handleSimulateDirectTest = async () => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const res = await fetch('/api/tranzak/simulate-deposit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          schoolId: effectiveSchoolId,
+          studentId: student.id,
+          amount: effectiveAmount,
+          operator: 'moncash',
+          customerPhone: displayPhone,
+          customerName: `${student.first_name} ${student.last_name}`
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        toast.success(data.message || "Dépôt test Tranzak simulé avec succès !");
+        handlePaymentConfirmed(data.payment_record || { transaction_reference: data.reference });
+      } else {
+        throw new Error(data.error || "Erreur simulation dépôt Tranzak");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Échec du test de simulation");
+      setError(err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // 2. Lancer la demande réelle de recharge MonCash après confirmation
@@ -174,7 +212,9 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         });
 
         if (dispatchRes.paymentUrl || dispatchRes.redirectUrl) {
-          console.log(`[TopUp] Session ${dispatchRes.gateway} initiée :`, dispatchRes.paymentUrl || dispatchRes.redirectUrl);
+          const pUrl = dispatchRes.paymentUrl || dispatchRes.redirectUrl;
+          setActivePaymentUrl(pUrl);
+          console.log(`[TopUp] Session ${dispatchRes.gateway} initiée :`, pUrl);
         }
       } catch (apiErr) {
         console.warn('[TopUp] API serveur en mode veille, bascule sur surveillance polling:', apiErr);
@@ -510,6 +550,18 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                   )}
                 </button>
 
+                {/* Bouton de test direct de simulation Tranzak */}
+                <button
+                  type="button"
+                  onClick={handleSimulateDirectTest}
+                  disabled={isSubmitting || effectiveAmount <= 0}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold text-xs border border-slate-700 shadow-sm transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                  title="Valide immédiatement la réception du montant sur le compte Tranzak de l'école et crédite le portefeuille élève"
+                >
+                  <Sparkles size={14} className="text-amber-400" />
+                  <span>Tester via simulation API Tranzak (+{effectiveAmount.toLocaleString()} HTG)</span>
+                </button>
+
                 {/* Mention de sécurité */}
                 <div className="flex items-center justify-center gap-1.5 text-[11px] text-slate-400 font-medium">
                   <ShieldCheck size={13} className="text-emerald-600" />
@@ -558,6 +610,7 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
           transactionReference={activeTransactionRef}
           amount={effectiveAmount}
           currency="HTG"
+          redirectUrl={activePaymentUrl}
           studentName={`${student.first_name} ${student.last_name}`}
           studentCode={student.reference_number}
           studentClass={student.class_name}

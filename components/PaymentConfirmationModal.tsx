@@ -266,7 +266,7 @@ export const PaymentConfirmationModal: React.FC<PaymentConfirmationModalProps> =
                       ? 'bg-amber-100 text-amber-800 border-amber-200' 
                       : 'bg-indigo-100 text-indigo-800 border-indigo-200'
               }`}>
-                {paymentMethod} {isMonCash && activeGateway === 'tranzak' ? '(Tranzak Direct)' : ''}
+                {paymentMethod} {isMonCash ? '(Guichet Caisse)' : ''}
               </span>
             </div>
 

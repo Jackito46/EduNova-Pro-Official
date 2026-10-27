@@ -3648,12 +3648,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           Règlement {paymentMethod === 'Natcash' ? 'NatCash' : 'Digicel MonCash'}
                         </span>
                         <span className="text-[10.5px] text-slate-500 block truncate">
-                          {activeGateway === 'tranzak' ? 'Passerelle Tranzak agréée Haïti' : 'Enregistrement direct au guichet'}
+                          Enregistrement au guichet • Contrôle référence SMS parent
                         </span>
                       </div>
                     </div>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                      Guichet Caisse
+                      Preuve Comptable
                     </span>
                   </div>
                 )}
@@ -4007,7 +4007,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               ) : paymentMethod === 'MonCash' ? (
                 <>
                   <Smartphone size={18} /> 
-                  <span>Vérifier & Payer via MonCash ({montantReel ? `${montantReel} ${currency}` : ''})</span>
+                  <span>Enregistrer le Règlement MonCash ({montantReel ? `${montantReel} ${currency}` : ''})</span>
                 </>
               ) : (
                 <>

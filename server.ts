@@ -2659,6 +2659,135 @@ async function startServer() {
     }
   });
 
+  // API Route pour simuler un dépôt test Tranzak (SAGACETECH) depuis le Dashboard Parent
+  app.post('/api/tranzak/simulate-deposit', async (req, res) => {
+    try {
+      const {
+        schoolId,
+        studentId,
+        amount = 100,
+        operator = 'moncash',
+        customerPhone = '50937000000',
+        customerName
+      } = req.body;
+
+      if (!schoolId) {
+        return res.status(400).json({ success: false, error: 'Identifiant d’établissement (schoolId) obligatoire.' });
+      }
+
+      if (!studentId) {
+        return res.status(400).json({ success: false, error: 'Identifiant de l’élève (studentId) obligatoire.' });
+      }
+
+      const depositAmount = Math.max(10, Math.round(Number(amount) || 100));
+      const orderRef = `TRZ-TEST-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+      const receiptNumber = `REC-TRZ-${Date.now().toString().slice(-6)}`;
+      const operatorLabel = operator === 'natcash' ? 'NatCash' : 'MonCash';
+
+      // 1. Récupérer l'élève pour valider et mettre à jour son solde portefeuille
+      const { data: student, error: stErr } = await supabase
+        .from('students')
+        .select('id, first_name, last_name, wallet_balance_htg, reference_number')
+        .eq('id', studentId)
+        .maybeSingle();
+
+      if (stErr || !student) {
+        return res.status(404).json({ success: false, error: 'Élève introuvable.' });
+      }
+
+      const oldBalance = Number(student.wallet_balance_htg || 0);
+      const newBalance = oldBalance + depositAmount;
+
+      // 2. Mettre à jour le solde du portefeuille dans la base de données
+      const { error: upErr } = await supabase
+        .from('students')
+        .update({
+          wallet_balance_htg: newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', studentId);
+
+      if (upErr) {
+        console.warn('[Simulate Deposit] Erreur mise à jour wallet_balance_htg:', upErr);
+      }
+
+      // 3. Insérer la transaction validée dans payments pour l'école
+      const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+      const { data: paymentRecord, error: pErr } = await supabase
+        .from('payments')
+        .insert([{
+          school_id: schoolId,
+          student_id: studentId,
+          amount: depositAmount,
+          amount_htg_equivalent: depositAmount,
+          currency: 'HTG',
+          payment_method: operatorLabel,
+          method: `${operatorLabel} (Tranzak Test Direct)`,
+          fee_type: 'CREDIT_PORTEFEUILLE',
+          nature: 'Scolarite',
+          type: 'Revenu',
+          reference_number: orderRef,
+          moncash_order_id: orderRef,
+          receipt_number: receiptNumber,
+          status: 'VALIDE',
+          moncash_status: 'COMPLETED',
+          notes: `Dépôt Test Simulé via API Tranzak (SAGACETECH) • Réf: ${orderRef} • Portefeuille crédité de +${depositAmount} HTG`,
+          payment_date: new Date().toISOString().split('T')[0],
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+
+      if (pErr) {
+        console.warn('[Simulate Deposit] Avertissement insertion payments:', pErr);
+      }
+
+      // 4. Ajouter une entrée d'audit Tranzak
+      webhookAuditLogs.unshift({
+        id: `wh-trz-sim-${Date.now()}`,
+        timestamp: new Date().toISOString(),
+        school_id: schoolId,
+        gateway: 'tranzak',
+        operator: operator,
+        event_type: 'payment.success.simulated',
+        order_id: orderRef,
+        transaction_id: orderRef,
+        amount: depositAmount,
+        currency: 'HTG',
+        signature_status: 'valid',
+        persisted_to_db: true,
+        http_status: 200,
+        simulated: true,
+        status: 'VALIDE',
+        notes: `Simulation test de dépôt Tranzak réussie pour ${studentFullName} (+${depositAmount} HTG)`,
+        raw_payload: { simulated: true, student_id: studentId, amount: depositAmount, order_ref: orderRef }
+      });
+      if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+
+      return res.json({
+        success: true,
+        is_simulated: true,
+        transaction_id: orderRef,
+        reference: orderRef,
+        receipt_number: receiptNumber,
+        amount: depositAmount,
+        currency: 'HTG',
+        student_id: studentId,
+        student_name: studentFullName,
+        old_balance: oldBalance,
+        new_balance: newBalance,
+        payment_record: paymentRecord,
+        message: `Dépôt de ${depositAmount.toLocaleString()} HTG simulé avec succès via Tranzak ! Montant perçu sur le compte école et portefeuille de ${student.first_name} crédité.`
+      });
+    } catch (err: any) {
+      console.error('[Simulate Deposit Error]:', err);
+      return res.status(500).json({
+        success: false,
+        error: err.message || 'Erreur lors de la simulation du dépôt Tranzak.'
+      });
+    }
+  });
+
   function isValidTranzakSignature(rawSignature: string, rawBuffer: Buffer, secret: string): boolean {
     if (!secret) return true;
     if (!rawSignature) return false;
@@ -2818,6 +2947,33 @@ async function startServer() {
             created_at: new Date().toISOString()
           }]);
           persistedToDb = true;
+        }
+
+        // Si la transaction correspond à une recharge de portefeuille, créditer automatiquement l'élève
+        const effectiveFeeType = feeType || existingPayment?.fee_type || '';
+        const effectiveStudentId = studentId || existingPayment?.student_id;
+        const effectiveAmount = amount || existingPayment?.amount || 0;
+
+        if (effectiveStudentId && (effectiveFeeType === 'CREDIT_PORTEFEUILLE' || effectiveFeeType === 'RECHARGE_PORTEFEUILLE')) {
+          try {
+            const { data: stRow } = await supabase
+              .from('students')
+              .select('wallet_balance_htg')
+              .eq('id', effectiveStudentId)
+              .maybeSingle();
+            const currentBal = Number(stRow?.wallet_balance_htg || 0);
+            const newBal = currentBal + effectiveAmount;
+            await supabase
+              .from('students')
+              .update({
+                wallet_balance_htg: newBal,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', effectiveStudentId);
+            console.log(`[Tranzak Webhook] Portefeuille de l'élève ${effectiveStudentId} crédité : +${effectiveAmount} HTG (Nouveau solde: ${newBal} HTG)`);
+          } catch (wErr) {
+            console.warn('[Tranzak Webhook] Erreur incrément portefeuille élève:', wErr);
+          }
         }
 
         try {

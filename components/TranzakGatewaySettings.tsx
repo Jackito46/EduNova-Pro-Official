@@ -21,12 +21,17 @@ import {
   Coins,
   Shield,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Wallet,
+  Receipt,
+  CreditCard,
+  ArrowUpRight
 } from 'lucide-react';
 import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile } from '../types';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
+import { formatStudentName } from '../utils/formatters';
 
 export interface TranzakGatewaySettingsProps {
   user: UserProfile;
@@ -75,6 +80,32 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
     timestamp?: string;
   } | null>(null);
 
+  // Transactions Tranzak reçues par l'établissement
+  const [tranzakPayments, setTranzakPayments] = useState<any[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+
+  const loadTranzakTransactions = async () => {
+    if (!currentSchoolId) return;
+    setLoadingPayments(true);
+    try {
+      const { data, error } = await supabase
+        .from('payments')
+        .select('id, receipt_number, amount, amount_htg_equivalent, currency, payment_method, reference_number, fee_type, status, payment_date, created_at, notes, student_id, student:students(id, first_name, last_name, matricule)')
+        .eq('school_id', currentSchoolId)
+        .or('payment_method.ilike.%tranzak%,reference_number.ilike.TZK-%,fee_type.eq.CREDIT_PORTEFEUILLE,fee_type.eq.RECHARGE_PORTEFEUILLE')
+        .order('created_at', { ascending: false })
+        .limit(30);
+
+      if (!error && data) {
+        setTranzakPayments(data);
+      }
+    } catch (err) {
+      console.warn('Erreur chargement transactions Tranzak:', err);
+    } finally {
+      setLoadingPayments(false);
+    }
+  };
+
   // Charger les identifiants existants
   useEffect(() => {
     let isMounted = true;
@@ -111,6 +142,7 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
       }
     }
     loadTranzakConfig();
+    loadTranzakTransactions();
     return () => { isMounted = false; };
   }, [currentSchoolId]);
 
@@ -226,6 +258,31 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
   const callbackUrl = `${rawOrigin}/api/tranzak/webhook`;
   const returnUrl = `${rawOrigin}/#/fees?payment=success`;
   const cancelUrl = `${rawOrigin}/#/fees?payment=cancel`;
+
+  // Calcul des statistiques des encaissements Tranzak pour l'établissement
+  const stats = React.useMemo(() => {
+    let totalHTG = 0;
+    let walletHTG = 0;
+    let validCount = 0;
+
+    for (const p of tranzakPayments) {
+      const amt = Number(p.amount_htg_equivalent || p.amount || 0);
+      const isValide = !p.status || p.status.toUpperCase() === 'VALIDE' || p.status.toUpperCase() === 'PAID';
+      if (isValide) {
+        totalHTG += amt;
+        validCount++;
+        if (
+          p.fee_type === 'CREDIT_PORTEFEUILLE' || 
+          p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
+          (p.notes || '').toLowerCase().includes('portefeuille')
+        ) {
+          walletHTG += amt;
+        }
+      }
+    }
+
+    return { totalHTG, walletHTG, validCount };
+  }, [tranzakPayments]);
 
   if (loading) {
     return (
@@ -630,6 +687,168 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
             Reçu de paiement et balance mis à jour en direct.
           </div>
         </div>
+      </div>
+
+      {/* 4. HISTORIQUE & AUDIT DES ENCAISSEMENTS TRANZAK DE L'ÉTABLISSEMENT */}
+      <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+          <div>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-purple-50 text-purple-700 rounded-lg border border-purple-200">
+                <Receipt size={16} />
+              </div>
+              <h5 className="font-bold text-slate-900 text-sm">
+                Journal des Encaissements &amp; Dépôts Reçus (Tranzak / SAGACETECH)
+              </h5>
+            </div>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Montants directement perçus sur le compte Tranzak de l'établissement et répercutés sur les portefeuilles des élèves.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={loadTranzakTransactions}
+            disabled={loadingPayments}
+            className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+          >
+            <RefreshCw size={13} className={loadingPayments ? "animate-spin text-purple-600" : "text-slate-500"} />
+            <span>Actualiser</span>
+          </button>
+        </div>
+
+        {/* 3 Cartes statistiques Tranzak */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          <div className="bg-gradient-to-br from-purple-50 to-indigo-50/40 p-3 rounded-xl border border-purple-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700 block">
+              Total Perçu sur Compte Tranzak
+            </span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-xl font-black text-purple-950 font-mono">
+                {stats.totalHTG.toLocaleString()}
+              </span>
+              <span className="text-xs font-bold text-purple-700">HTG</span>
+            </div>
+            <span className="text-[10.5px] text-purple-800/80 mt-0.5 block">
+              {stats.validCount} transaction(s) certifiée(s)
+            </span>
+          </div>
+
+          <div className="bg-gradient-to-br from-emerald-50 to-teal-50/40 p-3 rounded-xl border border-emerald-100">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+              Dont Dépôts Portefeuilles Élèves
+            </span>
+            <div className="mt-1 flex items-baseline gap-1">
+              <span className="text-xl font-black text-emerald-950 font-mono">
+                {stats.walletHTG.toLocaleString()}
+              </span>
+              <span className="text-xs font-bold text-emerald-700">HTG</span>
+            </div>
+            <span className="text-[10.5px] text-emerald-800/80 mt-0.5 block">
+              Crédits cantine &amp; fournitures
+            </span>
+          </div>
+
+          <div className="bg-gradient-to-br from-slate-50 to-slate-100/50 p-3 rounded-xl border border-slate-200">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-600 block">
+              Passerelle &amp; Sécurité
+            </span>
+            <div className="mt-1 flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <ShieldCheck size={16} className="text-emerald-600" />
+              <span>{config.mode === 'live' ? 'Production Réelle' : 'Mode Test Sandbox'}</span>
+            </div>
+            <span className="text-[10.5px] text-slate-500 mt-0.5 block">
+              Agrégateur SAGACETECH Haïti
+            </span>
+          </div>
+        </div>
+
+        {/* Tableau des transactions Tranzak de l'établissement */}
+        {loadingPayments ? (
+          <div className="py-8 flex flex-col items-center justify-center text-slate-400 gap-2">
+            <Loader2 size={20} className="animate-spin text-purple-600" />
+            <span className="text-xs">Chargement des transactions Tranzak...</span>
+          </div>
+        ) : tranzakPayments.length === 0 ? (
+          <div className="p-4 rounded-xl bg-slate-50 border border-dashed border-slate-200 text-center text-slate-500 text-xs">
+            <Receipt className="mx-auto text-slate-400 mb-1" size={24} />
+            <p className="font-bold text-slate-700">Aucun encaissement Tranzak enregistré pour l'instant</p>
+            <p className="text-[11px] text-slate-400 mt-0.5">
+              Les versements effectués par les parents ou via le bouton de test apparaîtront immédiatement dans ce journal.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-slate-200">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                <tr>
+                  <th className="py-2 px-3">Reçu</th>
+                  <th className="py-2 px-3">Date</th>
+                  <th className="py-2 px-3">Élève</th>
+                  <th className="py-2 px-3">Nature</th>
+                  <th className="py-2 px-3">Réf. Tranzak</th>
+                  <th className="py-2 px-3 text-right">Montant (HTG)</th>
+                  <th className="py-2 px-3 text-center">Statut</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 font-medium">
+                {tranzakPayments.map((p) => {
+                  const studentObj = p.student;
+                  const isWallet = p.fee_type === 'CREDIT_PORTEFEUILLE' || 
+                    p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
+                    (p.notes || '').toLowerCase().includes('portefeuille');
+                  const pDate = p.payment_date || p.created_at;
+                  const formattedDate = pDate ? new Date(pDate).toLocaleDateString('fr-FR', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : '-';
+
+                  return (
+                    <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
+                      <td className="py-2 px-3 font-mono font-bold text-indigo-700 whitespace-nowrap">
+                        #{p.receipt_number || 'SANS-NO'}
+                      </td>
+                      <td className="py-2 px-3 text-slate-500 whitespace-nowrap text-[11px]">
+                        {formattedDate}
+                      </td>
+                      <td className="py-2 px-3 font-bold text-slate-900 whitespace-nowrap">
+                        {studentObj 
+                          ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName 
+                          : 'Élève'}
+                      </td>
+                      <td className="py-2 px-3 whitespace-nowrap">
+                        {isWallet ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                            <Wallet size={10} className="text-emerald-600 shrink-0" />
+                            Dépôt Portefeuille
+                          </span>
+                        ) : (
+                          <span className="text-slate-700 text-[11px]">
+                            {p.fee_type || 'Scolarité'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-2 px-3 font-mono text-[10.5px] text-purple-700 font-bold whitespace-nowrap">
+                        {p.reference_number || '-'}
+                      </td>
+                      <td className="py-2 px-3 text-right font-black text-slate-900 font-mono whitespace-nowrap">
+                        {Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG
+                      </td>
+                      <td className="py-2 px-3 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle2 size={10} />
+                          Validé
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );

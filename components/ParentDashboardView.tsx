@@ -27,8 +27,11 @@ import {
   GraduationCap,
   Wallet,
   AlertCircle,
-  Download
+  Download,
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
+import { supabase } from '../supabase';
 import { UserProfile, SchoolType } from '../types';
 import { formatStudentName } from '../utils/formatters';
 import { PrintPreviewModal } from './PrintPreviewModal';
@@ -69,6 +72,11 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
   // Filters and search for payments
   const [paymentSearch, setPaymentSearch] = useState('');
   const [selectedChildFilter, setSelectedChildFilter] = useState<string>('all');
+  const [selectedFeeTypeFilter, setSelectedFeeTypeFilter] = useState<'all' | 'tuition' | 'wallet'>('all');
+
+  // Simulation test state
+  const [isSimulatingTranzak, setIsSimulatingTranzak] = useState<string | null>(null);
+  const [simulationSuccessCard, setSimulationSuccessCard] = useState<any | null>(null);
 
   // Modals state
   const [selectedPaymentForReceipt, setSelectedPaymentForReceipt] = useState<any | null>(null);
@@ -78,11 +86,72 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
   const [selectedChildForSchedule, setSelectedChildForSchedule] = useState<any | null>(null);
   const [showContactModal, setShowContactModal] = useState(false);
 
+  // Exécution du test de simulation de dépôt via l'API Tranzak (SAGACETECH)
+  const handleSimulateTranzakTest = async (child: any, testAmount: number = 100) => {
+    if (!child) return;
+    setIsSimulatingTranzak(child.id);
+    try {
+      const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const res = await fetch('/api/tranzak/simulate-deposit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          schoolId: school?.id || child.school_id,
+          studentId: child.id,
+          amount: testAmount,
+          operator: 'moncash',
+          customerName: `${child.first_name} ${child.last_name}`,
+          customerPhone: child.parent_phone || (user as any).phone || (user as any).phone_number || '50937000000'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSimulationSuccessCard({
+          childName: formatStudentName(child.last_name, child.first_name).fullName,
+          amount: data.amount,
+          reference: data.reference,
+          receiptNumber: data.receipt_number,
+          oldBalance: data.old_balance,
+          newBalance: data.new_balance,
+          timestamp: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        });
+        toast.success(`Dépôt test Tranzak de ${data.amount} HTG validé sur le compte école et crédité sur le portefeuille de ${child.first_name} !`);
+        if (onRefresh) {
+          onRefresh();
+        }
+      } else {
+        throw new Error(data.error || "Erreur lors de la simulation");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Échec de la simulation Tranzak");
+    } finally {
+      setIsSimulatingTranzak(null);
+    }
+  };
+
   // Filtered payments
   const filteredPayments = useMemo(() => {
     let list = parentStats.payments || [];
     if (selectedChildFilter !== 'all') {
       list = list.filter(p => p.student_id === selectedChildFilter);
+    }
+    if (selectedFeeTypeFilter === 'wallet') {
+      list = list.filter(p => 
+        p.fee_type === 'CREDIT_PORTEFEUILLE' || 
+        p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
+        (p.notes || '').toLowerCase().includes('portefeuille') ||
+        (p.description || '').toLowerCase().includes('portefeuille')
+      );
+    } else if (selectedFeeTypeFilter === 'tuition') {
+      list = list.filter(p => 
+        p.fee_type !== 'CREDIT_PORTEFEUILLE' && 
+        p.fee_type !== 'RECHARGE_PORTEFEUILLE' &&
+        !(p.notes || '').toLowerCase().includes('portefeuille')
+      );
     }
     if (paymentSearch.trim()) {
       const q = paymentSearch.toLowerCase().trim();
@@ -93,11 +162,12 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
           : '';
         const feeType = (p.fee_type || p.nature || p.type || p.description || '').toLowerCase();
         const method = (p.payment_method || '').toLowerCase();
-        return receiptNo.includes(q) || studentName.includes(q) || feeType.includes(q) || method.includes(q);
+        const refNo = (p.reference_number || p.moncash_order_id || '').toLowerCase();
+        return receiptNo.includes(q) || studentName.includes(q) || feeType.includes(q) || method.includes(q) || refNo.includes(q);
       });
     }
     return list;
-  }, [parentStats.payments, selectedChildFilter, paymentSearch]);
+  }, [parentStats.payments, selectedChildFilter, selectedFeeTypeFilter, paymentSearch]);
 
   // Latest payment
   const latestPayment = useMemo(() => {
@@ -284,6 +354,167 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* SECTION INTERACTIVE : PORTEFEUILLE NUMÉRIQUE & DÉPÔTS TRANZAK (SAGACETECH) */}
+      {/* ========================================================================= */}
+      {isWalletPaymentActive(school) && parentStats.children && parentStats.children.length > 0 && (
+        <div id="section-wallet-tranzak-portal" className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 text-white border border-indigo-500/30 shadow-lg space-y-4 relative overflow-hidden">
+          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 relative z-10">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20 shrink-0">
+                <Wallet size={22} className="text-slate-950" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
+                    Portefeuille Numérique &amp; Dépôts en Ligne
+                  </h3>
+                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Tranzak • SAGACETECH
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
+                    MonCash &amp; NatCash
+                  </span>
+                </div>
+                <p className="text-xs text-slate-300 font-medium mt-0.5 leading-relaxed">
+                  Rechargez le solde de l'élève pour la cantine et ses fournitures. Tout dépôt est perçu sur le compte Tranzak de l'établissement et crédité en temps réel.
+                </p>
+              </div>
+            </div>
+
+            {simulationSuccessCard && (
+              <button
+                type="button"
+                onClick={() => setSimulationSuccessCard(null)}
+                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1 self-start md:self-auto cursor-pointer"
+              >
+                <X size={12} />
+                <span>Fermer confirmation</span>
+              </button>
+            )}
+          </div>
+
+          {/* CARTE DE CONFIRMATION DE SIMULATION / SUCCÈS IMMÉDIAT */}
+          {simulationSuccessCard && (
+            <div className="bg-emerald-500/15 border-2 border-emerald-400/50 rounded-2xl p-4 text-emerald-100 space-y-2.5 animate-in zoom-in-95 duration-200">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-400/20">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black">
+                    <CheckCircle2 size={18} />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 block">
+                      Validation Immédiate • Compte École &amp; Portefeuille
+                    </span>
+                    <h4 className="text-sm font-black text-white">
+                      Dépôt Test Simulé avec Succès (+{simulationSuccessCard.amount} HTG)
+                    </h4>
+                  </div>
+                </div>
+                <span className="text-[11px] font-mono text-emerald-300 font-bold self-start sm:self-auto bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
+                  {simulationSuccessCard.timestamp}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Bénéficiaire</span>
+                  <span className="font-bold text-white truncate block">{simulationSuccessCard.childName}</span>
+                </div>
+                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Réf. Tranzak</span>
+                  <span className="font-mono font-bold text-amber-300 text-[11px] truncate block">{simulationSuccessCard.reference}</span>
+                </div>
+                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Reçu Officiel</span>
+                  <span className="font-mono font-bold text-emerald-300 truncate block">#{simulationSuccessCard.receiptNumber}</span>
+                </div>
+                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
+                  <span className="text-[10px] text-slate-400 block font-semibold">Nouveau Solde</span>
+                  <span className="font-black text-emerald-400 text-sm font-mono truncate block">{simulationSuccessCard.newBalance.toLocaleString()} HTG</span>
+                </div>
+              </div>
+
+              <p className="text-[11.5px] text-emerald-200/90 leading-relaxed pt-1">
+                ✓ <strong>Compte de l'école</strong> : Le montant de {simulationSuccessCard.amount} HTG est enregistré dans les écritures de l'établissement sous la référence <code className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">{simulationSuccessCard.reference}</code>.<br />
+                ✓ <strong>Portefeuille élève</strong> : Le solde a été mis à jour instantanément ({simulationSuccessCard.oldBalance.toLocaleString()} HTG → {simulationSuccessCard.newBalance.toLocaleString()} HTG).
+              </p>
+            </div>
+          )}
+
+          {/* GRILLE DES ENFANTS AVEC SOLDE PORTEFEUILLE & ACTIONS DE DÉPÔT / TEST */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+            {parentStats.children.map((child) => {
+              const { fullName } = formatStudentName(child.last_name, child.first_name);
+              const isSimulating = isSimulatingTranzak === child.id;
+
+              return (
+                <div 
+                  key={child.id}
+                  className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm">
+                        {child.first_name?.[0] || 'E'}{child.last_name?.[0] || 'N'}
+                      </div>
+                      <div className="min-w-0">
+                        <h4 className="text-sm font-bold text-white truncate">{fullName}</h4>
+                        <span className="text-[11px] text-slate-400 block truncate">
+                          {child.class?.name || 'Classe non assignée'} • Matr: {child.reference_number || 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Solde Actuel</span>
+                      <span className="text-base sm:text-lg font-black text-emerald-400 font-mono block">
+                        {(child.wallet_balance_htg || 0).toLocaleString()} <span className="text-xs text-emerald-300">HTG</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* BOUTONS D'ACTION : RECHARGE EN LIGNE + BOUTON TEST TRANZAK EXPLICITE */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-white/10">
+                    <button
+                      type="button"
+                      onClick={() => onTopUpStudentWallet(child)}
+                      className="w-full py-2.5 px-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                      title="Ouvrir le formulaire de recharge en ligne via MonCash / NatCash"
+                    >
+                      <Smartphone size={14} />
+                      <span>Recharger en Ligne</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSimulateTranzakTest(child, 100)}
+                      disabled={isSimulating}
+                      className="w-full py-2.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
+                      title="Simule un dépôt de test de 100 HTG via l'API Tranzak pour valider la réception sur le compte école et le crédit portefeuille"
+                    >
+                      {isSimulating ? (
+                        <>
+                          <Loader2 size={13} className="animate-spin text-amber-300" />
+                          <span>Validation Tranzak...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Sparkles size={13} className="text-amber-400" />
+                          <span>Tester Dépôt (+100 G)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* SECTION 1: SUIVI SCOLAIRE / PARCOURS ACADEMIQUE & ACTIONS */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4 lg:gap-5">
@@ -510,8 +741,58 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
             </p>
           </div>
 
-          {/* Search & Child filter pills */}
+          {/* Search & filters controls */}
           <div className="flex flex-wrap items-center gap-2">
+            {/* Onglets Filtres Nature Paiement */}
+            <div className="flex flex-wrap items-center gap-1 p-0.5 bg-slate-100 rounded-xl border border-slate-200/80">
+              <button
+                type="button"
+                onClick={() => setSelectedFeeTypeFilter('all')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedFeeTypeFilter === 'all'
+                    ? 'bg-white text-slate-900 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tous ({parentStats.payments?.length || 0})
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFeeTypeFilter('tuition')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                  selectedFeeTypeFilter === 'tuition'
+                    ? 'bg-white text-indigo-700 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Scolarité
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedFeeTypeFilter('wallet')}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedFeeTypeFilter === 'wallet'
+                    ? 'bg-white text-emerald-800 shadow-xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                <Wallet size={12} className="text-emerald-600" />
+                <span>Dépôts Portefeuille</span>
+                {(() => {
+                  const count = (parentStats.payments || []).filter(p => 
+                    p.fee_type === 'CREDIT_PORTEFEUILLE' || 
+                    p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
+                    (p.notes || '').toLowerCase().includes('portefeuille')
+                  ).length;
+                  return count > 0 ? (
+                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-black bg-emerald-100 text-emerald-800">
+                      {count}
+                    </span>
+                  ) : null;
+                })()}
+              </button>
+            </div>
+
             {parentStats.children.length > 1 && (
               <select
                 id="select-filter-child-payments"
@@ -559,8 +840,8 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                   <th className="py-2.5 px-3">N° Reçu</th>
                   <th className="py-2.5 px-3">Date</th>
                   <th className="py-2.5 px-3">{isAdvancedSchool ? "Étudiant" : "Élève"}</th>
-                  <th className="py-2.5 px-3">Type</th>
-                  <th className="py-2.5 px-3">Mode</th>
+                  <th className="py-2.5 px-3">Nature / Objet</th>
+                  <th className="py-2.5 px-3">Mode &amp; Réf</th>
                   <th className="py-2.5 px-3 text-right">Montant</th>
                   <th className="py-2.5 px-3 text-center">Statut</th>
                   <th className="py-2.5 px-3 text-center">Action</th>
@@ -577,6 +858,10 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                   const studentObj = p.student || parentStats.children.find(c => c.id === p.student_id);
                   const isMonCash = (p.payment_method || '').toLowerCase().includes('moncash');
                   const isNatcash = (p.payment_method || '').toLowerCase().includes('natcash');
+                  const isTranzak = (p.payment_method || '').toLowerCase().includes('tranzak') || (p.reference_number || '').startsWith('TZK-');
+                  const isWalletDeposit = p.fee_type === 'CREDIT_PORTEFEUILLE' || 
+                    p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
+                    (p.notes || '').toLowerCase().includes('portefeuille');
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/70 transition-colors">
@@ -599,18 +884,39 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
                         )}
                       </td>
                       <td className="py-2.5 px-3 font-semibold text-slate-700 text-[11px] sm:text-xs">
-                        {p.fee_type || p.nature || p.type || p.description || 'Scolarité'}
+                        {isWalletDeposit ? (
+                          <div className="flex flex-col items-start gap-0.5">
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                              <Wallet size={11} className="text-emerald-600 shrink-0" />
+                              Dépôt Portefeuille
+                            </span>
+                            <span className="text-[9.5px] text-slate-400">Cantine & Fournitures</span>
+                          </div>
+                        ) : (
+                          <span className="font-medium text-slate-800">
+                            {p.fee_type || p.nature || p.type || p.description || 'Scolarité'}
+                          </span>
+                        )}
                       </td>
                       <td className="py-2.5 px-3 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${
-                          isMonCash 
-                            ? 'bg-red-50 text-red-700 border-red-200'
-                            : isNatcash
-                            ? 'bg-amber-50 text-amber-700 border-amber-200'
-                            : 'bg-slate-100 text-slate-700 border-slate-200'
-                        }`}>
-                          {p.payment_method || 'Espèces'}
-                        </span>
+                        <div className="flex flex-col items-start gap-0.5">
+                          <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+                            isTranzak
+                              ? 'bg-purple-50 text-purple-700 border-purple-200'
+                              : isMonCash 
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : isNatcash
+                              ? 'bg-amber-50 text-amber-700 border-amber-200'
+                              : 'bg-slate-100 text-slate-700 border-slate-200'
+                          }`}>
+                            {p.payment_method || 'Espèces'}
+                          </span>
+                          {(p.reference_number || p.moncash_order_id) && (
+                            <span className="text-[9.5px] font-mono text-slate-400 truncate max-w-[120px]" title={p.reference_number || p.moncash_order_id}>
+                              Réf: {p.reference_number || p.moncash_order_id}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2.5 px-3 text-right font-black text-slate-900 whitespace-nowrap text-[11px] sm:text-xs">
                         {p.currency === 'USD' ? (
