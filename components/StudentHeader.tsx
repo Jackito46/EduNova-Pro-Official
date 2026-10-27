@@ -66,53 +66,57 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({ user }) => {
   return (
     <header 
       id="student-persistent-header"
-      className="sticky top-0 z-30 -mt-2 sm:-mt-3 mb-5 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-xs px-3.5 py-2.5 sm:px-5 sm:py-3 transition-all"
+      className="sticky top-0 z-30 -mt-1 sm:-mt-2 mb-3.5 bg-white/95 backdrop-blur-md border border-slate-200/90 rounded-2xl shadow-2xs px-3 py-2 sm:px-4 sm:py-2.5 transition-all"
     >
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         {/* Student Identity Display */}
-        <div className="flex items-center gap-3 min-w-0">
+        <Link 
+          to="/profil"
+          title="Consulter mon dossier étudiant" 
+          className="flex items-center gap-2.5 min-w-0 group hover:opacity-95 transition-opacity"
+        >
           <div className="relative shrink-0">
-            <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-blue-600 text-white font-black text-sm sm:text-base flex items-center justify-center shadow-xs border border-indigo-200">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-700 to-blue-600 text-white font-black text-xs sm:text-sm flex items-center justify-center shadow-2xs border border-indigo-200 group-hover:scale-105 transition-transform">
               {initials}
             </div>
             <span 
-              className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-emerald-500 border-2 border-white rounded-full" 
+              className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full" 
               title="Session élève active"
             />
           </div>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-md bg-indigo-50 text-indigo-700 border border-indigo-100">
-                <Sparkles size={10} className="text-indigo-500" />
+              <span className="inline-flex items-center gap-1 text-[9.5px] font-black uppercase tracking-wider px-1.5 py-0.2 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                <Sparkles size={9} className="text-indigo-500" />
                 Espace {terminology.student}
               </span>
-              <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200/70 truncate max-w-[150px] sm:max-w-xs">
-                <GraduationCap size={11} className="text-slate-500 shrink-0" />
-                {className}
+              <span className="inline-flex items-center gap-1 text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-700 border border-slate-200/70">
+                <GraduationCap size={10} className="text-slate-500 shrink-0" />
+                <span>{className}</span>
               </span>
               {matricule && (
-                <span className="hidden sm:inline-block text-[10px] font-mono text-slate-400">
+                <span className="hidden sm:inline-block text-[9.5px] font-mono text-slate-400">
                   Matricule: {matricule}
                 </span>
               )}
             </div>
 
-            {/* Dynamic Full Name */}
-            <div className="flex items-baseline gap-2 mt-0.5">
+            {/* Full Name without premature ellipsis */}
+            <div className="flex items-baseline gap-1.5 mt-0.5">
               <h2 
                 id="student-header-fullname"
-                className="text-sm sm:text-base lg:text-lg font-black text-slate-900 tracking-tight truncate" 
+                className="text-xs sm:text-sm lg:text-base font-black text-slate-900 tracking-tight whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px] sm:max-w-[320px] lg:max-w-none" 
                 title={formattedName.fullName}
               >
                 {formattedName.fullName}
               </h2>
             </div>
           </div>
-        </div>
+        </Link>
 
-        {/* Navigation Tabs - Permanent During Navigation */}
-        <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto custom-scrollbar py-0.5 -mx-1 px-1 shrink-0">
+        {/* Navigation Tabs - Compact segmented rhythm */}
+        <div className="flex items-center gap-1 sm:gap-1.5 overflow-x-auto custom-scrollbar py-0.5 -mx-1 px-1">
           {navItems.map((item) => {
             const isActive = location.pathname === item.path;
             const Icon = item.icon;
@@ -121,21 +125,21 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({ user }) => {
                 key={item.path}
                 id={`student-nav-${item.path.replace('/', '') || 'dashboard'}`}
                 to={item.path}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap shrink-0 min-h-[36px] ${
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] sm:text-xs font-bold transition-all whitespace-nowrap shrink-0 min-h-[32px] sm:min-h-[34px] cursor-pointer ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-xs'
-                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/60'
+                    : 'bg-slate-50 hover:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/70'
                 }`}
               >
-                <Icon size={14} className={isActive ? 'text-white' : 'text-slate-400'} />
+                <Icon size={13} className={isActive ? 'text-white' : 'text-slate-400'} />
                 <span>{item.name}</span>
               </Link>
             );
           })}
 
           {(activeYear?.label || (activeYear as any)?.name) && (
-            <div className="hidden xl:inline-flex items-center gap-1 text-[11px] font-bold text-slate-500 bg-slate-50 border border-slate-200/70 px-2.5 py-1.5 rounded-xl whitespace-nowrap ml-1">
-              <Calendar size={12} className="text-slate-400" />
+            <div className="hidden xl:inline-flex items-center gap-1 text-[10.5px] font-bold text-slate-500 bg-slate-50 border border-slate-200/70 px-2 py-1 rounded-xl whitespace-nowrap ml-0.5">
+              <Calendar size={11} className="text-slate-400" />
               <span>{activeYear?.label || (activeYear as any)?.name}</span>
             </div>
           )}

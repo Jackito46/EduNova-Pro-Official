@@ -85,11 +85,8 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const [completedBalance, setCompletedBalance] = useState<number | null>(null);
   const [copiedRef, setCopiedRef] = useState(false);
 
-  // Sécurité absolue : si le portefeuille ou MonCash est désactivé par l'administration, le modal ne s'ouvre pas
-  const isWalletActive = isWalletPaymentActive(contextSchool);
-  const isMonCashActive = isMonCashPaymentActive(contextSchool);
-
-  if (!isOpen || !isWalletActive || !isMonCashActive) return null;
+  // Le modal s'ouvre dès que l'utilisateur clique sur le bouton de recharge
+  if (!isOpen) return null;
 
   const effectiveAmount = isCustom ? (parseFloat(customAmount) || 0) : selectedAmount;
   const currentBalance = student.wallet_balance_htg || 0;

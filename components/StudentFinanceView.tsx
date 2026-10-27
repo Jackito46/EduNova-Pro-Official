@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { UserProfile } from '../types';
 import { useStudent } from '../hooks/useStudent';
 import { supabase } from '../supabase';
@@ -19,10 +19,12 @@ import {
   Wallet,
   ShieldCheck,
   Coins,
-  Activity
+  Smartphone,
+  Loader2
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
-import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
+import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import { isPaymentCompleted } from '../src/utils/payment';
 
 interface StudentFinanceViewProps {
@@ -39,7 +41,15 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [exchangeRate, setExchangeRate] = useState<number>(135.0);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns'>('all');
-  const [isDiagnosticOpen, setIsDiagnosticOpen] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number>(0);
+  const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
+  const [isSimulatingTranzak, setIsSimulatingTranzak] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (studentData?.wallet_balance_htg !== undefined) {
+      setWalletBalance(studentData.wallet_balance_htg || 0);
+    }
+  }, [studentData]);
 
   useEffect(() => {
     const fetchFinances = async () => {
@@ -118,6 +128,17 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           setAdHocCampaigns(studentCamps);
         }
 
+        // Rafraîchir le solde du portefeuille élève en direct depuis la base
+        const { data: latestStudent } = await supabase
+          .from('students')
+          .select('wallet_balance_htg')
+          .eq('id', studentData.id)
+          .maybeSingle();
+
+        if (latestStudent && latestStudent.wallet_balance_htg !== undefined) {
+          setWalletBalance(latestStudent.wallet_balance_htg || 0);
+        }
+
       } catch (err) {
         console.error("Error fetching finances: ", err);
       } finally {
@@ -125,7 +146,50 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
       }
     };
     fetchFinances();
-  }, [studentData, activeYear]);
+  }, [studentData, activeYear, user.school_id]);
+
+  // Simulation test directe via API Tranzak SAGETECK (+100 HTG)
+  const handleSimulateTranzakTest = async () => {
+    if (!studentData) return;
+    setIsSimulatingTranzak(true);
+    try {
+      const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const res = await fetch('/api/tranzak/simulate-deposit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          schoolId: school?.id || studentData.school_id || user.school_id,
+          studentId: studentData.id,
+          amount: 100,
+          operator: 'moncash',
+          customerName: `${studentData.first_name} ${studentData.last_name}`,
+          customerPhone: studentData.parent_phone || (user as any).phone || (user as any).phone_number || '50937000000'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setWalletBalance(data.new_balance);
+        toast.success(`Simulation Tranzak réussie ! +${data.amount} HTG crédités au portefeuille (Réf: ${data.reference})`);
+        // Actualiser l'historique des écritures
+        const { data: updatedPayments } = await supabase
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+          .eq('student_id', studentData.id)
+          .order('created_at', { ascending: false });
+        if (updatedPayments) setPayments(updatedPayments);
+      } else {
+        toast.error(data.error || 'Erreur lors de la simulation de dépôt');
+      }
+    } catch (err: any) {
+      toast.error('Erreur réseau lors de la simulation');
+    } finally {
+      setIsSimulatingTranzak(false);
+    }
+  };
 
   if (studentLoading || loading) {
     return (
@@ -319,21 +383,21 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   });
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-amber-100 text-amber-700 rounded-2xl shadow-sm">
-            <Receipt size={28} />
+    <div className="max-w-5xl mx-auto space-y-3.5 sm:space-y-4 pb-8 animate-in fade-in duration-200">
+      {/* Header Compact */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 pb-1 border-b border-slate-200/60">
+        <div className="flex items-center gap-2.5">
+          <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center border border-amber-200 shrink-0">
+            <Receipt size={17} />
           </div>
           <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">Mon Économat</h1>
-            <p className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mt-0.5">
-              <span>Situation financière pour l'année académique <strong className="text-slate-800">{activeYear?.label || '--'}</strong></span>
+            <h1 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Mon Économat</h1>
+            <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5 flex-wrap">
+              <span>Année académique : <strong className="text-slate-800">{activeYear?.label || '--'}</strong></span>
               {isMultiCurrency && (
                 <>
                   <span className="text-slate-300">•</span>
-                  <span className="text-indigo-600 font-mono font-bold bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                  <span className="text-indigo-700 font-mono font-bold bg-indigo-50 px-1.5 py-0.2 rounded text-[10.5px] border border-indigo-100">
                     Taux du jour : 1 USD = {exchangeRate} HTG
                   </span>
                 </>
@@ -341,25 +405,68 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             </p>
           </div>
         </div>
-
-        {isMultiCurrency && (
-          <button
-            type="button"
-            onClick={() => setIsDiagnosticOpen(true)}
-            className="self-start md:self-center px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl border border-indigo-200 transition-all flex items-center gap-2 shadow-xs cursor-pointer"
-          >
-            <Activity size={15} />
-            <span>Diagnostic Barème USD vs Engagement</span>
-          </button>
-        )}
       </div>
 
-      {/* Tabs Selector */}
-      <div className="flex bg-slate-100/80 p-1 rounded-2xl max-w-lg shadow-inner border border-slate-200/80 overflow-x-auto">
+      {/* Bannière Portefeuille Numérique de l'Élève & Renflouement en Ligne */}
+      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-200/90 rounded-2xl p-3 sm:p-3.5 shadow-2xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs shrink-0">
+            <Wallet size={20} />
+          </div>
+          <div>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">
+                Portefeuille Numérique
+              </span>
+              <span className="text-[10px] bg-emerald-100/90 text-emerald-800 font-bold px-1.5 py-0.2 rounded-md">
+                Solde Disponible
+              </span>
+            </div>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono flex items-baseline gap-1">
+              {(walletBalance || 0).toLocaleString()} <span className="text-xs font-bold text-slate-500">HTG</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowWalletTopUpModal(true)}
+            className="flex-1 sm:flex-none px-3.5 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            title="Recharger le portefeuille de l'élève en ligne via MonCash / Natcash / Tranzak"
+          >
+            <Smartphone size={14} />
+            <span>Renflouer mon Portefeuille</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSimulateTranzakTest}
+            disabled={isSimulatingTranzak}
+            className="px-3 py-2 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 border border-slate-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs disabled:opacity-50"
+            title="Simulation express de dépôt via l'API Tranzak SAGETECK (+100 HTG)"
+          >
+            {isSimulatingTranzak ? (
+              <>
+                <Loader2 size={13} className="animate-spin text-amber-500" />
+                <span>Simulation...</span>
+              </>
+            ) : (
+              <>
+                <Sparkles size={13} className="text-amber-500" />
+                <span>Test Dépôt (100 G)</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs Selector Compact */}
+      <div className="flex bg-slate-100/90 p-0.5 rounded-xl max-w-md shadow-2xs border border-slate-200/80 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveSection('all')}
-          className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex-1 py-1.5 px-2.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeSection === 'all'
               ? 'bg-white text-slate-950 shadow-xs border border-slate-200/60'
               : 'text-slate-500 hover:text-slate-800'
@@ -370,7 +477,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         <button
           type="button"
           onClick={() => setActiveSection('tuition')}
-          className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
+          className={`flex-1 py-1.5 px-2.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
             activeSection === 'tuition'
               ? 'bg-white text-slate-950 shadow-xs border border-slate-200/60'
               : 'text-slate-500 hover:text-slate-800'
@@ -382,7 +489,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           <button
             type="button"
             onClick={() => setActiveSection('misc')}
-            className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex-1 py-1.5 px-2.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap cursor-pointer ${
               activeSection === 'misc'
                 ? 'bg-white text-slate-950 shadow-xs border border-slate-200/60'
                 : 'text-slate-500 hover:text-slate-800'
@@ -395,7 +502,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           <button
             type="button"
             onClick={() => setActiveSection('campaigns')}
-            className={`flex-1 py-2 px-3 rounded-xl font-bold text-xs transition-all whitespace-nowrap relative cursor-pointer ${
+            className={`flex-1 py-1.5 px-2.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap relative cursor-pointer ${
               activeSection === 'campaigns'
                 ? 'bg-white text-slate-950 shadow-xs border border-slate-200/60'
                 : 'text-slate-500 hover:text-slate-800'
@@ -403,7 +510,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           >
             Campagnes
             {adHocCampaigns.length > 0 && (
-              <span className="ml-1.5 bg-blue-600 text-white font-black text-[9px] px-1.5 py-0.2 rounded-full">
+              <span className="ml-1 bg-blue-600 text-white font-black text-[9px] px-1.5 py-0.2 rounded-full">
                 {adHocCampaigns.length}
               </span>
             )}
@@ -411,53 +518,53 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         )}
       </div>
 
-      {/* Financial Overview Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in fade-in duration-300">
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-center">
-          <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">
+      {/* Financial Overview Cards Compact */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 animate-in fade-in duration-200">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
             {activeSection === 'all' ? 'Obligation Totale' : activeSection === 'tuition' ? 'Scolarité & Admission' : activeSection === 'misc' ? 'Frais Divers' : 'Frais de Campagnes'}
           </span>
-          <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">
+          <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
             {Math.round(displayedExpected).toLocaleString()} <span className="text-xs font-sans text-slate-500">HTG</span>
           </span>
           {activeSection === 'tuition' && totalDiscount > 0 && (
-            <span className="text-[10px] text-emerald-700 font-bold mt-1.5 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
+            <span className="text-[9.5px] text-emerald-700 font-bold mt-1 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
               Réduction de {totalDiscount.toLocaleString()} HTG incluse
             </span>
           )}
         </div>
 
-        <div className="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-center border-b-4 border-b-emerald-500 relative overflow-hidden">
-          <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Déjà Versé</span>
-          <span className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono">
+        <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center border-b-2 sm:border-b-4 border-b-emerald-500 relative overflow-hidden">
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Déjà Versé</span>
+          <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">
             {Math.round(displayedPaid).toLocaleString()} <span className="text-xs font-sans text-emerald-500">HTG</span>
           </span>
         </div>
 
-        <div className={`bg-white rounded-2xl p-5 border border-slate-200/80 shadow-xs flex flex-col items-center justify-center text-center border-b-4 ${displayedBalance <= 0 ? 'border-b-blue-500' : 'border-b-rose-500'}`}>
-          <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-1.5">Solde Restant</span>
+        <div className={`bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center border-b-2 sm:border-b-4 ${displayedBalance <= 0 ? 'border-b-blue-500' : 'border-b-rose-500'}`}>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Solde Restant</span>
           {displayedBalance <= 0 ? (
-            <span className="text-2xl sm:text-3xl font-black font-mono text-blue-600">Réglé (À Jour)</span>
+            <span className="text-xl sm:text-2xl font-black font-mono text-blue-600">Réglé (À Jour)</span>
           ) : displayedRemainingUSD > 0 && displayedRemainingHTG > 0 ? (
             <div className="space-y-0.5">
-              <span className="text-lg sm:text-xl font-black font-mono text-rose-600 block">
+              <span className="text-base sm:text-lg font-black font-mono text-rose-600 block">
                 {Math.round(displayedRemainingHTG).toLocaleString()} HTG + ${displayedRemainingUSD.toFixed(2)} USD
               </span>
-              <span className="text-[11px] text-slate-400 font-mono block">
+              <span className="text-[10px] text-slate-400 font-mono block">
                 (≈ {Math.round(displayedBalance).toLocaleString()} HTG)
               </span>
             </div>
           ) : displayedRemainingUSD > 0 ? (
             <div className="space-y-0.5">
-              <span className="text-2xl sm:text-3xl font-black font-mono text-rose-600 block">
+              <span className="text-xl sm:text-2xl font-black font-mono text-rose-600 block">
                 ${displayedRemainingUSD.toFixed(2)} USD
               </span>
-              <span className="text-[11px] text-slate-400 font-mono block">
+              <span className="text-[10px] text-slate-400 font-mono block">
                 (≈ {Math.round(displayedBalance).toLocaleString()} HTG)
               </span>
             </div>
           ) : (
-            <span className="text-2xl sm:text-3xl font-black font-mono text-rose-600">
+            <span className="text-xl sm:text-2xl font-black font-mono text-rose-600">
               {Math.round(displayedBalance).toLocaleString()} HTG
             </span>
           )}
@@ -466,49 +573,49 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
       {/* Detailed Fee Cards */}
       {(activeSection === 'all' || activeSection === 'tuition' || activeSection === 'misc') && (
-        <div className="space-y-4">
+        <div className="space-y-2.5 sm:space-y-3">
           <div className="flex items-center gap-2">
-            <FileText size={18} className="text-indigo-600" />
-            <h2 className="text-base font-bold text-slate-900">Grille Tarifaire des Frais Scolaires</h2>
+            <FileText size={15} className="text-indigo-600" />
+            <h2 className="text-xs sm:text-sm font-black text-slate-900">Grille Tarifaire des Frais Scolaires</h2>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
             {/* Admission Fee Card */}
             {(activeSection === 'all' || activeSection === 'tuition') && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
+              <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between hover:border-slate-300 transition-colors">
                 <div>
-                  <div className="border-b border-slate-100 pb-3 flex items-center justify-between mb-3.5">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Admission / Inscription</h3>
-                    <span className="text-[10px] font-bold uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                  <div className="border-b border-slate-100 pb-2 flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight">Admission / Inscription</h3>
+                    <span className="text-[9.5px] font-bold uppercase text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
                       Fixe
                     </span>
                   </div>
-                  <div className="space-y-2.5">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-start text-xs">
-                      <span className="text-slate-500">Montant Requis</span>
+                      <span className="text-slate-400">Montant Requis</span>
                       <div className="text-right font-mono">
                         <span className="font-bold text-slate-800 block">{admissionDetails.plannedNative}</span>
-                        {admissionDetails.plannedEquiv && <span className="text-[10px] text-slate-400 block">{admissionDetails.plannedEquiv}</span>}
+                        {admissionDetails.plannedEquiv && <span className="text-[9.5px] text-slate-400 block">{admissionDetails.plannedEquiv}</span>}
                       </div>
                     </div>
                     <div className="flex justify-between items-start text-xs">
-                      <span className="text-slate-500">Montant Versé</span>
+                      <span className="text-slate-400">Montant Versé</span>
                       <div className="text-right font-mono">
                         <span className="font-bold text-emerald-600 block">{admissionDetails.paidNative}</span>
-                        {admissionDetails.paidEquiv && <span className="text-[10px] text-emerald-500 block">{admissionDetails.paidEquiv}</span>}
+                        {admissionDetails.paidEquiv && <span className="text-[9.5px] text-emerald-500 block">{admissionDetails.paidEquiv}</span>}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3 mt-3 flex justify-between items-center text-xs font-bold font-mono">
-                  <span className="text-slate-600 font-sans">Reste à payer</span>
+                <div className="border-t border-slate-100 pt-2 mt-2 flex justify-between items-center text-xs font-bold font-mono">
+                  <span className="text-slate-600 font-sans text-[11px]">Reste à payer</span>
                   <div className="text-right">
                     <span className={admissionDetails.isPaid ? 'text-emerald-600' : 'text-rose-600'}>
                       {admissionDetails.remainingNative}
                     </span>
                     {!admissionDetails.isPaid && admissionDetails.remainingEquiv && (
-                      <span className="text-[10px] text-rose-400 block">{admissionDetails.remainingEquiv}</span>
+                      <span className="text-[9.5px] text-rose-400 block">{admissionDetails.remainingEquiv}</span>
                     )}
                   </div>
                 </div>
@@ -517,31 +624,31 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
             {/* Tuition Fee Card */}
             {(activeSection === 'all' || activeSection === 'tuition') && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
+              <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between hover:border-slate-300 transition-colors">
                 <div>
-                  <div className="border-b border-slate-100 pb-3 flex items-center justify-between mb-3.5">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Scolarité (Écolage)</h3>
-                    <span className="text-[10px] font-bold uppercase text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-100">
+                  <div className="border-b border-slate-100 pb-2 flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight">Scolarité (Écolage)</h3>
+                    <span className="text-[9.5px] font-bold uppercase text-indigo-700 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
                       Académique
                     </span>
                   </div>
-                  <div className="space-y-2.5">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-start text-xs">
-                      <span className="text-slate-500">Montant Exigé</span>
+                      <span className="text-slate-400">Montant Exigé</span>
                       <div className="text-right font-mono">
                         <span className="font-bold text-slate-800 block">{tuitionDetails.plannedNative}</span>
-                        {tuitionDetails.plannedEquiv && <span className="text-[10px] text-slate-400 block">{tuitionDetails.plannedEquiv}</span>}
+                        {tuitionDetails.plannedEquiv && <span className="text-[9.5px] text-slate-400 block">{tuitionDetails.plannedEquiv}</span>}
                       </div>
                     </div>
                     <div className="flex justify-between items-start text-xs">
-                      <span className="text-slate-500">Montant Versé</span>
+                      <span className="text-slate-400">Montant Versé</span>
                       <div className="text-right font-mono">
                         <span className="font-bold text-emerald-600 block">{tuitionDetails.paidNative}</span>
-                        {tuitionDetails.paidEquiv && <span className="text-[10px] text-emerald-500 block">{tuitionDetails.paidEquiv}</span>}
+                        {tuitionDetails.paidEquiv && <span className="text-[9.5px] text-emerald-500 block">{tuitionDetails.paidEquiv}</span>}
                       </div>
                     </div>
                     {totalDiscount > 0 && (
-                      <div className="flex justify-between items-center text-[11px] text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                      <div className="flex justify-between items-center text-[10.5px] text-emerald-700 bg-emerald-50 p-1.5 rounded-lg border border-emerald-100">
                         <span>Réduction accordée</span>
                         <span className="font-bold">-{totalDiscount.toLocaleString()} HTG</span>
                       </div>
@@ -549,14 +656,14 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3 mt-3 flex justify-between items-center text-xs font-bold font-mono">
-                  <span className="text-slate-600 font-sans">Reste à payer</span>
+                <div className="border-t border-slate-100 pt-2 mt-2 flex justify-between items-center text-xs font-bold font-mono">
+                  <span className="text-slate-600 font-sans text-[11px]">Reste à payer</span>
                   <div className="text-right">
                     <span className={tuitionDetails.isPaid ? 'text-emerald-600' : 'text-rose-600'}>
                       {tuitionDetails.remainingNative}
                     </span>
                     {!tuitionDetails.isPaid && tuitionDetails.remainingEquiv && (
-                      <span className="text-[10px] text-rose-400 block">{tuitionDetails.remainingEquiv}</span>
+                      <span className="text-[9.5px] text-rose-400 block">{tuitionDetails.remainingEquiv}</span>
                     )}
                   </div>
                 </div>
@@ -565,40 +672,40 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
             {/* Misc Fee Card (Frais Divers) */}
             {hasMiscFee && (activeSection === 'all' || activeSection === 'misc') && (
-              <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-colors">
+              <div className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3.5 sm:p-4 shadow-2xs flex flex-col justify-between hover:border-slate-300 transition-colors">
                 <div>
-                  <div className="border-b border-slate-100 pb-3 flex items-center justify-between mb-3.5">
-                    <h3 className="text-xs font-bold text-slate-800 uppercase tracking-tight">Frais Divers Obligatoires</h3>
-                    <span className="text-[10px] font-bold uppercase text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-100">
+                  <div className="border-b border-slate-100 pb-2 flex items-center justify-between mb-2">
+                    <h3 className="text-xs font-black text-slate-800 uppercase tracking-tight">Frais Divers Obligatoires</h3>
+                    <span className="text-[9.5px] font-bold uppercase text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-100">
                       Multi-Devises
                     </span>
                   </div>
-                  <div className="space-y-2.5">
+                  <div className="space-y-1.5">
                     <div className="flex justify-between items-start text-xs">
-                      <span className="text-slate-500">Montant Requis</span>
+                      <span className="text-slate-400">Montant Requis</span>
                       <div className="text-right font-mono">
                         <span className="font-bold text-slate-800 block">{miscDetails.plannedNative}</span>
-                        {miscDetails.plannedEquiv && <span className="text-[10px] text-slate-400 block">{miscDetails.plannedEquiv}</span>}
+                        {miscDetails.plannedEquiv && <span className="text-[9.5px] text-slate-400 block">{miscDetails.plannedEquiv}</span>}
                       </div>
                     </div>
                     <div className="flex justify-between items-start text-xs">
-                      <span className="text-slate-500">Montant Versé</span>
+                      <span className="text-slate-400">Montant Versé</span>
                       <div className="text-right font-mono">
                         <span className="font-bold text-emerald-600 block">{miscDetails.paidNative}</span>
-                        {miscDetails.paidEquiv && <span className="text-[10px] text-emerald-500 block">{miscDetails.paidEquiv}</span>}
+                        {miscDetails.paidEquiv && <span className="text-[9.5px] text-emerald-500 block">{miscDetails.paidEquiv}</span>}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="border-t border-slate-100 pt-3 mt-3 flex justify-between items-center text-xs font-bold font-mono">
-                  <span className="text-slate-600 font-sans">Reste à payer</span>
+                <div className="border-t border-slate-100 pt-2 mt-2 flex justify-between items-center text-xs font-bold font-mono">
+                  <span className="text-slate-600 font-sans text-[11px]">Reste à payer</span>
                   <div className="text-right">
                     <span className={miscDetails.isPaid ? 'text-emerald-600' : 'text-rose-600'}>
                       {miscDetails.remainingNative}
                     </span>
                     {!miscDetails.isPaid && miscDetails.remainingEquiv && (
-                      <span className="text-[10px] text-rose-400 block">{miscDetails.remainingEquiv}</span>
+                      <span className="text-[9.5px] text-rose-400 block">{miscDetails.remainingEquiv}</span>
                     )}
                   </div>
                 </div>
@@ -610,60 +717,60 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
       {/* Ad-hoc Campaigns Section */}
       {(activeSection === 'all' || activeSection === 'campaigns') && campaignBreakdowns.length > 0 && (
-        <div className="space-y-4">
+        <div className="space-y-2.5 sm:space-y-3">
           <div className="flex items-center gap-2">
-            <Sparkles size={18} className="text-blue-600" />
-            <h2 className="text-base font-bold text-slate-900">Campagnes & Activités Spéciales</h2>
+            <Sparkles size={15} className="text-blue-600" />
+            <h2 className="text-xs sm:text-sm font-black text-slate-900">Campagnes &amp; Activités Spéciales</h2>
           </div>
 
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 gap-2.5">
             {campaignBreakdowns.map(({ camp, details, isCustomized }) => (
-              <div key={camp.id} className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col md:flex-row justify-between items-start md:items-center gap-4 hover:border-slate-300 transition-colors">
-                <div className="space-y-1.5 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-black uppercase text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
+              <div key={camp.id} className="bg-white rounded-xl sm:rounded-2xl border border-slate-200/90 p-3 sm:p-3.5 shadow-2xs flex flex-col md:flex-row justify-between items-start md:items-center gap-3 hover:border-slate-300 transition-colors">
+                <div className="space-y-1 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="text-[9.5px] font-black uppercase text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-100">
                       {camp.type || 'Frais Spéciaux'}
                     </span>
                     {isCustomized && (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded border border-amber-100 flex items-center gap-1">
-                        <Sparkles size={10} />
+                      <span className="text-[9.5px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.2 rounded border border-amber-100 flex items-center gap-1">
+                        <Sparkles size={9} />
                         Tarif Personnalisé
                       </span>
                     )}
                   </div>
-                  <h3 className="text-sm font-bold text-slate-900">{camp.name}</h3>
+                  <h3 className="text-xs sm:text-sm font-bold text-slate-900">{camp.name}</h3>
                   {isCustomized && camp.adjustment_reason && (
-                    <p className="text-xs text-slate-500 bg-slate-50 p-2 rounded-lg border border-slate-100 flex items-start gap-1.5 max-w-xl">
-                      <Info size={13} className="text-slate-400 shrink-0 mt-0.5" />
+                    <p className="text-[11px] text-slate-500 bg-slate-50 p-1.5 rounded-lg border border-slate-100 flex items-start gap-1 max-w-xl">
+                      <Info size={11} className="text-slate-400 shrink-0 mt-0.5" />
                       <span><strong>Ajustement :</strong> {camp.adjustment_reason}</span>
                     </p>
                   )}
                   {camp.due_date && (
-                    <p className="text-[11px] text-slate-400 flex items-center gap-1">
-                      <Calendar size={12} />
-                      Date d'échéance : {new Date(camp.due_date).toLocaleDateString('fr-FR')}
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Calendar size={11} />
+                      Échéance : {new Date(camp.due_date).toLocaleDateString('fr-FR')}
                     </p>
                   )}
                 </div>
 
-                <div className="flex flex-wrap gap-2.5 shrink-0 w-full md:w-auto justify-between md:justify-end items-center font-mono">
-                  <div className="text-center px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-100 min-w-[90px]">
-                    <span className="block text-[9px] font-black text-slate-400 uppercase font-sans">Exigé</span>
+                <div className="flex flex-wrap gap-2 shrink-0 w-full md:w-auto justify-between md:justify-end items-center font-mono">
+                  <div className="text-center px-2.5 py-1 bg-slate-50 rounded-xl border border-slate-100 min-w-[85px]">
+                    <span className="block text-[8.5px] font-black text-slate-400 uppercase font-sans">Exigé</span>
                     <span className="text-xs font-bold text-slate-800 block">{details.plannedNative}</span>
-                    {details.plannedEquiv && <span className="text-[9px] text-slate-400 block">{details.plannedEquiv}</span>}
+                    {details.plannedEquiv && <span className="text-[8.5px] text-slate-400 block">{details.plannedEquiv}</span>}
                   </div>
-                  <div className="text-center px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-100 min-w-[90px]">
-                    <span className="block text-[9px] font-black text-emerald-600 uppercase font-sans">Payé</span>
+                  <div className="text-center px-2.5 py-1 bg-emerald-50 rounded-xl border border-emerald-100 min-w-[85px]">
+                    <span className="block text-[8.5px] font-black text-emerald-600 uppercase font-sans">Payé</span>
                     <span className="text-xs font-bold text-emerald-600 block">{details.paidNative}</span>
-                    {details.paidEquiv && <span className="text-[9px] text-emerald-500 block">{details.paidEquiv}</span>}
+                    {details.paidEquiv && <span className="text-[8.5px] text-emerald-500 block">{details.paidEquiv}</span>}
                   </div>
-                  <div className={`text-center px-3 py-1.5 rounded-xl border min-w-[90px] ${details.isPaid ? 'bg-blue-50 border-blue-100' : 'bg-rose-50 border-rose-100'}`}>
-                    <span className="block text-[9px] font-black uppercase font-sans text-slate-400">Solde</span>
+                  <div className={`text-center px-2.5 py-1 rounded-xl border min-w-[85px] ${details.isPaid ? 'bg-blue-50 border-blue-100' : 'bg-rose-50 border-rose-100'}`}>
+                    <span className="block text-[8.5px] font-black uppercase font-sans text-slate-400">Solde</span>
                     <span className={`text-xs font-bold block ${details.isPaid ? 'text-blue-600' : 'text-rose-600'}`}>
                       {details.remainingNative}
                     </span>
                     {!details.isPaid && details.remainingEquiv && (
-                      <span className="text-[9px] text-rose-400 block">{details.remainingEquiv}</span>
+                      <span className="text-[8.5px] text-rose-400 block">{details.remainingEquiv}</span>
                     )}
                   </div>
                 </div>
@@ -673,16 +780,16 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         </div>
       )}
 
-      {/* Payments History Table with Detailed Multi-Currency Columns & Tooltips */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+      {/* Payments History Table Compact */}
+      <div className="bg-white rounded-2xl border border-slate-200/90 shadow-2xs overflow-hidden">
+        <div className="p-3 sm:p-3.5 border-b border-slate-100 flex items-center justify-between bg-slate-50/60">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Historique des Paiements & Versements</h2>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Journal certifié avec détail du montant payé, taux de change historique et contrevaleur
+            <h2 className="text-xs sm:text-sm font-black text-slate-900">Historique des Paiements &amp; Versements</h2>
+            <p className="text-[10.5px] text-slate-400 mt-0.5">
+              Journal certifié avec détail du montant payé, taux de change et contrevaleur
             </p>
           </div>
-          <span className="text-xs font-bold text-slate-600 bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200">
+          <span className="text-[10.5px] font-bold text-slate-600 bg-white px-2 py-0.5 rounded-md border border-slate-200">
             {displayedPayments.length} versement{displayedPayments.length > 1 ? 's' : ''}
           </span>
         </div>
@@ -856,14 +963,31 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         )}
       </div>
 
-      {isDiagnosticOpen && (
-        <StudentCurrencyDiagnosticModal
-          isOpen={isDiagnosticOpen}
-          onClose={() => setIsDiagnosticOpen(false)}
-          studentId={studentData?.id || 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c'}
-          studentName={studentData ? `${studentData.last_name} ${studentData.first_name}` : 'AUGUSTIN Djenny'}
-          studentClass={studentData?.class?.name || 'NS II'}
-          currentExchangeRate={exchangeRate}
+      {/* Modal de Renflouement Express du Portefeuille Élève */}
+      {showWalletTopUpModal && studentData && (
+        <StudentWalletTopUpModal
+          isOpen={showWalletTopUpModal}
+          onClose={() => setShowWalletTopUpModal(false)}
+          student={{
+            id: studentData.id,
+            first_name: studentData.first_name,
+            last_name: studentData.last_name,
+            reference_number: studentData.reference_number,
+            class_name: studentData.class?.name,
+            wallet_balance_htg: walletBalance,
+            parent_name: studentData.parent_name,
+            parent_phone: studentData.parent_phone,
+            school_id: studentData.school_id || school?.id || user.school_id
+          }}
+          schoolName={school?.name}
+          schoolId={studentData.school_id || school?.id || user.school_id}
+          onSuccess={(newBalance, paymentRecord) => {
+            setWalletBalance(newBalance);
+            if (paymentRecord) {
+              setPayments(prev => [paymentRecord, ...prev]);
+            }
+            toast.success(`Portefeuille renfloué avec succès ! Nouveau solde : ${newBalance.toLocaleString()} HTG`);
+          }}
         />
       )}
     </div>

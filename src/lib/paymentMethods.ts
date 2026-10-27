@@ -46,7 +46,7 @@ export const DEFAULT_PAYMENT_METHODS: PaymentMethodConfig[] = [
     code: 'MonCash',
     name: 'MonCash (Digicel)',
     description: 'Paiement électronique via portefeuille MonCash.',
-    enabled: false, // Disabled by default until administration configures and activates it
+    enabled: true, // Enabled for mobile payment & student wallet top-ups
     requires_bank: false,
     requires_reference: true,
     requires_deposit_date: false,
