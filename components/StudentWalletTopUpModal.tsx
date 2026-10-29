@@ -121,6 +121,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
     setError(null);
     try {
       const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
       const res = await fetch('/api/tranzak/simulate-deposit', {
         method: 'POST',
         headers: {
@@ -130,17 +131,22 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         body: JSON.stringify({
           schoolId: effectiveSchoolId,
           studentId: student.id,
+          studentName: studentFullName,
+          referenceNumber: student.reference_number || '',
           amount: effectiveAmount,
           operator: 'moncash',
           customerPhone: displayPhone,
-          customerName: `${student.first_name} ${student.last_name}`
+          customerName: studentFullName
         })
       });
 
       const data = await res.json();
       if (res.ok && data.success) {
         toast.success(data.message || "Dépôt test Tranzak simulé avec succès !");
-        handlePaymentConfirmed(data.payment_record || { transaction_reference: data.reference });
+        handlePaymentConfirmed(
+          data.payment_record || { transaction_reference: data.reference, amount: data.amount },
+          data.new_balance
+        );
       } else {
         throw new Error(data.error || "Erreur simulation dépôt Tranzak");
       }
@@ -228,9 +234,9 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   };
 
   // Traitement du succès de la recharge
-  const handlePaymentConfirmed = async (payment: any) => {
+  const handlePaymentConfirmed = async (payment: any, explicitNewBalance?: number) => {
     setIsWaitingModalOpen(false);
-    const newBal = currentBalance + effectiveAmount;
+    const newBal = explicitNewBalance !== undefined ? explicitNewBalance : currentBalance + effectiveAmount;
     setCompletedBalance(newBal);
     setConfirmedPayment(payment || { transaction_reference: activeOrderId });
 

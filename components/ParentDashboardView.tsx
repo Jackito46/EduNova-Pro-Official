@@ -101,9 +101,11 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
         body: JSON.stringify({
           schoolId: school?.id || child.school_id,
           studentId: child.id,
+          studentName: `${child.first_name || ''} ${child.last_name || ''}`.trim(),
+          referenceNumber: child.reference_number || '',
           amount: testAmount,
           operator: 'moncash',
-          customerName: `${child.first_name} ${child.last_name}`,
+          customerName: `${child.first_name || ''} ${child.last_name || ''}`.trim(),
           customerPhone: child.parent_phone || (user as any).phone || (user as any).phone_number || '50937000000'
         })
       });
@@ -177,6 +179,16 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
     return null;
   }, [parentStats.payments]);
 
+  // Cumul des soldes portefeuilles de tous les enfants
+  const totalWalletHTG = useMemo(() => {
+    return (parentStats.children || []).reduce((acc, c) => acc + (Number(c.wallet_balance_htg) || 0), 0);
+  }, [parentStats.children]);
+
+  // Enfant ayant le solde dû le plus urgent
+  const childWithDue = useMemo(() => {
+    return (parentStats.children || []).find(c => Number(c.dueAmount || 0) > 0) || parentStats.children?.[0];
+  }, [parentStats.children]);
+
   // Execute print for receipt
   const executePrintReceipt = () => {
     window.print();
@@ -240,488 +252,489 @@ export const ParentDashboardView: React.FC<ParentDashboardViewProps> = ({
         <div className="absolute top-0 right-0 -mt-8 -mr-8 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* KPI METRIC CARDS */}
-      <div id="parent-kpi-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5 lg:gap-4">
-        {/* Card 1: Children count or Student status */}
-        <div id="parent-kpi-children" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 shadow-2xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-blue-100 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-slate-400">
+      {/* ========================================================================= */}
+      {/* 1. BANDEAU DES ACTIONS PRIORITAIRES (QUICK ACTIONS HUB)                  */}
+      {/* ========================================================================= */}
+      <div id="parent-quick-actions-hub" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 shadow-2xs border border-slate-200/80">
+        <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse"></div>
+            <h2 className="text-xs sm:text-sm font-black uppercase tracking-wider text-slate-800">
+              Actions Prioritaires &amp; Démarches Rapides
+            </h2>
+          </div>
+          <span className="text-[11px] font-bold text-slate-400">
+            {parentStats.children.length} {parentStats.children.length > 1 ? 'élèves rattachés' : 'élève rattaché'}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-2.5">
+          {/* Action 1 : Renflouer le portefeuille */}
+          <button
+            type="button"
+            onClick={() => {
+              if (parentStats.children.length > 0) {
+                onTopUpStudentWallet(parentStats.children[0]);
+              }
+            }}
+            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-red-50 to-rose-50/60 hover:from-red-100/80 hover:to-rose-100/80 border border-red-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+            title="Recharger le portefeuille de l'élève en ligne via MonCash / NatCash / Tranzak"
+          >
+            <div className="w-9 h-9 rounded-xl bg-red-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+              <Smartphone size={18} />
+            </div>
+            <span className="text-xs font-black text-slate-900 leading-tight">Renflouer Portefeuille</span>
+            <span className="text-[10px] font-bold text-red-600 mt-0.5">MonCash / Tranzak</span>
+          </button>
+
+          {/* Action 2 : Régulariser la scolarité */}
+          <button
+            type="button"
+            onClick={() => {
+              if (childWithDue) {
+                setSelectedChildForStatement(childWithDue);
+              }
+            }}
+            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50/60 hover:from-indigo-100/80 hover:to-blue-100/80 border border-indigo-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+            title="Consulter l'échéancier et régulariser la scolarité"
+          >
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+              <Coins size={18} />
+            </div>
+            <span className="text-xs font-black text-slate-900 leading-tight">Payer Scolarité</span>
+            <span className="text-[10px] font-bold text-indigo-600 mt-0.5">
+              {parentStats.totalDue > 0 ? `${parentStats.totalDue.toLocaleString()} G dû` : 'À jour'}
+            </span>
+          </button>
+
+          {/* Action 3 : Relevé de compte */}
+          <button
+            type="button"
+            onClick={() => {
+              if (parentStats.children.length > 0) {
+                setSelectedChildForStatement(parentStats.children[0]);
+              }
+            }}
+            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50/60 hover:from-emerald-100/80 hover:to-teal-100/80 border border-emerald-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+            title="Consulter le relevé financier officiel avec ventilation détaillée"
+          >
+            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+              <FileText size={18} />
+            </div>
+            <span className="text-xs font-black text-slate-900 leading-tight">Relevé de Compte</span>
+            <span className="text-[10px] font-bold text-emerald-700 mt-0.5">Bilan Financier</span>
+          </button>
+
+          {/* Action 4 : Dernier reçu certifié */}
+          <button
+            type="button"
+            onClick={() => {
+              if (latestPayment) {
+                setSelectedPaymentForReceipt(latestPayment);
+              } else {
+                const el = document.getElementById('section-payments-history');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }
+            }}
+            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50/60 hover:from-amber-100/80 hover:to-yellow-100/80 border border-amber-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+            title="Visualiser et réimprimer le dernier reçu officiel scellé"
+          >
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+              <Receipt size={18} />
+            </div>
+            <span className="text-xs font-black text-slate-900 leading-tight">Dernier Reçu</span>
+            <span className="text-[10px] font-bold text-amber-700 mt-0.5">
+              {latestPayment ? `#${latestPayment.receipt_number || 'Reçu'}` : 'Historique'}
+            </span>
+          </button>
+
+          {/* Action 5 : Horaires & Emploi du temps */}
+          <button
+            type="button"
+            onClick={() => {
+              if (parentStats.children.length > 0) {
+                setSelectedChildForSchedule(parentStats.children[0]);
+              }
+              setShowScheduleModal(true);
+            }}
+            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50/60 hover:from-purple-100/80 hover:to-violet-100/80 border border-purple-200/70 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+            title="Consulter le planning et les horaires de cours de la classe"
+          >
+            <div className="w-9 h-9 rounded-xl bg-purple-600 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+              <Calendar size={18} />
+            </div>
+            <span className="text-xs font-black text-slate-900 leading-tight">Emploi du Temps</span>
+            <span className="text-[10px] font-bold text-purple-700 mt-0.5">Planning Hebdo</span>
+          </button>
+
+          {/* Action 6 : Contacter l'école */}
+          <button
+            type="button"
+            onClick={() => setShowContactModal(true)}
+            className="group flex flex-col items-center justify-center p-3 rounded-xl sm:rounded-2xl bg-gradient-to-br from-slate-50 to-slate-100 hover:from-slate-100 hover:to-slate-200 border border-slate-200/80 transition-all text-center cursor-pointer shadow-2xs active:scale-95"
+            title="Contacter la direction, le secrétariat ou l'économat"
+          >
+            <div className="w-9 h-9 rounded-xl bg-slate-800 text-white flex items-center justify-center shadow-xs group-hover:scale-110 transition-transform mb-1.5">
+              <MessageCircle size={18} />
+            </div>
+            <span className="text-xs font-black text-slate-900 leading-tight">Contacter l'École</span>
+            <span className="text-[10px] font-bold text-slate-600 mt-0.5">Assistance &amp; Bureau</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ========================================================================= */}
+      {/* 2. KPI METRIC CARDS SYNTHÉTIQUES                                          */}
+      {/* ========================================================================= */}
+      <div id="parent-kpi-grid" className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+        {/* Card 1: Children count */}
+        <div id="parent-kpi-children" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">
               {isAdvancedSchool ? "Mon Dossier" : "Mes Enfants"}
             </span>
-            <div className="p-1.5 sm:p-2 bg-blue-50 text-blue-600 rounded-xl sm:rounded-2xl shadow-2xs border border-blue-100/50">
-              {isAdvancedSchool ? <GraduationCap size={16} /> : <Baby size={16} />}
+            <div className="w-8 h-8 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center border border-blue-100">
+              {isAdvancedSchool ? <GraduationCap size={15} /> : <Baby size={15} />}
             </div>
           </div>
           <div>
-            <p className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            <p className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight font-mono">
               {isAdvancedSchool ? (parentStats.childrenCount > 0 ? "Actif" : "Non assigné") : parentStats.childrenCount}
             </p>
-            <p className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-500 truncate">
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500 truncate">
               {parentStats.children?.length === 1
-                ? `${formatStudentName(parentStats.children[0].last_name, parentStats.children[0].first_name).fullName}${parentStats.children[0].class?.name ? ` (${parentStats.children[0].class.name})` : ''}`
-                : (isAdvancedSchool 
-                    ? (parentStats.children?.[0]?.class?.name ? `Classe: ${parentStats.children[0].class.name}` : "Dossier académique")
-                    : `${parentStats.childrenCount} ${terminology.students.toLowerCase()}`)}
+                ? `${formatStudentName(parentStats.children[0].last_name, parentStats.children[0].first_name).fullName}`
+                : `${parentStats.childrenCount} ${terminology.students.toLowerCase()}`}
             </p>
           </div>
         </div>
 
         {/* Card 2: Total Paid */}
-        <div id="parent-kpi-paid" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 shadow-2xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-emerald-100 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-slate-400">Total Versé</span>
-            <div className="p-1.5 sm:p-2 bg-emerald-50 text-emerald-600 rounded-xl sm:rounded-2xl shadow-2xs border border-emerald-100/50">
-              <Coins size={16} />
+        <div id="parent-kpi-paid" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Total Versé</span>
+            <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center border border-emerald-100">
+              <Coins size={15} />
             </div>
           </div>
           <div>
-            <p className="text-2xl sm:text-3xl font-black text-emerald-600 tracking-tight">
+            <p className="text-xl sm:text-2xl font-black text-emerald-600 tracking-tight font-mono">
               {parentStats.totalPaid.toLocaleString()} G
             </p>
-            <p className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-400 truncate">
-              {parentStats.payments?.length || 0} versement{(parentStats.payments?.length || 0) > 1 ? 's' : ''}
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-400 truncate">
+              {parentStats.payments?.length || 0} versement{(parentStats.payments?.length || 0) > 1 ? 's certifiés' : ' certifié'}
             </p>
           </div>
         </div>
 
         {/* Card 3: Remaining Balance */}
-        <div id="parent-kpi-due" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 shadow-2xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-rose-100 transition-all duration-300">
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-slate-400">Solde Restant</span>
-            <div className={`p-1.5 sm:p-2 rounded-xl sm:rounded-2xl shadow-2xs border ${parentStats.totalDue > 0 ? 'bg-rose-50 text-rose-600 border-rose-100/50' : 'bg-emerald-50 text-emerald-600 border-emerald-100/50'}`}>
-              <TrendingDown size={16} />
+        <div id="parent-kpi-due" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Solde Scolarité</span>
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center border ${parentStats.totalDue > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+              <TrendingDown size={15} />
             </div>
           </div>
           <div>
-            <p className={`text-2xl sm:text-3xl font-black tracking-tight ${parentStats.totalDue > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+            <p className={`text-xl sm:text-2xl font-black tracking-tight font-mono ${parentStats.totalDue > 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
               {parentStats.totalDue.toLocaleString()} G
             </p>
-            <p className="mt-1 text-[11px] sm:text-xs font-semibold text-slate-400 truncate">
-              {parentStats.totalDue > 0 ? "À régulariser" : "À jour"}
+            <p className="mt-0.5 text-[11px] font-bold truncate">
+              {parentStats.totalDue > 0 ? (
+                <span className="text-rose-600">À régulariser</span>
+              ) : (
+                <span className="text-emerald-600">✓ 100% à jour</span>
+              )}
             </p>
           </div>
         </div>
 
-        {/* Card 4: Latest Receipt & History shortcut */}
-        <div 
-          id="parent-kpi-receipt"
-          onClick={() => {
-            if (latestPayment) {
-              setSelectedPaymentForReceipt(latestPayment);
-            } else {
-              const el = document.getElementById('section-payments-history');
-              if (el) el.scrollIntoView({ behavior: 'smooth' });
-            }
-          }}
-          className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 md:p-5 shadow-2xs border border-slate-100/90 flex flex-col justify-between hover:shadow-md hover:border-amber-200 transition-all duration-300 cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-2 sm:mb-3">
-            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-widest text-slate-400">
-              {latestPayment ? "Dernier Reçu" : "Historique"}
-            </span>
-            <div className="p-1.5 sm:p-2 bg-amber-50 text-amber-600 rounded-xl sm:rounded-2xl shadow-2xs border border-amber-100/50 group-hover:scale-110 transition-transform">
-              <Receipt size={16} />
+        {/* Card 4: Total Wallet across all children */}
+        <div id="parent-kpi-wallet" className="bg-white rounded-2xl sm:rounded-3xl p-3.5 sm:p-4 border border-slate-200/80 shadow-2xs flex flex-col justify-between hover:shadow-md transition-all">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-400">Portefeuilles Famille</span>
+            <div className="w-8 h-8 bg-cyan-50 text-cyan-600 rounded-xl flex items-center justify-center border border-cyan-100">
+              <Wallet size={15} />
             </div>
           </div>
           <div>
-            {latestPayment ? (
-              <>
-                <p className="text-lg sm:text-xl font-black text-slate-900 tracking-tight truncate">
-                  #{latestPayment.receipt_number || 'Reçu'}
-                </p>
-                <p className="mt-0.5 text-[11px] sm:text-xs font-bold text-amber-700 truncate">
-                  {latestPayment.currency === 'USD' ? (
-                    <span>
-                      ${Number(latestPayment.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD
-                      <span className="text-[10px] text-amber-600 font-semibold ml-1">
-                        (≈ {Number(latestPayment.amount_htg_equivalent || (Number(latestPayment.amount || 0) * (latestPayment.exchange_rate_applied || 140))).toLocaleString()} HTG)
-                      </span>
-                    </span>
-                  ) : (
-                    <span>{Number(latestPayment.amount_htg_equivalent || latestPayment.amount || 0).toLocaleString()} HTG</span>
-                  )}
-                </p>
-                <p className="mt-0.5 text-[10px] sm:text-[11px] text-indigo-600 font-bold flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                  Imprimer <ChevronRight size={11} />
-                </p>
-              </>
-            ) : (
-              <>
-                <p className="text-base sm:text-lg font-black text-slate-900 tracking-tight">Aucun versement</p>
-                <p className="mt-1 text-[11px] text-slate-400">Reçus ici</p>
-              </>
-            )}
+            <p className="text-xl sm:text-2xl font-black text-cyan-700 tracking-tight font-mono">
+              {totalWalletHTG.toLocaleString()} G
+            </p>
+            <p className="mt-0.5 text-[11px] font-semibold text-slate-500 truncate">
+              Solde disponible (Cantine &amp; fournitures)
+            </p>
           </div>
         </div>
       </div>
 
       {/* ========================================================================= */}
-      {/* SECTION INTERACTIVE : PORTEFEUILLE NUMÉRIQUE & DÉPÔTS TRANZAK (SAGACETECH) */}
+      {/* NOTIFICATION DE SUCCÈS SIMULATION TRANZAK DIRECT (si active)              */}
       {/* ========================================================================= */}
-      {isWalletPaymentActive(school) && parentStats.children && parentStats.children.length > 0 && (
-        <div id="section-wallet-tranzak-portal" className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-5 md:p-6 text-white border border-indigo-500/30 shadow-lg space-y-4 relative overflow-hidden">
-          <div className="absolute top-0 right-0 -mt-8 -mr-8 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 relative z-10">
-            <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-amber-500 to-emerald-500 flex items-center justify-center text-slate-950 font-black shadow-md shadow-amber-500/20 shrink-0">
-                <Wallet size={22} className="text-slate-950" />
+      {simulationSuccessCard && (
+        <div className="bg-emerald-500/15 border-2 border-emerald-400/50 rounded-2xl p-4 text-emerald-950 space-y-2.5 animate-in zoom-in-95 duration-200 bg-white">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-200">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center font-black">
+                <CheckCircle2 size={18} />
               </div>
               <div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-base sm:text-lg font-black text-white tracking-tight">
-                    Portefeuille Numérique &amp; Dépôts en Ligne
-                  </h3>
-                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    Tranzak • SAGACETECH
-                  </span>
-                  <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold bg-red-500/20 text-red-300 border border-red-500/30">
-                    MonCash &amp; NatCash
-                  </span>
-                </div>
-                <p className="text-xs text-slate-300 font-medium mt-0.5 leading-relaxed">
-                  Rechargez le solde de l'élève pour la cantine et ses fournitures. Tout dépôt est perçu sur le compte Tranzak de l'établissement et crédité en temps réel.
-                </p>
+                <span className="text-[10px] font-black uppercase tracking-wider text-emerald-800 block">
+                  Validation Immédiate • Compte École &amp; Portefeuille
+                </span>
+                <h4 className="text-sm font-black text-slate-900">
+                  Dépôt Test Tranzak Validé (+{simulationSuccessCard.amount} HTG)
+                </h4>
               </div>
             </div>
-
-            {simulationSuccessCard && (
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-mono text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                {simulationSuccessCard.timestamp}
+              </span>
               <button
                 type="button"
                 onClick={() => setSimulationSuccessCard(null)}
-                className="px-2.5 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all flex items-center gap-1 self-start md:self-auto cursor-pointer"
+                className="p-1 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 cursor-pointer"
               >
-                <X size={12} />
-                <span>Fermer confirmation</span>
+                <X size={14} />
               </button>
-            )}
+            </div>
           </div>
 
-          {/* CARTE DE CONFIRMATION DE SIMULATION / SUCCÈS IMMÉDIAT */}
-          {simulationSuccessCard && (
-            <div className="bg-emerald-500/15 border-2 border-emerald-400/50 rounded-2xl p-4 text-emerald-100 space-y-2.5 animate-in zoom-in-95 duration-200">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-emerald-400/20">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-emerald-500 text-slate-950 flex items-center justify-center font-black">
-                    <CheckCircle2 size={18} />
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black uppercase tracking-wider text-emerald-300 block">
-                      Validation Immédiate • Compte École &amp; Portefeuille
-                    </span>
-                    <h4 className="text-sm font-black text-white">
-                      Dépôt Test Simulé avec Succès (+{simulationSuccessCard.amount} HTG)
-                    </h4>
-                  </div>
-                </div>
-                <span className="text-[11px] font-mono text-emerald-300 font-bold self-start sm:self-auto bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
-                  {simulationSuccessCard.timestamp}
-                </span>
-              </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 block font-semibold">Bénéficiaire</span>
+              <span className="font-bold text-slate-900 truncate block">{simulationSuccessCard.childName}</span>
+            </div>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 block font-semibold">Réf. Tranzak</span>
+              <span className="font-mono font-bold text-amber-700 text-[11px] truncate block">{simulationSuccessCard.reference}</span>
+            </div>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 block font-semibold">Reçu Officiel</span>
+              <span className="font-mono font-bold text-emerald-700 truncate block">#{simulationSuccessCard.receiptNumber}</span>
+            </div>
+            <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-200">
+              <span className="text-[10px] text-slate-400 block font-semibold">Nouveau Solde</span>
+              <span className="font-black text-emerald-700 text-sm font-mono truncate block">{simulationSuccessCard.newBalance.toLocaleString()} HTG</span>
+            </div>
+          </div>
+        </div>
+      )}
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-slate-400 block font-semibold">Bénéficiaire</span>
-                  <span className="font-bold text-white truncate block">{simulationSuccessCard.childName}</span>
-                </div>
-                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-slate-400 block font-semibold">Réf. Tranzak</span>
-                  <span className="font-mono font-bold text-amber-300 text-[11px] truncate block">{simulationSuccessCard.reference}</span>
-                </div>
-                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-slate-400 block font-semibold">Reçu Officiel</span>
-                  <span className="font-mono font-bold text-emerald-300 truncate block">#{simulationSuccessCard.receiptNumber}</span>
-                </div>
-                <div className="bg-black/20 p-2.5 rounded-xl border border-white/5">
-                  <span className="text-[10px] text-slate-400 block font-semibold">Nouveau Solde</span>
-                  <span className="font-black text-emerald-400 text-sm font-mono truncate block">{simulationSuccessCard.newBalance.toLocaleString()} HTG</span>
-                </div>
-              </div>
-
-              <p className="text-[11.5px] text-emerald-200/90 leading-relaxed pt-1">
-                ✓ <strong>Compte de l'école</strong> : Le montant de {simulationSuccessCard.amount} HTG est enregistré dans les écritures de l'établissement sous la référence <code className="font-mono text-white bg-black/30 px-1 py-0.2 rounded">{simulationSuccessCard.reference}</code>.<br />
-                ✓ <strong>Portefeuille élève</strong> : Le solde a été mis à jour instantanément ({simulationSuccessCard.oldBalance.toLocaleString()} HTG → {simulationSuccessCard.newBalance.toLocaleString()} HTG).
+      {/* ========================================================================= */}
+      {/* 3. CENTRE DE CONTRÔLE UNIFIÉ DES ENFANTS (CARTES ACTIONNABLES)           */}
+      {/* ========================================================================= */}
+      <div id="section-children-control-center" className="space-y-3 sm:space-y-3.5">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center border border-indigo-100">
+              <Baby size={16} />
+            </div>
+            <div>
+              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+                {isAdvancedSchool ? "Mon Centre de Contrôle Académique" : "Centre de Contrôle de Mes Enfants"}
+              </h3>
+              <p className="text-xs text-slate-500 font-medium">
+                Vue complète : scolarité, solde portefeuille, relevé et recharge pour chaque élève
               </p>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* GRILLE DES ENFANTS AVEC SOLDE PORTEFEUILLE & ACTIONS DE DÉPÔT / TEST */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 relative z-10">
+        {parentStats.children.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-2xl sm:rounded-3xl border border-dashed border-slate-200">
+            <Users className="mx-auto text-slate-300 mb-2" size={32} />
+            <h4 className="text-sm font-bold text-slate-700">Aucun élève rattaché pour le moment</h4>
+            <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+              Contactez le secrétariat pour associer votre adresse email à la fiche de votre enfant.
+            </p>
+            <button
+              onClick={() => setShowContactModal(true)}
+              className="mt-3 px-4 py-2 bg-indigo-600 text-white text-xs font-bold rounded-xl hover:bg-indigo-700 transition-all cursor-pointer shadow-xs"
+            >
+              Contacter le secrétariat
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3.5 sm:gap-4">
             {parentStats.children.map((child) => {
               const { fullName } = formatStudentName(child.last_name, child.first_name);
               const isSimulating = isSimulatingTranzak === child.id;
+              const due = Number(child.dueAmount || 0);
+              const paid = Number(child.paidAmount || 0);
+              const expected = Number(child.expectedAmount || 0);
+              const progressPct = expected > 0 ? Math.min(100, Math.round((paid / expected) * 100)) : 100;
+              const walletBal = Number(child.wallet_balance_htg || 0);
 
               return (
-                <div 
+                <div
                   key={child.id}
-                  className="bg-white/5 hover:bg-white/10 border border-white/10 rounded-2xl p-4 transition-all flex flex-col justify-between space-y-3"
+                  className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/80 p-4 sm:p-5 shadow-2xs hover:shadow-md transition-all flex flex-col justify-between space-y-3.5 group"
                 >
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-sm">
+                  {/* Identité de l'élève */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-indigo-500 via-indigo-600 to-blue-700 text-white font-black text-sm flex items-center justify-center shrink-0 shadow-xs">
                         {child.first_name?.[0] || 'E'}{child.last_name?.[0] || 'N'}
                       </div>
                       <div className="min-w-0">
-                        <h4 className="text-sm font-bold text-white truncate">{fullName}</h4>
-                        <span className="text-[11px] text-slate-400 block truncate">
-                          {child.class?.name || 'Classe non assignée'} • Matr: {child.reference_number || 'N/A'}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="text-sm sm:text-base font-black text-slate-900 truncate">
+                            {fullName}
+                          </h4>
+                          <span className="text-[10px] font-bold px-2 py-0.2 bg-emerald-50 text-emerald-700 rounded-md border border-emerald-200">
+                            Inscrit
+                          </span>
+                        </div>
+                        <p className="text-xs text-slate-500 font-semibold mt-0.5 truncate">
+                          {child.class?.name || 'Classe non assignée'}
+                          {child.reference_number && (
+                            <span className="text-slate-400 font-mono font-normal ml-1.5">
+                              • Matr: {child.reference_number}
+                            </span>
+                          )}
+                        </p>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <span className="text-[10px] text-slate-400 uppercase font-black tracking-wider block">Solde Actuel</span>
-                      <span className="text-base sm:text-lg font-black text-emerald-400 font-mono block">
-                        {(child.wallet_balance_htg || 0).toLocaleString()} <span className="text-xs text-emerald-300">HTG</span>
-                      </span>
+                    <div className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedChildForDetail(child)}
+                        className="px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold text-xs rounded-xl border border-slate-200 transition-all cursor-pointer flex items-center gap-1 shadow-2xs"
+                        title="Voir la fiche détaillée"
+                      >
+                        <span>Fiche</span>
+                        <ChevronRight size={12} />
+                      </button>
                     </div>
                   </div>
 
-                  {/* BOUTONS D'ACTION : RECHARGE EN LIGNE + BOUTON TEST TRANZAK EXPLICITE */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1 border-t border-white/10">
-                    <button
-                      type="button"
-                      onClick={() => onTopUpStudentWallet(child)}
-                      className="w-full py-2.5 px-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                      title="Ouvrir le formulaire de recharge en ligne via MonCash / NatCash"
-                    >
-                      <Smartphone size={14} />
-                      <span>Recharger en Ligne</span>
-                    </button>
+                  {/* Volet Financier Double : Scolarité & Portefeuille */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    {/* Colonne 1 : Scolarité */}
+                    <div className="p-3 rounded-2xl bg-slate-50/80 border border-slate-200/70 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                          Scolarité
+                        </span>
+                        <span className={`text-[10px] font-black px-1.5 py-0.2 rounded-md ${
+                          due <= 0 
+                            ? 'bg-emerald-100 text-emerald-800' 
+                            : 'bg-rose-100 text-rose-800'
+                        }`}>
+                          {due <= 0 ? '✓ Soldé' : `Reste ${due.toLocaleString()} G`}
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1">
+                        <div className="flex items-baseline justify-between text-xs">
+                          <span className="text-slate-500 font-medium">Déjà réglé :</span>
+                          <span className="font-bold text-slate-900 font-mono">{paid.toLocaleString()} G</span>
+                        </div>
+                        {expected > 0 && (
+                          <div className="w-full bg-slate-200 rounded-full h-1.5 overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full transition-all duration-500 ${due <= 0 ? 'bg-emerald-500' : 'bg-indigo-600'}`} 
+                              style={{ width: `${progressPct}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={() => handleSimulateTranzakTest(child, 100)}
-                      disabled={isSimulating}
-                      className="w-full py-2.5 px-3 bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 hover:text-white border border-amber-500/40 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 disabled:opacity-50"
-                      title="Simule un dépôt de test de 100 HTG via l'API Tranzak pour valider la réception sur le compte école et le crédit portefeuille"
-                    >
-                      {isSimulating ? (
-                        <>
-                          <Loader2 size={13} className="animate-spin text-amber-300" />
-                          <span>Validation Tranzak...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Sparkles size={13} className="text-amber-400" />
-                          <span>Tester Dépôt (+100 G)</span>
-                        </>
-                      )}
-                    </button>
+                    {/* Colonne 2 : Portefeuille Numérique */}
+                    <div className="p-3 rounded-2xl bg-gradient-to-br from-emerald-50/90 to-teal-50/60 border border-emerald-200/80 flex flex-col justify-between">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <div className="flex items-center gap-1">
+                          <Wallet size={13} className="text-emerald-700" />
+                          <span className="text-[10px] font-black text-emerald-800 uppercase tracking-wider">
+                            Portefeuille
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-1.5 py-0.2 rounded-md">
+                          Cantine &amp; Ravitaillement
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xs text-slate-500 font-medium">Solde actuel :</span>
+                        <span className="text-base font-black text-emerald-700 font-mono">
+                          {walletBal.toLocaleString()} <span className="text-xs font-bold text-emerald-800">HTG</span>
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions Principales Directes de l'Enfant */}
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      {/* Action 1 : Renflouer Portefeuille MonCash (Priorité Absolue) */}
+                      <button
+                        type="button"
+                        onClick={() => onTopUpStudentWallet(child)}
+                        className="py-2.5 px-3 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                        title="Recharger le portefeuille de l'élève en ligne via MonCash / Tranzak"
+                      >
+                        <Smartphone size={14} />
+                        <span>Renflouer Portefeuille</span>
+                      </button>
+
+                      {/* Action 2 : Relevé de Compte & Dettes */}
+                      <button
+                        type="button"
+                        onClick={() => setSelectedChildForStatement(child)}
+                        className="py-2.5 px-3 bg-white hover:bg-slate-50 border border-slate-200 hover:border-indigo-300 text-slate-700 hover:text-indigo-700 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                        title="Consulter le relevé financier des versements de cet élève"
+                      >
+                        <FileText size={14} className="text-indigo-600" />
+                        <span>Relevé des Frais</span>
+                      </button>
+                    </div>
+
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {/* Action 3 : Emploi du temps */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSelectedChildForSchedule(child);
+                          setShowScheduleModal(true);
+                        }}
+                        className="flex-1 py-1.5 px-2.5 bg-slate-50 hover:bg-slate-100 border border-slate-200/80 text-slate-700 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer"
+                        title="Horaires de cours de sa classe"
+                      >
+                        <Calendar size={13} className="text-purple-600" />
+                        <span>Horaires</span>
+                      </button>
+
+                      {/* Action 4 : Simulation Dépôt Test Tranzak (+100 HTG) */}
+                      <button
+                        type="button"
+                        onClick={() => handleSimulateTranzakTest(child, 100)}
+                        disabled={isSimulating}
+                        className="flex-1 py-1.5 px-2.5 bg-amber-50/70 hover:bg-amber-100/80 text-amber-900 border border-amber-200/80 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 disabled:opacity-50"
+                        title="Test express de dépôt via l'API Tranzak SAGETECK (+100 HTG) pour vérifier la bonne réception"
+                      >
+                        {isSimulating ? (
+                          <>
+                            <Loader2 size={13} className="animate-spin text-amber-600" />
+                            <span>Validation...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={13} className="text-amber-600" />
+                            <span>Tester Dépôt (+100 G)</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
-      )}
-
-      {/* SECTION 1: SUIVI SCOLAIRE / PARCOURS ACADEMIQUE & ACTIONS */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3.5 sm:gap-4 lg:gap-5">
-        {/* Left 2 Cols: Children list with quick actions */}
-        <div id="section-children-overview" className="lg:col-span-2 bg-white rounded-2xl sm:rounded-3xl shadow-2xs border border-slate-100/90 p-4 sm:p-5 md:p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mb-4 sm:mb-5">
-            <div>
-              <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
-                {isAdvancedSchool ? "Mon Parcours Académique & Dossier" : "Suivi Scolaire des Enfants"}
-              </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
-                {isAdvancedSchool
-                  ? "Détail de votre scolarité, solde portefeuille et versements d'inscription"
-                  : "Progression académique, portefeuille électronique et situation financière par enfant"}
-              </p>
-            </div>
-            {parentStats.children.length > 0 && (
-              <span className="px-2.5 py-0.5 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 self-start sm:self-auto border border-slate-200/60">
-                {parentStats.children.length} {isAdvancedSchool ? "dossier" : terminology.students.toLowerCase()}
-              </span>
-            )}
-          </div>
-
-          <div className="space-y-2.5 sm:space-y-3">
-            {parentStats.children.map((child, idx) => (
-              <div 
-                key={child.id || idx} 
-                id={`child-card-${child.id || idx}`}
-                className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-xl sm:rounded-2xl bg-slate-50/70 border border-slate-100/90 hover:bg-slate-50 transition-all duration-200 gap-3"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 sm:w-11 sm:h-11 bg-gradient-to-br from-indigo-500 to-indigo-700 text-white rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-sm sm:text-base shadow-2xs shrink-0">
-                    {child.first_name?.[0] || 'E'}{child.last_name?.[0] || 'N'}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-black text-slate-900 truncate">
-                      {formatStudentName(child.last_name, child.first_name).fullName}
-                    </p>
-                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
-                      <span className="text-[11px] sm:text-xs text-slate-500 font-semibold bg-white px-2 py-0.5 rounded-md border border-slate-200/70">
-                        {child.class?.name || 'Classe non assignée'}
-                      </span>
-                      {child.reference_number && (
-                        <span className="text-[10px] sm:text-[11px] text-slate-400 font-mono">
-                          Matr: {child.reference_number}
-                        </span>
-                      )}
-                      {isWalletPaymentActive(school) && (
-                        <span className="text-[11px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/60 flex items-center gap-1">
-                          👛 {(child.wallet_balance_htg || 0).toLocaleString()} HTG
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Individual Action Buttons */}
-                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 shrink-0">
-                  {/* Top-up MonCash */}
-                  {isWalletPaymentActive(school) && isMonCashPaymentActive(school) && (
-                    <button
-                      type="button"
-                      id={`btn-topup-${child.id}`}
-                      onClick={() => onTopUpStudentWallet(child)}
-                      className="px-2.5 sm:px-3 py-1.5 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-lg sm:rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-                      title="Recharger le portefeuille de l'élève par MonCash"
-                    >
-                      <Smartphone size={13} />
-                      <span>MonCash</span>
-                    </button>
-                  )}
-
-                  {/* Relevé financier de l'enfant */}
-                  <button 
-                    type="button"
-                    id={`btn-statement-${child.id}`}
-                    onClick={() => setSelectedChildForStatement(child)}
-                    className="px-2.5 sm:px-3 py-1.5 bg-white border border-slate-200 hover:border-indigo-300 hover:text-indigo-600 rounded-lg sm:rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-50 shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
-                    title="Voir l'état des frais et versements de cet élève"
-                  >
-                    <FileText size={13} className="text-indigo-600" />
-                    <span>Relevé</span>
-                  </button>
-
-                  {/* Fiche scolaire / Détails */}
-                  <button 
-                    type="button"
-                    id={`btn-detail-${child.id}`}
-                    onClick={() => setSelectedChildForDetail(child)}
-                    className="px-2.5 sm:px-3 py-1.5 bg-indigo-50 border border-indigo-100 hover:bg-indigo-100 rounded-lg sm:rounded-xl text-xs font-bold text-indigo-700 shadow-2xs transition-all flex items-center gap-1 cursor-pointer"
-                    title="Détails du profil et cursus"
-                  >
-                    <span>Fiche</span>
-                  </button>
-                </div>
-              </div>
-            ))}
-
-            {parentStats.children.length === 0 && (
-              <div className="py-8 text-center bg-slate-50/50 rounded-xl sm:rounded-2xl border border-dashed border-slate-200">
-                <Users className="mx-auto text-slate-300 mb-1.5" size={28} />
-                <p className="text-xs sm:text-sm font-bold text-slate-700">
-                  {isAdvancedSchool
-                    ? "Aucun dossier étudiant actif trouvé pour votre compte."
-                    : "Aucun enfant trouvé associé à votre adresse email ou compte."}
-                </p>
-                <p className="text-[11px] sm:text-xs text-slate-400 mt-1 max-w-sm mx-auto">
-                  Si vos enfants sont déjà inscrits à l'école, veuillez contacter le secrétariat pour lier votre compte parent à leur fiche élève.
-                </p>
-                <button
-                  onClick={() => setShowContactModal(true)}
-                  className="mt-3 px-3.5 py-1.5 bg-indigo-600 text-white text-xs font-bold rounded-lg sm:rounded-xl hover:bg-indigo-700 transition-all cursor-pointer"
-                >
-                  Contacter le secrétariat
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Right Col: Quick Access & School Services */}
-        <div id="section-quick-services" className="bg-white rounded-2xl sm:rounded-3xl shadow-2xs border border-slate-100/90 p-4 sm:p-5 md:p-6 flex flex-col justify-between">
-          <div>
-            <h3 className="text-base sm:text-lg font-black text-slate-900 tracking-tight mb-1">
-              {isAdvancedSchool ? "Services Étudiant" : "Espace Famille"}
-            </h3>
-            <p className="text-xs text-slate-400 mb-3 sm:mb-4">
-              Services et accès rapide pour vos démarches au quotidien
-            </p>
-
-            <div className="space-y-2 sm:space-y-2.5">
-              {/* Receipts quick modal */}
-              <button
-                type="button"
-                id="btn-quick-receipts"
-                onClick={() => {
-                  const el = document.getElementById('section-payments-history');
-                  if (el) el.scrollIntoView({ behavior: 'smooth' });
-                }}
-                className="w-full flex items-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl hover:bg-amber-50/60 border border-slate-100 hover:border-amber-200 transition-all group shadow-2xs text-left cursor-pointer bg-slate-50/40"
-              >
-                <div className="p-2 bg-amber-100/80 text-amber-700 rounded-lg sm:rounded-xl group-hover:scale-105 transition-transform shrink-0">
-                  <Receipt size={16} />
-                </div>
-                <div className="ml-2.5 min-w-0">
-                  <p className="text-xs font-bold text-slate-900">Mes Factures & Reçus</p>
-                  <p className="text-[11px] text-slate-400 truncate">Consulter et réimprimer les versements</p>
-                </div>
-                <ChevronRight size={15} className="ml-auto text-slate-300 group-hover:text-amber-500 transition-colors shrink-0" />
-              </button>
-
-              {/* Class Schedule modal */}
-              <button
-                type="button"
-                id="btn-quick-schedule"
-                onClick={() => {
-                  if (parentStats.children.length > 0) {
-                    setSelectedChildForSchedule(parentStats.children[0]);
-                  }
-                  setShowScheduleModal(true);
-                }}
-                className="w-full flex items-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl hover:bg-blue-50/60 border border-slate-100 hover:border-blue-200 transition-all group shadow-2xs text-left cursor-pointer bg-slate-50/40"
-              >
-                <div className="p-2 bg-blue-100/80 text-blue-700 rounded-lg sm:rounded-xl group-hover:scale-105 transition-transform shrink-0">
-                  <Calendar size={16} />
-                </div>
-                <div className="ml-2.5 min-w-0">
-                  <p className="text-xs font-bold text-slate-900">Horaires des Cours</p>
-                  <p className="text-[11px] text-slate-400 truncate">Emploi du temps des classes</p>
-                </div>
-                <ChevronRight size={15} className="ml-auto text-slate-300 group-hover:text-blue-500 transition-colors shrink-0" />
-              </button>
-
-              {/* Contact School modal */}
-              <button
-                type="button"
-                id="btn-quick-contact"
-                onClick={() => setShowContactModal(true)}
-                className="w-full flex items-center p-2.5 sm:p-3 rounded-xl sm:rounded-2xl hover:bg-purple-50/60 border border-slate-100 hover:border-purple-200 transition-all group shadow-2xs text-left cursor-pointer bg-slate-50/40"
-              >
-                <div className="p-2 bg-purple-100/80 text-purple-700 rounded-lg sm:rounded-xl group-hover:scale-105 transition-transform shrink-0">
-                  <MessageCircle size={16} />
-                </div>
-                <div className="ml-2.5 min-w-0">
-                  <p className="text-xs font-bold text-slate-900">Contacter l'École</p>
-                  <p className="text-[11px] text-slate-400 truncate">Secrétariat, Économat & Direction</p>
-                </div>
-                <ChevronRight size={15} className="ml-auto text-slate-300 group-hover:text-purple-500 transition-colors shrink-0" />
-              </button>
-            </div>
-          </div>
-
-          {/* Assistance card */}
-          {isMonCashPaymentActive(school) && isWalletPaymentActive(school) && (
-            <div className="mt-3.5 sm:mt-4 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-indigo-50/60 border border-indigo-100">
-              <div className="flex items-start gap-2.5">
-                <ShieldCheck className="text-indigo-600 shrink-0 mt-0.5" size={16} />
-                <div className="text-xs text-indigo-950">
-                  <p className="font-bold">Paiement Mobile Sécurisé</p>
-                  <p className="text-indigo-800/80 mt-0.5 text-[11px] leading-relaxed">
-                    Rechargez le portefeuille par MonCash avec validation instantanée.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* SECTION 2: HISTORIQUE ET JOURNAL DES VERSEMENTS DÉJÀ EFFECTUÉS */}

@@ -163,9 +163,11 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         body: JSON.stringify({
           schoolId: school?.id || studentData.school_id || user.school_id,
           studentId: studentData.id,
+          studentName: `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim(),
+          referenceNumber: studentData.reference_number || '',
           amount: 100,
           operator: 'moncash',
-          customerName: `${studentData.first_name} ${studentData.last_name}`,
+          customerName: `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim(),
           customerPhone: studentData.parent_phone || (user as any).phone || (user as any).phone_number || '50937000000'
         })
       });
