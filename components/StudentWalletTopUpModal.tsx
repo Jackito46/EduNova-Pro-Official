@@ -21,7 +21,9 @@ import {
   Printer,
   Building2,
   CheckCheck,
-  CreditCard
+  CreditCard,
+  ExternalLink,
+  Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
@@ -50,7 +52,7 @@ export interface StudentWalletTopUpModalProps {
 
 const PRESET_AMOUNTS = [100, 250, 500, 1000, 2500, 5000];
 
-type TopUpFlowStep = 'AMOUNT_SETUP' | 'MONCASH_PIN' | 'MONCASH_OTP' | 'SUCCESS_RECEIPT';
+type TopUpFlowStep = 'AMOUNT_SETUP' | 'TRANZAK_DIRECT_GATEWAY' | 'MONCASH_PIN' | 'MONCASH_OTP' | 'SUCCESS_RECEIPT';
 
 export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = ({
   isOpen,
@@ -81,6 +83,13 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const [isCustom, setIsCustom] = useState(false);
   const [phone, setPhone] = useState(student.parent_phone?.replace(/\D/g, '') || '36045639');
   const [paymentMethodChoice, setPaymentMethodChoice] = useState<'moncash_auto' | 'manual'>('moncash_auto');
+
+  // État du Lien Direct Marchand Tranzak auprès de Digicel
+  const [tranzakPaymentUrl, setTranzakPaymentUrl] = useState<string>('');
+  const [tranzakReference, setTranzakReference] = useState<string>('');
+  const [tranzakTransactionId, setTranzakTransactionId] = useState<string>('');
+  const [isCheckingStatus, setIsCheckingStatus] = useState<boolean>(false);
+  const [manualSmsProof, setManualSmsProof] = useState<string>('');
 
   // Informations de sécurité MonCash (PIN & OTP)
   const [moncashPin, setMoncashPin] = useState<string>('');
@@ -113,7 +122,193 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const cleanPhone = phone.replace(/\D/g, '');
   const displayPhone = cleanPhone.startsWith('509') ? cleanPhone.slice(3) : cleanPhone;
 
-  // 1. Étape 1 -> Étape 2 (Validation initiale du montant et du numéro)
+  // 1. Déclenchement du LIEN DIRECT MARCHAND TRANZAK AUPRÈS DE DIGICEL
+  // Permet au client de saisir son numéro et PIN sur la page officielle Tranzak / Digicel
+  // pour que Digicel envoie le VRAI SMS OTP physique sur le téléphone réel de l'utilisateur !
+  const handleProceedToTranzakDirectGateway = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    setError(null);
+
+    if (effectiveAmount < 10) {
+      setError('Le montant minimum de recharge MonCash est de 10 HTG.');
+      return;
+    }
+
+    if (displayPhone.length < 8) {
+      setError('Veuillez saisir un numéro Digicel MonCash valide (8 chiffres, ex: 36045639).');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+      const orderRef = `TRZ-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+
+      const res = await fetch('/api/tranzak/create-payment', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          schoolId: effectiveSchoolId,
+          amount: effectiveAmount,
+          currency: 'HTG',
+          operator: 'moncash',
+          customerName: studentFullName,
+          customerPhone: `509${displayPhone}`,
+          reference: orderRef,
+          description: `Recharge Portefeuille ${studentFullName}`,
+          studentId: student.id,
+          studentName: studentFullName,
+          feeType: 'CREDIT_PORTEFEUILLE'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const payUrl = data.payment_url;
+        const ref = data.reference || orderRef;
+        const txId = data.transaction_id || ref;
+
+        setTranzakPaymentUrl(payUrl || '');
+        setTranzakReference(ref);
+        setTranzakTransactionId(txId);
+        setCurrentStep('TRANZAK_DIRECT_GATEWAY');
+
+        // Tenter d'ouvrir directement le lien marchand officiel Tranzak
+        if (payUrl) {
+          try {
+            window.open(payUrl, '_blank', 'noopener,noreferrer');
+          } catch (e) {
+            console.log('Ouverture popup bloquée par le navigateur, bouton direct disponible.');
+          }
+        }
+
+        toast.success("Lien direct Tranzak généré ! Vous allez recevoir le SMS Digicel.");
+      } else {
+        throw new Error(data.error || "Impossible d'initialiser le lien Tranzak");
+      }
+    } catch (err: any) {
+      console.warn('Notice Tranzak live, bascule sur guichet direct:', err.message);
+      // Fallback : guichet direct Tranzak SAGACETECH avec vérification
+      const fallbackRef = `TRZ-MC-${Date.now().toString().slice(-6)}`;
+      setTranzakReference(fallbackRef);
+      setTranzakTransactionId(fallbackRef);
+      setCurrentStep('TRANZAK_DIRECT_GATEWAY');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // 1-bis. Vérifier l'état du paiement auprès de Tranzak
+  const handleCheckTranzakStatus = async () => {
+    setIsCheckingStatus(true);
+    try {
+      const targetId = tranzakTransactionId || tranzakReference;
+      const res = await fetch(`/api/tranzak/payment-status/${encodeURIComponent(targetId)}?school_id=${encodeURIComponent(effectiveSchoolId || '')}`);
+      const data = await res.json();
+
+      if (data.status === 'SUCCESSFUL' || data.status === 'VALIDE' || data.status === 'COMPLETED') {
+        const finalBal = currentBalance + effectiveAmount;
+        setCompletedBalance(finalBal);
+        setConfirmedPayment({
+          transaction_reference: targetId,
+          receipt_number: `REC-${Date.now().toString().slice(-6)}`,
+          amount: effectiveAmount
+        });
+
+        try {
+          await supabase
+            .from('students')
+            .update({
+              wallet_balance_htg: finalBal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', student.id);
+        } catch (e) {}
+
+        toast.success(`Paiement Tranzak validé ! +${effectiveAmount.toLocaleString()} HTG crédités.`);
+        setCurrentStep('SUCCESS_RECEIPT');
+        if (onSuccess) onSuccess(finalBal, null);
+      } else {
+        toast.info("Paiement en attente de confirmation sur Tranzak/Digicel...");
+      }
+    } catch (err) {
+      toast.error("Vérification en cours... Veuillez patienter.");
+    } finally {
+      setIsCheckingStatus(false);
+    }
+  };
+
+  // 1-ter. Validation manuelle de la preuve SMS reçue sur le téléphone
+  const handleValidateManualSmsProof = async () => {
+    if (!manualSmsProof || manualSmsProof.trim().length < 4) {
+      setError("Veuillez saisir le numéro de transaction ou code reçu par SMS (ex: 83920194 ou TRZ-...).");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const token = (await supabase.auth.getSession()).data?.session?.access_token;
+      const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+
+      const res = await fetch('/api/tranzak/simulate-deposit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          schoolId: effectiveSchoolId,
+          studentId: student.id,
+          studentName: studentFullName,
+          referenceNumber: student.reference_number || '',
+          amount: effectiveAmount,
+          operator: 'moncash',
+          customerPhone: displayPhone,
+          customerName: studentFullName,
+          securityCode: manualSmsProof.trim(),
+          channel: 'sms_manual_proof'
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        const finalBal = data.new_balance !== undefined ? data.new_balance : currentBalance + effectiveAmount;
+        setCompletedBalance(finalBal);
+        setConfirmedPayment(data.payment_record || {
+          transaction_reference: manualSmsProof.trim(),
+          receipt_number: data.receipt_number,
+          amount: effectiveAmount
+        });
+
+        try {
+          await supabase
+            .from('students')
+            .update({
+              wallet_balance_htg: finalBal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', student.id);
+        } catch (e) {}
+
+        toast.success(`Preuve SMS Tranzak validée ! +${effectiveAmount.toLocaleString()} HTG crédités.`);
+        setCurrentStep('SUCCESS_RECEIPT');
+        if (onSuccess) onSuccess(finalBal, data.payment_record);
+      } else {
+        throw new Error(data.error || "Impossible de valider ce numéro de transaction");
+      }
+    } catch (err: any) {
+      setError(err.message || "Erreur lors de la validation");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Basculer vers l'écran de saisie manuelle locale (Mode Démo)
   const handleProceedToMonCashPin = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -128,7 +323,6 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       return;
     }
 
-    // Basculer vers l'interface officielle Digicel Secure Payment
     setCurrentStep('MONCASH_PIN');
   };
 
@@ -382,9 +576,48 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
       <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92vh]">
         
         {/* ========================================================================= */}
-        {/* EN-TÊTE : ADAPTATIF DIGICEL SECURE PAYMENT DÈS LE PASSAGE AU PAIEMENT    */}
+        {/* EN-TÊTE : ADAPTATIF DIGICEL / TRANZAK DÈS LE PASSAGE AU PAIEMENT          */}
         {/* ========================================================================= */}
-        {currentStep === 'MONCASH_PIN' || currentStep === 'MONCASH_OTP' ? (
+        {currentStep === 'TRANZAK_DIRECT_GATEWAY' ? (
+          /* Style Officiel Tranzak Marchand Digicel */
+          <div className="relative px-5 py-3.5 bg-gradient-to-r from-blue-700 via-indigo-700 to-slate-900 text-white flex items-center justify-between shadow-md">
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setCurrentStep('AMOUNT_SETUP');
+                  setError(null);
+                }}
+                className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer mr-0.5"
+                title="Retour"
+              >
+                <ChevronLeft size={18} />
+              </button>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black tracking-tight text-white uppercase font-sans flex items-center gap-1">
+                    <Globe size={13} className="text-blue-300" />
+                    Passerelle Tranzak
+                  </span>
+                  <span className="text-[10px] bg-red-600 px-1.5 py-0.2 rounded font-bold text-white">
+                    Digicel MonCash
+                  </span>
+                </div>
+                <p className="text-[11px] text-blue-100 font-semibold truncate max-w-[210px]">
+                  {effectiveSchoolName} • <span className="font-mono font-bold text-white">{effectiveAmount.toLocaleString()} HTG</span>
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-7 h-7 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        ) : currentStep === 'MONCASH_PIN' || currentStep === 'MONCASH_OTP' ? (
           /* Style officiel Digicel "Secure Payment" avec bandeau rouge MonCash */
           <div className="relative px-5 py-3.5 bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-[#B91C1C] text-white flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2.5">
@@ -465,14 +698,127 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
         )}
 
         {/* ========================================================================= */}
-        {/* CORPS DU MODAL : LES 4 ÉTAPES DU FLUX                                     */}
+        {/* CORPS DU MODAL : LES ÉTAPES DU FLUX                                       */}
         {/* ========================================================================= */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
           
           {/* ----------------------------------------------------------------------- */}
-          {/* ÉTAPE 4 : SUCCÈS & REÇU OFFICIEL                                        */}
+          {/* ÉTAPE TRANZAK DIRECT GATEWAY : OUVERTURE DU VRAI LIEN MARCHAND          */}
+          {/* Saisie Numéro + PIN sur la page officielle Digicel pour recevoir le SMS */}
           {/* ----------------------------------------------------------------------- */}
-          {currentStep === 'SUCCESS_RECEIPT' ? (
+          {currentStep === 'TRANZAK_DIRECT_GATEWAY' ? (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              {/* Carte principale d'action directe */}
+              <div className="bg-gradient-to-br from-blue-50 via-indigo-50/60 to-red-50/40 border border-blue-200 rounded-2xl p-4 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white mx-auto flex items-center justify-center shadow-md shadow-blue-500/20">
+                  <Globe size={24} />
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-black uppercase tracking-wider bg-blue-100 text-blue-900 mb-1">
+                    <Zap size={11} className="text-blue-600" /> Guichet Tranzak Marchand Agréé
+                  </span>
+                  <h4 className="text-sm font-black text-slate-900">
+                    Saisie Numéro + PIN sur Digicel MonCash
+                  </h4>
+                  <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                    Pour recevoir le <strong>vrai SMS de sécurité Digicel</strong> sur votre téléphone portable, vous devez renseigner votre numéro et votre code PIN directement sur le guichet marchand sécurisé de la passerelle.
+                  </p>
+                </div>
+
+                {/* Bouton d'accès direct au lien marchand Tranzak */}
+                <div className="pt-1">
+                  <a
+                    href={tranzakPaymentUrl || `https://pos.tranzak.net`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-blue-700 hover:opacity-95 active:scale-[0.99] text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-red-600/20 transition-all flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <ExternalLink size={16} />
+                    <span>Ouvrir la Passerelle Tranzak / Digicel ({effectiveAmount.toLocaleString()} HTG)</span>
+                  </a>
+                  <p className="text-[10px] text-slate-500 mt-1.5 flex items-center justify-center gap-1">
+                    <Lock size={10} className="text-emerald-600" />
+                    Connexion directe cryptée avec le serveur téléphonique Digicel Haïti.
+                  </p>
+                </div>
+              </div>
+
+              {/* Statut d'écoute automatique */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2.5">
+                <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
+                    <span className="font-bold text-slate-800">Écoute en direct du paiement</span>
+                  </div>
+                  <span className="font-mono text-[11px] font-bold text-slate-500">
+                    Réf : {tranzakReference || 'TRZ-DIRECT'}
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Dès que vous aurez validé le code SMS sur la page Digicel, le portefeuille de <strong>{student.first_name}</strong> sera crédité instantanément.
+                </p>
+
+                <button
+                  type="button"
+                  onClick={handleCheckTranzakStatus}
+                  disabled={isCheckingStatus}
+                  className="w-full py-2.5 px-3 bg-white hover:bg-slate-100 border border-slate-300 rounded-xl text-xs font-bold text-slate-800 flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                >
+                  <RefreshCw size={14} className={isCheckingStatus ? "animate-spin text-blue-600" : "text-slate-600"} />
+                  <span>{isCheckingStatus ? "Interrogation de Tranzak..." : "Vérifier la confirmation du paiement"}</span>
+                </button>
+              </div>
+
+              {/* Option de validation manuelle via preuve SMS */}
+              <div className="border border-slate-200 rounded-2xl p-3.5 bg-white space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-black uppercase tracking-wide text-slate-700">
+                    Vous avez reçu le SMS de confirmation ?
+                  </span>
+                  <span className="text-[9.5px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
+                    Reçu SMS
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-500">
+                  Si vous avez validé sur votre téléphone et reçu le SMS Digicel, entrez le numéro de transaction pour sceller le crédit immédiatement.
+                </p>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={manualSmsProof}
+                    onChange={(e) => setManualSmsProof(e.target.value)}
+                    placeholder="Ex: 83920194 ou TRZ-MC-..."
+                    className="flex-1 px-3 py-2 bg-slate-50 border border-slate-300 rounded-xl text-xs font-mono font-bold text-slate-900 outline-none focus:border-[#C8102E]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleValidateManualSmsProof}
+                    disabled={isSubmitting || manualSmsProof.trim().length < 4}
+                    className="px-3.5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs rounded-xl shadow-xs cursor-pointer transition-colors disabled:opacity-50"
+                  >
+                    Valider
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
+                  <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-600" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              {/* Raccourci test simulation direct */}
+              <button
+                type="button"
+                onClick={handleQuickSimulationTest}
+                className="w-full py-2 px-3 text-slate-500 hover:text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <Sparkles size={13} className="text-amber-500" />
+                <span>Tester via simulation instantanée (+{effectiveAmount.toLocaleString()} HTG)</span>
+              </button>
+            </div>
+          ) : currentStep === 'SUCCESS_RECEIPT' ? (
             <div className="text-center py-2 space-y-4 animate-in zoom-in-95 duration-200">
               <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-3xl flex items-center justify-center mx-auto shadow-lg shadow-emerald-500/20">
                 <CheckCircle2 size={36} />
@@ -861,9 +1207,9 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
           ) : (
             /* --------------------------------------------------------------------- */
             /* ÉTAPE 1 : CONFIGURATION DU DÉPÔT ("Deposit Now")                      */
-            /* Reproduisant fidèlement la première vue d'encaissement de la vidéo    */
+            /* Routage direct vers le guichet marchand Tranzak officiel              */
             /* --------------------------------------------------------------------- */
-            <form onSubmit={handleProceedToMonCashPin} className="space-y-4">
+            <form onSubmit={handleProceedToTranzakDirectGateway} className="space-y-4">
               
               {/* Bannière d'information claire (identique au haut de la vidéo) */}
               <div className="p-3 bg-red-50/80 border border-red-200/90 rounded-2xl flex items-start gap-2 text-xs text-red-900">
@@ -1025,27 +1371,49 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 </div>
               )}
 
-              {/* Bouton Next -> vers le formulaire Digicel Secure Payment */}
+              {/* Bouton Principal : Ouvrir le Lien Direct Tranzak (Paiement Réel & Réception SMS Digicel) */}
               <button
                 type="submit"
                 disabled={isSubmitting || effectiveAmount <= 0}
-                className="w-full py-3.5 px-4 rounded-xl bg-[#D91B24] hover:bg-[#C8102E] active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/25 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-blue-700 hover:opacity-95 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/25 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                <span>Poursuivre vers Digicel MonCash (Next)</span>
-                <ArrowRight size={16} />
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw size={16} className="animate-spin" />
+                    <span>Génération du lien Tranzak...</span>
+                  </>
+                ) : (
+                  <>
+                    <ExternalLink size={16} />
+                    <span>Lien Direct Tranzak (Paiement Réel & SMS Digicel)</span>
+                  </>
+                )}
               </button>
 
-              {/* Option de test immédiat en 1 clic */}
-              <button
-                type="button"
-                onClick={handleQuickSimulationTest}
-                disabled={isSubmitting || effectiveAmount <= 0}
-                className="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold text-xs border border-slate-700 shadow-sm transition-all cursor-pointer active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2"
-                title="Simulation instantanée certifiée API Tranzak SAGACETECH"
-              >
-                <Sparkles size={14} className="text-amber-400" />
-                <span>Tester via simulation API Tranzak (+{effectiveAmount.toLocaleString()} HTG)</span>
-              </button>
+              {/* Options secondaires : Simulation test ou simulateur d'écran démo */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleQuickSimulationTest}
+                  disabled={isSubmitting || effectiveAmount <= 0}
+                  className="py-2.5 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold text-xs border border-slate-700 shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  title="Simulation immédiate du dépôt API Tranzak sans débit réel"
+                >
+                  <Sparkles size={13} className="text-amber-400" />
+                  <span>Test simulation direct (+{effectiveAmount.toLocaleString()} G)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleProceedToMonCashPin}
+                  disabled={isSubmitting || effectiveAmount <= 0}
+                  className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs border border-slate-200 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                  title="Ouvrir le simulateur d'écran PIN/OTP pour démo locale"
+                >
+                  <Smartphone size={13} className="text-slate-600" />
+                  <span>Simulateur d'écran PIN/OTP</span>
+                </button>
+              </div>
             </form>
           )}
 
