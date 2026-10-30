@@ -14,6 +14,7 @@ export interface TranzakPaymentRequest {
   studentName?: string;
   feeType?: string;
   campaignId?: string;
+  mode?: 'live' | 'test';
 }
 
 export interface TranzakDirectPaymentRequest {

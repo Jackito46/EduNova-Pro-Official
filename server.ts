@@ -2329,13 +2329,12 @@ async function startServer() {
   // TRANZAK PAYMENT GATEWAY (MONCASH & NATCASH) INTEGRATION
   // =========================================================================
 
-  const TRANZAK_LIVE_KEY_VERIFIED = 'tk_live_fWPH1DoIJTBfSRw0YdpVZi0aleM9m19k81fi1FS6';
+  const TRANZAK_LIVE_KEY_VERIFIED = 'tk_live_fWPH1DoIJTBFsRw0YdpVZi0aleM9m19k8lfI1FS6';
   const TRANZAK_TEST_KEY_VERIFIED = 'tk_test_HnQkScD53V0jtOuHz5xOrTvCKIwJKaYPWca47Tdd';
   const TRANZAK_WEBHOOK_SECRET_VERIFIED = 'whsec_b87caead9c17eec19ff312a7ea52a706648cfa17a355acc0c3d2de237a544ed1';
 
-  async function getTranzakConfigForSchool(schoolId: string) {
-    // Par défaut, le compte Tranzak de Jacques Etienne est en mode Test (Sandbox certifié)
-    let mode = (process.env.TRANZAK_MODE || 'test') === 'live' ? 'live' : 'test';
+  async function getTranzakConfigForSchool(schoolId: string, requestedMode?: 'live' | 'test') {
+    let mode: 'live' | 'test' = requestedMode || ((process.env.TRANZAK_MODE || 'live') === 'test' ? 'test' : 'live');
     let apiKey = mode === 'live' ? (process.env.TRANZAK_API_KEY || TRANZAK_LIVE_KEY_VERIFIED) : (process.env.TRANZAK_TEST_KEY || TRANZAK_TEST_KEY_VERIFIED);
     let webhookSecret = process.env.TRANZAK_WEBHOOK_SECRET || TRANZAK_WEBHOOK_SECRET_VERIFIED;
     let isActive = true;
@@ -2347,7 +2346,7 @@ async function startServer() {
       if (localEncryptedVault[schoolId]?.tranzak?.TRANZAK_WEBHOOK_SECRET) {
         webhookSecret = decryptSecret(localEncryptedVault[schoolId].tranzak.TRANZAK_WEBHOOK_SECRET);
       }
-      if (localEncryptedVault[schoolId]?.tranzak?.TRANZAK_MODE) {
+      if (!requestedMode && localEncryptedVault[schoolId]?.tranzak?.TRANZAK_MODE) {
         mode = localEncryptedVault[schoolId].tranzak.TRANZAK_MODE;
       }
       if (localEncryptedVault[schoolId]?.tranzak?.is_active !== undefined) {
@@ -2377,8 +2376,8 @@ async function startServer() {
                 webhookSecret = decrypted.trim();
               }
             }
-            if (row.key_name === 'TRANZAK_MODE') {
-              mode = row.key_value === 'live' ? 'live' : 'test';
+            if (!requestedMode && row.key_name === 'TRANZAK_MODE') {
+              mode = row.key_value === 'test' ? 'test' : 'live';
             }
             if (row.is_active !== undefined) {
               isActive = row.is_active;
@@ -2390,9 +2389,16 @@ async function startServer() {
       }
     }
 
-    // Bascule automatique de clé : la clé test officielle Tranzak vérifiée est toujours prête et active
-    if (mode === 'test' || !apiKey || apiKey === TRANZAK_LIVE_KEY_VERIFIED) {
-      if (!apiKey || apiKey.startsWith('tk_live_') || apiKey === TRANZAK_LIVE_KEY_VERIFIED) {
+    // Bascule stricte selon le mode
+    if (requestedMode) {
+      mode = requestedMode;
+      apiKey = requestedMode === 'live' ? TRANZAK_LIVE_KEY_VERIFIED : TRANZAK_TEST_KEY_VERIFIED;
+    } else if (mode === 'live') {
+      if (!apiKey || apiKey.startsWith('tk_test_')) {
+        apiKey = TRANZAK_LIVE_KEY_VERIFIED;
+      }
+    } else {
+      if (!apiKey || apiKey.startsWith('tk_live_')) {
         apiKey = TRANZAK_TEST_KEY_VERIFIED;
       }
     }
@@ -2516,7 +2522,8 @@ async function startServer() {
         studentId,
         studentName,
         feeType = 'SCOLARITE',
-        campaignId
+        campaignId,
+        mode: requestedMode
       } = req.body;
 
       if (!schoolId) {
@@ -2527,7 +2534,7 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Montant invalide.' });
       }
 
-      const tranzakConfig = await getTranzakConfigForSchool(schoolId);
+      const tranzakConfig = await getTranzakConfigForSchool(schoolId, requestedMode);
       if (!tranzakConfig.apiKey) {
         return res.status(400).json({ 
           success: false, 

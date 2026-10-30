@@ -81,6 +81,9 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   // Navigation dans le flux
   const [currentStep, setCurrentStep] = useState<TopUpFlowStep>('AMOUNT_SETUP');
 
+  // Mode de transaction : Live (SMS Réel Digicel) ou Test (Sandbox)
+  const [paymentMode, setPaymentMode] = useState<'live' | 'test'>('live');
+
   // Montant, Téléphone & PIN
   const [selectedAmount, setSelectedAmount] = useState<number>(100);
   const [customAmount, setCustomAmount] = useState<string>('');
@@ -119,6 +122,35 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const cleanPhone = phone.replace(/\D/g, '');
   const displayPhone = cleanPhone.startsWith('509') ? cleanPhone.slice(3) : cleanPhone;
 
+  // Polling automatique en direct du statut Tranzak (pour détecter la validation sur Digicel Live)
+  useEffect(() => {
+    if (currentStep !== 'DIGICEL_PIN_INPUT' || !tranzakTransactionId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const res = await TranzakService.checkStatus(tranzakTransactionId, effectiveSchoolId);
+        const st = res?.status || res?.data?.status;
+        if (st === 'completed' || st === 'SUCCESSFUL' || st === 'VALIDE') {
+          clearInterval(interval);
+          const finalBal = currentBalance + effectiveAmount;
+          setCompletedBalance(finalBal);
+          const paymentObj = {
+            transaction_reference: tranzakTransactionId,
+            receipt_number: `REC-TRZ-${Date.now().toString().slice(-6)}`,
+            amount: effectiveAmount,
+            status: 'VALIDE'
+          };
+          setConfirmedPayment(paymentObj);
+          setCurrentStep('SUCCESS_RECEIPT');
+          toast.success('Paiement Digicel MonCash validé avec succès ! Solde crédité.');
+          if (onSuccess) onSuccess(finalBal, paymentObj);
+        }
+      } catch (e) {}
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [currentStep, tranzakTransactionId, effectiveAmount, currentBalance, effectiveSchoolId, onSuccess]);
+
   // 1. ÉTAPE 1 -> ÉTAPE 2 : INITIALISATION DE LA SESSION TRANZAK DIRECTE SUR L'API
   const handleProceedToDigicelGateway = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -139,7 +171,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
       const orderRef = `TRZ-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
 
-      // Création de la vraie transaction auprès de l'API Tranzak
+      // Création de la vraie transaction auprès de l'API Tranzak (en mode Live ou Test)
       const res = await TranzakService.createPayment({
         schoolId: effectiveSchoolId || '',
         studentId: student.id,
@@ -151,7 +183,8 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         customerPhone: `509${displayPhone}`,
         reference: orderRef,
         description: `Recharge Portefeuille ${studentFullName}`,
-        feeType: 'CREDIT_PORTEFEUILLE'
+        feeType: 'CREDIT_PORTEFEUILLE',
+        mode: paymentMode
       });
 
       if (res.success) {
@@ -159,10 +192,15 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         setTranzakTransactionId(txId);
         setTranzakReference(res.reference || orderRef);
         setTranzakPaymentUrl(res.payment_url || '');
+
+        if (paymentMode === 'live' && res.payment_url) {
+          // Ouvre directement le guichet officiel Digicel MonCash Live
+          window.open(res.payment_url, '_blank', 'noopener,noreferrer');
+        }
         
         // Passer au guichet Digicel sécurisé
         setCurrentStep('DIGICEL_PIN_INPUT');
-        toast.info(`Session Tranzak active (Tx: ${txId}).`);
+        toast.info(paymentMode === 'live' ? `Passerelle Digicel ouverte. SMS OTP envoyé par Digicel.` : `Session Tranzak Sandbox active (Tx: ${txId}).`);
       } else {
         throw new Error(res.error || "Impossible d'initialiser la passerelle Tranzak");
       }
@@ -244,6 +282,47 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
     } finally {
       setIsSubmitting(false);
       setClearingProgress(0);
+    }
+  };
+
+  // 3. VÉRIFICATION DU STATUT DU PAIEMENT EN DIRECT SUR TRANZAK & DIGICEL
+  const handleCheckLiveStatus = async () => {
+    if (!tranzakTransactionId) return;
+    setIsCheckingStatus(true);
+    try {
+      const res = await TranzakService.checkStatus(tranzakTransactionId, effectiveSchoolId);
+      const st = res?.status || res?.data?.status;
+      if (st === 'completed' || st === 'SUCCESSFUL' || st === 'VALIDE') {
+        const finalBal = currentBalance + effectiveAmount;
+        setCompletedBalance(finalBal);
+        const paymentObj = {
+          transaction_reference: tranzakTransactionId,
+          receipt_number: `REC-TRZ-${Date.now().toString().slice(-6)}`,
+          amount: effectiveAmount,
+          status: 'VALIDE'
+        };
+        setConfirmedPayment(paymentObj);
+
+        try {
+          await supabase
+            .from('students')
+            .update({
+              wallet_balance_htg: finalBal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', student.id);
+        } catch (dbErr) {}
+
+        setCurrentStep('SUCCESS_RECEIPT');
+        toast.success('Paiement Digicel MonCash validé ! Portefeuille crédité.');
+        if (onSuccess) onSuccess(finalBal, paymentObj);
+      } else {
+        toast.info(`Statut actuel Digicel : ${st || 'En attente de confirmation...'}`);
+      }
+    } catch (err: any) {
+      toast.error('Erreur lors de la vérification : ' + (err.message || 'Serveur distant injoignable'));
+    } finally {
+      setIsCheckingStatus(false);
     }
   };
 
@@ -487,16 +566,57 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                   </div>
                 </div>
 
-                {/* Note explicative transparente sur le Sandbox et le SMS Digicel */}
-                <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/90 text-[10.5px] text-amber-900 leading-relaxed space-y-1">
-                  <div className="font-bold flex items-center gap-1 text-amber-800">
-                    <Info size={12} className="shrink-0 text-amber-600" />
-                    <span>Mode Sandbox Tranzak (Test Sécurisé)</span>
+                {/* Panneau Spécifique Live Digicel MonCash (avec SMS OTP) */}
+                {paymentMode === 'live' && tranzakPaymentUrl ? (
+                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 text-xs text-red-950 space-y-2.5 shadow-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-red-700 flex items-center gap-1.5 text-xs">
+                        <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+                        Guichet Officiel Digicel MonCash Ouvert
+                      </span>
+                      <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-red-200 text-red-700 font-bold">
+                        SMS OTP Actif
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-700 leading-relaxed">
+                      Digicel a ouvert votre session sécurisée et expédie actuellement le <strong>SMS avec le Code OTP</strong> sur votre mobile <strong>+509 {displayPhone}</strong>.
+                    </p>
+
+                    <div className="flex flex-col gap-1.5 pt-0.5">
+                      <a
+                        href={tranzakPaymentUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
+                      >
+                        <ExternalLink size={14} />
+                        <span>Accéder au Guichet Sécurisé Digicel (Saisir PIN & OTP)</span>
+                      </a>
+
+                      <button
+                        type="button"
+                        onClick={handleCheckLiveStatus}
+                        disabled={isCheckingStatus}
+                        className="w-full py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                      >
+                        <RefreshCw size={13} className={isCheckingStatus ? 'animate-spin' : ''} />
+                        <span>{isCheckingStatus ? 'Vérification en cours...' : 'Vérifier la confirmation Digicel en direct'}</span>
+                      </button>
+                    </div>
                   </div>
-                  <p>
-                    En mode Sandbox Tranzak, les opérateurs télécoms (Digicel) n'émettent pas de SMS physique aux antennes cellulaires. La confirmation est scellée directement sur l'API Tranzak via le protocole officiel <code className="font-mono bg-white/70 px-1 py-0.5 rounded text-amber-950 font-bold">POST /verify</code>.
-                  </p>
-                </div>
+                ) : (
+                  /* Note explicative transparente sur le Sandbox et le SMS Digicel */
+                  <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/90 text-[10.5px] text-amber-900 leading-relaxed space-y-1">
+                    <div className="font-bold flex items-center gap-1 text-amber-800">
+                      <Info size={12} className="shrink-0 text-amber-600" />
+                      <span>Mode Sandbox Tranzak (Test Sécurisé)</span>
+                    </div>
+                    <p>
+                      En mode Sandbox Tranzak, les opérateurs télécoms (Digicel) n'émettent pas de SMS physique aux antennes cellulaires. La confirmation est scellée directement sur l'API Tranzak via le protocole officiel <code className="font-mono bg-white/70 px-1 py-0.5 rounded text-amber-950 font-bold">POST /verify</code>.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* Circuit Financier Validé en direct */}
@@ -861,6 +981,60 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 </div>
               </div>
 
+              {/* Sélecteur de Mode : Live Réel vs Test Sandbox */}
+              <div className="space-y-1.5 pt-1">
+                <label className="block text-xs font-black text-slate-800 uppercase tracking-wide">
+                  Mode de la Passerelle
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode('live')}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      paymentMode === 'live'
+                        ? 'border-red-600 bg-red-50/70 ring-2 ring-red-500/20'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-red-700 flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
+                        Live Réel
+                      </span>
+                      <span className="text-[8.5px] bg-red-100 text-red-800 font-bold px-1.5 py-0.2 rounded">
+                        SMS OTP
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 leading-tight">
+                      Envoi du SMS OTP officiel par Digicel sur votre téléphone.
+                    </p>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPaymentMode('test')}
+                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                      paymentMode === 'test'
+                        ? 'border-blue-600 bg-blue-50/70 ring-2 ring-blue-500/20'
+                        : 'border-slate-200 bg-white hover:bg-slate-50'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-black text-blue-700 flex items-center gap-1">
+                        <Zap size={12} />
+                        Test Sandbox
+                      </span>
+                      <span className="text-[8.5px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded">
+                        Sans débit
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-slate-600 mt-1 leading-tight">
+                      Test certifié sur grand livre Tranzak (aucun débit bancaire).
+                    </p>
+                  </button>
+                </div>
+              </div>
+
               {/* Récapitulatif comptable */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 space-y-1.5 text-xs">
                 <div className="flex justify-between items-center text-slate-600">
@@ -897,11 +1071,15 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 {isSubmitting ? (
                   <>
                     <RefreshCw size={16} className="animate-spin" />
-                    <span>Création de la session Tranzak...</span>
+                    <span>Ouverture de la passerelle Tranzak...</span>
                   </>
                 ) : (
                   <>
-                    <span>Poursuivre vers la Passerelle Digicel MonCash (Tranzak) →</span>
+                    <span>
+                      {paymentMode === 'live'
+                        ? 'Ouvrir Digicel MonCash (Envoi SMS OTP Réel) →'
+                        : 'Lancer le Test Sandbox (Sans Débit) →'}
+                    </span>
                   </>
                 )}
               </button>
