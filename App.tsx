@@ -319,12 +319,12 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               } />
 
               {/* Student & Parent Portal Routes */}
-              <Route path="/profil" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT]}><StudentProfileView user={user} /></RoleGuard>} />
-              <Route path="/mes-cours" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT]}><StudentCoursesView user={user} /></RoleGuard>} />
+              <Route path="/profil" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentProfileView user={user} /></RoleGuard>} />
+              <Route path="/mes-cours" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentCoursesView user={user} /></RoleGuard>} />
               <Route path="/mes-devoirs" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...academicRoles]}><HomeworkManager user={user} defaultTab="student" /></RoleGuard>} />
-              <Route path="/mes-notes" element={<ModuleGuard moduleId="exams" moduleName="Mes Notes" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT]}><StudentGradesView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/mon-economat" element={<ModuleGuard moduleId="finance" moduleName="Mon Économat" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT]}><StudentFinanceView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/mon-horaire" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT]}><StudentScheduleView user={user} /></RoleGuard>} />
+              <Route path="/mes-notes" element={<ModuleGuard moduleId="exams" moduleName="Mes Notes" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentGradesView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/mon-economat" element={<ModuleGuard moduleId="finance" moduleName="Mon Économat" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles, UserRole.ACCOUNTANT]}><StudentFinanceView user={user} /></RoleGuard></ModuleGuard>} />
+              <Route path="/mon-horaire" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentScheduleView user={user} /></RoleGuard>} />
               
               {/* Academic Routes */}
               <Route path="/eleves" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentList user={user} /></RoleGuard>} />
