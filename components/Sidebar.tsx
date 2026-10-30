@@ -474,6 +474,21 @@ const Sidebar: React.FC<SidebarProps> = ({ user, onLogout }) => {
             </div>
           )}
 
+          {isParent && (
+            <div className="space-y-1 pt-2">
+               {renderMenuHeader("espaceParent", "Espace Responsable", Users)}
+               {openMenus.espaceParent && (
+                 <div className="space-y-0.5 animate-in slide-in-from-top-2 duration-200 border-l-2 border-slate-200/80 ml-2.5 pl-1">
+                   {renderNavLink({ name: 'Mes Enfants', path: '/' }, true, Users)}
+                   {isFinanceEnabled && renderNavLink({ name: 'Économat & Portefeuille', path: '/mon-economat' }, true, Receipt)}
+                   {renderNavLink({ name: 'Devoirs & Leçons', path: '/mes-devoirs' }, true, CheckSquare)}
+                   {isExamsEnabled && renderNavLink({ name: 'Bulletins & Notes', path: '/mes-notes' }, true, TrendingUp)}
+                   {renderNavLink({ name: 'Emploi du Temps', path: '/mon-horaire' }, true, Clock)}
+                 </div>
+               )}
+            </div>
+          )}
+
           {hasAccess(academicRoles) && (
             <div className="space-y-1 pt-2">
               {renderMenuHeader("vieAcademique", "Gestion Académique", GraduationCap)}

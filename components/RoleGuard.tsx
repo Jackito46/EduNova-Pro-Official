@@ -69,8 +69,8 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   const authorized = isUserAuthorized(user, allowedRoles);
 
   if (!authorized) {
-    // Alerte l'utilisateur en cas de tentative d'accès direct non autorisé via l'URL
-    if (typeof window !== 'undefined') {
+    // Alerte l'utilisateur uniquement en cas de tentative d'accès manuel non autorisé à une URL protégée
+    if (typeof window !== 'undefined' && location.pathname !== '/' && location.pathname !== '/dashboard') {
       const warnedKey = `role_denied_${location.pathname}`;
       if (!sessionStorage.getItem(warnedKey)) {
         sessionStorage.setItem(warnedKey, 'true');

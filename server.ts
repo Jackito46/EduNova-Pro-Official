@@ -2698,7 +2698,11 @@ async function startServer() {
         customerPhone = '50937000000',
         customerName,
         studentName,
-        referenceNumber
+        referenceNumber,
+        pin,
+        securityCode,
+        otpCode,
+        channel = 'moncash_auto'
       } = req.body;
 
       if (!schoolId) {
@@ -2710,9 +2714,9 @@ async function startServer() {
       }
 
       const depositAmount = Math.max(10, Math.round(Number(amount) || 100));
-      const orderRef = `TRZ-TEST-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
-      const receiptNumber = `REC-TRZ-${Date.now().toString().slice(-6)}`;
-      const operatorLabel = operator === 'natcash' ? 'NatCash' : 'MonCash';
+      const orderRef = `TRZ-MC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
+      const receiptNumber = `REC-MC-${Date.now().toString().slice(-6)}`;
+      const operatorLabel = operator === 'natcash' ? 'NatCash' : 'MonCash Auto';
 
       // 1. Obtenir le client Supabase (avec JWT utilisateur transmis dans le Bearer ou service key)
       const dbClient = getSupabaseClient(req);
