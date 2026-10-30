@@ -54,10 +54,9 @@ const PRESET_AMOUNTS = [100, 250, 500, 1000, 2500, 5000];
 
 type TopUpFlowStep = 
   | 'AMOUNT_SETUP'              // 1. Choix du montant & numéro payeur
-  | 'DIGICEL_PIN_INPUT'         // 2. Passerelle Digicel : Saisie sécurisée Numéro + PIN
-  | 'DIGICEL_OTP_INPUT'         // 3. Réception du SMS OTP Digicel & Saisie du code
+  | 'DIGICEL_PIN_INPUT'         // 2. Passerelle Digicel MonCash : Saisie sécurisée Numéro & PIN
   | 'TRANZAK_EXTERNAL_GATEWAY'  // Optionnel : Lien web externe Tranzak
-  | 'SUCCESS_RECEIPT';          // 4. Reçu certifié avec vrai transaction_id Tranzak
+  | 'SUCCESS_RECEIPT';          // 3. Reçu certifié avec vrai transaction_id Tranzak
 
 export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = ({
   isOpen,
@@ -90,10 +89,8 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const [clientPin, setClientPin] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
 
-  // SMS OTP Digicel
+  // Code OTP de sécurité (si fourni par le réseau Digicel en production)
   const [otpCode, setOtpCode] = useState<string>('');
-  const [activeSmsOtp, setActiveSmsOtp] = useState<string>('163880');
-  const [isResendingOtp, setIsResendingOtp] = useState(false);
   const [clearingProgress, setClearingProgress] = useState<number>(0);
 
   // État de la Session Marchande Tranzak
@@ -122,8 +119,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const cleanPhone = phone.replace(/\D/g, '');
   const displayPhone = cleanPhone.startsWith('509') ? cleanPhone.slice(3) : cleanPhone;
 
-  // 1. ÉTAPE 1 -> ÉTAPE 2 : INITIALISATION DE LA VRAIE SESSION TRANZAK API
-  // Appelle l'API Tranzak (POST /payments) et ouvre l'interface Digicel MonCash
+  // 1. ÉTAPE 1 -> ÉTAPE 2 : INITIALISATION DE LA SESSION TRANZAK DIRECTE SUR L'API
   const handleProceedToDigicelGateway = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setError(null);
@@ -159,19 +155,19 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       });
 
       if (res.success) {
-        const txId = res.transaction_id || orderRef;
+        const txId = String(res.transaction_id || orderRef);
         setTranzakTransactionId(txId);
         setTranzakReference(res.reference || orderRef);
         setTranzakPaymentUrl(res.payment_url || '');
         
-        // Passer à l'interface officielle Digicel MonCash
+        // Passer au guichet Digicel sécurisé
         setCurrentStep('DIGICEL_PIN_INPUT');
-        toast.info(`Session Tranzak initialisée (Tx: ${txId}). Veuillez saisir votre PIN Digicel.`);
+        toast.info(`Session Tranzak active (Tx: ${txId}).`);
       } else {
         throw new Error(res.error || "Impossible d'initialiser la passerelle Tranzak");
       }
     } catch (err: any) {
-      console.warn('Notice Tranzak live, bascule sur guichet direct:', err.message);
+      console.warn('Notice Tranzak initialisation:', err.message);
       const fallbackTx = `TRZ-${Date.now().toString().slice(-6)}`;
       setTranzakTransactionId(fallbackTx);
       setTranzakReference(fallbackTx);
@@ -181,8 +177,9 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
     }
   };
 
-  // 2. ÉTAPE 2 -> ÉTAPE 3 : SAISIE DU PIN & ENVOI DU SMS OTP DIGICEL
-  const handleSendDigicelOtp = async (e: React.FormEvent) => {
+  // 2. ÉTAPE 2 : VALIDATION INSTANTANÉE SUR TRANZAK (POST /verify & Direct Charge)
+  // Supprime tout code OTP statique et valide directement l'opération auprès de Tranzak
+  const handleExecuteTranzakPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
 
@@ -192,53 +189,15 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
     }
 
     setIsSubmitting(true);
-    try {
-      await new Promise(r => setTimeout(r, 600));
-      // Code OTP Digicel (alterne dynamiquement)
-      const nextOtp = activeSmsOtp === '163880' ? '196925' : '163880';
-      setActiveSmsOtp(nextOtp);
-      setOtpCode('');
-      setCurrentStep('DIGICEL_OTP_INPUT');
-      toast.success(`Digicel SMS reçu : Mon Cash OTP for online transaction is ${nextOtp}`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Renvoyer le SMS OTP Digicel
-  const handleResendOtp = async () => {
-    setIsResendingOtp(true);
-    try {
-      await new Promise(r => setTimeout(r, 500));
-      const nextOtp = activeSmsOtp === '163880' ? '196925' : '163880';
-      setActiveSmsOtp(nextOtp);
-      toast.info(`Nouveau SMS Digicel : Mon Cash OTP is ${nextOtp}`);
-    } finally {
-      setIsResendingOtp(false);
-    }
-  };
-
-  // 3. ÉTAPE 3 -> ÉTAPE 4 : VALIDATION OTP & CONFIRMATION SUR L'API TRANZAK
-  // Appelle POST /payments/{transaction_id}/verify sur Tranzak pour sceller le paiement
-  const handleConfirmOtpAndExecutePayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-
-    if (!otpCode || otpCode.trim().length < 4) {
-      setError('Veuillez renseigner le code de sécurité reçu par SMS (ex: 6 chiffres).');
-      return;
-    }
-
-    setIsSubmitting(true);
     setClearingProgress(1); // 1/3 Débit MonCash
 
     try {
-      await new Promise(r => setTimeout(r, 400));
+      await new Promise(r => setTimeout(r, 350));
       setClearingProgress(2); // 2/3 Encaissement Tranzak
 
       const targetTx = tranzakTransactionId || tranzakReference || `TRZ-${Date.now().toString().slice(-6)}`;
 
-      // 1. Appeler l'API officielle POST /payments/{id}/verify de Tranzak
+      // 1. Appeler l'API Tranzak POST /payments/{id}/verify
       const verifyRes = await TranzakService.verifyPayment(targetTx, {
         schoolId: effectiveSchoolId,
         studentId: student.id,
@@ -246,20 +205,22 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       });
 
       setClearingProgress(3); // 3/3 Crédit portefeuille élève
-      await new Promise(r => setTimeout(r, 300));
+      await new Promise(r => setTimeout(r, 250));
 
       const finalBal = verifyRes.new_balance !== null && verifyRes.new_balance !== undefined
         ? verifyRes.new_balance
         : currentBalance + effectiveAmount;
 
       setCompletedBalance(finalBal);
-      setConfirmedPayment({
+      const paymentObj = {
         transaction_reference: targetTx,
         receipt_number: `REC-TRZ-${Date.now().toString().slice(-6)}`,
-        amount: effectiveAmount
-      });
+        amount: effectiveAmount,
+        status: 'VALIDE'
+      };
+      setConfirmedPayment(paymentObj);
 
-      // Synchronisation en base de données
+      // Synchronisation directe dans la table students
       try {
         await supabase
           .from('students')
@@ -268,13 +229,15 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
             updated_at: new Date().toISOString()
           })
           .eq('id', student.id);
-      } catch (dbErr) {}
+      } catch (dbErr) {
+        console.warn('Notice mise à jour wallet student:', dbErr);
+      }
 
-      toast.success(`Transaction Tranzak confirmée ! +${effectiveAmount.toLocaleString()} HTG crédités.`);
+      toast.success(`Dépôt Tranzak certifié ! +${effectiveAmount.toLocaleString()} HTG crédités.`);
       setCurrentStep('SUCCESS_RECEIPT');
 
       if (onSuccess) {
-        onSuccess(finalBal, confirmedPayment);
+        onSuccess(finalBal, paymentObj);
       }
     } catch (err: any) {
       setError(err.message || 'Erreur lors de la validation du paiement auprès de Tranzak');
@@ -329,18 +292,14 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
         {/* ========================================================================= */}
         {/* EN-TÊTE DU MODAL : ADAPTATIF DIGICEL / MONCASH / TRANZAK                  */}
         {/* ========================================================================= */}
-        {currentStep === 'DIGICEL_PIN_INPUT' || currentStep === 'DIGICEL_OTP_INPUT' ? (
+        {currentStep === 'DIGICEL_PIN_INPUT' ? (
           /* Style officiel Digicel "Secure Payment" */
           <div className="relative px-5 py-3.5 bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-[#B91C1C] text-white flex items-center justify-between shadow-md">
             <div className="flex items-center gap-2.5">
               <button
                 type="button"
                 onClick={() => {
-                  if (currentStep === 'DIGICEL_OTP_INPUT') {
-                    setCurrentStep('DIGICEL_PIN_INPUT');
-                  } else {
-                    setCurrentStep('AMOUNT_SETUP');
-                  }
+                  setCurrentStep('AMOUNT_SETUP');
                   setError(null);
                 }}
                 className="w-7 h-7 rounded-full bg-white/15 hover:bg-white/25 flex items-center justify-center text-white transition-colors cursor-pointer mr-0.5"
@@ -421,7 +380,7 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
           {/* ÉTAPE 2 : SAISIE NUMÉRO & PIN DIGICEL MONCASH                           */}
           {/* ----------------------------------------------------------------------- */}
           {currentStep === 'DIGICEL_PIN_INPUT' ? (
-            <form onSubmit={handleSendDigicelOtp} className="space-y-4 animate-in fade-in duration-150">
+            <form onSubmit={handleExecuteTranzakPayment} className="space-y-4 animate-in fade-in duration-150">
               
               {/* Récapitulatif de la transaction Tranzak */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-1.5">
@@ -503,130 +462,40 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                     </button>
                   </div>
                   <p className="text-[10.5px] text-slate-500 leading-tight">
-                    Digicel vous enverra un SMS contenant le code OTP de sécurité dès la validation de votre PIN.
+                    Saisissez votre code PIN secret MonCash pour autoriser le prélèvement.
                   </p>
                 </div>
-              </div>
 
-              {error && (
-                <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-700 flex items-start gap-2">
-                  <AlertCircle size={15} className="shrink-0 mt-0.5 text-rose-600" />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Bouton pour demander l'OTP Digicel */}
-              <button
-                type="submit"
-                disabled={isSubmitting || clientPin.length < 4}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-[#B91C1C] hover:opacity-95 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>Communication avec le serveur Digicel...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Demander le Code de Sécurité OTP (Digicel SMS) →</span>
-                  </>
-                )}
-              </button>
-
-              {/* Option de secours : ouverture externe */}
-              {tranzakPaymentUrl && (
-                <div className="text-center pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setCurrentStep('TRANZAK_EXTERNAL_GATEWAY')}
-                    className="text-[11px] text-slate-500 hover:text-slate-700 underline cursor-pointer"
-                  >
-                    Ouvrir le guichet web externe Tranzak
-                  </button>
-                </div>
-              )}
-            </form>
-          ) : currentStep === 'DIGICEL_OTP_INPUT' ? (
-            /* --------------------------------------------------------------------- */
-            /* ÉTAPE 3 : RÉCEPTION DU SMS DIGICEL & SAISIE DU CODE OTP               */
-            /* --------------------------------------------------------------------- */
-            <form onSubmit={handleConfirmOtpAndExecutePayment} className="space-y-4 animate-in fade-in duration-150">
-              
-              {/* Notification SMS Digicel Réelle */}
-              <div className="bg-slate-50 border border-indigo-100 rounded-2xl p-3 shadow-2xs space-y-2">
-                <div className="flex items-center justify-between text-[10.5px]">
-                  <span className="font-bold text-red-600 flex items-center gap-1">
-                    <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse"></span>
-                    SMS Téléphonique Reçu
-                  </span>
-                  <span className="font-mono text-slate-400">À l'instant</span>
-                </div>
-
-                <div className="bg-white rounded-xl p-3 border border-indigo-100 flex items-start justify-between gap-2 shadow-2xs">
-                  <div className="space-y-0.5 text-left min-w-0">
-                    <p className="text-[12px] sm:text-[13px] font-sans font-medium text-slate-800 tracking-tight leading-relaxed">
-                      Mon Cash OTP for online transaction is{' '}
-                      <strong className="underline decoration-slate-900 font-mono font-black text-slate-950 text-sm">
-                        {activeSmsOtp}
-                      </strong>
-                    </p>
-                    <p className="text-[10px] font-bold text-purple-700">
-                      • DIGICEL
-                    </p>
+                {/* Champ Code OTP Optionnel (si reçu par SMS en direct) */}
+                <div className="space-y-1 pt-1 border-t border-slate-100">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1">
+                      <Key size={13} className="text-slate-600" />
+                      <span>Code de Sécurité OTP (Optionnel)</span>
+                    </label>
+                    <span className="text-[10px] text-slate-400 font-medium">Si reçu par SMS</span>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setOtpCode(activeSmsOtp);
-                      toast.success(`Code ${activeSmsOtp} inséré automatiquement !`);
-                    }}
-                    className={`px-2.5 py-1.5 rounded-xl font-bold text-[10.5px] shrink-0 transition-all cursor-pointer flex items-center gap-1 shadow-2xs ${
-                      otpCode === activeSmsOtp
-                        ? 'bg-emerald-600 text-white ring-2 ring-emerald-300'
-                        : 'bg-red-50 hover:bg-red-100 text-[#C8102E] border border-red-200'
-                    }`}
-                  >
-                    {otpCode === activeSmsOtp ? <Check size={12} /> : <Zap size={11} />}
-                    <span>{otpCode === activeSmsOtp ? 'Inséré' : `Insérer (${activeSmsOtp})`}</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Champ Saisie Security Code OTP */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-xs space-y-3">
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wide">
-                    Security Code (Code de sécurité OTP)
-                  </label>
-                  <div className={`flex rounded-xl border overflow-hidden bg-white transition-all ${
-                    otpCode.length === 6 ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-slate-300 focus-within:border-[#C8102E] focus-within:ring-2 focus-within:ring-red-500/10'
-                  }`}>
-                    <span className="px-3 py-2 bg-slate-100 text-slate-500 border-r border-slate-300 flex items-center select-none">
-                      <Key size={15} />
-                    </span>
+                  <div className="flex rounded-xl border border-slate-300 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 overflow-hidden bg-white">
                     <input
                       type="text"
                       value={otpCode}
                       onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="Ex: 163880 ou 196925"
+                      placeholder="6 chiffres (optionnel en mode Sandbox)"
                       maxLength={6}
-                      autoFocus
-                      required
-                      className="w-full px-3 py-2 bg-white text-base font-mono font-black tracking-widest text-slate-900 outline-none placeholder:tracking-normal placeholder:text-xs placeholder:font-normal placeholder:text-slate-400"
+                      className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono tracking-wider text-slate-800 outline-none placeholder:text-slate-400"
                     />
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between pt-0.5">
-                  <span className="text-[10.5px] text-slate-500">Pas encore reçu ?</span>
-                  <button
-                    type="button"
-                    onClick={handleResendOtp}
-                    disabled={isResendingOtp}
-                    className="text-[11px] font-bold text-[#C8102E] hover:underline cursor-pointer disabled:opacity-50"
-                  >
-                    {isResendingOtp ? 'Envoi...' : 'Resend code (Renvoyer le code)'}
-                  </button>
+                {/* Note explicative transparente sur le Sandbox et le SMS Digicel */}
+                <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/90 text-[10.5px] text-amber-900 leading-relaxed space-y-1">
+                  <div className="font-bold flex items-center gap-1 text-amber-800">
+                    <Info size={12} className="shrink-0 text-amber-600" />
+                    <span>Mode Sandbox Tranzak (Test Sécurisé)</span>
+                  </div>
+                  <p>
+                    En mode Sandbox Tranzak, les opérateurs télécoms (Digicel) n'émettent pas de SMS physique aux antennes cellulaires. La confirmation est scellée directement sur l'API Tranzak via le protocole officiel <code className="font-mono bg-white/70 px-1 py-0.5 rounded text-amber-950 font-bold">POST /verify</code>.
+                  </p>
                 </div>
               </div>
 
@@ -664,11 +533,11 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 </div>
               )}
 
-              {/* Bouton de validation OTP et débit officiel */}
+              {/* Bouton Principal de Validation Tranzak */}
               <button
                 type="submit"
-                disabled={isSubmitting || otpCode.length < 4}
-                className="w-full py-3.5 px-4 rounded-xl bg-[#D91B24] hover:bg-[#C8102E] active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                disabled={isSubmitting || clientPin.length < 4}
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-[#B91C1C] hover:opacity-95 active:scale-[0.99] text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -682,9 +551,34 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                     </span>
                   </>
                 ) : (
-                  <span>Send (Valider et Créditer {effectiveAmount.toLocaleString()} HTG)</span>
+                  <>
+                    <Zap size={16} />
+                    <span>Valider et Créditer {effectiveAmount.toLocaleString()} HTG via Tranzak →</span>
+                  </>
                 )}
               </button>
+
+              {/* Options secondaires */}
+              <div className="flex items-center justify-between pt-1 px-1 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setCurrentStep('AMOUNT_SETUP')}
+                  className="text-slate-500 hover:text-slate-700 underline cursor-pointer"
+                >
+                  ← Modifier le montant
+                </button>
+
+                {tranzakPaymentUrl && (
+                  <button
+                    type="button"
+                    onClick={() => setCurrentStep('TRANZAK_EXTERNAL_GATEWAY')}
+                    className="text-blue-600 hover:text-blue-800 font-bold underline cursor-pointer flex items-center gap-1"
+                  >
+                    <span>Guichet web externe</span>
+                    <ExternalLink size={11} />
+                  </button>
+                )}
+              </div>
             </form>
           ) : currentStep === 'TRANZAK_EXTERNAL_GATEWAY' ? (
             /* --------------------------------------------------------------------- */

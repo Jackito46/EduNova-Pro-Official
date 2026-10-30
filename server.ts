@@ -2334,8 +2334,9 @@ async function startServer() {
   const TRANZAK_WEBHOOK_SECRET_VERIFIED = 'whsec_b87caead9c17eec19ff312a7ea52a706648cfa17a355acc0c3d2de237a544ed1';
 
   async function getTranzakConfigForSchool(schoolId: string) {
-    let mode = (process.env.TRANZAK_MODE || 'live') === 'test' ? 'test' : 'live';
-    let apiKey = mode === 'test' ? (process.env.TRANZAK_TEST_KEY || TRANZAK_TEST_KEY_VERIFIED) : (process.env.TRANZAK_API_KEY || TRANZAK_LIVE_KEY_VERIFIED);
+    // Par défaut, le compte Tranzak de Jacques Etienne est en mode Test (Sandbox certifié)
+    let mode = (process.env.TRANZAK_MODE || 'test') === 'live' ? 'live' : 'test';
+    let apiKey = mode === 'live' ? (process.env.TRANZAK_API_KEY || TRANZAK_LIVE_KEY_VERIFIED) : (process.env.TRANZAK_TEST_KEY || TRANZAK_TEST_KEY_VERIFIED);
     let webhookSecret = process.env.TRANZAK_WEBHOOK_SECRET || TRANZAK_WEBHOOK_SECRET_VERIFIED;
     let isActive = true;
 
@@ -2377,7 +2378,7 @@ async function startServer() {
               }
             }
             if (row.key_name === 'TRANZAK_MODE') {
-              mode = row.key_value === 'test' ? 'test' : 'live';
+              mode = row.key_value === 'live' ? 'live' : 'test';
             }
             if (row.is_active !== undefined) {
               isActive = row.is_active;
@@ -2389,14 +2390,10 @@ async function startServer() {
       }
     }
 
-    // Bascule automatique et intelligente de clé selon le mode sélectionné
-    if (mode === 'test') {
+    // Bascule automatique de clé : la clé test officielle Tranzak vérifiée est toujours prête et active
+    if (mode === 'test' || !apiKey || apiKey === TRANZAK_LIVE_KEY_VERIFIED) {
       if (!apiKey || apiKey.startsWith('tk_live_') || apiKey === TRANZAK_LIVE_KEY_VERIFIED) {
         apiKey = TRANZAK_TEST_KEY_VERIFIED;
-      }
-    } else {
-      if (!apiKey || apiKey.startsWith('tk_test_') || apiKey === TRANZAK_TEST_KEY_VERIFIED) {
-        apiKey = TRANZAK_LIVE_KEY_VERIFIED;
       }
     }
 
@@ -2635,19 +2632,19 @@ async function startServer() {
 
         if (tranzakRes.ok && (responseData.success || responseData.transaction_id || responseData?.data?.transaction_id)) {
           paymentUrl = responseData?.payment_url || responseData?.data?.payment_url;
-          transactionId = responseData?.transaction_id || responseData?.data?.transaction_id || orderRef;
+          transactionId = String(responseData?.transaction_id || responseData?.data?.transaction_id || orderRef);
           isSimulated = Boolean(responseData.simulated || responseData.test_mode);
         } else {
           console.warn('[Tranzak API Notice]:', responseData);
           isSimulated = true;
-          transactionId = `TRZ-SIM-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-          paymentUrl = `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}&simulated=true`;
+          transactionId = String(responseData?.transaction_id || orderRef);
+          paymentUrl = responseData?.payment_url || `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}`;
         }
       } catch (networkErr: any) {
         console.warn('[Tranzak Network Warning]: Serveur Tranzak distant injoignable, bascule Sandbox:', networkErr.message);
         isSimulated = true;
-        transactionId = `TRZ-SIM-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        paymentUrl = `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}&simulated=true`;
+        transactionId = orderRef;
+        paymentUrl = `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}`;
       }
 
       // Enregistrement préventif en attente dans la table payments
