@@ -51,6 +51,63 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     }
   }, [studentData]);
 
+  // Détection automatique du retour de redirection Digicel / Tranzak (ex: /#/mon-economat?payment=success&ref=TRZ-...)
+  useEffect(() => {
+    const handleUrlPaymentReturn = async () => {
+      const hash = window.location.hash || '';
+      const search = window.location.search || '';
+      const fullUrl = hash + search;
+
+      if (fullUrl.includes('payment=success')) {
+        const queryPart = hash.includes('?') ? hash.split('?')[1] : search.replace(/^\?/, '');
+        const params = new URLSearchParams(queryPart);
+        const ref = params.get('ref') || params.get('order_id') || params.get('transaction_id');
+        const amount = Number(params.get('amount')) || 100;
+
+        if (ref) {
+          toast.loading('Confirmation de votre dépôt Tranzak MonCash en cours...', { id: 'trz-confirm' });
+          try {
+            const res = await fetch(`/api/tranzak/verify-payment/${encodeURIComponent(ref)}`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                school_id: school?.id || studentData?.school_id || user.school_id,
+                student_id: studentData?.id,
+                amount: amount
+              })
+            });
+            await res.json().catch(() => ({}));
+
+            if (studentData?.id) {
+              const { data: st } = await supabase
+                .from('students')
+                .select('wallet_balance_htg')
+                .eq('id', studentData.id)
+                .maybeSingle();
+              if (st?.wallet_balance_htg !== undefined) {
+                setWalletBalance(st.wallet_balance_htg);
+              }
+              const { data: pList } = await supabase
+                .from('payments')
+                .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+                .eq('student_id', studentData.id)
+                .order('created_at', { ascending: false });
+              if (pList) setPayments(pList);
+            }
+
+            toast.success(`Dépôt Tranzak Digicel MonCash validé ! +${amount.toLocaleString()} HTG crédités au portefeuille.`, { id: 'trz-confirm' });
+          } catch (e) {
+            toast.dismiss('trz-confirm');
+          } finally {
+            window.history.replaceState({}, document.title, window.location.pathname + '#/mon-economat');
+          }
+        }
+      }
+    };
+
+    handleUrlPaymentReturn();
+  }, [studentData?.id, school?.id, user.school_id]);
+
   useEffect(() => {
     const fetchFinances = async () => {
       if (!studentData?.id || !activeYear) {

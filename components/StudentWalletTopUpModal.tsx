@@ -89,6 +89,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const [customAmount, setCustomAmount] = useState<string>('');
   const [isCustom, setIsCustom] = useState(false);
   const [phone, setPhone] = useState(student.parent_phone?.replace(/\D/g, '') || '36045639');
+  const [showPhoneEdit, setShowPhoneEdit] = useState(false);
   const [clientPin, setClientPin] = useState<string>('');
   const [showPin, setShowPin] = useState(false);
 
@@ -121,6 +122,9 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   // Nettoyage et formatage du numéro haïtien
   const cleanPhone = phone.replace(/\D/g, '');
   const displayPhone = cleanPhone.startsWith('509') ? cleanPhone.slice(3) : cleanPhone;
+  const finalPhone = displayPhone.length >= 8 
+    ? displayPhone 
+    : (student.parent_phone?.replace(/\D/g, '').slice(-8) || '36045639');
 
   // Polling automatique en direct du statut Tranzak (pour détecter la validation sur Digicel Live)
   useEffect(() => {
@@ -146,7 +150,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
           if (onSuccess) onSuccess(finalBal, paymentObj);
         }
       } catch (e) {}
-    }, 4000);
+    }, 3500);
 
     return () => clearInterval(interval);
   }, [currentStep, tranzakTransactionId, effectiveAmount, currentBalance, effectiveSchoolId, onSuccess]);
@@ -158,11 +162,6 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
 
     if (effectiveAmount < 10) {
       setError('Le montant minimum de recharge MonCash est de 10 HTG.');
-      return;
-    }
-
-    if (displayPhone.length < 8) {
-      setError('Veuillez saisir un numéro Digicel MonCash valide (8 chiffres, ex: 36045639).');
       return;
     }
 
@@ -180,7 +179,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         currency: 'HTG',
         operator: 'moncash',
         customerName: studentFullName,
-        customerPhone: `509${displayPhone}`,
+        customerPhone: `509${finalPhone}`,
         reference: orderRef,
         description: `Recharge Portefeuille ${studentFullName}`,
         feeType: 'CREDIT_PORTEFEUILLE',
@@ -481,143 +480,151 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 </div>
               </div>
 
-              {/* Formulaire officiel Digicel MonCash */}
-              <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-xs space-y-3.5">
-                <div className="flex items-center justify-between pb-1 border-b border-slate-100">
-                  <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
-                    <Lock size={12} className="text-[#C8102E]" />
-                    Authentification Digicel Haïti
-                  </span>
-                  <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">
-                    Chiffré SSL 256-bit
-                  </span>
-                </div>
-
-                {/* Champ Numéro */}
-                <div className="space-y-1">
-                  <label className="block text-xs font-bold text-slate-700">
-                    Numéro de Téléphone MonCash
-                  </label>
-                  <div className="flex rounded-xl border border-slate-300 bg-slate-50 overflow-hidden">
-                    <span className="px-3 py-2 text-slate-500 font-mono font-bold text-xs border-r border-slate-300 flex items-center select-none">
-                      +509
-                    </span>
-                    <input
-                      type="text"
-                      readOnly
-                      value={displayPhone}
-                      className="w-full px-3 py-2 text-xs sm:text-sm font-mono font-bold text-slate-700 outline-none bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Champ PIN MonCash */}
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <KeyRound size={13} className="text-[#C8102E]" />
-                      <span>Code PIN Secret MonCash</span>
-                    </label>
-                    <span className="text-[10.5px] text-slate-400 font-medium">4 chiffres</span>
-                  </div>
-                  
-                  <div className="relative flex rounded-xl border border-slate-300 focus-within:border-[#C8102E] focus-within:ring-2 focus-within:ring-red-500/10 overflow-hidden bg-white">
-                    <input
-                      type={showPin ? "text" : "password"}
-                      value={clientPin}
-                      onChange={(e) => setClientPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                      placeholder="•••• (4 chiffres)"
-                      maxLength={4}
-                      autoFocus
-                      required
-                      className="w-full px-3.5 py-2.5 bg-white text-base font-mono font-black tracking-widest text-slate-900 outline-none placeholder:tracking-normal placeholder:font-normal placeholder:text-slate-400"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPin(!showPin)}
-                      className="px-3 text-slate-400 hover:text-slate-600 transition-colors flex items-center cursor-pointer"
-                    >
-                      {showPin ? <EyeOff size={16} /> : <Eye size={16} />}
-                    </button>
-                  </div>
-                  <p className="text-[10.5px] text-slate-500 leading-tight">
-                    Saisissez votre code PIN secret MonCash pour autoriser le prélèvement.
-                  </p>
-                </div>
-
-                {/* Champ Code OTP Optionnel (si reçu par SMS en direct) */}
-                <div className="space-y-1 pt-1 border-t border-slate-100">
-                  <div className="flex justify-between items-center">
-                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1">
-                      <Key size={13} className="text-slate-600" />
-                      <span>Code de Sécurité OTP (Optionnel)</span>
-                    </label>
-                    <span className="text-[10px] text-slate-400 font-medium">Si reçu par SMS</span>
-                  </div>
-                  <div className="flex rounded-xl border border-slate-300 focus-within:border-emerald-500 focus-within:ring-2 focus-within:ring-emerald-500/10 overflow-hidden bg-white">
-                    <input
-                      type="text"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      placeholder="6 chiffres (optionnel en mode Sandbox)"
-                      maxLength={6}
-                      className="w-full px-3.5 py-2 text-xs sm:text-sm font-mono tracking-wider text-slate-800 outline-none placeholder:text-slate-400"
-                    />
-                  </div>
-                </div>
-
-                {/* Panneau Spécifique Live Digicel MonCash (avec SMS OTP) */}
-                {paymentMode === 'live' && tranzakPaymentUrl ? (
-                  <div className="p-3.5 rounded-2xl bg-gradient-to-br from-red-50 to-rose-50 border border-red-200 text-xs text-red-950 space-y-2.5 shadow-xs">
+              {/* Formulaire officiel Digicel MonCash / Monitoring Live */}
+              {paymentMode === 'live' ? (
+                <div className="space-y-3.5">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-red-50 via-rose-50 to-red-100/50 border border-red-200 text-xs text-red-950 space-y-3 shadow-xs">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-red-700 flex items-center gap-1.5 text-xs">
+                      <span className="font-black text-red-700 flex items-center gap-2 text-xs uppercase tracking-wide">
                         <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
-                        Guichet Officiel Digicel MonCash Ouvert
+                        Guichet Officiel Digicel MonCash Actif
                       </span>
                       <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-red-200 text-red-700 font-bold">
-                        SMS OTP Actif
+                        SMS OTP Live
                       </span>
                     </div>
 
-                    <p className="text-[11px] text-slate-700 leading-relaxed">
-                      Digicel a ouvert votre session sécurisée et expédie actuellement le <strong>SMS avec le Code OTP</strong> sur votre mobile <strong>+509 {displayPhone}</strong>.
+                    <p className="text-xs text-slate-700 leading-relaxed">
+                      Digicel a ouvert votre guichet sécurisé. Sur la page Digicel, confirmez votre numéro <strong>+509 {finalPhone}</strong> et votre PIN secret pour recevoir le code SMS OTP et finaliser le prélèvement de <strong>{effectiveAmount.toLocaleString()} HTG</strong>.
                     </p>
 
-                    <div className="flex flex-col gap-1.5 pt-0.5">
-                      <a
-                        href={tranzakPaymentUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="w-full py-2.5 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all"
-                      >
-                        <ExternalLink size={14} />
-                        <span>Accéder au Guichet Sécurisé Digicel (Saisir PIN & OTP)</span>
-                      </a>
+                    <div className="p-3 rounded-xl bg-white border border-red-100 flex items-center justify-between text-xs text-slate-700 shadow-2xs">
+                      <span className="flex items-center gap-2 font-medium">
+                        <RefreshCw size={14} className="text-red-600 animate-spin shrink-0" />
+                        <span>Détection automatique en direct...</span>
+                      </span>
+                      <span className="font-bold text-red-600 font-mono text-[11px] bg-red-50 px-2 py-0.5 rounded">
+                        Écoute Tranzak
+                      </span>
+                    </div>
 
+                    <div className="flex flex-col gap-2 pt-1">
                       <button
                         type="button"
                         onClick={handleCheckLiveStatus}
                         disabled={isCheckingStatus}
-                        className="w-full py-2 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-50"
+                        className="w-full py-3 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.99] text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer disabled:opacity-50"
                       >
-                        <RefreshCw size={13} className={isCheckingStatus ? 'animate-spin' : ''} />
-                        <span>{isCheckingStatus ? 'Vérification en cours...' : 'Vérifier la confirmation Digicel en direct'}</span>
+                        <RefreshCw size={14} className={isCheckingStatus ? 'animate-spin' : ''} />
+                        <span>{isCheckingStatus ? 'Vérification en cours...' : 'Vérifier la confirmation Digicel maintenant'}</span>
                       </button>
+
+                      {tranzakPaymentUrl && (
+                        <a
+                          href={tranzakPaymentUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all text-center"
+                        >
+                          <ExternalLink size={13} />
+                          <span>Rouvrir la page sécurisée Digicel MonCash</span>
+                        </a>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  /* Note explicative transparente sur le Sandbox et le SMS Digicel */
-                  <div className="p-2.5 rounded-xl bg-amber-50/80 border border-amber-200/90 text-[10.5px] text-amber-900 leading-relaxed space-y-1">
-                    <div className="font-bold flex items-center gap-1 text-amber-800">
-                      <Info size={12} className="shrink-0 text-amber-600" />
-                      <span>Mode Sandbox Tranzak (Test Sécurisé)</span>
-                    </div>
-                    <p>
-                      En mode Sandbox Tranzak, les opérateurs télécoms (Digicel) n'émettent pas de SMS physique aux antennes cellulaires. La confirmation est scellée directement sur l'API Tranzak via le protocole officiel <code className="font-mono bg-white/70 px-1 py-0.5 rounded text-amber-950 font-bold">POST /verify</code>.
-                    </p>
+
+                  {/* Option alternative : Autoriser directement par PIN dans EduNova */}
+                  <div className="border border-slate-200 rounded-2xl p-3.5 bg-white space-y-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowPin(!showPin)}
+                      className="w-full flex items-center justify-between text-left text-xs font-bold text-slate-700 cursor-pointer"
+                    >
+                      <span className="flex items-center gap-1.5">
+                        <KeyRound size={14} className="text-slate-500" />
+                        <span>Ou autoriser directement ici avec votre PIN MonCash</span>
+                      </span>
+                      <span className="text-[11px] text-red-600 underline">
+                        {showPin ? 'Masquer' : 'Saisir PIN ici'}
+                      </span>
+                    </button>
+
+                    {showPin && (
+                      <div className="pt-2 border-t border-slate-100 space-y-3 animate-in fade-in">
+                        <div className="space-y-1">
+                          <label className="block text-xs font-bold text-slate-700">Code PIN Secret MonCash (4 chiffres)</label>
+                          <input
+                            type="password"
+                            value={clientPin}
+                            onChange={(e) => setClientPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                            placeholder="••••"
+                            maxLength={4}
+                            className="w-full px-3.5 py-2 border border-slate-300 rounded-xl font-mono text-base tracking-widest text-slate-900 outline-none"
+                          />
+                        </div>
+
+                        <button
+                          type="submit"
+                          disabled={isSubmitting || clientPin.length < 4}
+                          className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                        >
+                          <Zap size={14} />
+                          <span>Valider le prélèvement direct</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                )}
-              </div>
+                </div>
+              ) : (
+                /* Mode Sandbox Test */
+                <div className="border border-slate-200 rounded-2xl p-4 bg-white shadow-xs space-y-3.5">
+                  <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                      <Lock size={12} className="text-blue-600" />
+                      Test Sandbox Tranzak (Sans Débit)
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded">
+                      Environnement Test
+                    </span>
+                  </div>
+
+                  <div className="p-2.5 rounded-xl bg-blue-50/80 border border-blue-200/90 text-[10.5px] text-blue-900 leading-relaxed">
+                    Confirmation scellée directement sur l'API Tranzak via le protocole officiel <code className="font-mono bg-white px-1 py-0.5 rounded text-blue-950 font-bold">POST /verify</code>.
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="block text-xs font-bold text-slate-700 flex items-center gap-1">
+                      <KeyRound size={13} className="text-blue-600" />
+                      <span>Code PIN Test (ex: 1234)</span>
+                    </label>
+                    <input
+                      type="password"
+                      value={clientPin || '1234'}
+                      onChange={(e) => setClientPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      maxLength={4}
+                      className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl font-mono text-base tracking-widest text-slate-900 outline-none"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-700 hover:opacity-95 text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-md transition-all cursor-pointer flex items-center justify-center gap-2"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <RefreshCw size={16} className="animate-spin" />
+                        <span>Validation Sandbox...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Zap size={16} />
+                        <span>Valider le test et créditer {effectiveAmount.toLocaleString()} HTG →</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
 
               {/* Circuit Financier Validé en direct */}
               <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2.5 space-y-1">
@@ -631,7 +638,7 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                   <div className="p-1.5 rounded-xl bg-white border border-slate-200">
                     <span className="text-[9px] text-slate-400 block uppercase">1. Débit Payeur</span>
                     <p className="font-mono font-black text-red-600">-{effectiveAmount.toLocaleString()} G</p>
-                    <span className="text-[8.5px] text-slate-400 block truncate">+509 {displayPhone}</span>
+                    <span className="text-[8.5px] text-slate-400 block truncate">+509 {finalPhone}</span>
                   </div>
                   <div className="p-1.5 rounded-xl bg-white border border-slate-200">
                     <span className="text-[9px] text-slate-400 block uppercase">2. Compte Tranzak</span>
@@ -652,31 +659,6 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                   <span>{error}</span>
                 </div>
               )}
-
-              {/* Bouton Principal de Validation Tranzak */}
-              <button
-                type="submit"
-                disabled={isSubmitting || clientPin.length < 4}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-[#B91C1C] hover:opacity-95 active:scale-[0.99] text-white font-black text-xs sm:text-sm uppercase tracking-wider shadow-lg shadow-red-600/30 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw size={16} className="animate-spin" />
-                    <span>
-                      {clearingProgress === 1
-                        ? "1/3 : Débit compte MonCash..."
-                        : clearingProgress === 2
-                        ? "2/3 : Encaissement sur compte Tranzak..."
-                        : "3/3 : Crédit portefeuille élève..."}
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <Zap size={16} />
-                    <span>Valider et Créditer {effectiveAmount.toLocaleString()} HTG via Tranzak →</span>
-                  </>
-                )}
-              </button>
 
               {/* Options secondaires */}
               <div className="flex items-center justify-between pt-1 px-1 text-[11px]">
@@ -960,25 +942,51 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                 )}
               </div>
 
-              {/* Saisie Numéro Digicel MonCash */}
-              <div className="space-y-1">
-                <label className="block text-xs font-black text-slate-800 uppercase tracking-wide">
-                  Numéro Digicel MonCash du payeur
-                </label>
-                <div className="flex rounded-xl border border-slate-300 focus-within:border-[#C8102E] focus-within:ring-2 focus-within:ring-red-500/10 overflow-hidden bg-white">
-                  <span className="px-3 py-2 bg-slate-100 text-slate-600 font-mono font-bold text-xs border-r border-slate-300 flex items-center select-none">
-                    +509
-                  </span>
-                  <input
-                    type="tel"
-                    value={displayPhone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="36045639"
-                    maxLength={8}
-                    required
-                    className="w-full px-3 py-2 bg-white text-xs sm:text-sm font-mono font-bold text-slate-900 outline-none placeholder:text-slate-400"
-                  />
+              {/* Numéro MonCash Payeur (Pré-rempli & Automatique) */}
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-red-100 text-red-600 flex items-center justify-center">
+                      <Smartphone size={15} />
+                    </div>
+                    <div>
+                      <span className="text-[9.5px] font-bold text-slate-400 uppercase block">
+                        Numéro MonCash Payeur
+                      </span>
+                      <span className="font-mono font-bold text-xs text-slate-800">
+                        +509 {finalPhone}
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowPhoneEdit(!showPhoneEdit)}
+                    className="text-[11px] font-bold text-red-600 hover:text-red-700 underline cursor-pointer"
+                  >
+                    {showPhoneEdit ? 'Masquer' : 'Modifier'}
+                  </button>
                 </div>
+
+                {showPhoneEdit && (
+                  <div className="mt-2.5 pt-2.5 border-t border-slate-200 animate-in fade-in">
+                    <label className="block text-[10.5px] font-bold text-slate-700 mb-1">
+                      Numéro Digicel MonCash (8 chiffres)
+                    </label>
+                    <div className="flex rounded-xl border border-slate-300 focus-within:border-[#C8102E] focus-within:ring-2 focus-within:ring-red-500/10 overflow-hidden bg-white">
+                      <span className="px-3 py-1.5 bg-slate-100 text-slate-600 font-mono font-bold text-xs border-r border-slate-300 flex items-center select-none">
+                        +509
+                      </span>
+                      <input
+                        type="tel"
+                        value={displayPhone}
+                        onChange={(e) => setPhone(e.target.value.replace(/\D/g, ''))}
+                        placeholder="36045639"
+                        maxLength={8}
+                        className="w-full px-3 py-1.5 bg-white text-xs font-mono font-bold text-slate-900 outline-none placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
 
               {/* Sélecteur de Mode : Live Réel vs Test Sandbox */}
@@ -1066,7 +1074,7 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
               <button
                 type="submit"
                 disabled={isSubmitting || effectiveAmount <= 0}
-                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-blue-700 hover:opacity-95 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/25 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-red-700 hover:opacity-95 active:scale-[0.99] text-white font-black text-sm uppercase tracking-wider shadow-lg shadow-red-600/25 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
                   <>
@@ -1077,8 +1085,8 @@ _Ce crédit est disponible immédiatement à la cantine et à l'économat de l'�
                   <>
                     <span>
                       {paymentMode === 'live'
-                        ? 'Ouvrir Digicel MonCash (Envoi SMS OTP Réel) →'
-                        : 'Lancer le Test Sandbox (Sans Débit) →'}
+                        ? `Payer ${effectiveAmount.toLocaleString()} HTG via Digicel MonCash (Live) →`
+                        : `Tester ${effectiveAmount.toLocaleString()} HTG en Sandbox (Test) →`}
                     </span>
                   </>
                 )}

@@ -2573,8 +2573,10 @@ async function startServer() {
       const effectiveOperator = (operator === 'natcash') ? 'natcash' : 'moncash';
 
       const baseUrl = process.env.APP_URL || 'https://edunova-pro.tech';
-      const successUrl = `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}`;
-      const cancelUrl = `${baseUrl}/#/fees?payment=cancel&ref=${encodeURIComponent(orderRef)}`;
+      const isWalletTopUp = feeType === 'CREDIT_PORTEFEUILLE' || feeType === 'RECHARGE_PORTEFEUILLE';
+      const targetHash = isWalletTopUp ? 'mon-economat' : 'fees';
+      const successUrl = `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}`;
+      const cancelUrl = `${baseUrl}/#/${targetHash}?payment=cancel&ref=${encodeURIComponent(orderRef)}`;
       const callbackUrl = `${baseUrl}/api/tranzak/webhook`;
 
       const payload = {
@@ -2645,13 +2647,13 @@ async function startServer() {
           console.warn('[Tranzak API Notice]:', responseData);
           isSimulated = true;
           transactionId = String(responseData?.transaction_id || orderRef);
-          paymentUrl = responseData?.payment_url || `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}`;
+          paymentUrl = responseData?.payment_url || `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}`;
         }
       } catch (networkErr: any) {
         console.warn('[Tranzak Network Warning]: Serveur Tranzak distant injoignable, bascule Sandbox:', networkErr.message);
         isSimulated = true;
         transactionId = orderRef;
-        paymentUrl = `${baseUrl}/#/fees?payment=success&ref=${encodeURIComponent(orderRef)}`;
+        paymentUrl = `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}`;
       }
 
       // Enregistrement préventif en attente dans la table payments
@@ -3583,17 +3585,40 @@ async function startServer() {
       let finalStudentId = studentId || tranzakVerifyData?.data?.metadata?.student_id;
 
       if (isCompleted) {
-        // 1. Mettre à jour l'entrée payments
+        let effectiveCreditAmount = depositAmount;
+        // 1. Rechercher la transaction correspondante dans payments pour récupérer student_id et montant exact
         try {
-          await supabase
+          const { data: pRec } = await supabase
             .from('payments')
-            .update({
-              status: 'VALIDE',
-              moncash_status: 'COMPLETED',
-              notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
-              updated_at: new Date().toISOString()
-            })
-            .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`);
+            .select('id, student_id, amount, status, fee_type')
+            .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`)
+            .maybeSingle();
+
+          if (pRec) {
+            if (!finalStudentId && pRec.student_id) finalStudentId = pRec.student_id;
+            if (pRec.amount) effectiveCreditAmount = Number(pRec.amount) || depositAmount;
+            if (pRec.status !== 'VALIDE') {
+              await supabase
+                .from('payments')
+                .update({
+                  status: 'VALIDE',
+                  moncash_status: 'COMPLETED',
+                  notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', pRec.id);
+            }
+          } else {
+            await supabase
+              .from('payments')
+              .update({
+                status: 'VALIDE',
+                moncash_status: 'COMPLETED',
+                notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
+                updated_at: new Date().toISOString()
+              })
+              .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`);
+          }
         } catch (dbErr) {}
 
         // 2. Créditer le portefeuille de l'élève
@@ -3607,7 +3632,7 @@ async function startServer() {
 
             if (st) {
               const currentBal = Number(st.wallet_balance_htg) || 0;
-              const credit = depositAmount || Number(tranzakVerifyData?.data?.amount) || 100;
+              const credit = effectiveCreditAmount || Number(tranzakVerifyData?.data?.amount) || 100;
               newBalance = currentBal + credit;
               await supabase
                 .from('students')
