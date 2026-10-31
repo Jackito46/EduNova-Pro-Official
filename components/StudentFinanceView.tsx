@@ -44,19 +44,10 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns'>('all');
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
-  const [isSimulatingTranzak, setIsSimulatingTranzak] = useState<boolean>(false);
-  const [verifiedWalletPhone, setVerifiedWalletPhone] = useState<string>('');
 
   useEffect(() => {
     if (studentData?.wallet_balance_htg !== undefined) {
       setWalletBalance(studentData.wallet_balance_htg || 0);
-    }
-    if (studentData?.id) {
-      const savedPhone = localStorage.getItem(`edunova_wallet_verified_phone_${studentData.id}`)
-        || (studentData.parent_phone ? studentData.parent_phone.replace(/\D/g, '').slice(-8) : '')
-        || localStorage.getItem('edunova_last_verified_wallet_phone')
-        || '34278313';
-      setVerifiedWalletPhone(savedPhone);
     }
   }, [studentData]);
 
@@ -237,50 +228,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     fetchFinances();
   }, [studentData, activeYear, user.school_id]);
 
-  // Simulation test directe via API Tranzak SAGETECK (+100 HTG)
-  const handleSimulateTranzakTest = async () => {
-    if (!studentData) return;
-    setIsSimulatingTranzak(true);
-    try {
-      const token = (await supabase.auth.getSession()).data?.session?.access_token;
-      const res = await fetch('/api/tranzak/simulate-deposit', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
-        },
-        body: JSON.stringify({
-          schoolId: school?.id || studentData.school_id || user.school_id,
-          studentId: studentData.id,
-          studentName: `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim(),
-          referenceNumber: studentData.reference_number || '',
-          amount: 100,
-          operator: 'moncash',
-          customerName: `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim(),
-          customerPhone: studentData.parent_phone || (user as any).phone || (user as any).phone_number || '50937000000'
-        })
-      });
-
-      const data = await res.json();
-      if (res.ok && data.success) {
-        setWalletBalance(data.new_balance);
-        toast.success(`Simulation Tranzak réussie ! +${data.amount} HTG crédités au portefeuille (Réf: ${data.reference})`);
-        // Actualiser l'historique des écritures
-        const { data: updatedPayments } = await supabase
-          .from('payments')
-          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-          .eq('student_id', studentData.id)
-          .order('created_at', { ascending: false });
-        if (updatedPayments) setPayments(updatedPayments);
-      } else {
-        toast.error(data.error || 'Erreur lors de la simulation de dépôt');
-      }
-    } catch (err: any) {
-      toast.error('Erreur réseau lors de la simulation');
-    } finally {
-      setIsSimulatingTranzak(false);
-    }
-  };
 
   if (studentLoading || loading) {
     return (
@@ -512,12 +459,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
               <span className="text-[10px] bg-emerald-100/90 text-emerald-800 font-bold px-1.5 py-0.2 rounded-md">
                 Solde Disponible
               </span>
-              {verifiedWalletPhone && (
-                <span className="text-[9.5px] bg-blue-100 text-blue-900 font-mono font-bold px-1.5 py-0.2 rounded-md flex items-center gap-1 border border-blue-200">
-                  <ShieldCheck size={11} className="text-blue-600" />
-                  +509 {verifiedWalletPhone} (Lié OTP)
-                </span>
-              )}
             </div>
             <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono flex items-baseline gap-1">
               {(walletBalance || 0).toLocaleString()} <span className="text-xs font-bold text-slate-500">HTG</span>
@@ -525,35 +466,15 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           </div>
         </div>
 
-        <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
+        <div className="flex items-center gap-2 self-stretch sm:self-auto">
           <button
             type="button"
             onClick={() => setShowWalletTopUpModal(true)}
-            className="flex-1 sm:flex-none px-3.5 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             title="Recharger le portefeuille de l'élève en ligne via MonCash / Natcash / Tranzak"
           >
             <Smartphone size={14} />
             <span>Renflouer mon Portefeuille</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSimulateTranzakTest}
-            disabled={isSimulatingTranzak}
-            className="px-3 py-2 bg-white hover:bg-amber-50 text-slate-700 hover:text-amber-700 border border-slate-200 hover:border-amber-300 font-bold text-xs rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 shadow-2xs disabled:opacity-50"
-            title="Simulation express de dépôt via l'API Tranzak SAGETECK (+100 HTG)"
-          >
-            {isSimulatingTranzak ? (
-              <>
-                <Loader2 size={13} className="animate-spin text-amber-500" />
-                <span>Simulation...</span>
-              </>
-            ) : (
-              <>
-                <Sparkles size={13} className="text-amber-500" />
-                <span>Test Dépôt (100 G)</span>
-              </>
-            )}
           </button>
         </div>
       </div>
@@ -1082,10 +1003,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             setWalletBalance(newBalance);
             if (paymentRecord) {
               setPayments(prev => [paymentRecord, ...prev]);
-            }
-            if (studentData?.id) {
-              const saved = localStorage.getItem(`edunova_wallet_verified_phone_${studentData.id}`) || '34278313';
-              setVerifiedWalletPhone(saved);
             }
             toast.success(`Portefeuille renfloué avec succès ! Nouveau solde : ${newBalance.toLocaleString()} HTG`);
           }}

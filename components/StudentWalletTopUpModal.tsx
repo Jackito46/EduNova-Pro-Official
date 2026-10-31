@@ -110,7 +110,6 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   };
 
   const [contactPhone, setContactPhone] = useState<string>(getInitialPhone);
-  const [showPhoneEdit, setShowPhoneEdit] = useState(false);
 
   // PIN & OTP pour validation directe
   const [clientPin, setClientPin] = useState<string>('');
@@ -1175,54 +1174,6 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                         HTG
                       </span>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              {/* NUMÉRO DE CONTACT POUR REÇU SMS (OPTIONNEL & NON BLOQUANT) */}
-              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Smartphone size={16} className="text-slate-600" />
-                    <div>
-                      <span className="text-[10px] font-bold text-slate-500 uppercase block">
-                        Numéro pour le Reçu SMS (Parent/Payeur)
-                      </span>
-                      <span className="font-mono font-bold text-xs text-slate-800">
-                        +509 {finalPhone}
-                      </span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setShowPhoneEdit(!showPhoneEdit)}
-                    className={`text-[11px] font-bold underline cursor-pointer ${isMonCash ? 'text-red-600' : 'text-blue-600'}`}
-                  >
-                    {showPhoneEdit ? 'Masquer' : 'Changer'}
-                  </button>
-                </div>
-
-                {showPhoneEdit && (
-                  <div className="mt-2.5 pt-2.5 border-t border-slate-200 space-y-1.5 animate-in fade-in">
-                    <label className="block text-[10.5px] font-bold text-slate-700">
-                      Numéro de téléphone pour recevoir le reçu SMS officiel
-                    </label>
-                    <div className="flex rounded-xl border border-slate-300 overflow-hidden bg-white">
-                      <span className="px-3 py-1.5 bg-slate-100 text-slate-600 font-mono font-bold text-xs border-r border-slate-300 flex items-center select-none">
-                        +509
-                      </span>
-                      <input
-                        type="tel"
-                        value={displayPhone}
-                        onChange={(e) => setContactPhone(e.target.value.replace(/\D/g, ''))}
-                        placeholder="34278313"
-                        maxLength={8}
-                        className="w-full px-3 py-1.5 bg-white text-xs font-mono font-bold text-slate-900 outline-none"
-                      />
-                    </div>
-                    <p className="text-[10px] text-slate-500">
-                      Rappel : N'importe quel téléphone ayant un solde suffisant peut régler au guichet.
-                    </p>
                   </div>
                 )}
               </div>
