@@ -3877,9 +3877,11 @@ async function startServer() {
         }
       }
 
-      // Si de nouveaux fonds ont été validés, créditer le portefeuille de l'élève
+      // Calcul certifié et idempotent du total réel validé sur Tranzak pour cet élève
+      const totalTranzakCompleted = matchedCompletedTx.reduce((sum: number, tx: any) => sum + (Math.round(Number(tx.amount)) || 0), 0);
+
       let currentBal = 0;
-      let newBal = 0;
+      let newBal = totalTranzakCompleted;
 
       try {
         const { data: stRow } = await dbClient
@@ -3889,9 +3891,11 @@ async function startServer() {
           .maybeSingle();
 
         currentBal = Number(stRow?.wallet_balance_htg) || 0;
-        newBal = currentBal + newlyCreditedAmount;
 
-        if (newlyCreditedAmount > 0) {
+        // Si le solde en base est différent du total certifié Tranzak (ex: 40 HTG au lieu de 20 HTG suite à un double appel de test),
+        // nous rectifions immédiatement le solde au montant réel certifié !
+        if (currentBal !== totalTranzakCompleted) {
+          newBal = totalTranzakCompleted;
           await dbClient
             .from('students')
             .update({
@@ -3900,27 +3904,29 @@ async function startServer() {
             })
             .eq('id', studentId);
 
-          // Audit log
+          // Audit log de réconciliation
           webhookAuditLogs.unshift({
-            id: `wh-trz-sync-${Date.now()}`,
+            id: `wh-trz-reconcile-${Date.now()}`,
             timestamp: new Date().toISOString(),
             school_id: schoolId || undefined,
             gateway: 'tranzak',
             operator: 'moncash',
-            event_type: 'payment.sync.completed',
-            order_id: newlyValidatedList[0]?.reference || 'SYNC-TRANZAK',
-            transaction_id: newlyValidatedList[0]?.transaction_id || 'SYNC-TRANZAK',
-            amount: newlyCreditedAmount,
+            event_type: 'payment.sync.reconciled',
+            order_id: newlyValidatedList[0]?.reference || 'RECONCILE-TRANZAK',
+            transaction_id: newlyValidatedList[0]?.transaction_id || 'RECONCILE-TRANZAK',
+            amount: newBal,
             currency: 'HTG',
             signature_status: 'valid',
             persisted_to_db: true,
             http_status: 200,
             simulated: false,
             status: 'VALIDE',
-            notes: `Synchronisation automatique Tranzak : +${newlyCreditedAmount} HTG crédités au portefeuille élève`,
+            notes: `Réconciliation certifiée Tranzak : solde portefeuille rectifié de ${currentBal} HTG à ${newBal} HTG (Total réel Tranzak)`,
             student_name: studentName || studentId
           });
           if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+        } else {
+          newBal = currentBal;
         }
       } catch (stUpErr) {
         console.warn('[Tranzak Sync] Erreur mise à jour wallet_balance_htg:', stUpErr);
@@ -3930,17 +3936,225 @@ async function startServer() {
         success: true,
         synced: true,
         matched_transactions_count: matchedCompletedTx.length,
-        newly_credited_amount: newlyCreditedAmount,
+        total_tranzak_completed: totalTranzakCompleted,
         old_balance: currentBal,
-        new_balance: newlyCreditedAmount > 0 ? newBal : currentBal,
+        new_balance: newBal,
         transactions: newlyValidatedList,
-        message: newlyCreditedAmount > 0
-          ? `Dépôt Tranzak détecté ! +${newlyCreditedAmount} HTG crédités au portefeuille de l'élève.`
-          : 'Portefeuille déjà à jour avec les transactions Tranzak.'
+        message: currentBal !== newBal
+          ? `Solde du portefeuille rectifié au montant certifié Tranzak : ${newBal} HTG (auparavant ${currentBal} HTG).`
+          : `Portefeuille certifié et conforme avec Tranzak (${newBal} HTG).`
       });
     } catch (err: any) {
       console.error('[Tranzak Sync Error]:', err);
       return res.status(500).json({ success: false, error: err.message || 'Erreur lors de la synchronisation Tranzak' });
+    }
+  });
+
+  // API Route de Diagnostic Avancé pour StudentFinanceView :
+  // Compare les logs de la table Supabase 'transactions' / 'payments' de l'élève
+  // avec les relevés Tranzak et les callbacks Webhook pour expliquer tout écart de solde
+  app.get('/api/tranzak/diagnostics/:studentId', async (req, res) => {
+    try {
+      const studentId = req.params.studentId;
+      const schoolId = (req.query.schoolId as string) || '';
+      const studentName = (req.query.studentName as string) || '';
+
+      const dbClient = getSupabaseClient(req);
+
+      // 1. Lire la table 'students' pour le solde actuel
+      let studentRecord: any = null;
+      try {
+        const { data: st } = await dbClient
+          .from('students')
+          .select('id, first_name, last_name, reference_number, wallet_balance_htg, school_id')
+          .eq('id', studentId)
+          .maybeSingle();
+        studentRecord = st;
+      } catch (e) {}
+
+      // 2. Lire la table Supabase 'transactions' spécifiquement demandée, avec repli sur 'payments'
+      let dbTransactions: any[] = [];
+      let dbSource = 'payments';
+      try {
+        const { data: txList, error: txErr } = await dbClient
+          .from('transactions')
+          .select('*')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false });
+        if (!txErr && txList && txList.length > 0) {
+          dbTransactions = txList;
+          dbSource = 'transactions';
+        }
+      } catch (e) {}
+
+      if (dbTransactions.length === 0) {
+        try {
+          const { data: pList } = await dbClient
+            .from('payments')
+            .select('*')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false });
+          if (pList) {
+            dbTransactions = pList;
+            dbSource = 'payments';
+          }
+        } catch (e) {}
+      }
+
+      // 3. Lire les logs de callbacks Webhook reçus par le serveur pour cet élève
+      const studentAuditLogs = webhookAuditLogs.filter(log => {
+        if (log.student_name === studentId || log.student_name?.includes(studentId)) return true;
+        if (studentRecord && log.student_name?.includes(studentRecord.first_name)) return true;
+        const matchesDb = dbTransactions.some(tx => 
+          (tx.reference_number && (log.order_id === tx.reference_number || log.transaction_id === tx.reference_number)) ||
+          (tx.moncash_order_id && (log.order_id === tx.moncash_order_id || log.transaction_id === tx.moncash_order_id))
+        );
+        return matchesDb;
+      });
+
+      // 4. Interroger l'API officielle Tranzak Live
+      const config = await getTranzakConfigForSchool(schoolId || studentRecord?.school_id || '', 'live');
+      const apiKey = config.apiKey || TRANZAK_LIVE_KEY_VERIFIED;
+
+      let tranzakGatewayRecords: any[] = [];
+      try {
+        const tranzakRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=30', {
+          headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' }
+        });
+        if (tranzakRes.ok) {
+          const rJson = await tranzakRes.json();
+          const allT = Array.isArray(rJson?.data) ? rJson.data : [];
+          tranzakGatewayRecords = allT.filter((t: any) => {
+            if (t.metadata?.student_id === studentId) return true;
+            if (studentRecord && (
+              t.customer?.name?.toLowerCase().includes(studentRecord.first_name?.toLowerCase()) ||
+              t.description?.toLowerCase().includes(studentRecord.first_name?.toLowerCase())
+            )) return true;
+            if (studentName && (
+              t.customer?.name?.toLowerCase().includes(studentName.toLowerCase()) ||
+              t.description?.toLowerCase().includes(studentName.toLowerCase())
+            )) return true;
+            return false;
+          });
+        }
+      } catch (trErr) {
+        console.warn('[Diagnostics Tranzak Fetch Error]:', trErr);
+      }
+
+      // 5. Analyse comparative détaillée et détection des écarts
+      const comparisonList: any[] = [];
+      let totalTranzakCompletedAmount = 0;
+      let totalDbValidatedAmount = 0;
+      let missedCallbackCount = 0;
+
+      for (const trz of tranzakGatewayRecords) {
+        const trzAmount = Number(trz.amount) || 0;
+        const trzStatus = trz.status;
+        const trzRef = trz.reference || trz.transaction_id;
+        const trzId = trz.transaction_id;
+
+        if (trzStatus === 'completed') {
+          totalTranzakCompletedAmount += trzAmount;
+        }
+
+        const dbMatch = dbTransactions.find(d => 
+          d.reference_number === trzRef || 
+          d.reference_number === trzId || 
+          d.moncash_order_id === trzRef ||
+          (d.notes && d.notes.includes(trzId))
+        );
+
+        const isDbValidated = dbMatch && (dbMatch.status === 'VALIDE' || dbMatch.moncash_status === 'COMPLETED');
+        if (isDbValidated) {
+          totalDbValidatedAmount += Number(dbMatch.amount || trzAmount);
+        }
+
+        const cbMatch = studentAuditLogs.find(cb => cb.order_id === trzRef || cb.transaction_id === trzId);
+        const callbackReceived = Boolean(cbMatch);
+
+        let diagnosticVerdict = 'SYNCED';
+        let explanation = 'Paiement confirmé sur Tranzak et synchronisé dans la base Supabase.';
+
+        if (trzStatus === 'completed') {
+          if (!dbMatch || !isDbValidated) {
+            diagnosticVerdict = 'DISCREPANCY_NOT_IN_DB';
+            missedCallbackCount++;
+            explanation = !callbackReceived
+              ? "Paiement validé par Tranzak, mais le callback Webhook n'a pas été reçu et l'utilisateur n'a pas été redirigé avec les paramètres de retour. Le montant n'apparaissait donc pas dans le solde."
+              : "Callback reçu mais l'écriture Supabase n'était pas validée.";
+          }
+        } else if (trzStatus === 'failed') {
+          diagnosticVerdict = 'FAILED_AT_GATEWAY';
+          explanation = `Transaction rejetée ou expirée au guichet MonCash (${trz.failure_reason || 'Délai de 15 minutes dépassé ou abandon'}).`;
+        } else if (trzStatus === 'pending') {
+          diagnosticVerdict = 'PENDING_AT_GATEWAY';
+          explanation = "Session de paiement ouverte, en attente de validation du code PIN/OTP sur le téléphone.";
+        }
+
+        comparisonList.push({
+          transaction_id: trzId,
+          reference: trzRef,
+          amount: trzAmount,
+          currency: trz.currency || 'HTG',
+          operator: trz.payment_method || 'moncash',
+          created_at: trz.created_at,
+          completed_at: trz.completed_at,
+          tranzak_status: trzStatus,
+          database_match: dbMatch ? {
+            id: dbMatch.id,
+            status: dbMatch.status,
+            amount: dbMatch.amount,
+            source_table: dbSource
+          } : null,
+          callback_received: callbackReceived,
+          callback_log: cbMatch ? {
+            timestamp: cbMatch.timestamp,
+            event_type: cbMatch.event_type,
+            signature_status: cbMatch.signature_status
+          } : null,
+          verdict: diagnosticVerdict,
+          explanation: explanation
+        });
+      }
+
+      const currentBalance = Number(studentRecord?.wallet_balance_htg) || 0;
+      const discrepancyAmount = Math.max(0, totalTranzakCompletedAmount - currentBalance);
+      const isHealthy = discrepancyAmount === 0 && missedCallbackCount === 0;
+
+      return res.json({
+        success: true,
+        timestamp: new Date().toISOString(),
+        student: {
+          id: studentId,
+          name: studentRecord ? `${studentRecord.first_name} ${studentRecord.last_name}` : studentName,
+          reference_number: studentRecord?.reference_number,
+          current_wallet_balance_htg: currentBalance
+        },
+        metrics: {
+          total_tranzak_completed_htg: totalTranzakCompletedAmount,
+          total_db_validated_htg: totalDbValidatedAmount,
+          current_wallet_balance_htg: currentBalance,
+          discrepancy_amount_htg: discrepancyAmount,
+          tranzak_transactions_found: tranzakGatewayRecords.length,
+          db_records_found: dbTransactions.length,
+          db_source_table: dbSource,
+          callbacks_recorded: studentAuditLogs.length,
+          missed_callbacks_count: missedCallbackCount,
+          status: isHealthy ? 'HEALTHY' : (discrepancyAmount > 0 ? 'DISCREPANCY_DETECTED' : 'WARNING')
+        },
+        comparisons: comparisonList,
+        raw_db_transactions: dbTransactions.slice(0, 10),
+        raw_webhook_callbacks: studentAuditLogs.slice(0, 10),
+        diagnostic_summary: {
+          has_discrepancy: discrepancyAmount > 0,
+          explanation: discrepancyAmount > 0
+            ? `Écart détecté de ${discrepancyAmount} HTG : Tranzak a validé ${totalTranzakCompletedAmount} HTG, mais le solde affiché dans l'UI est de ${currentBalance} HTG. Utilisez le bouton "Résoudre & Synchroniser" pour corriger immédiatement.`
+            : `Parfait : Les relevés Tranzak et le solde Supabase (${currentBalance} HTG) sont en totale concordance.`
+        }
+      });
+    } catch (err: any) {
+      console.error('[Tranzak Diagnostics Error]:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Erreur lors du diagnostic Tranzak' });
     }
   });
 

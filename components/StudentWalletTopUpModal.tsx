@@ -259,8 +259,8 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
     if (e) e.preventDefault();
     setError(null);
 
-    if (effectiveAmount < 10) {
-      setError('Le montant minimum de recharge est de 10 HTG.');
+    if (effectiveAmount < 20) {
+      setError('Le montant minimum requis par Tranzak pour MonCash/NatCash est de 20 HTG.');
       return;
     }
 
@@ -1169,9 +1169,9 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                         type="number"
                         value={customAmount}
                         onChange={(e) => setCustomAmount(e.target.value)}
-                        placeholder="Montant en Gourdes (ex: 350)"
-                        min="10"
-                        step="10"
+                        placeholder="Montant en Gourdes (ex: 25, 50, 150)"
+                        min="20"
+                        step="1"
                         autoFocus
                         className="w-full px-3.5 py-2 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 outline-none focus:ring-2 focus:ring-slate-400"
                       />

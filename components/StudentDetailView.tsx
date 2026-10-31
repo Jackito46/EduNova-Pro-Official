@@ -30,7 +30,6 @@ import { RetryableError } from './RetryableError';
 import { getStudentAgeStatus } from '../utils/academicPath';
 import { useSchool } from '../contexts/SchoolContext';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';
-import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import StudentSolvencySummary, { SolvencyData } from './StudentSolvencySummary';
 import { isWalletPaymentActive, isMonCashPaymentActive } from '../lib/paymentMethods';
 import { 
@@ -66,7 +65,6 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Documents status modal state
   const [showDocsModal, setShowDocsModal] = useState(false);
-  const [isWalletTopUpOpen, setIsWalletTopUpOpen] = useState(false);
   
   // Access generation states
   const [showAccessModal, setShowAccessModal] = useState(false);
@@ -1004,19 +1002,12 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <span className="text-[10px] font-bold text-indigo-500 ml-1">USD</span>
               </div>
             </div>
-            <div className="mt-2">
-              {isMonCashPaymentActive(school) ? (
-                <button
-                  type="button"
-                  onClick={() => setIsWalletTopUpOpen(true)}
-                  className="w-full py-1 px-2 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-lg text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
-                >
-                  <Smartphone size={11} />
-                  <span>Recharger MonCash</span>
-                </button>
-              ) : (
-                <span className="text-[10px] text-slate-400 italic">Crédits disponibles</span>
-              )}
+            <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-slate-500">
+              <span className="text-emerald-700 flex items-center gap-1">
+                <ShieldCheck size={11} className="text-emerald-600" />
+                Solde vérifié
+              </span>
+              <span className="text-slate-400 font-mono">Économat</span>
             </div>
           </div>
         </div>
@@ -1698,17 +1689,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
 
-                {/* Bouton de recharge express MonCash */}
-                {isMonCashPaymentActive(school) && (
-                  <button
-                    type="button"
-                    onClick={() => setIsWalletTopUpOpen(true)}
-                    className="w-full mt-1 flex items-center justify-center gap-1.5 py-2 px-3 bg-red-600 hover:bg-red-700 active:scale-[0.98] text-white rounded-xl text-xs font-bold shadow-xs transition-all cursor-pointer"
-                  >
-                    <Smartphone size={13} />
-                    <span>Recharger via MonCash</span>
-                  </button>
-                )}
+
               </div>
             )}
 
@@ -1991,29 +1972,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         />
       )}
 
-      {/* Modal de recharge express du portefeuille MonCash */}
-      {student && (
-        <StudentWalletTopUpModal
-          isOpen={isWalletTopUpOpen}
-          onClose={() => setIsWalletTopUpOpen(false)}
-          student={{
-            id: student.id,
-            first_name: student.first_name,
-            last_name: student.last_name,
-            reference_number: student.reference_number,
-            class_name: student.class_name,
-            wallet_balance_htg: student.wallet_balance_htg,
-            parent_name: student.parent_name,
-            parent_phone: student.parent_phone,
-            school_id: student.school_id || user.school_id
-          }}
-          schoolName={school?.name}
-          schoolId={student.school_id || user.school_id}
-          onSuccess={(newBalance) => {
-            setStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: newBalance } : prev);
-          }}
-        />
-      )}
+
     </div>
   );
 };
