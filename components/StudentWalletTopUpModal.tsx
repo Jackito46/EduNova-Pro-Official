@@ -291,6 +291,11 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         setTranzakReference(res.reference || orderRef);
         setTranzakPaymentUrl(res.payment_url || '');
 
+        // Mémoriser la référence pour la synchronisation automatique immédiate au retour
+        try {
+          localStorage.setItem('edunova_pending_tranzak_payment_ref', res.reference || orderRef);
+        } catch (e) {}
+
         if (paymentMode === 'live' && res.payment_url) {
           if (operator === 'natcash') {
             // Le serveur web externe merchantpay.natcom.com.ht a un problème d'API (400 init-data / chargement infini)

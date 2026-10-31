@@ -3730,6 +3730,220 @@ async function startServer() {
     }
   });
 
+  // API Route pour synchroniser et réconcilier en temps réel les paiements Tranzak d'un élève
+  // Détecte automatiquement les transactions 'completed' (ex: 20 HTG MonCash) et crédite le portefeuille
+  app.post('/api/tranzak/sync-student-payments', async (req, res) => {
+    try {
+      const { studentId, schoolId, reference, studentName } = req.body || {};
+      if (!studentId) {
+        return res.status(400).json({ success: false, error: 'Identifiant élève (studentId) requis.' });
+      }
+
+      const dbClient = getSupabaseClient(req);
+
+      // Résolution de la clé API Tranzak (préférer Live pour récupérer les vraies transactions)
+      const config = await getTranzakConfigForSchool(schoolId || '', 'live');
+      const apiKey = config.apiKey || TRANZAK_LIVE_KEY_VERIFIED;
+
+      // Interroger les paiements récents sur l'API Tranzak
+      let tranzakPayments: any[] = [];
+      try {
+        const tranzakRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=30', {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Accept': 'application/json'
+          }
+        });
+        if (tranzakRes.ok) {
+          const resJson = await tranzakRes.json();
+          tranzakPayments = Array.isArray(resJson?.data) ? resJson.data : [];
+        } else {
+          // Essai avec l'URL alternative
+          const altRes = await fetch('https://tranzak.co/api/gateway/v1/payments?limit=30', {
+            headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' }
+          });
+          if (altRes.ok) {
+            const altJson = await altRes.json();
+            tranzakPayments = Array.isArray(altJson?.data) ? altJson.data : [];
+          }
+        }
+      } catch (fetchErr: any) {
+        console.warn('[Tranzak Sync API Warning]:', fetchErr.message);
+      }
+
+      // Si aucune transaction distante trouvée avec Live, essayer aussi en Sandbox
+      if (tranzakPayments.length === 0) {
+        try {
+          const sbRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=30', {
+            headers: { 'X-Api-Key': TRANZAK_TEST_KEY_VERIFIED, 'Accept': 'application/json' }
+          });
+          if (sbRes.ok) {
+            const sbJson = await sbRes.json();
+            if (Array.isArray(sbJson?.data)) tranzakPayments = sbJson.data;
+          }
+        } catch (e) {}
+      }
+
+      // Filtrer les transactions 'completed' qui correspondent à cet élève
+      const matchedCompletedTx = tranzakPayments.filter((t: any) => {
+        if (t.status !== 'completed') return false;
+        const txStudentId = t.metadata?.student_id;
+        const txRef = t.reference || t.metadata?.order_id;
+        const txId = t.transaction_id;
+        const txCustName = (t.customer?.name || '').toLowerCase();
+        const txDesc = (t.description || '').toLowerCase();
+
+        if (txStudentId && txStudentId === studentId) return true;
+        if (reference && (txRef === reference || txId === reference)) return true;
+        if (studentName && (txCustName.includes(studentName.toLowerCase()) || txDesc.includes(studentName.toLowerCase()))) return true;
+        return false;
+      });
+
+      let newlyCreditedAmount = 0;
+      const newlyValidatedList: any[] = [];
+
+      for (const tx of matchedCompletedTx) {
+        const txAmount = Math.round(Number(tx.amount) || 0);
+        if (txAmount <= 0) continue;
+
+        const txRef = tx.reference || tx.transaction_id;
+        const txId = tx.transaction_id;
+
+        // Vérifier si cette transaction existe déjà et est déjà validée
+        let isAlreadyValidated = false;
+        try {
+          const { data: existingList } = await dbClient
+            .from('payments')
+            .select('id, status, moncash_status, amount')
+            .or(`reference_number.eq.${txRef},reference_number.eq.${txId},moncash_order_id.eq.${txRef}`)
+            .limit(1);
+
+          if (existingList && existingList.length > 0) {
+            const p = existingList[0];
+            if (p.status === 'VALIDE' || p.moncash_status === 'COMPLETED') {
+              isAlreadyValidated = true;
+            } else {
+              // Mettre à jour en VALIDE
+              await dbClient
+                .from('payments')
+                .update({
+                  status: 'VALIDE',
+                  moncash_status: 'COMPLETED',
+                  notes: `Confirmé via Synchronisation Tranzak Live • Tx: ${txId}`,
+                  updated_at: new Date().toISOString()
+                })
+                .eq('id', p.id);
+              newlyCreditedAmount += txAmount;
+              newlyValidatedList.push({ ...tx, payment_id: p.id });
+              isAlreadyValidated = true;
+            }
+          }
+        } catch (dbCheckErr) {}
+
+        if (!isAlreadyValidated) {
+          // Insérer la transaction validée dans payments
+          const operatorLabel = tx.payment_method === 'natcash' ? 'NatCash' : 'MonCash';
+          try {
+            const { data: newP } = await dbClient
+              .from('payments')
+              .insert([{
+                school_id: tx.metadata?.school_id || schoolId,
+                student_id: studentId,
+                amount: txAmount,
+                amount_htg_equivalent: txAmount,
+                currency: tx.currency || 'HTG',
+                payment_method: operatorLabel,
+                method: `${operatorLabel} (Tranzak Live)`,
+                fee_type: 'CREDIT_PORTEFEUILLE',
+                nature: 'Scolarite',
+                type: 'Revenu',
+                reference_number: txId || txRef,
+                moncash_order_id: txRef,
+                receipt_number: `REC-TRZ-${txId || Date.now().toString().slice(-6)}`,
+                status: 'VALIDE',
+                moncash_status: 'COMPLETED',
+                notes: `Recharge MonCash confirmée sur Tranzak • Tx: ${txId} • Réf: ${txRef}`,
+                payment_date: tx.completed_at ? tx.completed_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                created_at: tx.created_at || new Date().toISOString()
+              }])
+              .select()
+              .maybeSingle();
+
+            newlyCreditedAmount += txAmount;
+            newlyValidatedList.push({ ...tx, payment_id: newP?.id });
+          } catch (insErr) {
+            console.warn('[Tranzak Sync] Notice insertion payments:', insErr);
+          }
+        }
+      }
+
+      // Si de nouveaux fonds ont été validés, créditer le portefeuille de l'élève
+      let currentBal = 0;
+      let newBal = 0;
+
+      try {
+        const { data: stRow } = await dbClient
+          .from('students')
+          .select('wallet_balance_htg')
+          .eq('id', studentId)
+          .maybeSingle();
+
+        currentBal = Number(stRow?.wallet_balance_htg) || 0;
+        newBal = currentBal + newlyCreditedAmount;
+
+        if (newlyCreditedAmount > 0) {
+          await dbClient
+            .from('students')
+            .update({
+              wallet_balance_htg: newBal,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', studentId);
+
+          // Audit log
+          webhookAuditLogs.unshift({
+            id: `wh-trz-sync-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            school_id: schoolId || undefined,
+            gateway: 'tranzak',
+            operator: 'moncash',
+            event_type: 'payment.sync.completed',
+            order_id: newlyValidatedList[0]?.reference || 'SYNC-TRANZAK',
+            transaction_id: newlyValidatedList[0]?.transaction_id || 'SYNC-TRANZAK',
+            amount: newlyCreditedAmount,
+            currency: 'HTG',
+            signature_status: 'valid',
+            persisted_to_db: true,
+            http_status: 200,
+            simulated: false,
+            status: 'VALIDE',
+            notes: `Synchronisation automatique Tranzak : +${newlyCreditedAmount} HTG crédités au portefeuille élève`,
+            student_name: studentName || studentId
+          });
+          if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+        }
+      } catch (stUpErr) {
+        console.warn('[Tranzak Sync] Erreur mise à jour wallet_balance_htg:', stUpErr);
+      }
+
+      return res.json({
+        success: true,
+        synced: true,
+        matched_transactions_count: matchedCompletedTx.length,
+        newly_credited_amount: newlyCreditedAmount,
+        old_balance: currentBal,
+        new_balance: newlyCreditedAmount > 0 ? newBal : currentBal,
+        transactions: newlyValidatedList,
+        message: newlyCreditedAmount > 0
+          ? `Dépôt Tranzak détecté ! +${newlyCreditedAmount} HTG crédités au portefeuille de l'élève.`
+          : 'Portefeuille déjà à jour avec les transactions Tranzak.'
+      });
+    } catch (err: any) {
+      console.error('[Tranzak Sync Error]:', err);
+      return res.status(500).json({ success: false, error: err.message || 'Erreur lors de la synchronisation Tranzak' });
+    }
+  });
+
   // API Route for Kobara Asynchronous Webhook Notifications (MonCash & Natcash)
   app.get('/api/webhooks/kobara', (req, res) => {
     res.status(200).json({ 

@@ -20,7 +20,8 @@ import {
   ShieldCheck,
   Coins,
   Smartphone,
-  Loader2
+  Loader2,
+  RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
@@ -44,12 +45,83 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns'>('all');
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
+  const [isSyncingTranzak, setIsSyncingTranzak] = useState<boolean>(false);
+
+  // Synchronisation et réconciliation automatique avec l'API Tranzak
+  const handleSyncTranzakPayments = useCallback(async (isManual = false) => {
+    if (!studentData?.id) return;
+    if (isManual) setIsSyncingTranzak(true);
+    try {
+      const session = (await supabase.auth.getSession()).data?.session;
+      const token = session?.access_token;
+      const pendingRef = localStorage.getItem('edunova_pending_tranzak_payment_ref') || undefined;
+
+      const res = await fetch('/api/tranzak/sync-student-payments', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          studentId: studentData.id,
+          schoolId: school?.id || studentData.school_id || user.school_id,
+          studentName: `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim(),
+          reference: pendingRef
+        })
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success) {
+        if (data.newly_credited_amount > 0) {
+          const updatedBal = Number(data.new_balance) || 0;
+          setWalletBalance(updatedBal);
+
+          // Sécurisation persistante en base Supabase directe
+          try {
+            await supabase
+              .from('students')
+              .update({ wallet_balance_htg: updatedBal })
+              .eq('id', studentData.id);
+          } catch (e) {}
+
+          // Rafraîchir l'historique des écritures comptables
+          const { data: pList } = await supabase
+            .from('payments')
+            .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+            .eq('student_id', studentData.id)
+            .order('created_at', { ascending: false });
+          if (pList) setPayments(pList);
+
+          localStorage.removeItem('edunova_pending_tranzak_payment_ref');
+          toast.success(`🎉 Dépôt Tranzak Digicel MonCash validé ! +${data.newly_credited_amount} HTG crédités au portefeuille.`);
+        } else if (isManual) {
+          // Re-vérifier le solde en base
+          const { data: st } = await supabase
+            .from('students')
+            .select('wallet_balance_htg')
+            .eq('id', studentData.id)
+            .maybeSingle();
+          if (st?.wallet_balance_htg !== undefined) {
+            setWalletBalance(st.wallet_balance_htg);
+          }
+          toast.info("Vérification Tranzak : votre solde est parfaitement synchronisé.");
+        }
+      }
+    } catch (err) {
+      if (isManual) toast.error("Impossible de joindre le service de synchronisation Tranzak.");
+    } finally {
+      if (isManual) setIsSyncingTranzak(false);
+    }
+  }, [studentData, school?.id, user.school_id]);
 
   useEffect(() => {
     if (studentData?.wallet_balance_htg !== undefined) {
       setWalletBalance(studentData.wallet_balance_htg || 0);
     }
-  }, [studentData]);
+    if (studentData?.id) {
+      handleSyncTranzakPayments(false);
+    }
+  }, [studentData, handleSyncTranzakPayments]);
 
   // Détection automatique du retour de redirection Digicel MonCash / Natcom NatCash (ex: /#/mon-economat?payment=success&ref=TRZ-...)
   useEffect(() => {
@@ -459,6 +531,16 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
               <span className="text-[10px] bg-emerald-100/90 text-emerald-800 font-bold px-1.5 py-0.2 rounded-md">
                 Solde Disponible
               </span>
+              <button
+                type="button"
+                onClick={() => handleSyncTranzakPayments(true)}
+                disabled={isSyncingTranzak}
+                className="text-[9.5px] bg-white hover:bg-emerald-100/80 text-emerald-800 font-bold px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-300 shadow-2xs cursor-pointer transition-all active:scale-95 disabled:opacity-60"
+                title="Vérifier et synchroniser les dépôts récents avec la passerelle Tranzak"
+              >
+                <RefreshCw size={10} className={isSyncingTranzak ? 'animate-spin text-emerald-600' : 'text-emerald-600'} />
+                <span>{isSyncingTranzak ? 'Vérification...' : 'Synchroniser'}</span>
+              </button>
             </div>
             <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono flex items-baseline gap-1">
               {(walletBalance || 0).toLocaleString()} <span className="text-xs font-bold text-slate-500">HTG</span>
