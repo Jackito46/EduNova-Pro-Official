@@ -1145,6 +1145,18 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   <span>Activer Kobara en 1 clic</span>
                 </button>
               )}
+
+              {isGatewaysEnabledForSchool && activeGateway === 'kobara' && (
+                <button
+                  type="button"
+                  onClick={() => handleSwitchActiveGateway('tranzak')}
+                  className="px-3 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-xs font-bold rounded-lg shadow-xs transition-all flex items-center gap-1.5 cursor-pointer shrink-0 self-start sm:self-center"
+                  title="Désactiver Kobara et utiliser Tranzak pour traiter MonCash et NatCash"
+                >
+                  <Layers size={13} />
+                  <span>Désactiver Kobara &amp; Utiliser Tranzak</span>
+                </button>
+              )}
             </div>
 
             {/* NOTICE ISOLATION KOBARA POUR L'ÉCOLE */}

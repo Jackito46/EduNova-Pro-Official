@@ -22,6 +22,7 @@ import {
   History,
   AlertTriangle,
   PlusCircle,
+  Plus,
   CalendarCheck,
   Banknote,
   Tags,
@@ -397,20 +398,24 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const paymentMethodOptions: SelectOption[] = useMemo(() => {
     const isWalletActive = isWalletPaymentActive(schoolDetails || school);
+    const bal = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
     const opts: SelectOption[] = activePaymentMethods
       .filter(m => isWalletActive || (m.code !== 'Portefeuille' && m.id !== 'PORTEFEUILLE'))
-      .map(m => ({
-        value: m.code,
-        label: m.name,
-        icon: m.code === 'MonCash' ? Zap : m.code === 'Chèque' || m.code === 'Dépôt Bancaire' ? Building2 : CreditCard
-      }));
+      .map(m => {
+        const isPortefeuille = m.code === 'Portefeuille' || m.id === 'PORTEFEUILLE';
+        return {
+          value: m.code,
+          label: m.name,
+          badge: isPortefeuille && selectedStudent ? `${bal.toLocaleString()} ${currency === 'USD' ? '$' : 'G'}` : undefined,
+          icon: m.code === 'MonCash' ? Zap : m.code === 'Chèque' || m.code === 'Dépôt Bancaire' ? Building2 : isPortefeuille ? Wallet : CreditCard
+        };
+      });
 
-    if (isWalletActive && feeType !== 'CREDIT_PORTEFEUILLE' && !opts.some(o => o.value === 'Portefeuille') && ((currency === 'USD' ? selectedStudent?.wallet_balance_usd : selectedStudent?.wallet_balance_htg) || 0) > 0) {
-      const bal = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
+    if (isWalletActive && feeType !== 'CREDIT_PORTEFEUILLE' && !opts.some(o => o.value === 'Portefeuille')) {
       opts.push({
         value: 'Portefeuille',
-        label: 'Portefeuille',
-        badge: `${bal.toLocaleString()} ${currency}`,
+        label: 'Portefeuille / Avoir élève',
+        badge: selectedStudent ? `${bal.toLocaleString()} ${currency === 'USD' ? '$' : 'G'}` : undefined,
         icon: Wallet
       });
     }
@@ -3658,6 +3663,155 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 )}
 
+                {/* BLOC INTELLIGENT & INTERACTIF : PORTEFEUILLE / AVOIR ÉLÈVE AU GUICHET */}
+                {paymentMethod === 'Portefeuille' && (
+                  <div className="p-3.5 sm:p-4 bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 text-white rounded-2xl border border-indigo-500/30 shadow-md space-y-3 animate-in fade-in zoom-in-95 duration-200">
+                    {/* Ligne 1 : En-tête Portefeuille & Solde Actuel */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center border border-indigo-400/30 shrink-0">
+                          <Wallet size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[10px] font-mono uppercase tracking-wider text-indigo-300 font-bold block">
+                            Solde Portefeuille / Avoir
+                          </span>
+                          <span className="text-xs font-bold text-slate-100 truncate block">
+                            {selectedStudent ? selectedStudent.fullName : 'Aucun élève sélectionné'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Solde en gros badge */}
+                      {selectedStudent && (() => {
+                        const bal = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+                        return (
+                          <div className="text-right shrink-0">
+                            <span className="text-[9.5px] uppercase tracking-wider text-slate-400 font-semibold block">
+                              Disponible
+                            </span>
+                            <span className={`font-mono font-black text-sm sm:text-base ${bal > 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
+                              {bal.toLocaleString()} <span className="text-xs font-bold text-slate-300">{currency}</span>
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {/* Rappel multi-devises si l'élève est identifié */}
+                    {selectedStudent && (
+                      <div className="flex items-center justify-between pt-2 border-t border-indigo-900/50 text-[10.5px]">
+                        <span className="text-slate-400">Comptes devises :</span>
+                        <div className="flex items-center gap-1.5 font-mono font-bold">
+                          <span className={`px-2 py-0.5 rounded text-[10.5px] border ${currency === 'HTG' ? 'bg-indigo-600/50 text-indigo-100 border-indigo-400/60 font-black' : 'bg-slate-800 text-slate-300 border-slate-700/60'}`}>
+                            {(selectedStudent.wallet_balance_htg || 0).toLocaleString()} G
+                          </span>
+                          <span className={`px-2 py-0.5 rounded text-[10.5px] border ${currency === 'USD' ? 'bg-indigo-600/50 text-indigo-100 border-indigo-400/60 font-black' : 'bg-slate-800 text-slate-300 border-slate-700/60'}`}>
+                            ${(selectedStudent.wallet_balance_usd || 0).toLocaleString()} USD
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Évaluation Dynamique Temps Réel par rapport au montant à percevoir */}
+                    {selectedStudent && (() => {
+                      const bal = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+                      const entered = parseFloat(montantReel || '0');
+
+                      if (bal <= 0) {
+                        return (
+                          <div className="bg-rose-500/20 border border-rose-500/40 rounded-xl p-2.5 text-xs text-rose-200 flex items-start gap-2">
+                            <AlertCircle size={15} className="text-rose-400 shrink-0 mt-0.5" />
+                            <div className="flex-1 min-w-0">
+                              <span className="font-bold text-rose-300 block">Solde à 0.00 {currency}</span>
+                              <p className="text-[11px] text-rose-200/90 mt-0.5 leading-snug">
+                                L'élève ne dispose d'aucun fonds dans son portefeuille. Veuillez sélectionner <strong>Cash / Espèces</strong> ou <strong>Dépôt Bancaire</strong>, ou alimenter d'abord son compte.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleFeeTypeChange('CREDIT_PORTEFEUILLE')}
+                                className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10.5px] font-bold transition-all cursor-pointer shadow-xs active:scale-95"
+                              >
+                                <Plus size={12} /> Alimenter / Recharger le Portefeuille
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      if (entered > bal) {
+                        const diff = entered - bal;
+                        return (
+                          <div className="bg-amber-500/20 border border-amber-500/40 rounded-xl p-2.5 text-xs text-amber-200 space-y-2">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                              <div className="min-w-0 flex-1">
+                                <span className="font-bold text-amber-300 block">Solde portefeuille insuffisant</span>
+                                <p className="text-[11px] text-amber-200/90 mt-0.5 leading-snug">
+                                  Disponible : <strong className="text-white">{bal.toLocaleString()} {currency}</strong> • Montant demandé : <strong className="text-white">{entered.toLocaleString()} {currency}</strong>. Il manque <strong className="text-rose-300 font-mono">{diff.toLocaleString()} {currency}</strong>.
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center justify-between gap-2 pt-1 border-t border-amber-500/30 flex-wrap">
+                              <span className="text-[10px] text-amber-300 font-medium">Paiement mixte possible :</span>
+                              <button
+                                type="button"
+                                onClick={() => setMontantReel(bal.toString())}
+                                className="px-2.5 py-1 bg-amber-400 hover:bg-amber-300 text-slate-950 font-black rounded-lg text-[10.5px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                              >
+                                <Sparkles size={11} /> Plafonner au max ({bal.toLocaleString()} {currency})
+                              </button>
+                            </div>
+                            <p className="text-[10px] text-amber-200/70 italic">
+                              Réglez {bal.toLocaleString()} {currency} par portefeuille, puis saisissez les {diff.toLocaleString()} {currency} restants en Espèces.
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      if (entered > 0 && entered <= bal) {
+                        const remaining = bal - entered;
+                        return (
+                          <div className="bg-emerald-500/20 border border-emerald-500/40 rounded-xl p-2.5 text-xs text-emerald-200 flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                              <div className="min-w-0">
+                                <span className="font-bold text-emerald-300 block text-xs">✓ Solde suffisant • Débit prêt</span>
+                                <span className="text-[10.5px] text-emerald-200/90 block truncate">
+                                  Nouveau solde après encaissement : <strong className="font-mono text-white">{remaining.toLocaleString()} {currency}</strong>
+                                </span>
+                              </div>
+                            </div>
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-600/40 text-emerald-300 border border-emerald-500/40 text-[10px] font-mono font-bold shrink-0">
+                              - {entered.toLocaleString()} {currency}
+                            </span>
+                          </div>
+                        );
+                      }
+
+                      // Saisi vide ou 0
+                      return (
+                        <div className="bg-slate-800/70 border border-slate-700/70 rounded-xl p-2.5 text-xs text-slate-300 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-slate-300">
+                            Déduction automatique sur l'avoir élève ({bal.toLocaleString()} {currency} disponibles).
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const target = Math.min(bal, paymentLogic?.suggestion || bal);
+                              if (target > 0) setMontantReel(target.toString());
+                            }}
+                            className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-[10.5px] transition-all cursor-pointer shadow-xs active:scale-95 shrink-0"
+                          >
+                            Utiliser le solde
+                          </button>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
                 {/* Information de compte pour la méthode active */}
                 {currentMethodConfig?.account_info && (
                   <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-700 flex items-center justify-between gap-2">
@@ -3669,7 +3823,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </span>
                   </div>
                 )}
-                {currentMethodConfig?.instructions && paymentMethod !== 'MonCash' && paymentMethod !== 'Natcash' && (
+                {currentMethodConfig?.instructions && paymentMethod !== 'MonCash' && paymentMethod !== 'Natcash' && paymentMethod !== 'Portefeuille' && (
                   <div className="p-2.5 bg-slate-50 border border-slate-200/80 rounded-xl text-xs text-slate-600 leading-relaxed">
                     {currentMethodConfig.instructions}
                   </div>
@@ -3990,32 +4144,53 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
             
-            <button 
-              type="submit" 
-              disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError} 
-              className={`w-full py-2.5 sm:py-3 text-white font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1 sm:mt-2 cursor-pointer active:scale-98 text-xs sm:text-sm ${
-                paymentMethod === 'MonCash'
-                  ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-red-600/20'
-                  : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
-              }`}
-            >
-              {isSubmitting ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="animate-spin" size={18} />
-                  <span>Traitement de l'encaissement...</span>
-                </div>
-              ) : paymentMethod === 'MonCash' ? (
-                <>
-                  <Smartphone size={18} /> 
-                  <span>Enregistrer le Règlement MonCash ({montantReel ? `${montantReel} ${currency}` : ''})</span>
-                </>
-              ) : (
-                <>
-                  <Save size={18} /> 
-                  <span>{selectedStudent?.isNotEnrolledInTargetYear ? "Régulariser l'Inscription" : "Enregistrer l'Encaissement"}</span>
-                </>
-              )}
-            </button>
+            {(() => {
+              const enteredVal = parseFloat(montantReel || '0');
+              const studentWalletBal = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
+              const isWalletOverdraft = paymentMethod === 'Portefeuille' && selectedStudent && (enteredVal > studentWalletBal);
+
+              return (
+                <button 
+                  type="submit" 
+                  disabled={!selectedStudent || !montantReel || isSubmitting || !activeYear || !!refError || Boolean(isWalletOverdraft)} 
+                  className={`w-full py-2.5 sm:py-3 text-white font-bold rounded-xl shadow-xs transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-1 sm:mt-2 cursor-pointer active:scale-98 text-xs sm:text-sm ${
+                    paymentMethod === 'MonCash'
+                      ? 'bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 shadow-red-600/20'
+                      : paymentMethod === 'Portefeuille'
+                      ? isWalletOverdraft
+                        ? 'bg-rose-600 hover:bg-rose-700'
+                        : 'bg-gradient-to-r from-indigo-600 via-purple-600 to-indigo-700 hover:from-indigo-700 hover:to-purple-700 shadow-indigo-600/20'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700'
+                  }`}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="animate-spin" size={18} />
+                      <span>Traitement de l'encaissement...</span>
+                    </div>
+                  ) : paymentMethod === 'MonCash' ? (
+                    <>
+                      <Smartphone size={18} /> 
+                      <span>Enregistrer le Règlement MonCash ({montantReel ? `${montantReel} ${currency}` : ''})</span>
+                    </>
+                  ) : paymentMethod === 'Portefeuille' ? (
+                    <>
+                      <Wallet size={18} /> 
+                      <span>
+                        {isWalletOverdraft 
+                          ? `Solde Insuffisant (${montantReel} ${currency})` 
+                          : `Débiter le Portefeuille (${montantReel ? `${montantReel} ${currency}` : ''})`}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Save size={18} /> 
+                      <span>{selectedStudent?.isNotEnrolledInTargetYear ? "Régulariser l'Inscription" : "Enregistrer l'Encaissement"}</span>
+                    </>
+                  )}
+                </button>
+              );
+            })()}
           </form>
         </div>
       </div>

@@ -3887,22 +3887,22 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold text-white">
-                          Statut pour cet établissement :
+                          Accès Global API (SaaS Platform) :
                         </span>
                         {(schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
                           <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-black uppercase">
-                            Passerelles Déverrouillées
+                            Toutes Passerelles Déverrouillées
                           </span>
                         ) : (
                           <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-black uppercase">
-                            Passerelles Désactivées
+                            Toutes Passerelles Coupées (Mode Manuel)
                           </span>
                         )}
                       </div>
                       <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
                         {(schoolData.has_api_gateways ?? school?.has_api_gateways)
-                          ? "L'école a accès aux clés d'API (MonCash, Natcash, Kobara), aux webhooks et à la synchronisation automatique des transactions."
-                          : "Les clés d'API et la validation automatique sont désactivées. L'école gère les paiements en mode manuel uniquement."
+                          ? "L'école est autorisée à utiliser les paiements électroniques. Pour activer/désactiver une passerelle spécifique (ex: couper Kobara au profit de Tranzak), utilisez l'Aiguilleur ci-dessous."
+                          : "ATTENTION : Toutes les passerelles (Tranzak, Kobara, MonCash) sont coupées au niveau plateforme. L'école fonctionne en mode manuel uniquement."
                         }
                       </p>
                     </div>
@@ -3927,12 +3927,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                     ) : (schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
                       <>
                         <Lock size={13} />
-                        <span>Désactiver pour cette école</span>
+                        <span>Couper TOUTES les API (Global)</span>
                       </>
                     ) : (
                       <>
                         <CheckCircle2 size={13} />
-                        <span>Activer pour cette école</span>
+                        <span>Déverrouiller les API pour l'école</span>
                       </>
                     )}
                   </button>

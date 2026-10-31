@@ -605,6 +605,29 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
           </div>
 
           <div className="p-3 sm:p-3.5 space-y-3">
+            {/* Architecture Guidance Banner: Guichet vs Dépôt Mobile Élève */}
+            <div className="p-3 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 border border-blue-200/80 rounded-xl flex items-start gap-2.5 text-xs text-blue-900 shadow-2xs">
+              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 border border-blue-200 mt-0.5">
+                <HelpCircle size={15} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-extrabold text-slate-900 text-xs">
+                    Règlement au Guichet vs Dépôt Mobile en Ligne de l'Élève
+                  </span>
+                  <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[9px] font-black rounded uppercase">
+                    Architecture & Fonctionnement
+                  </span>
+                </div>
+                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
+                  <strong>Au Guichet (ci-dessous) :</strong> Ces modes définissent ce que le caissier peut sélectionner lorsqu'un parent vient physiquement à l'école. Si vous exigez que les élèves/parents fassent <em>uniquement</em> leurs dépôts MonCash/Natcash en ligne depuis leur propre téléphone, <strong>désactivez MonCash et Natcash ici</strong> (ils n'apparaîtront plus dans la caisse du comptoir).
+                </p>
+                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
+                  <strong>En Ligne (Élève/Parent) :</strong> Les dépôts et recharges automatiques sur le compte/portefeuille élève se configurent dans l'onglet <strong>« Coffre-fort Paiement » (Tranzak / Kobara)</strong> et restent 100% opérationnels même si le guichet physique désactive ces options !
+                </p>
+              </div>
+            </div>
+
             {/* Banner if API gateways are disabled by Super Admin */}
             {!schoolData?.has_api_gateways && (
               <div className="p-2.5 sm:p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
@@ -703,6 +726,16 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                             <p className="text-[11px] text-slate-500 font-medium line-clamp-1">
                               {method.description}
                             </p>
+                            {(method.id === 'MONCASH' || method.id === 'NATCASH') && (
+                              <p className={`text-[10px] font-medium mt-0.5 ${method.enabled ? 'text-blue-600' : 'text-slate-400 italic'}`}>
+                                {method.enabled ? "Encaissement au guichet physique (contrôle SMS)" : "Désactivé au guichet • Recharge élève en ligne uniquement"}
+                              </p>
+                            )}
+                            {method.id === 'PORTEFEUILLE' && (
+                              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">
+                                Déduction en direct sur l'avoir ou le solde créditeur de l'élève
+                              </p>
+                            )}
                           </div>
                         </div>
 
