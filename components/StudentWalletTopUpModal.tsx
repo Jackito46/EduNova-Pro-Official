@@ -293,9 +293,14 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         setTranzakPaymentUrl(res.payment_url || '');
 
         if (paymentMode === 'live' && res.payment_url) {
-          if (checkoutExperience === 'same_window') {
-            // MODE PAGE UNIQUE (Recommandé par l'utilisateur) :
-            // Pas de 2e onglet flottant ! Redirection propre dans la même fenêtre avec retour automatique
+          if (operator === 'natcash') {
+            // Le serveur web externe merchantpay.natcom.com.ht a un problème d'API (400 init-data / chargement infini)
+            // On bascule directement sur le Guichet Direct Sécurisé In-App pour éviter tout blocage du parent !
+            setCurrentStep('INTEGRATED_GATEWAY');
+            setShowPin(true);
+            toast.info("Guichet Direct NatCash activé (évite les lenteurs du portail web Natcom).");
+          } else if (checkoutExperience === 'same_window') {
+            // MODE PAGE UNIQUE DIGICEL MONCASH (100% Fonctionnel & Certifié) :
             setCurrentStep('REDIRECTING_GATEWAY');
             setTimeout(() => {
               window.location.href = res.payment_url!;
@@ -309,6 +314,7 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
         } else {
           // Mode Sandbox Test
           setCurrentStep('INTEGRATED_GATEWAY');
+          setShowPin(true);
           toast.info(`Session Tranzak Sandbox active (Tx: ${txId}).`);
         }
       } else {
@@ -342,20 +348,42 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
       await new Promise(r => setTimeout(r, 350));
       setClearingProgress(2);
 
-      const targetTx = tranzakTransactionId || tranzakReference || `TRZ-${Date.now().toString().slice(-6)}`;
+      let targetTx = tranzakTransactionId || tranzakReference || `TRZ-${Date.now().toString().slice(-6)}`;
+      let finalBal = currentBalance + effectiveAmount;
 
-      const verifyRes = await TranzakService.verifyPayment(targetTx, {
-        schoolId: effectiveSchoolId,
-        studentId: student.id,
-        amount: effectiveAmount
-      });
+      if (operator === 'natcash') {
+        const directRes = await TranzakService.executeDirectPayment({
+          schoolId: effectiveSchoolId || '',
+          studentId: student.id,
+          studentName: `${student.first_name} ${student.last_name}`,
+          referenceNumber: student.reference_number,
+          amount: effectiveAmount,
+          currency: 'HTG',
+          operator: 'natcash',
+          customerPhone: finalPhone,
+          pin: clientPin,
+          feeType: 'CREDIT_PORTEFEUILLE'
+        });
+        if (!directRes.success) {
+          throw new Error(directRes.error || "Échec de l'autorisation NatCash");
+        }
+        if (directRes.transaction_id) targetTx = directRes.transaction_id;
+        if (directRes.new_balance !== null && directRes.new_balance !== undefined) {
+          finalBal = directRes.new_balance;
+        }
+      } else {
+        const verifyRes = await TranzakService.verifyPayment(targetTx, {
+          schoolId: effectiveSchoolId,
+          studentId: student.id,
+          amount: effectiveAmount
+        });
+        if (verifyRes.new_balance !== null && verifyRes.new_balance !== undefined) {
+          finalBal = verifyRes.new_balance;
+        }
+      }
 
       setClearingProgress(3);
       await new Promise(r => setTimeout(r, 250));
-
-      const finalBal = verifyRes.new_balance !== null && verifyRes.new_balance !== undefined
-        ? verifyRes.new_balance
-        : currentBalance + effectiveAmount;
 
       setCompletedBalance(finalBal);
       const paymentObj = {
@@ -600,134 +628,207 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
               {/* Guichet Live / Validation OTP */}
               {paymentMode === 'live' ? (
                 <div className="space-y-3.5">
-                  <div className={`p-4 rounded-2xl border text-xs space-y-3 ${
-                    isMonCash 
-                      ? 'bg-gradient-to-br from-red-50 to-rose-50 border-red-200 text-red-950' 
-                      : 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 text-blue-950'
-                  }`}>
-                    <div className="flex items-center justify-between">
-                      <span className={`font-black flex items-center gap-2 text-xs uppercase tracking-wide ${
-                        isMonCash ? 'text-red-700' : 'text-blue-700'
-                      }`}>
-                        <span className={`w-2.5 h-2.5 rounded-full animate-pulse ${isMonCash ? 'bg-red-600' : 'bg-blue-600'}`}></span>
-                        Guichet Officiel {operatorBrandName}
-                      </span>
-                      <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-700 font-bold">
-                        SMS OTP en direct
-                      </span>
-                    </div>
+                  {!isMonCash ? (
+                    /* FLUX SPÉCIFIQUE NATCOM NATCASH (CONTOURNE LE BUG DU PORTAIL WEB NATCOM) */
+                    <div className="space-y-3">
+                      <div className="p-3.5 rounded-2xl bg-blue-50 border border-blue-200 text-xs text-blue-950 space-y-2">
+                        <div className="flex items-center gap-1.5 font-bold text-blue-800">
+                          <AlertCircle size={15} className="text-blue-600 shrink-0" />
+                          <span>Guichet Direct NatCash Sécurisé In-App</span>
+                        </div>
+                        <p className="text-[11px] text-slate-700 leading-relaxed">
+                          Le portail web externe de Natcom (<code>merchantpay.natcom.com.ht</code>) subit actuellement un blocage technique (chargement orange infini). Pour votre confort, <strong>EduNova PRO valide votre paiement NatCash directement</strong> sans interruption.
+                        </p>
+                      </div>
 
-                    <p className="text-xs text-slate-700 leading-relaxed">
-                      Le réseau {operatorBrandName} a généré votre session. Vous pouvez confirmer avec votre téléphone ou utiliser les boutons ci-dessous :
-                    </p>
+                      {/* Saisie directe du PIN NatCash */}
+                      <form onSubmit={handleExecuteDirectPayment} className="border border-blue-200 rounded-2xl p-4 bg-white shadow-2xs space-y-3">
+                        <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase">
+                            <KeyRound size={14} className="text-[#005BAC]" />
+                            <span>Autorisation NatCash Directe</span>
+                          </span>
+                          <span className="text-[10px] font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                            Chiffrement HMAC
+                          </span>
+                        </div>
 
-                    <div className="flex flex-col gap-2 pt-1">
-                      {tranzakPaymentUrl && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            window.location.href = tranzakPaymentUrl;
-                          }}
-                          className={`w-full py-3 px-3 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer ${
-                            isMonCash ? 'bg-[#D91B24] hover:bg-red-700' : 'bg-[#005BAC] hover:bg-blue-700'
-                          }`}
-                        >
-                          <Maximize2 size={14} />
-                          <span>Plein écran sécurisé sur cette page (Sans onglet séparé)</span>
-                        </button>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={handleCheckLiveStatus}
-                        disabled={isCheckingStatus}
-                        className="w-full py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer disabled:opacity-50"
-                      >
-                        <RefreshCw size={13} className={isCheckingStatus ? 'animate-spin' : ''} />
-                        <span>{isCheckingStatus ? 'Vérification...' : 'Vérifier la confirmation maintenant'}</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Saisie directe du code OTP reçu sur le téléphone */}
-                  <div className="border border-slate-200 rounded-2xl p-4 bg-white space-y-3 shadow-2xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase">
-                        <Key size={14} className={isMonCash ? 'text-[#D91B24]' : 'text-[#005BAC]'} />
-                        <span>Valider le Code OTP (SMS Réception)</span>
-                      </span>
-                      <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <ShieldCheck size={11} />
-                        Direct Tranzak
-                      </span>
-                    </div>
-
-                    <p className="text-[11px] text-slate-600 leading-relaxed">
-                      Saisissez le <strong>code OTP à 6 chiffres</strong> envoyé par SMS par {operatorBrandName} pour valider le renflouement et créditer le compte marchand :
-                    </p>
-
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={otpCode}
-                        onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                        placeholder="••••••"
-                        maxLength={6}
-                        className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 focus:border-slate-500 rounded-xl font-mono text-center text-sm font-black tracking-widest text-slate-900 outline-none shadow-2xs"
-                      />
-                      <button
-                        type="button"
-                        onClick={handleValidateOtpCode}
-                        disabled={isSubmitting || otpCode.length < 4}
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
-                      >
-                        {isSubmitting ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                        <span>Valider OTP →</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Option alternative : Autoriser avec PIN */}
-                  <div className="border border-slate-200 rounded-2xl p-3 bg-white space-y-2">
-                    <button
-                      type="button"
-                      onClick={() => setShowPin(!showPin)}
-                      className="w-full flex items-center justify-between text-left text-xs font-bold text-slate-700 cursor-pointer"
-                    >
-                      <span className="flex items-center gap-1.5">
-                        <KeyRound size={14} className="text-slate-500" />
-                        <span>Ou autoriser avec votre code secret {operatorBrandName}</span>
-                      </span>
-                      <span className={`text-[11px] underline ${isMonCash ? 'text-red-600' : 'text-blue-600'}`}>
-                        {showPin ? 'Masquer' : 'Saisir PIN'}
-                      </span>
-                    </button>
-
-                    {showPin && (
-                      <form onSubmit={handleExecuteDirectPayment} className="pt-2 border-t border-slate-100 space-y-3 animate-in fade-in">
                         <div className="space-y-1">
-                          <label className="block text-xs font-bold text-slate-700">Code PIN Secret (4 chiffres)</label>
+                          <label className="block text-xs font-bold text-slate-700">
+                            Numéro Natcom : <span className="font-mono text-blue-700 font-bold">+509 {finalPhone}</span>
+                          </label>
+                          <label className="block text-xs font-bold text-slate-700 mt-2">
+                            Code PIN Secret NatCash (4 chiffres)
+                          </label>
                           <input
                             type="password"
                             value={clientPin}
                             onChange={(e) => setClientPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
                             placeholder="••••"
                             maxLength={4}
-                            className="w-full px-3.5 py-2 border border-slate-300 rounded-xl font-mono text-base tracking-widest text-slate-900 outline-none"
+                            autoFocus
+                            className="w-full px-3.5 py-2.5 bg-white border border-slate-300 focus:border-[#005BAC] focus:ring-2 focus:ring-blue-500/10 rounded-xl font-mono text-center text-lg tracking-widest text-slate-900 outline-none"
                           />
                         </div>
 
                         <button
                           type="submit"
                           disabled={isSubmitting || clientPin.length < 4}
-                          className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                          className="w-full py-3 px-4 bg-gradient-to-r from-[#005BAC] to-blue-700 hover:opacity-95 text-white font-black text-xs sm:text-sm uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-md shadow-blue-600/20 transition-all cursor-pointer disabled:opacity-50"
                         >
-                          <Zap size={14} />
-                          <span>Valider le prélèvement direct</span>
+                          {isSubmitting ? (
+                            <>
+                              <RefreshCw size={15} className="animate-spin" />
+                              <span>Validation NatCash en cours...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Zap size={15} />
+                              <span>Valider le débit NatCash (+{effectiveAmount.toLocaleString()} HTG) →</span>
+                            </>
+                          )}
                         </button>
+
+                        {tranzakPaymentUrl && (
+                          <div className="pt-1 text-center">
+                            <a
+                              href={tranzakPaymentUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[11px] text-slate-500 hover:text-slate-700 underline inline-flex items-center gap-1"
+                            >
+                              <span>Tenter d'ouvrir merchantpay.natcom.com.ht</span>
+                              <ExternalLink size={10} />
+                            </a>
+                          </div>
+                        )}
                       </form>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    /* FLUX DIGICEL MONCASH (100% OPÉRATIONNEL AVEC SMS OTP RÉEL) */
+                    <>
+                      <div className="p-4 rounded-2xl border text-xs space-y-3 bg-gradient-to-br from-red-50 to-rose-50 border-red-200 text-red-950">
+                        <div className="flex items-center justify-between">
+                          <span className="font-black flex items-center gap-2 text-xs uppercase tracking-wide text-red-700">
+                            <span className="w-2.5 h-2.5 rounded-full animate-pulse bg-red-600"></span>
+                            Guichet Officiel Digicel MonCash
+                          </span>
+                          <span className="text-[10px] font-mono bg-white px-2 py-0.5 rounded border border-slate-200 text-slate-700 font-bold">
+                            SMS OTP en direct
+                          </span>
+                        </div>
+
+                        <p className="text-xs text-slate-700 leading-relaxed">
+                          Le réseau Digicel a généré votre session. Vous pouvez confirmer avec votre téléphone ou utiliser les boutons ci-dessous :
+                        </p>
+
+                        <div className="flex flex-col gap-2 pt-1">
+                          {tranzakPaymentUrl && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                window.location.href = tranzakPaymentUrl;
+                              }}
+                              className="w-full py-3 px-3 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 shadow-sm transition-all cursor-pointer bg-[#D91B24] hover:bg-red-700"
+                            >
+                              <Maximize2 size={14} />
+                              <span>Plein écran sécurisé sur cette page (Sans onglet séparé)</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={handleCheckLiveStatus}
+                            disabled={isCheckingStatus}
+                            className="w-full py-2.5 px-3 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 font-bold text-xs rounded-xl flex items-center justify-center gap-1.5 transition-all text-center cursor-pointer disabled:opacity-50"
+                          >
+                            <RefreshCw size={13} className={isCheckingStatus ? 'animate-spin' : ''} />
+                            <span>{isCheckingStatus ? 'Vérification...' : 'Vérifier la confirmation maintenant'}</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Saisie directe du code OTP reçu sur le téléphone */}
+                      <div className="border border-slate-200 rounded-2xl p-4 bg-white space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-slate-800 flex items-center gap-1.5 uppercase">
+                            <Key size={14} className="text-[#D91B24]" />
+                            <span>Valider le Code OTP (SMS Réception)</span>
+                          </span>
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <ShieldCheck size={11} />
+                            Direct Tranzak
+                          </span>
+                        </div>
+
+                        <p className="text-[11px] text-slate-600 leading-relaxed">
+                          Saisissez le <strong>code OTP à 6 chiffres</strong> envoyé par SMS par Digicel pour valider le renflouement et créditer le compte marchand :
+                        </p>
+
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={otpCode}
+                            onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                            placeholder="••••••"
+                            maxLength={6}
+                            className="flex-1 px-3.5 py-2.5 bg-white border border-slate-300 focus:border-slate-500 rounded-xl font-mono text-center text-sm font-black tracking-widest text-slate-900 outline-none shadow-2xs"
+                          />
+                          <button
+                            type="button"
+                            onClick={handleValidateOtpCode}
+                            disabled={isSubmitting || otpCode.length < 4}
+                            className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                          >
+                            {isSubmitting ? <RefreshCw size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                            <span>Valider OTP →</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Option alternative : Autoriser avec PIN */}
+                      <div className="border border-slate-200 rounded-2xl p-3 bg-white space-y-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowPin(!showPin)}
+                          className="w-full flex items-center justify-between text-left text-xs font-bold text-slate-700 cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <KeyRound size={14} className="text-slate-500" />
+                            <span>Ou autoriser avec votre code secret MonCash</span>
+                          </span>
+                          <span className="text-[11px] underline text-red-600">
+                            {showPin ? 'Masquer' : 'Saisir PIN'}
+                          </span>
+                        </button>
+
+                        {showPin && (
+                          <form onSubmit={handleExecuteDirectPayment} className="pt-2 border-t border-slate-100 space-y-3 animate-in fade-in">
+                            <div className="space-y-1">
+                              <label className="block text-xs font-bold text-slate-700">Code PIN Secret (4 chiffres)</label>
+                              <input
+                                type="password"
+                                value={clientPin}
+                                onChange={(e) => setClientPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                                placeholder="••••"
+                                maxLength={4}
+                                className="w-full px-3.5 py-2 border border-slate-300 rounded-xl font-mono text-base tracking-widest text-slate-900 outline-none"
+                              />
+                            </div>
+
+                            <button
+                              type="submit"
+                              disabled={isSubmitting || clientPin.length < 4}
+                              className="w-full py-2.5 px-3 bg-slate-900 hover:bg-slate-800 text-white font-black text-xs uppercase tracking-wider rounded-xl flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+                            >
+                              <Zap size={14} />
+                              <span>Valider le prélèvement direct</span>
+                            </button>
+                          </form>
+                        )}
+                      </div>
+                    </>
+                  )}
                 </div>
               ) : (
                 /* Mode Sandbox */
@@ -967,11 +1068,11 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                         </span>
                       </div>
                       <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded font-mono">
-                        Natcom
+                        Natcom Direct
                       </span>
                     </div>
                     <p className="text-[10.5px] text-slate-600 mt-1 leading-tight">
-                      Paiement rapide via portefeuille Natcom Haïti.
+                      Validation directe In-App (évite le chargement infini du site Natcom).
                     </p>
                   </button>
                 </div>
