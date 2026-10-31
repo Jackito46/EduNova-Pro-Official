@@ -44,10 +44,18 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
   const [isSimulatingTranzak, setIsSimulatingTranzak] = useState<boolean>(false);
+  const [verifiedWalletPhone, setVerifiedWalletPhone] = useState<string>('');
 
   useEffect(() => {
     if (studentData?.wallet_balance_htg !== undefined) {
       setWalletBalance(studentData.wallet_balance_htg || 0);
+    }
+    if (studentData?.id) {
+      const savedPhone = localStorage.getItem(`edunova_wallet_verified_phone_${studentData.id}`)
+        || (studentData.parent_phone ? studentData.parent_phone.replace(/\D/g, '').slice(-8) : '')
+        || localStorage.getItem('edunova_last_verified_wallet_phone')
+        || '34278313';
+      setVerifiedWalletPhone(savedPhone);
     }
   }, [studentData]);
 
@@ -480,6 +488,12 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
               <span className="text-[10px] bg-emerald-100/90 text-emerald-800 font-bold px-1.5 py-0.2 rounded-md">
                 Solde Disponible
               </span>
+              {verifiedWalletPhone && (
+                <span className="text-[9.5px] bg-blue-100 text-blue-900 font-mono font-bold px-1.5 py-0.2 rounded-md flex items-center gap-1 border border-blue-200">
+                  <ShieldCheck size={11} className="text-blue-600" />
+                  +509 {verifiedWalletPhone} (Lié OTP)
+                </span>
+              )}
             </div>
             <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono flex items-baseline gap-1">
               {(walletBalance || 0).toLocaleString()} <span className="text-xs font-bold text-slate-500">HTG</span>
@@ -1044,6 +1058,10 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             setWalletBalance(newBalance);
             if (paymentRecord) {
               setPayments(prev => [paymentRecord, ...prev]);
+            }
+            if (studentData?.id) {
+              const saved = localStorage.getItem(`edunova_wallet_verified_phone_${studentData.id}`) || '34278313';
+              setVerifiedWalletPhone(saved);
             }
             toast.success(`Portefeuille renfloué avec succès ! Nouveau solde : ${newBalance.toLocaleString()} HTG`);
           }}

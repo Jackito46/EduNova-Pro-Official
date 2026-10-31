@@ -2287,6 +2287,7 @@ const SuppliesPOS: React.FC<SuppliesPOSProps> = ({ user, catalog, classes, selec
             last_name: selectedStudent.last_name,
             reference_number: selectedStudent.reference_number,
             wallet_balance_htg: selectedStudent.wallet_balance_htg,
+            parent_phone: selectedStudent.parent_phone,
             school_id: user.school_id
           }}
           schoolName={school?.name}
