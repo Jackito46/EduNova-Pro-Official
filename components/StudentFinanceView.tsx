@@ -26,6 +26,7 @@ import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import { isPaymentCompleted } from '../src/utils/payment';
+import { sendPaymentConfirmationSms } from '../services/paymentSmsService';
 
 interface StudentFinanceViewProps {
   user: UserProfile;
@@ -59,7 +60,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     }
   }, [studentData]);
 
-  // Détection automatique du retour de redirection Digicel / Tranzak (ex: /#/mon-economat?payment=success&ref=TRZ-...)
+  // Détection automatique du retour de redirection Digicel MonCash / Natcom NatCash (ex: /#/mon-economat?payment=success&ref=TRZ-...)
   useEffect(() => {
     const handleUrlPaymentReturn = async () => {
       const hash = window.location.hash || '';
@@ -71,9 +72,11 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         const params = new URLSearchParams(queryPart);
         const ref = params.get('ref') || params.get('order_id') || params.get('transaction_id');
         const amount = Number(params.get('amount')) || 100;
+        const rawOperator = (params.get('operator') || 'moncash').toLowerCase();
+        const operatorLabel = rawOperator.includes('natcash') ? 'Natcom NatCash' : 'Digicel MonCash';
 
         if (ref) {
-          toast.loading('Confirmation de votre dépôt Tranzak MonCash en cours...', { id: 'trz-confirm' });
+          toast.loading(`Confirmation de votre dépôt Tranzak (${operatorLabel}) en cours...`, { id: 'trz-confirm' });
           try {
             const res = await fetch(`/api/tranzak/verify-payment/${encodeURIComponent(ref)}`, {
               method: 'POST',
@@ -86,6 +89,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             });
             await res.json().catch(() => ({}));
 
+            let finalBal = walletBalance + amount;
             if (studentData?.id) {
               const { data: st } = await supabase
                 .from('students')
@@ -93,6 +97,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                 .eq('id', studentData.id)
                 .maybeSingle();
               if (st?.wallet_balance_htg !== undefined) {
+                finalBal = st.wallet_balance_htg;
                 setWalletBalance(st.wallet_balance_htg);
               }
               const { data: pList } = await supabase
@@ -101,9 +106,28 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                 .eq('student_id', studentData.id)
                 .order('created_at', { ascending: false });
               if (pList) setPayments(pList);
+
+              // Envoi automatique du SMS de confirmation au parent
+              if (studentData.parent_phone) {
+                sendPaymentConfirmationSms({
+                  schoolId: school?.id || studentData.school_id || user.school_id,
+                  studentId: studentData.id,
+                  studentName: `${studentData.first_name} ${studentData.last_name}`,
+                  studentClass: studentData.class_name,
+                  parentName: studentData.parent_name || 'Parent',
+                  parentPhone: studentData.parent_phone,
+                  amount: amount,
+                  currency: 'HTG',
+                  feeTypeLabel: `Recharge Portefeuille (${operatorLabel})`,
+                  transactionRef: ref,
+                  schoolName: school?.name || 'Collège des Innovations',
+                  remainingAmount: 0,
+                  paymentMethod: `Tranzak ${operatorLabel}`
+                }).catch(console.warn);
+              }
             }
 
-            toast.success(`Dépôt Tranzak Digicel MonCash validé ! +${amount.toLocaleString()} HTG crédités au portefeuille.`, { id: 'trz-confirm' });
+            toast.success(`Dépôt Tranzak ${operatorLabel} validé ! +${amount.toLocaleString()} HTG crédités au portefeuille de ${studentData?.first_name || 'l\'élève'}.`, { id: 'trz-confirm' });
           } catch (e) {
             toast.dismiss('trz-confirm');
           } finally {
@@ -114,7 +138,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     };
 
     handleUrlPaymentReturn();
-  }, [studentData?.id, school?.id, user.school_id]);
+  }, [studentData?.id, studentData?.first_name, studentData?.last_name, studentData?.parent_phone, studentData?.parent_name, studentData?.class_name, school?.id, school?.name, user.school_id, walletBalance]);
 
   useEffect(() => {
     const fetchFinances = async () => {

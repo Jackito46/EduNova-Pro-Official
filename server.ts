@@ -2575,7 +2575,7 @@ async function startServer() {
       const baseUrl = process.env.APP_URL || 'https://edunova-pro.tech';
       const isWalletTopUp = feeType === 'CREDIT_PORTEFEUILLE' || feeType === 'RECHARGE_PORTEFEUILLE';
       const targetHash = isWalletTopUp ? 'mon-economat' : 'fees';
-      const successUrl = `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}`;
+      const successUrl = `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}&operator=${effectiveOperator}`;
       const cancelUrl = `${baseUrl}/#/${targetHash}?payment=cancel&ref=${encodeURIComponent(orderRef)}`;
       const callbackUrl = `${baseUrl}/api/tranzak/webhook`;
 
@@ -3584,17 +3584,19 @@ async function startServer() {
       let newBalance: number | null = null;
       let effectiveCreditAmount = depositAmount;
       let finalStudentId = studentId || tranzakVerifyData?.data?.metadata?.student_id;
+      let paymentRecordFound: any = null;
 
       if (isCompleted) {
         // 1. Rechercher la transaction correspondante dans payments pour récupérer student_id et montant exact
         try {
           const { data: pRec } = await supabase
             .from('payments')
-            .select('id, student_id, amount, status, fee_type')
+            .select('id, student_id, amount, status, fee_type, payment_method')
             .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`)
             .maybeSingle();
 
           if (pRec) {
+            paymentRecordFound = pRec;
             if (!finalStudentId && pRec.student_id) finalStudentId = pRec.student_id;
             if (pRec.amount) effectiveCreditAmount = Number(pRec.amount) || depositAmount;
             if (pRec.status !== 'VALIDE') {
@@ -3647,12 +3649,14 @@ async function startServer() {
 
         // 3. Renflouement et enregistrement comptable du compte marchand Tranzak
         try {
+          const rawOp = req.body?.operator || paymentRecordFound?.payment_method || 'moncash';
+          const logOperator = String(rawOp).toLowerCase().includes('natcash') ? 'natcash' : 'moncash';
           webhookAuditLogs.unshift({
             id: `wh-trz-verify-${Date.now()}`,
             timestamp: new Date().toISOString(),
             school_id: schoolId || undefined,
             gateway: 'tranzak',
-            operator: 'moncash',
+            operator: logOperator,
             event_type: 'payment.otp.verified',
             order_id: transactionId,
             transaction_id: transactionId,
@@ -3663,7 +3667,7 @@ async function startServer() {
             http_status: 200,
             simulated: false,
             status: 'VALIDE',
-            notes: `Validation sécurisée Tranzak (OTP) • Compte marchand crédité de +${effectiveCreditAmount} HTG • Portefeuille élève renfloué`,
+            notes: `Validation sécurisée Tranzak (${logOperator}) • Compte marchand crédité de +${effectiveCreditAmount} HTG • Portefeuille élève renfloué`,
             student_name: finalStudentId
           });
           if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
