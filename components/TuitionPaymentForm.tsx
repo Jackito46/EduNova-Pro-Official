@@ -3641,6 +3641,80 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                 </div>
 
+                {/* CHAMP OFFICIEL : SOLDE ACTUEL DU PORTEFEUILLE DE L'ÉLÈVE */}
+                <div className="space-y-1 min-w-0 animate-in fade-in duration-200">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5" title="Solde actuel du portefeuille élève">
+                      <Wallet size={13} className="text-indigo-600" />
+                      <span>Solde actuel du portefeuille élève</span>
+                    </label>
+                    {selectedStudent && (paymentMethod !== 'Portefeuille') && ((currency === 'USD' ? selectedStudent.wallet_balance_usd : selectedStudent.wallet_balance_htg) || 0) > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => handlePaymentMethodChange('Portefeuille')}
+                        className="text-[9.5px] font-bold text-indigo-700 hover:text-indigo-900 transition-colors uppercase tracking-wider bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md cursor-pointer flex items-center gap-1 active:scale-95 shadow-2xs"
+                        title="Basculer le mode de règlement sur Portefeuille"
+                      >
+                        <span>Payer par Portefeuille</span>
+                        <ArrowRight size={10} />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className={`p-2.5 sm:p-3 rounded-xl border transition-all flex items-center justify-between gap-2 sm:gap-3 ${
+                    !selectedStudent 
+                      ? 'bg-slate-50/60 border-slate-200 text-slate-400'
+                      : (currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0)) > 0
+                      ? 'bg-gradient-to-r from-emerald-50/80 via-teal-50/40 to-slate-50 border-emerald-200/90 text-slate-900 shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-600'
+                  }`}>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 border ${
+                        !selectedStudent
+                          ? 'bg-slate-100 text-slate-400 border-slate-200'
+                          : (currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0)) > 0
+                          ? 'bg-emerald-100 text-emerald-700 border-emerald-300'
+                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                      }`}>
+                        <Wallet size={16} />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] uppercase font-bold text-slate-500 block tracking-tight truncate">
+                          {selectedStudent ? `Avoir disponible • ${selectedStudent.fullName}` : 'Fonds en compte élève'}
+                        </span>
+                        <span className="text-xs font-semibold text-slate-700 block truncate">
+                          {selectedStudent 
+                            ? ((currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0)) > 0 
+                                ? (paymentMethod === 'Portefeuille' ? 'Mode Portefeuille sélectionné pour débit' : 'Solde créditeur disponible pour règlement') 
+                                : 'Aucun fond en réserve (Solde 0.00)')
+                            : 'Sélectionner un élève pour visualiser son solde'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Badges de soldes chiffrés */}
+                    <div className="flex items-center gap-1.5 font-mono shrink-0">
+                      <div className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-black border flex items-center gap-1 ${
+                        (selectedStudent?.wallet_balance_htg || 0) > 0
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                      }`}>
+                        <span>{(selectedStudent?.wallet_balance_htg || 0).toLocaleString()}</span>
+                        <span className="text-[10px] font-bold opacity-90">HTG</span>
+                      </div>
+                      <div className={`px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg text-xs font-black border flex items-center gap-1 ${
+                        (selectedStudent?.wallet_balance_usd || 0) > 0
+                          ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                          : 'bg-slate-100 text-slate-500 border-slate-200'
+                      }`}>
+                        <span className="text-[10px] font-bold opacity-90">$</span>
+                        <span>{(selectedStudent?.wallet_balance_usd || 0).toLocaleString()}</span>
+                        <span className="text-[10px] font-bold opacity-90">USD</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Information claire pour les paiements mobiles */}
                 {(paymentMethod === 'MonCash' || paymentMethod === 'Natcash') && (
                   <div className="p-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs flex items-center justify-between gap-2 animate-in fade-in duration-200">
@@ -4007,15 +4081,30 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <label className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 truncate">
                     Montant à percevoir ({currency})
                   </label>
-                  {paymentLogic?.suggestion > 0 && (
-                    <button 
-                      type="button" 
-                      onClick={() => setMontantReel(paymentLogic.suggestion.toString())}
-                      className="text-[9.5px] font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-wider bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md cursor-pointer shrink-0"
-                    >
-                      Suggérer : {paymentLogic.suggestion.toLocaleString()} {currency}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
+                    {paymentMethod === 'Portefeuille' && selectedStudent && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const bal = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+                          if (bal > 0) setMontantReel(bal.toString());
+                        }}
+                        className="text-[9.5px] font-bold text-indigo-700 hover:text-indigo-900 transition-colors uppercase tracking-wider bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 px-2 py-0.5 rounded-md cursor-pointer shrink-0 shadow-2xs active:scale-95"
+                        title="Appliquer le solde du portefeuille élève"
+                      >
+                        Solde Portefeuille : {(currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0)).toLocaleString()} {currency}
+                      </button>
+                    )}
+                    {paymentLogic?.suggestion > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={() => setMontantReel(paymentLogic.suggestion.toString())}
+                        className="text-[9.5px] font-bold text-blue-600 hover:text-blue-800 transition-colors uppercase tracking-wider bg-blue-50 border border-blue-100 px-2 py-0.5 rounded-md cursor-pointer shrink-0"
+                      >
+                        Suggérer : {paymentLogic.suggestion.toLocaleString()} {currency}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <div className="relative group">
                   <input 
