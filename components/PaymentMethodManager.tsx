@@ -92,6 +92,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
 
   // In-card configuration state
   const [editingMethodId, setEditingMethodId] = useState<string | null>(null);
+  const [showInfoDetails, setShowInfoDetails] = useState(false);
 
   // Copy feedback
   const [copiedText, setCopiedText] = useState<string | null>(null);
@@ -588,61 +589,56 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
       {/* SECTION 1: MODES DE RÈGLEMENT */}
       {(activeTab === 'unified' || activeTab === 'methods') && (
         <div className="bg-white rounded-xl border border-slate-200/90 overflow-hidden shadow-2xs">
-          <div className="p-2.5 sm:p-3 flex items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/70">
-            <div className="flex items-center gap-2.5">
-              <div className="w-7 h-7 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-200/60 shrink-0">
-                <Wallet size={14} />
+          {activeTab === 'unified' && (
+            <div className="px-3 py-2 flex items-center justify-between border-b border-slate-100 bg-slate-50/70">
+              <div className="flex items-center gap-2">
+                <Wallet size={13} className="text-emerald-600" />
+                <h4 className="text-xs font-bold text-slate-800 tracking-tight">Modes d'Encaissement au Guichet</h4>
               </div>
-              <div>
-                <h4 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight">Modes d'Encaissement au Guichet</h4>
-                <p className="text-[11px] text-slate-500 font-medium">Activation et paramétrage des canaux de paiement</p>
-              </div>
+              <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200/80">
+                {activeMethodsCount} / {methods.length} Actifs
+              </span>
             </div>
+          )}
 
-            <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/80 shrink-0">
-              {activeMethodsCount} / {methods.length} Actifs
-            </span>
-          </div>
-
-          <div className="p-3 sm:p-3.5 space-y-3">
-            {/* Architecture Guidance Banner: Guichet vs Dépôt Mobile Élève */}
-            <div className="p-3 bg-gradient-to-r from-blue-50/90 via-indigo-50/70 to-slate-50 border border-blue-200/80 rounded-xl flex items-start gap-2.5 text-xs text-blue-900 shadow-2xs">
-              <div className="w-7 h-7 rounded-lg bg-blue-100 text-blue-700 flex items-center justify-center shrink-0 border border-blue-200 mt-0.5">
-                <HelpCircle size={15} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-extrabold text-slate-900 text-xs">
-                    Règlement au Guichet vs Dépôt Mobile en Ligne de l'Élève
-                  </span>
-                  <span className="px-1.5 py-0.2 bg-blue-100 text-blue-800 text-[9px] font-black rounded uppercase">
-                    Architecture & Fonctionnement
-                  </span>
+          <div className="p-2.5 sm:p-3 space-y-2.5">
+            {/* Architecture Guidance Banner: Compact & Expandable */}
+            <div className="px-2.5 py-1.5 sm:px-3 sm:py-2 bg-gradient-to-r from-blue-50/80 to-indigo-50/50 border border-blue-200/70 rounded-lg flex items-center justify-between gap-2 text-xs shadow-2xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-5 h-5 rounded-md bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                  <HelpCircle size={12} />
                 </div>
-                <p className="text-[11px] text-slate-600 mt-1 leading-relaxed">
-                  <strong>Au Guichet (ci-dessous) :</strong> Ces modes définissent ce que le caissier peut sélectionner lorsqu'un parent vient physiquement à l'école. Si vous exigez que les élèves/parents fassent <em>uniquement</em> leurs dépôts MonCash/Natcash en ligne depuis leur propre téléphone, <strong>désactivez MonCash et Natcash ici</strong> (ils n'apparaîtront plus dans la caisse du comptoir).
-                </p>
-                <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                  <strong>En Ligne (Élève/Parent) :</strong> Les dépôts et recharges automatiques sur le compte/portefeuille élève se configurent dans l'onglet <strong>« Coffre-fort Paiement » (Tranzak / Kobara)</strong> et restent 100% opérationnels même si le guichet physique désactive ces options !
+                <p className="text-[11px] text-slate-700 truncate">
+                  <strong className="text-blue-950 font-bold">Règle Guichet :</strong> Ces modes s'appliquent à la caisse physique. La recharge autonome des élèves s'opère dans le <em>Coffre-fort Paiement</em>.
                 </p>
               </div>
+              <button
+                type="button"
+                onClick={() => setShowInfoDetails(!showInfoDetails)}
+                className="text-[10.5px] font-bold text-blue-700 hover:text-blue-900 bg-white/90 hover:bg-white px-2 py-0.5 rounded-md border border-blue-200/70 shrink-0 transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
+              >
+                {showInfoDetails ? 'Masquer' : 'En savoir plus'}
+              </button>
             </div>
+            {showInfoDetails && (
+              <div className="p-2.5 bg-blue-50/90 border border-blue-200/70 rounded-lg text-[11px] text-slate-600 space-y-1 animate-in fade-in duration-150">
+                <p><strong>Au Guichet :</strong> Activez ou désactivez les modes autorisés au comptoir physique par les caissiers.</p>
+                <p><strong>En Ligne (Élève/Parent) :</strong> Les dépôts mobiles autonomes via Tranzak/Kobara fonctionnent indépendamment depuis le Coffre-fort Paiement.</p>
+              </div>
+            )}
 
             {/* Banner if API gateways are disabled by Super Admin */}
             {!schoolData?.has_api_gateways && (
-              <div className="p-2.5 sm:p-3 bg-amber-50/90 border border-amber-200/90 rounded-xl flex items-start gap-2.5 text-xs text-amber-900 shadow-2xs">
-                <Smartphone size={16} className="text-amber-600 mt-0.5 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 font-bold text-amber-950 flex-wrap">
-                    <span>Passerelles API MonCash & Natcash inactives</span>
-                    <span className="px-1.5 py-0.2 bg-amber-200/80 text-amber-900 text-[9px] font-black rounded uppercase">
-                      Contrôle Super Admin
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-amber-800 font-medium mt-0.5 leading-relaxed">
-                    Ce module est désactivé en base de données pour cet établissement. Les paiements saisis via MonCash ou Natcash fonctionneront en mode de référence manuelle uniquement (sans vérification automatique ni webhook).
+              <div className="px-3 py-1.5 bg-amber-50/90 border border-amber-200/90 rounded-lg flex items-center justify-between gap-2 text-xs text-amber-900 shadow-2xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Smartphone size={13} className="text-amber-600 shrink-0" />
+                  <p className="text-[11px] text-amber-900 truncate">
+                    <strong className="font-bold">Passerelles API Inactives (Super Admin) :</strong> Les règlements saisis fonctionneront en référence manuelle uniquement.
                   </p>
                 </div>
+                <span className="px-1.5 py-0.2 bg-amber-200/80 text-amber-900 text-[9px] font-black rounded uppercase shrink-0">
+                  Manuel
+                </span>
               </div>
             )}
 
@@ -682,8 +678,8 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
               </div>
             </div>
 
-            {/* Grid of Methods */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+            {/* Grid of Methods - Responsive 2 colonnes sur laptops/tablettes et 3 sur écrans 2XL */}
+            <div className="grid grid-cols-1 md:grid-cols-2 2xl:grid-cols-3 gap-2.5 sm:gap-3">
               {filteredMethods.map((method: PaymentMethodConfig) => {
                 const isMenuOpen = openMethodMenuId === method.id;
                 const isEditing = editingMethodId === method.id;
@@ -692,20 +688,24 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                 return (
                   <div
                     key={method.id}
-                    className={`bg-white rounded-xl border transition-all relative ${
+                    className={`bg-white rounded-xl border transition-all ${
+                      isMenuOpen
+                        ? 'z-40 relative shadow-md ring-1 ring-slate-300'
+                        : 'z-10 relative'
+                    } ${
                       method.enabled
                         ? 'border-slate-200/90 shadow-2xs hover:border-slate-300'
                         : 'border-slate-200 bg-slate-50/40 opacity-75'
                     }`}
                   >
-                    <div className="p-3 space-y-2.5">
+                    <div className="p-2.5 sm:p-3 space-y-2">
                       {/* Top: Icon + Title + Dropdown Actions */}
                       <div className="flex items-start justify-between gap-2">
-                        <div className="flex items-center gap-2.5 min-w-0">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
                           {renderMethodIcon(method.icon_name, method.enabled)}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <h5 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight truncate">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h5 className="text-xs sm:text-sm font-bold text-slate-900 tracking-tight leading-snug">
                                 {method.name}
                               </h5>
                               {method.is_custom && (
@@ -719,23 +719,13 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                     ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
                                     : 'bg-amber-50 text-amber-800 border-amber-200'
                                 }`}>
-                                  {schoolData?.has_api_gateways ? 'API Active' : 'Manuel (API Inactive)'}
+                                  {schoolData?.has_api_gateways ? 'API' : 'Manuel'}
                                 </span>
                               )}
                             </div>
-                            <p className="text-[11px] text-slate-500 font-medium line-clamp-1">
+                            <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5" title={method.description}>
                               {method.description}
                             </p>
-                            {(method.id === 'MONCASH' || method.id === 'NATCASH') && (
-                              <p className={`text-[10px] font-medium mt-0.5 ${method.enabled ? 'text-blue-600' : 'text-slate-400 italic'}`}>
-                                {method.enabled ? "Encaissement au guichet physique (contrôle SMS)" : "Désactivé au guichet • Recharge élève en ligne uniquement"}
-                              </p>
-                            )}
-                            {method.id === 'PORTEFEUILLE' && (
-                              <p className="text-[10px] text-emerald-600 font-medium mt-0.5">
-                                Déduction en direct sur l'avoir ou le solde créditeur de l'élève
-                              </p>
-                            )}
                           </div>
                         </div>
 
@@ -745,14 +735,14 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                             <button
                               type="button"
                               onClick={() => toggleMethodActive(method.id)}
-                              className={`px-2 py-1 rounded-lg border text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                              className={`px-2 py-0.5 rounded-full text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer border ${
                                 method.enabled
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
+                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200'
                                   : 'bg-slate-100 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-200'
                               }`}
-                              title={method.enabled ? "Cliquer pour désactiver ce moyen de paiement partout" : "Cliquer pour activer ce moyen de paiement"}
+                              title={method.enabled ? "Actif au Guichet (Cliquer pour désactiver)" : "Inactif au Guichet (Cliquer pour activer)"}
                             >
-                              {method.enabled ? <Eye size={12} className="text-emerald-600" /> : <EyeOff size={12} className="text-slate-400" />}
+                              <span className={`w-1.5 h-1.5 rounded-full ${method.enabled ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                               <span>{method.enabled ? 'Actif' : 'Inactif'}</span>
                             </button>
                           )}
@@ -760,14 +750,15 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                           <button
                             type="button"
                             onClick={() => setOpenMethodMenuId(isMenuOpen ? null : method.id)}
-                            className={`px-2 py-1 rounded-lg border text-xs font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 ${
+                            className={`px-2 py-1 rounded-lg border text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
                               isMenuOpen
                                 ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
-                                : 'bg-slate-50 hover:bg-slate-100 text-slate-800 border-slate-200'
+                                : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
                             }`}
+                            title="Options du mode de règlement"
                           >
                             <span>Options</span>
-                            <ChevronDown size={12} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDown size={11} className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-180' : ''}`} />
                           </button>
 
                           <AnimatePresence>
@@ -777,7 +768,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 animate={{ opacity: 1, scale: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95, y: 4 }}
                                 transition={{ duration: 0.12 }}
-                                className="absolute right-0 top-full mt-1 w-52 bg-white rounded-xl shadow-lg border border-slate-200 py-1 z-40 text-xs font-medium space-y-0.5"
+                                className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-slate-200 py-1.5 z-50 text-xs font-medium space-y-0.5"
                               >
                                 <div className="px-3 py-1 border-b border-slate-100 text-[10px] font-mono font-bold text-slate-400 uppercase truncate">
                                   {method.name}
@@ -900,28 +891,9 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                         )}
                       </div>
 
-                      {/* Notice explicative si la méthode mobile est inactive au guichet */}
-                      {!method.enabled && (method.id === 'MONCASH' || method.id === 'NATCASH') && (
-                        <div className="p-2 rounded-lg bg-amber-50/90 border border-amber-200/90 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-[11px] text-amber-950">
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <AlertCircle size={13} className="text-amber-600 shrink-0" />
-                            <span className="truncate">Inactif au guichet : ce moyen de règlement est masqué pour les caissiers.</span>
-                          </div>
-                          {canManageAllCampuses && (
-                            <button
-                              type="button"
-                              onClick={() => toggleMethodActive(method.id)}
-                              className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md font-bold text-[10.5px] shrink-0 transition-all cursor-pointer shadow-2xs self-start sm:self-auto"
-                            >
-                              Activer au Guichet
-                            </button>
-                          )}
-                        </div>
-                      )}
-
                       {/* In-Card Config Form */}
                       {isEditing ? (
-                        <div className="space-y-2 p-2.5 bg-slate-50/90 rounded-lg border border-slate-200 animate-in fade-in">
+                        <div className="space-y-2 p-2 bg-slate-50/90 rounded-lg border border-slate-200 animate-in fade-in">
                           <div className="space-y-1">
                             <label className="text-[10px] font-bold uppercase text-slate-700 font-mono">
                               Compte / ID Marchand
@@ -940,7 +912,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 });
                               }}
                               placeholder="Ex: +509 3844-0000 / Compte..."
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
+                              className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 shadow-2xs"
                             />
                           </div>
 
@@ -962,7 +934,7 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                                 });
                               }}
                               placeholder="Ex: Vérifier le SMS officiel Digicel..."
-                              className="w-full px-2.5 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 resize-none shadow-2xs"
+                              className="w-full px-2.5 py-1 bg-white border border-slate-200 rounded-lg text-xs font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal outline-none focus:border-slate-800 resize-none shadow-2xs"
                             />
                           </div>
 
@@ -970,35 +942,28 @@ export const PaymentMethodManager: React.FC<PaymentMethodManagerProps> = ({
                             <button
                               type="button"
                               onClick={() => setEditingMethodId(null)}
-                              className="px-2.5 py-1 bg-slate-900 text-white rounded-lg text-xs font-bold hover:bg-black transition-colors cursor-pointer"
+                              className="px-2.5 py-0.5 bg-slate-900 text-white rounded-md text-xs font-bold hover:bg-black transition-colors cursor-pointer"
                             >
                               Terminer
                             </button>
                           </div>
                         </div>
                       ) : (
-                        (method.account_info || method.instructions) && (
-                          <div className="space-y-1 text-xs pt-0.5">
-                            {method.account_info && (
-                              <div className="flex items-center justify-between gap-1.5 bg-slate-50 px-2 py-1 rounded-md border border-slate-200/70">
-                                <div className="min-w-0 truncate">
-                                  <span className="text-[9px] uppercase font-bold text-slate-500 font-mono mr-1">ID:</span>
-                                  <span className="font-mono font-bold text-slate-900 text-xs">{method.account_info}</span>
-                                </div>
-                                <button
-                                  type="button"
-                                  onClick={() => copyToClipboard(method.account_info || '', 'ID Marchand')}
-                                  className="p-0.5 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
-                                >
-                                  {copiedText === method.account_info ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
-                                </button>
+                        method.account_info && (
+                          <div className="pt-0.5">
+                            <div className="flex items-center justify-between gap-1.5 bg-slate-50 px-2 py-0.5 rounded-md border border-slate-200/70 text-xs">
+                              <div className="min-w-0 truncate">
+                                <span className="text-[9px] uppercase font-bold text-slate-500 font-mono mr-1">ID:</span>
+                                <span className="font-mono font-bold text-slate-900 text-[11px]">{method.account_info}</span>
                               </div>
-                            )}
-                            {method.instructions && (
-                              <p className="text-[11px] text-slate-600 italic bg-slate-50/60 p-1.5 rounded-md border border-slate-100 line-clamp-2">
-                                "{method.instructions}"
-                              </p>
-                            )}
+                              <button
+                                type="button"
+                                onClick={() => copyToClipboard(method.account_info || '', 'ID Marchand')}
+                                className="p-0.5 text-slate-400 hover:text-slate-800 transition-colors cursor-pointer"
+                              >
+                                {copiedText === method.account_info ? <Check size={11} className="text-emerald-600" /> : <Copy size={11} />}
+                              </button>
+                            </div>
                           </div>
                         )
                       )}

@@ -3836,77 +3836,46 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
 
         {(activeTab === 'gateways' || (activeTab as any) === 'kobara') && (
           <div className="space-y-4 animate-in slide-in-from-right duration-500">
-            {/* Super Admin Executive Governance Panel */}
+            {/* Super Admin Executive Governance Panel - Version Compacte & Moderne */}
             {isSuperAdmin && (
-              <div className="bg-gradient-to-br from-slate-900 via-slate-850 to-slate-950 rounded-2xl p-4 sm:p-5 text-white border border-slate-800 shadow-md space-y-4 relative overflow-hidden">
-                <div className="absolute top-0 right-0 -mt-6 -mr-6 w-36 h-36 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
-                
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0 shadow-inner">
-                      <Smartphone size={20} />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                          SaaS Governance
-                        </span>
-                        <h4 className="text-sm font-bold text-white tracking-tight">
-                          Contrôle Super Admin — Activation des Passerelles
-                        </h4>
-                      </div>
-                      <p className="text-xs text-slate-400 font-medium mt-0.5 truncate">
-                        Établissement actif : <strong className="text-white font-bold">{school?.name || schoolData.name || 'Établissement courant'}</strong>
-                      </p>
-                    </div>
+              <div className="bg-slate-900 rounded-xl p-2.5 sm:p-3 text-white border border-slate-800 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30 shrink-0">
+                    SaaS Governance
+                  </span>
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="font-bold text-white text-xs truncate">
+                      Contrôle Global Passerelles API
+                    </span>
+                    <span className="text-slate-400 text-xs hidden md:inline">•</span>
+                    <span className="text-slate-300 text-xs hidden md:inline truncate">
+                      {school?.name || schoolData.name || 'Établissement actif'}
+                    </span>
                   </div>
-
-                  <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        fetchSchoolsForGateways();
-                        setIsGatewaysSchoolModalOpen(true);
-                      }}
-                      className="px-3 py-1.5 bg-white/10 hover:bg-white/15 text-white border border-white/20 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer active:scale-95"
-                    >
-                      <Building2 size={13} />
-                      <span>Gérer par établissement ({allSchoolsForGateways.length || '...'})</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Status bar & One-Click Toggle for current school */}
-                <div className="p-3 bg-white/5 border border-white/10 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-                  <div className="flex items-center gap-2.5">
-                    <div className={`w-3 h-3 rounded-full shrink-0 ${
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <div className={`w-2 h-2 rounded-full ${
                       (schoolData.has_api_gateways ?? school?.has_api_gateways)
                         ? 'bg-emerald-400 animate-pulse'
                         : 'bg-amber-400'
                     }`} />
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold text-white">
-                          Accès Global API (SaaS Platform) :
-                        </span>
-                        {(schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
-                          <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 rounded text-[10px] font-black uppercase">
-                            Toutes Passerelles Déverrouillées
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded text-[10px] font-black uppercase">
-                            Toutes Passerelles Coupées (Mode Manuel)
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">
-                        {(schoolData.has_api_gateways ?? school?.has_api_gateways)
-                          ? "L'école est autorisée à utiliser les paiements électroniques. Pour activer/désactiver une passerelle spécifique (ex: couper Kobara au profit de Tranzak), utilisez l'Aiguilleur ci-dessous."
-                          : "ATTENTION : Toutes les passerelles (Tranzak, Kobara, MonCash) sont coupées au niveau plateforme. L'école fonctionne en mode manuel uniquement."
-                        }
-                      </p>
-                    </div>
+                    <span className="text-[11px] font-semibold text-slate-300">
+                      {(schoolData.has_api_gateways ?? school?.has_api_gateways) ? 'Déverrouillé' : 'Coupé (Manuel)'}
+                    </span>
                   </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      fetchSchoolsForGateways();
+                      setIsGatewaysSchoolModalOpen(true);
+                    }}
+                    className="px-2.5 py-1 bg-white/10 hover:bg-white/15 text-white border border-white/20 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <Building2 size={12} />
+                    <span>Écoles ({allSchoolsForGateways.length || '...'})</span>
+                  </button>
 
                   <button
                     type="button"
@@ -3916,57 +3885,29 @@ const SettingsView: React.FC<SettingsViewProps> = ({ user }) => {
                       Boolean(schoolData.has_api_gateways ?? school?.has_api_gateways),
                       school?.name || schoolData.name
                     )}
-                    className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-95 shadow-sm whitespace-nowrap shrink-0 ${
+                    className={`px-3 py-1 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap ${
                       (schoolData.has_api_gateways ?? school?.has_api_gateways)
                         ? 'bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/40'
-                        : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/30'
+                        : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                     }`}
                   >
                     {togglingSchoolId === (school?.id || user.school_id) ? (
-                      <Loader2 size={14} className="animate-spin" />
+                      <Loader2 size={12} className="animate-spin" />
                     ) : (schoolData.has_api_gateways ?? school?.has_api_gateways) ? (
                       <>
-                        <Lock size={13} />
-                        <span>Couper TOUTES les API (Global)</span>
+                        <Lock size={12} />
+                        <span>Couper API</span>
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 size={13} />
-                        <span>Déverrouiller les API pour l'école</span>
+                        <CheckCircle2 size={12} />
+                        <span>Déverrouiller</span>
                       </>
                     )}
                   </button>
                 </div>
               </div>
             )}
-
-            {/* Bannière d'isolation et d'autonomie marchande de l'établissement */}
-            <div className="bg-gradient-to-r from-blue-950 via-indigo-950 to-slate-900 rounded-2xl p-4 sm:p-5 text-white border border-blue-500/30 shadow-sm relative overflow-hidden">
-              <div className="absolute top-0 right-0 -mt-6 -mr-6 w-40 h-40 bg-blue-500/10 rounded-full blur-2xl pointer-events-none" />
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 relative z-10">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-300 border border-blue-400/30 flex items-center justify-center shrink-0 shadow-inner">
-                    <ShieldCheck size={22} />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-400/20 text-emerald-300 border border-emerald-400/30">
-                        Isolation Établissement
-                      </span>
-                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-blue-400/20 text-blue-200 border border-blue-400/30">
-                        Tranzak &amp; Kobara
-                      </span>
-                      <h4 className="text-sm sm:text-base font-bold text-white tracking-tight">
-                        Coffre-fort Paiement — {school?.name || schoolData.name || 'Votre Établissement'}
-                      </h4>
-                    </div>
-                    <p className="text-xs text-slate-300 font-medium mt-1 leading-relaxed">
-                      Configurez ici vos clés d'API Tranzak (MonCash direct &amp; Natcash) ou Kobara propres à cet établissement. Vos clés sont chiffrées en AES-256 et ont priorité absolue sur la configuration globale de la plateforme pour isoler vos encaissements et versements.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
 
             <ApiCredentialsVault
               user={user}
