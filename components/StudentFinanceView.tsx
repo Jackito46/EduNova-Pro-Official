@@ -27,7 +27,6 @@ import {
 import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
-import { StudentWalletDiagnosticsModal } from './StudentWalletDiagnosticsModal';
 import { isPaymentCompleted } from '../src/utils/payment';
 import { sendPaymentConfirmationSms } from '../services/paymentSmsService';
 
@@ -44,10 +43,9 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [adHocCampaigns, setAdHocCampaigns] = useState<any[]>([]);
   const [exchangeRate, setExchangeRate] = useState<number>(135.0);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns'>('all');
+  const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns' | 'wallet'>('all');
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
-  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
   const [isSyncingTranzak, setIsSyncingTranzak] = useState<boolean>(false);
 
   // Synchronisation et réconciliation automatique avec l'API Tranzak
@@ -323,8 +321,42 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
   const validPayments = payments.filter(isPaymentCompleted);
 
-  // Classification des versements
+  // Détection stricte des dépôts / recharges de portefeuille
+  // Un rechargement de portefeuille n'est PAS un versement d'écolage ou de frais divers.
+  // Ce sont des fonds personnels disponibles au crédit de l'élève (cantine, fournitures ou paiement ultérieur).
+  const isWalletDeposit = (p: any) => {
+    if (!p) return false;
+    const feeType = (p.fee_type || '').toUpperCase();
+    const nature = (p.nature || '').toLowerCase();
+    const desc = (p.description || '').toLowerCase();
+    const notes = (p.notes || '').toLowerCase();
+    const method = (p.payment_method || p.method || '').toLowerCase();
+    
+    return (
+      feeType === 'CREDIT_PORTEFEUILLE' ||
+      feeType === 'RECHARGE_PORTEFEUILLE' ||
+      feeType.includes('PORTEFEUILLE') ||
+      nature.includes('portefeuille') ||
+      desc.includes('recharge portefeuille') ||
+      desc.includes('dépôt portefeuille') ||
+      desc.includes('depot portefeuille') ||
+      desc.includes('alimentation portefeuille') ||
+      notes.includes('recharge moncash') ||
+      notes.includes('recharge natcash') ||
+      notes.includes('portefeuille crédité') ||
+      notes.includes('recharge portefeuille') ||
+      method.includes('tranzak test direct') ||
+      method.includes('tranzak live')
+    );
+  };
+
+  // Les versements scolaires effectifs (excluant strictement les recharges de portefeuille)
+  const feePayments = validPayments.filter(p => !isWalletDeposit(p));
+  const walletDepositPayments = validPayments.filter(p => isWalletDeposit(p));
+
+  // Classification des versements de frais scolaires
   const isAdmissionPayment = (p: any) => {
+    if (isWalletDeposit(p)) return false;
     const feeType = (p.fee_type || '').toLowerCase();
     const nature = (p.nature || '').toLowerCase();
     const desc = (p.description || '').toLowerCase();
@@ -341,6 +373,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   };
 
   const isMiscPayment = (p: any) => {
+    if (isWalletDeposit(p)) return false;
     const feeType = (p.fee_type || '').toLowerCase();
     const nature = (p.nature || '').toLowerCase();
     const desc = (p.description || '').toLowerCase();
@@ -354,21 +387,24 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     );
   };
 
-  const isCampPmt = (p: any) => Boolean(
-    p.ad_hoc_campaign_id || 
-    p.fee_type === 'AD_HOC' || 
-    p.campaign?.id || 
-    adHocCampaigns.some((c: any) => {
-      const campName = (c.name || '').toLowerCase();
-      const nat = (p.nature || p.label || p.type || '').toLowerCase();
-      return (campName && nat && (nat.includes(campName) || (campName.includes('assurance') && nat.includes('assurance'))));
-    })
-  );
+  const isCampPmt = (p: any) => {
+    if (isWalletDeposit(p)) return false;
+    return Boolean(
+      p.ad_hoc_campaign_id || 
+      p.fee_type === 'AD_HOC' || 
+      p.campaign?.id || 
+      adHocCampaigns.some((c: any) => {
+        const campName = (c.name || '').toLowerCase();
+        const nat = (p.nature || p.label || p.type || '').toLowerCase();
+        return (campName && nat && (nat.includes(campName) || (campName.includes('assurance') && nat.includes('assurance'))));
+      })
+    );
+  };
 
-  const admissionPayments = validPayments.filter(p => !isCampPmt(p) && isAdmissionPayment(p));
-  const miscPayments = validPayments.filter(p => !isCampPmt(p) && !isAdmissionPayment(p) && isMiscPayment(p));
-  const campaignPayments = validPayments.filter(p => isCampPmt(p));
-  const tuitionPayments = validPayments.filter(p => !isCampPmt(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
+  const admissionPayments = feePayments.filter(p => !isCampPmt(p) && isAdmissionPayment(p));
+  const miscPayments = feePayments.filter(p => !isCampPmt(p) && !isAdmissionPayment(p) && isMiscPayment(p));
+  const campaignPayments = feePayments.filter(p => isCampPmt(p));
+  const tuitionPayments = feePayments.filter(p => !isCampPmt(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
 
   // Frais prévus
   const admissionNativeHTG = Number(feePlan?.inscription_fee || 0);
@@ -447,6 +483,9 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     (hasMiscFee && !miscDetails.isPaid ? miscDetails.remainingHTG : 0) +
     campaignsRemainingHTG;
 
+  // Calcul du total des dépôts de portefeuille
+  const totalWalletDepositsHTG = walletDepositPayments.reduce((sum, p) => sum + Number(p.amount_htg_equivalent || p.amount || 0), 0);
+
   // Filtrage selon onglet
   const displayedExpected = activeSection === 'all' 
     ? grandTotalExpected 
@@ -454,6 +493,8 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     ? (tuitionDetails.effectiveDueHTG + admissionDetails.effectiveDueHTG) 
     : activeSection === 'misc'
     ? miscDetails.effectiveDueHTG
+    : activeSection === 'wallet'
+    ? walletBalance
     : campaignsExpectedHTG;
 
   const displayedPaid = activeSection === 'all' 
@@ -462,6 +503,8 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     ? (tuitionDetails.paidHTGEquiv + admissionDetails.paidHTGEquiv) 
     : activeSection === 'misc'
     ? miscDetails.paidHTGEquiv
+    : activeSection === 'wallet'
+    ? totalWalletDepositsHTG
     : campaignsPaidHTG;
 
   const displayedBalance = activeSection === 'all' 
@@ -470,6 +513,8 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     ? (tuitionDetails.remainingHTG + admissionDetails.remainingHTG) 
     : activeSection === 'misc'
     ? miscDetails.remainingHTG
+    : activeSection === 'wallet'
+    ? 0
     : campaignsRemainingHTG;
 
   const displayedRemainingUSD = activeSection === 'all'
@@ -478,6 +523,8 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     ? ((tuitionDetails.isPaid ? 0 : tuitionDetails.remainingUSD) + (admissionDetails.isPaid ? 0 : admissionDetails.remainingUSD))
     : activeSection === 'misc'
     ? (miscDetails.isPaid ? 0 : miscDetails.remainingUSD)
+    : activeSection === 'wallet'
+    ? 0
     : campaignsRemainingUSD;
 
   const displayedRemainingHTG = activeSection === 'all'
@@ -486,12 +533,15 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
     ? ((tuitionDetails.isPaid ? 0 : tuitionDetails.remainingHTG) + (admissionDetails.isPaid ? 0 : admissionDetails.remainingHTG))
     : activeSection === 'misc'
     ? (miscDetails.isPaid ? 0 : miscDetails.remainingHTG)
+    : activeSection === 'wallet'
+    ? 0
     : campaignsRemainingHTG;
 
   const displayedPayments = payments.filter(p => {
-    if (activeSection === 'tuition') return !p.ad_hoc_campaign_id && !isMiscPayment(p);
-    if (activeSection === 'misc') return !p.ad_hoc_campaign_id && isMiscPayment(p);
-    if (activeSection === 'campaigns') return !!p.ad_hoc_campaign_id;
+    if (activeSection === 'tuition') return !isWalletDeposit(p) && !p.ad_hoc_campaign_id && !isMiscPayment(p) && !isAdmissionPayment(p);
+    if (activeSection === 'misc') return !isWalletDeposit(p) && !p.ad_hoc_campaign_id && isMiscPayment(p);
+    if (activeSection === 'campaigns') return !isWalletDeposit(p) && !!p.ad_hoc_campaign_id;
+    if (activeSection === 'wallet') return isWalletDeposit(p);
     return true;
   });
 
@@ -554,16 +604,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
           <button
             type="button"
-            onClick={() => setShowDiagnosticsModal(true)}
-            className="px-3 py-2 bg-white hover:bg-indigo-50 text-indigo-700 hover:text-indigo-800 border border-indigo-200 hover:border-indigo-300 font-bold text-xs rounded-xl shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-            title="Outil de Diagnostic : Comparer la table Supabase transactions avec les relevés Tranzak et callbacks"
-          >
-            <Activity size={13} className="text-indigo-600" />
-            <span>Diagnostic Tranzak</span>
-          </button>
-
-          <button
-            type="button"
             onClick={() => setShowWalletTopUpModal(true)}
             className="flex-1 sm:flex-none px-4 py-2 bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-700 hover:to-rose-700 text-white font-bold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
             title="Recharger le portefeuille de l'élève en ligne via MonCash / Natcash / Tranzak"
@@ -575,7 +615,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
       </div>
 
       {/* Tabs Selector Compact */}
-      <div className="flex bg-slate-100/90 p-0.5 rounded-xl max-w-md shadow-2xs border border-slate-200/80 overflow-x-auto">
+      <div className="flex bg-slate-100/90 p-0.5 rounded-xl max-w-lg shadow-2xs border border-slate-200/80 overflow-x-auto">
         <button
           type="button"
           onClick={() => setActiveSection('all')}
@@ -629,34 +669,60 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             )}
           </button>
         )}
+        {walletDepositPayments.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveSection('wallet')}
+            className={`flex-1 py-1.5 px-2.5 rounded-lg font-bold text-xs transition-all whitespace-nowrap relative cursor-pointer ${
+              activeSection === 'wallet'
+                ? 'bg-white text-indigo-900 shadow-xs border border-indigo-200'
+                : 'text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            Portefeuille
+            <span className="ml-1 bg-indigo-600 text-white font-black text-[9px] px-1.5 py-0.2 rounded-full">
+              {walletDepositPayments.length}
+            </span>
+          </button>
+        )}
       </div>
 
       {/* Financial Overview Cards Compact */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 animate-in fade-in duration-200">
         <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center">
           <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-            {activeSection === 'all' ? 'Obligation Totale' : activeSection === 'tuition' ? 'Scolarité & Admission' : activeSection === 'misc' ? 'Frais Divers' : 'Frais de Campagnes'}
+            {activeSection === 'all' ? 'Obligation Totale' : activeSection === 'tuition' ? 'Scolarité & Admission' : activeSection === 'misc' ? 'Frais Divers' : activeSection === 'wallet' ? 'Solde Portefeuille Disponible' : 'Frais de Campagnes'}
           </span>
           <span className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
             {Math.round(displayedExpected).toLocaleString()} <span className="text-xs font-sans text-slate-500">HTG</span>
           </span>
-          {activeSection === 'tuition' && totalDiscount > 0 && (
+          {activeSection === 'wallet' ? (
+            <span className="text-[9.5px] text-indigo-700 font-bold mt-1 bg-indigo-50 px-1.5 py-0.2 rounded border border-indigo-100">
+              Disponible pour cantine &amp; fournitures
+            </span>
+          ) : activeSection === 'tuition' && totalDiscount > 0 ? (
             <span className="text-[9.5px] text-emerald-700 font-bold mt-1 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-100">
               Réduction de {totalDiscount.toLocaleString()} HTG incluse
             </span>
-          )}
+          ) : null}
         </div>
 
         <div className="bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center border-b-2 sm:border-b-4 border-b-emerald-500 relative overflow-hidden">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Déjà Versé</span>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+            {activeSection === 'wallet' ? 'Total Rechargé' : 'Déjà Versé'}
+          </span>
           <span className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">
             {Math.round(displayedPaid).toLocaleString()} <span className="text-xs font-sans text-emerald-500">HTG</span>
           </span>
         </div>
 
-        <div className={`bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center border-b-2 sm:border-b-4 ${displayedBalance <= 0 ? 'border-b-blue-500' : 'border-b-rose-500'}`}>
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Solde Restant</span>
-          {displayedBalance <= 0 ? (
+        <div className={`bg-white rounded-2xl p-3 sm:p-3.5 border border-slate-200/80 shadow-2xs flex flex-col items-center justify-center text-center border-b-2 sm:border-b-4 ${activeSection === 'wallet' ? 'border-b-indigo-500' : displayedBalance <= 0 ? 'border-b-blue-500' : 'border-b-rose-500'}`}>
+          <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+            {activeSection === 'wallet' ? 'Statut du Solde' : 'Solde Restant'}
+          </span>
+          {activeSection === 'wallet' ? (
+            <span className="text-xl sm:text-2xl font-black font-mono text-indigo-600">Actif &amp; Crédité</span>
+          ) : displayedBalance <= 0 ? (
             <span className="text-xl sm:text-2xl font-black font-mono text-blue-600">Réglé (À Jour)</span>
           ) : displayedRemainingUSD > 0 && displayedRemainingHTG > 0 ? (
             <div className="space-y-0.5">
@@ -926,8 +992,11 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
               </thead>
               <tbody className="divide-y divide-slate-100 text-xs">
                 {displayedPayments.map(payment => {
+                  const isWallet = isWalletDeposit(payment);
                   let displayNature = payment.nature || payment.type || payment.fee_type || 'Frais Divers';
-                  if (payment.campaign?.name) {
+                  if (isWallet) {
+                    displayNature = 'Recharge Portefeuille Élève';
+                  } else if (payment.campaign?.name) {
                     displayNature = `Campagne: ${payment.campaign.name}`;
                   } else if (payment.ad_hoc_campaign_id) {
                     displayNature = 'Frais de Campagne';
@@ -944,10 +1013,10 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   const appliedRate = Number(payment.exchange_rate_applied || (isUSD && payment.amount_htg_equivalent ? (payment.amount_htg_equivalent / rawAmount) : exchangeRate));
                   const baseHTG = Number(payment.amount_htg_equivalent || (isUSD ? rawAmount * appliedRate : rawAmount));
 
-                  const isCamp = isCampPmt(payment);
-                  const isTuitionFee = !isCamp && (payment.fee_type === 'SCOLARITE' || (!payment.fee_type && (!payment.nature || payment.nature === 'SCOLARITE' || payment.nature === 'Scolarité')));
-                  const isAdmissionFee = !isCamp && (payment.fee_type === 'INSCRIPTION' || payment.nature === 'INSCRIPTION' || payment.nature === "Frais d'inscription");
-                  const isMiscFee = !isCamp && isMiscPayment(payment);
+                  const isCamp = !isWallet && isCampPmt(payment);
+                  const isTuitionFee = !isWallet && !isCamp && (payment.fee_type === 'SCOLARITE' || (!payment.fee_type && (!payment.nature || payment.nature === 'SCOLARITE' || payment.nature === 'Scolarité')));
+                  const isAdmissionFee = !isWallet && !isCamp && (payment.fee_type === 'INSCRIPTION' || payment.nature === 'INSCRIPTION' || payment.nature === "Frais d'inscription");
+                  const isMiscFee = !isWallet && !isCamp && isMiscPayment(payment);
                   const matchedCampaign = isCamp ? campaignBreakdowns.find(c => 
                     c.camp.id === payment.ad_hoc_campaign_id || 
                     c.camp.id === payment.campaign?.id ||
@@ -956,10 +1025,12 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   ) : null;
                   const isCampaignPlannedInUSD = Boolean(matchedCampaign && matchedCampaign.camp.currency === 'USD');
                   const isFeePlannedInUSD = Boolean(
-                    (isTuitionFee && tuitionNativeUSD > 0) ||
-                    (isAdmissionFee && admissionNativeUSD > 0) ||
-                    (isMiscFee && miscNativeUSD > 0) ||
-                    isCampaignPlannedInUSD
+                    !isWallet && (
+                      (isTuitionFee && tuitionNativeUSD > 0) ||
+                      (isAdmissionFee && admissionNativeUSD > 0) ||
+                      (isMiscFee && miscNativeUSD > 0) ||
+                      isCampaignPlannedInUSD
+                    )
                   );
 
                   return (
@@ -970,9 +1041,23 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                       </td>
 
                       <td className="py-3.5 px-4">
-                        <div className="font-semibold text-slate-800">{displayNature}</div>
-                        {payment.description && (
-                          <div className="text-[11px] text-slate-500 italic mt-0.5">{payment.description}</div>
+                        {isWallet ? (
+                          <div>
+                            <div className="inline-flex items-center gap-1.5 font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded text-xs">
+                              <Wallet size={12} className="text-indigo-600" />
+                              <span>Recharge Portefeuille</span>
+                            </div>
+                            <div className="text-[11px] text-slate-500 italic mt-0.5">
+                              {payment.description || 'Dépôt personnel pour cantine ou versements futurs'}
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-semibold text-slate-800">{displayNature}</div>
+                            {payment.description && (
+                              <div className="text-[11px] text-slate-500 italic mt-0.5">{payment.description}</div>
+                            )}
+                          </div>
                         )}
                       </td>
 
@@ -1012,7 +1097,20 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                       </td>
 
                       <td className="py-3.5 px-4 text-center whitespace-nowrap">
-                        {isUSD ? (
+                        {isWallet ? (
+                          <div className="inline-flex flex-col items-center gap-0.5">
+                            <span 
+                              className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-900 border border-indigo-200 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold whitespace-nowrap shadow-2xs"
+                              title="Dépôt sur le portefeuille de l'élève. Ces fonds ne sont pas encore affectés aux frais scolaires."
+                            >
+                              <Wallet size={12} className="text-indigo-600 shrink-0" />
+                              <span>Crédit Portefeuille</span>
+                            </span>
+                            <span className="text-[9px] font-bold text-indigo-700 tracking-tight">
+                              Fonds disponibles • Non amorti
+                            </span>
+                          </div>
+                        ) : isUSD ? (
                           <div className="inline-flex flex-col items-center gap-1 py-0.5">
                             <div 
                               className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 via-amber-100/90 to-amber-50 text-amber-950 border border-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-mono font-black whitespace-nowrap shadow-xs hover:border-amber-400 hover:shadow-sm transition-all cursor-help"
@@ -1054,12 +1152,17 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
                       <td className="py-3.5 px-4 text-right font-black font-mono whitespace-nowrap">
                         <div className="flex flex-col items-end">
-                          {payment.status === 'ANNULE' ? (
+                          {isWallet ? (
+                            <div>
+                              <span className="text-indigo-700 font-bold text-xs inline-block">+{rawAmount.toLocaleString()} HTG</span>
+                              <div className="text-[9px] text-indigo-500 font-sans font-medium">Solde Portefeuille</div>
+                            </div>
+                          ) : payment.status === 'ANNULE' ? (
                             <span className="text-slate-400 line-through">{Math.round(baseHTG).toLocaleString()} HTG</span>
                           ) : (
                             <span className="text-slate-900">{Math.round(baseHTG).toLocaleString()} HTG</span>
                           )}
-                          {isUSD && payment.status !== 'ANNULE' && (
+                          {!isWallet && isUSD && payment.status !== 'ANNULE' && (
                             <div className="text-[10px] text-emerald-800 font-mono font-bold flex items-center justify-end gap-1 mt-0.5" title="Détail du calcul certifié pour l'audit">
                               <CheckCircle2 size={10} className="text-emerald-600 shrink-0" />
                               <span>${rawAmount} × {appliedRate}</span>
@@ -1104,32 +1207,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         />
       )}
 
-      {/* Modal d'Outil de Diagnostic Avancé Portefeuille / Tranzak */}
-      {showDiagnosticsModal && studentData && (
-        <StudentWalletDiagnosticsModal
-          isOpen={showDiagnosticsModal}
-          onClose={() => setShowDiagnosticsModal(false)}
-          student={{
-            id: studentData.id,
-            first_name: studentData.first_name,
-            last_name: studentData.last_name,
-            reference_number: studentData.reference_number,
-            wallet_balance_htg: walletBalance,
-            school_id: studentData.school_id || school?.id || user.school_id
-          }}
-          schoolId={studentData.school_id || school?.id || user.school_id}
-          onReconciled={(newBal) => {
-            setWalletBalance(newBal);
-            // Rafraîchir les écritures
-            supabase
-              .from('payments')
-              .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-              .eq('student_id', studentData.id)
-              .order('created_at', { ascending: false })
-              .then(({ data }) => { if (data) setPayments(data); });
-          }}
-        />
-      )}
     </div>
   );
 };
