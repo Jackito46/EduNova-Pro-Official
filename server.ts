@@ -2917,10 +2917,18 @@ async function startServer() {
       const effectiveOperator = (operator === 'natcash') ? 'natcash' : 'moncash';
 
       const baseUrl = process.env.APP_URL || 'https://edunova-pro.tech';
-      const isWalletTopUp = feeType === 'CREDIT_PORTEFEUILLE' || feeType === 'RECHARGE_PORTEFEUILLE';
+      const normFeeType = String(feeType || '').toUpperCase().trim();
+      // Tout paiement associé à un élève (recharge portefeuille, frais en ligne) doit STRICTEMENT
+      // rediriger vers 'mon-economat' afin d'éviter tout blocage de RoleGuard sur /fees (réservé aux caissiers)
+      const isCashierAction = Boolean(req.body?.isCashierAction || req.body?.isCashierDesk);
+      const isWalletTopUp = normFeeType.includes('PORTEFEUILLE') || normFeeType.includes('WALLET') || (Boolean(studentId) && !isCashierAction);
       const targetHash = isWalletTopUp ? 'mon-economat' : 'fees';
-      const successUrl = `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}&operator=${effectiveOperator}`;
-      const cancelUrl = `${baseUrl}/#/${targetHash}?payment=cancel&ref=${encodeURIComponent(orderRef)}`;
+
+      // Paramètres complets transmis à la fois dans le search (?) et le fragment (#) pour garantir
+      // qu'aucune passerelle ni redirection 302 ne tronque les paramètres de confirmation
+      const queryParams = `payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}&operator=${effectiveOperator}&redirect_to=${targetHash}`;
+      const successUrl = `${baseUrl}/?${queryParams}#/${targetHash}?${queryParams}`;
+      const cancelUrl = `${baseUrl}/?payment=cancel&ref=${encodeURIComponent(orderRef)}#/${targetHash}?payment=cancel`;
       const callbackUrl = `${baseUrl}/api/tranzak/webhook`;
 
       const payload = {
@@ -3912,7 +3920,7 @@ async function startServer() {
 
       let tranzakVerifyData: any = null;
       try {
-        const verifyRes = await fetch(`https://tranzak.co/api/gateway/v1/payments/${encodeURIComponent(transactionId)}/verify`, {
+        const verifyRes = await fetch(`https://api.tranzak.co/api/gateway/v1/payments/${encodeURIComponent(transactionId)}/verify`, {
           method: 'POST',
           headers: {
             'X-Api-Key': effectiveKey,
@@ -3924,12 +3932,37 @@ async function startServer() {
         console.warn('Tranzak POST /verify network error:', vfErr);
       }
 
-      const status = tranzakVerifyData?.data?.status || tranzakVerifyData?.status || 'completed';
+      // Si le POST direct /verify échoue ou ne renvoie pas completed (ex: si transactionId est une référence interne TRZ-...),
+      // rechercher la transaction dans la liste récente Tranzak Live
+      let matchedRemoteTx: any = null;
+      if (!tranzakVerifyData?.data?.status && !tranzakVerifyData?.status) {
+        try {
+          const listRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=35', {
+            headers: {
+              'X-Api-Key': effectiveKey || TRANZAK_LIVE_KEY_VERIFIED,
+              'Accept': 'application/json'
+            }
+          });
+          if (listRes.ok) {
+            const listJson = await listRes.json().catch(() => ({}));
+            const txList = Array.isArray(listJson?.data) ? listJson.data : [];
+            matchedRemoteTx = txList.find((t: any) => 
+              t.reference === transactionId || 
+              t.transaction_id === transactionId || 
+              t.metadata?.order_id === transactionId
+            );
+          }
+        } catch (lErr) {
+          console.warn('Tranzak list fallback error:', lErr);
+        }
+      }
+
+      const status = tranzakVerifyData?.data?.status || tranzakVerifyData?.status || matchedRemoteTx?.status || 'completed';
       const isCompleted = status === 'completed' || status === 'SUCCESSFUL' || status === 'VALIDE';
 
       let newBalance: number | null = null;
-      let effectiveCreditAmount = depositAmount;
-      let finalStudentId = studentId || tranzakVerifyData?.data?.metadata?.student_id;
+      let effectiveCreditAmount = Number(matchedRemoteTx?.amount) || depositAmount;
+      let finalStudentId = studentId || matchedRemoteTx?.metadata?.student_id || tranzakVerifyData?.data?.metadata?.student_id;
       let paymentRecordFound: any = null;
 
       if (isCompleted) {

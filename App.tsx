@@ -159,6 +159,50 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
     );
   }, []);
 
+  // Détection et réacheminement automatique des retours de passerelle de paiement (Tranzak MonCash / NatCash)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const searchStr = window.location.search || '';
+    const hashStr = window.location.hash || '';
+    const fullUrl = searchStr + hashStr;
+
+    if (fullUrl.includes('payment=success') || fullUrl.includes('payment=cancel') || searchStr.includes('redirect_to=')) {
+      const searchParams = new URLSearchParams(searchStr.replace(/^\?/, ''));
+      const hashQueryPart = hashStr.includes('?') ? hashStr.split('?')[1] : '';
+      const hashParams = new URLSearchParams(hashQueryPart);
+
+      const ref = searchParams.get('ref') || hashParams.get('ref') || '';
+      const amount = searchParams.get('amount') || hashParams.get('amount') || '';
+      const studentId = searchParams.get('student_id') || hashParams.get('student_id') || '';
+      const operator = searchParams.get('operator') || hashParams.get('operator') || 'moncash';
+      const redirectTo = searchParams.get('redirect_to') || hashParams.get('redirect_to') || '';
+      const isSuccess = fullUrl.includes('payment=success');
+
+      const isStudentOrParent = 
+        user.role === UserRole.STUDENT || 
+        user.role === UserRole.PARENT || 
+        Boolean(studentId) || 
+        redirectTo === 'mon-economat';
+
+      if (isStudentOrParent) {
+        const targetQuery = isSuccess
+          ? `payment=success&ref=${encodeURIComponent(ref)}&amount=${encodeURIComponent(amount)}&student_id=${encodeURIComponent(studentId)}&operator=${encodeURIComponent(operator)}`
+          : `payment=cancel&ref=${encodeURIComponent(ref)}`;
+
+        const targetHashUrl = `#/mon-economat?${targetQuery}`;
+        
+        // Si les paramètres sont dans window.location.search, nettoyer search et mettre dans le hash
+        if (searchStr || !window.location.hash.includes('mon-economat')) {
+          window.history.replaceState({}, document.title, `${window.location.pathname}${targetHashUrl}`);
+          if (window.location.hash !== `#/mon-economat?${targetQuery}`) {
+            window.location.hash = `#/mon-economat?${targetQuery}`;
+          }
+        }
+      }
+    }
+  }, [user.role]);
+
   const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
   
   // Define role groups for easier management

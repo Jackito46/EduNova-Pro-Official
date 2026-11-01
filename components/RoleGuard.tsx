@@ -69,6 +69,18 @@ export const RoleGuard: React.FC<RoleGuardProps> = ({
   const authorized = isUserAuthorized(user, allowedRoles);
 
   if (!authorized) {
+    const searchStr = typeof window !== 'undefined' ? (window.location.search + window.location.hash) : '';
+    const isPaymentReturn = searchStr.includes('payment=') || searchStr.includes('redirect_to=') || searchStr.includes('ref=TRZ-');
+    const userRoleStr = normalizeUserRole(user.role);
+    const isStudentOrParent = userRoleStr === UserRole.STUDENT || userRoleStr === UserRole.PARENT;
+
+    // Si un élève ou parent atterrit sur un lien de retour de paiement (ex: vers /fees),
+    // le rediriger gracieusement vers /mon-economat sans afficher d'alerte d'accès restreint
+    if (isPaymentReturn && isStudentOrParent) {
+      const qParams = location.search || (window.location.search ? window.location.search : '');
+      return <Navigate to={`/mon-economat${qParams}`} replace />;
+    }
+
     // Alerte l'utilisateur uniquement en cas de tentative d'accès manuel non autorisé à une URL protégée
     if (typeof window !== 'undefined' && location.pathname !== '/' && location.pathname !== '/dashboard') {
       const warnedKey = `role_denied_${location.pathname}`;
