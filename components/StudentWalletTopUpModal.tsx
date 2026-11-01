@@ -32,6 +32,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { getTerminology } from '../lib/terminology';
 import { TranzakService } from '../services/tranzakService';
 import { sendPaymentConfirmationSms } from '../services/paymentSmsService';
+import { getAllowedWalletOperators } from '../src/lib/paymentMethods';
 
 export interface StudentWalletTopUpModalProps {
   isOpen: boolean;
@@ -80,17 +81,34 @@ export const StudentWalletTopUpModal: React.FC<StudentWalletTopUpModalProps> = (
   const terminology = contextTerminology || getTerminology();
   const effectiveSchoolName = contextSchool?.name || schoolName || 'Collège des Innovations';
 
-  // Opérateur Mobile Money : Digicel MonCash ou Natcom NatCash
-  const [operator, setOperator] = useState<'moncash' | 'natcash'>('moncash');
+  // Vérification des opérateurs mobile money autorisés par l'école dans Modes de Règlement
+  const allowedOperators = React.useMemo(() => {
+    return getAllowedWalletOperators(contextSchool);
+  }, [contextSchool]);
 
-  // Mode de navigation : 'same_window' (1 seule page continue) ou 'in_modal' (intégré)
-  const [checkoutExperience, setCheckoutExperience] = useState<'same_window' | 'in_modal'>('same_window');
+  const isMobilePaymentGloballyDisabled = allowedOperators.length === 0;
+
+  // Opérateur Mobile Money : initialisé sur le premier opérateur autorisé par l'école
+  const [operator, setOperator] = useState<'moncash' | 'natcash'>(() => {
+    if (allowedOperators.includes('moncash')) return 'moncash';
+    if (allowedOperators.includes('natcash')) return 'natcash';
+    return 'moncash';
+  });
+
+  useEffect(() => {
+    if (allowedOperators.length > 0 && !allowedOperators.includes(operator)) {
+      setOperator(allowedOperators[0]);
+    }
+  }, [allowedOperators, operator]);
+
+  // Mode de navigation : Toujours 'same_window' (Page Unique officielle et fluide, sans popups bloquées)
+  const checkoutExperience: 'same_window' = 'same_window';
 
   // Navigation dans le flux
   const [currentStep, setCurrentStep] = useState<TopUpFlowStep>('AMOUNT_SETUP');
 
-  // Mode de transaction : Live (SMS Réel Digicel/Natcom) ou Test (Sandbox)
-  const [paymentMode, setPaymentMode] = useState<'live' | 'test'>('live');
+  // Mode de transaction : Live (SMS Réel Digicel/Natcom) par défaut
+  const [paymentMode] = useState<'live' | 'test'>('live');
 
   // Montant
   const [selectedAmount, setSelectedAmount] = useState<number>(100);
@@ -1023,64 +1041,91 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
             <form onSubmit={handleProceedToPayment} className="space-y-3.5">
               
               {/* SÉLECTEUR D'OPÉRATEUR : DIGICEL MONCASH OU NATCOM NATCASH */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-800 uppercase tracking-wide">
-                  1. Choisissez votre Opérateur Mobile Money
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  {/* Option Digicel MonCash */}
-                  <button
-                    type="button"
-                    onClick={() => setOperator('moncash')}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
-                      isMonCash
-                        ? 'border-[#D91B24] bg-red-50/80 ring-2 ring-red-500/20 shadow-xs'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
-                        <span className="text-xs font-black text-red-700 font-sans">
-                          Mon<span className="text-slate-900">Cash</span>
-                        </span>
-                      </div>
-                      <span className="text-[9px] bg-red-100 text-red-800 font-bold px-1.5 py-0.2 rounded font-mono">
-                        Digicel
-                      </span>
-                    </div>
-                    <p className="text-[10.5px] text-slate-600 mt-1 leading-tight">
-                      Paiement sécurisé via compte Digicel (OTP SMS Réel).
+              {isMobilePaymentGloballyDisabled ? (
+                <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 flex items-start gap-2.5">
+                  <AlertCircle size={18} className="text-amber-600 shrink-0 mt-0.5" />
+                  <div>
+                    <h5 className="font-bold text-amber-950">Dépôts mobiles temporairement suspendus</h5>
+                    <p className="text-[11px] text-amber-800 mt-0.5 leading-relaxed">
+                      L'administration de l'établissement a désactivé les règlements par portefeuille MonCash et Natcash dans les <em>Modes de Règlement & Banques</em>. Pour approvisionner le compte de l'élève, veuillez vous adresser directement au guichet de l'école.
                     </p>
-                  </button>
-
-                  {/* Option Natcom NatCash */}
-                  <button
-                    type="button"
-                    onClick={() => setOperator('natcash')}
-                    className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
-                      !isMonCash
-                        ? 'border-[#005BAC] bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
-                        <span className="text-xs font-black text-blue-700 font-sans">
-                          Nat<span className="text-slate-900">Cash</span>
-                        </span>
-                      </div>
-                      <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded font-mono">
-                        Natcom Direct
-                      </span>
-                    </div>
-                    <p className="text-[10.5px] text-slate-600 mt-1 leading-tight">
-                      Validation directe In-App (évite le chargement infini du site Natcom).
-                    </p>
-                  </button>
+                  </div>
                 </div>
-              </div>
+              ) : allowedOperators.length === 1 ? (
+                <div className="p-2.5 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className={`w-2.5 h-2.5 rounded-full ${operator === 'moncash' ? 'bg-[#D91B24]' : 'bg-[#005BAC]'} animate-pulse`} />
+                    <div>
+                      <span className="text-xs font-black text-slate-800">
+                        {operator === 'moncash' ? 'Digicel MonCash' : 'Natcom NatCash'}
+                      </span>
+                      <span className="text-[10px] text-slate-500 block">Canal officiel actif configuré par l'école</span>
+                    </div>
+                  </div>
+                  <span className="text-[9px] font-bold px-2 py-0.5 rounded bg-emerald-100 text-emerald-800 font-mono">
+                    Canal Actif
+                  </span>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <label className="block text-xs font-black text-slate-800 uppercase tracking-wide">
+                    1. Choisissez votre Opérateur Mobile Money
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {/* Option Digicel MonCash */}
+                    <button
+                      type="button"
+                      onClick={() => setOperator('moncash')}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                        isMonCash
+                          ? 'border-[#D91B24] bg-red-50/80 ring-2 ring-red-500/20 shadow-xs'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-red-600 animate-pulse"></span>
+                          <span className="text-xs font-black text-red-700 font-sans">
+                            Mon<span className="text-slate-900">Cash</span>
+                          </span>
+                        </div>
+                        <span className="text-[9px] bg-red-100 text-red-800 font-bold px-1.5 py-0.2 rounded font-mono">
+                          Digicel
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 mt-1 leading-tight">
+                        Paiement sécurisé via compte Digicel (OTP SMS Réel).
+                      </p>
+                    </button>
+
+                    {/* Option Natcom NatCash */}
+                    <button
+                      type="button"
+                      onClick={() => setOperator('natcash')}
+                      className={`p-3 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                        !isMonCash
+                          ? 'border-[#005BAC] bg-blue-50/80 ring-2 ring-blue-500/20 shadow-xs'
+                          : 'border-slate-200 bg-white hover:bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-2.5 h-2.5 rounded-full bg-blue-600 animate-pulse"></span>
+                          <span className="text-xs font-black text-blue-700 font-sans">
+                            Nat<span className="text-slate-900">Cash</span>
+                          </span>
+                        </div>
+                        <span className="text-[9px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 rounded font-mono">
+                          Natcom Direct
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 mt-1 leading-tight">
+                        Validation directe In-App (évite le chargement infini du site Natcom).
+                      </p>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* CARTE D'ATTRIBUTION SCELLÉE DE L'ÉLÈVE BÉNÉFICIAIRE (FOCUS CLÉ) */}
               <div className="bg-gradient-to-br from-slate-50 via-slate-100/40 to-slate-50 border border-slate-200 rounded-2xl p-3.5 space-y-2.5 shadow-2xs">
@@ -1183,107 +1228,16 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                 )}
               </div>
 
-              {/* SÉLECTION DU FLUX : PAGE UNIQUE VS GUICHET INTÉGRÉ */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-800 uppercase tracking-wide">
-                  3. Expérience de Règlement
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCheckoutExperience('same_window')}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      checkoutExperience === 'same_window'
-                        ? 'border-emerald-600 bg-emerald-50/70 ring-2 ring-emerald-500/20'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-emerald-800 flex items-center gap-1">
-                        <CheckCircle2 size={12} className="text-emerald-600" />
-                        Page Unique
-                      </span>
-                      <span className="text-[8.5px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.2 rounded">
-                        Recommandé
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-600 mt-1 leading-tight">
-                      Un seul onglet fluide, sans pages séparées, avec retour direct.
-                    </p>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCheckoutExperience('in_modal')}
-                    className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
-                      checkoutExperience === 'in_modal'
-                        ? 'border-slate-800 bg-slate-50 ring-2 ring-slate-400/20'
-                        : 'border-slate-200 bg-white hover:bg-slate-50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-black text-slate-800 flex items-center gap-1">
-                        <Globe size={12} className="text-slate-600" />
-                        Guichet Intégré
-                      </span>
-                      <span className="text-[8.5px] bg-slate-200 text-slate-700 font-bold px-1.5 py-0.2 rounded">
-                        Dans ce modal
-                      </span>
-                    </div>
-                    <p className="text-[10px] text-slate-600 mt-1 leading-tight">
-                      Saisie du code OTP ou du PIN directement dans la boîte.
-                    </p>
-                  </button>
-                </div>
-              </div>
-
-              {/* SÉLECTEUR DU MODE : LIVE RÉEL OU TEST SANDBOX */}
-              <div className="grid grid-cols-2 gap-2 pt-0.5">
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode('live')}
-                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                    paymentMode === 'live'
-                      ? (isMonCash ? 'border-red-600 bg-red-50/70 ring-1 ring-red-500/20' : 'border-blue-600 bg-blue-50/70 ring-1 ring-blue-500/20')
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-slate-800 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                      Live Réel
-                    </span>
-                    <span className="text-[8px] bg-emerald-100 text-emerald-800 font-bold px-1 py-0.2 rounded">
-                      SMS OTP
-                    </span>
-                  </div>
-                  <p className="text-[9.5px] text-slate-500 mt-0.5 leading-tight">
-                    Envoi officiel SMS par {isMonCash ? 'Digicel' : 'Natcom'}.
-                  </p>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setPaymentMode('test')}
-                  className={`p-2 rounded-xl border text-left transition-all cursor-pointer ${
-                    paymentMode === 'test'
-                      ? 'border-indigo-600 bg-indigo-50/70 ring-1 ring-indigo-500/20'
-                      : 'border-slate-200 bg-white hover:bg-slate-50'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black text-indigo-700 flex items-center gap-1">
-                      <Zap size={11} />
-                      Sandbox Test
-                    </span>
-                    <span className="text-[8px] bg-indigo-100 text-indigo-800 font-bold px-1 py-0.2 rounded">
-                      Sans débit
-                    </span>
-                  </div>
-                  <p className="text-[9.5px] text-slate-500 mt-0.5 leading-tight">
-                    Test certifié sur grand livre Tranzak.
-                  </p>
-                </button>
+              {/* NOTE DE SÉCURITÉ TRANZAK */}
+              <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-slate-50 border border-slate-200/80 text-[11px] text-slate-600">
+                <span className="flex items-center gap-1.5 font-medium">
+                  <ShieldCheck size={14} className="text-emerald-600" />
+                  Passerelle Officielle {operatorBrandName}
+                </span>
+                <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Paiement Sécurisé
+                </span>
               </div>
 
               {/* RÉCAPITULATIF COMPTABLE */}
@@ -1315,12 +1269,14 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                 </div>
               )}
 
-              {/* BOUTON D'ACTION PRINCIPAL */}
+              {/* BOUTON D'ACTION PRINCIPAL DIRECT */}
               <button
                 type="submit"
-                disabled={isSubmitting || effectiveAmount <= 0}
+                disabled={isSubmitting || effectiveAmount <= 0 || isMobilePaymentGloballyDisabled}
                 className={`w-full py-3.5 px-4 rounded-xl text-white font-black text-sm uppercase tracking-wider shadow-lg transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2 ${
-                  isMonCash
+                  isMobilePaymentGloballyDisabled
+                    ? 'bg-slate-400 cursor-not-allowed'
+                    : isMonCash
                     ? 'bg-gradient-to-r from-[#D91B24] via-[#C8102E] to-red-700 hover:opacity-95 shadow-red-600/25'
                     : 'bg-gradient-to-r from-[#005BAC] via-[#004B8D] to-indigo-800 hover:opacity-95 shadow-blue-600/25'
                 }`}
@@ -1330,14 +1286,12 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                     <RefreshCw size={16} className="animate-spin" />
                     <span>Initialisation de la passerelle Tranzak...</span>
                   </>
+                ) : isMobilePaymentGloballyDisabled ? (
+                  <span>Recharges Mobiles Suspendues par l'École</span>
                 ) : (
-                  <>
-                    <span>
-                      {paymentMode === 'live'
-                        ? `Payer ${effectiveAmount.toLocaleString()} HTG via ${operatorBrandName} →`
-                        : `Tester ${effectiveAmount.toLocaleString()} HTG en Sandbox →`}
-                    </span>
-                  </>
+                  <span>
+                    Payer {effectiveAmount.toLocaleString()} HTG via {operatorBrandName} →
+                  </span>
                 )}
               </button>
             </form>

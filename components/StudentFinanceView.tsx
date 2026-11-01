@@ -27,6 +27,7 @@ import {
 import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
+import { StudentWalletDiagnosticsModal } from './StudentWalletDiagnosticsModal';
 import { isPaymentCompleted } from '../src/utils/payment';
 import { sendPaymentConfirmationSms } from '../services/paymentSmsService';
 
@@ -46,6 +47,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns' | 'wallet'>('all');
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
+  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
   const [isSyncingTranzak, setIsSyncingTranzak] = useState<boolean>(false);
 
   // Synchronisation et réconciliation automatique avec l'API Tranzak
@@ -602,6 +604,15 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         </div>
 
         <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowDiagnosticsModal(true)}
+            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+            title="Ouvrir l'outil de diagnostic comparatif Tranzak / Base de données"
+          >
+            <Activity size={14} className="text-slate-600" />
+            <span>Diagnostic Portefeuille</span>
+          </button>
           <button
             type="button"
             onClick={() => setShowWalletTopUpModal(true)}
@@ -1203,6 +1214,32 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
               setPayments(prev => [paymentRecord, ...prev]);
             }
             toast.success(`Portefeuille renfloué avec succès ! Nouveau solde : ${newBalance.toLocaleString()} HTG`);
+          }}
+        />
+      )}
+
+      {/* Modal d'Outil de Diagnostic Avancé Portefeuille / Tranzak */}
+      {showDiagnosticsModal && studentData && (
+        <StudentWalletDiagnosticsModal
+          isOpen={showDiagnosticsModal}
+          onClose={() => setShowDiagnosticsModal(false)}
+          student={{
+            id: studentData.id,
+            first_name: studentData.first_name,
+            last_name: studentData.last_name,
+            reference_number: studentData.reference_number,
+            wallet_balance_htg: walletBalance,
+            school_id: studentData.school_id || school?.id || user.school_id
+          }}
+          schoolId={studentData.school_id || school?.id || user.school_id}
+          onReconciled={(newBal) => {
+            setWalletBalance(newBal);
+            supabase
+              .from('payments')
+              .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+              .eq('student_id', studentData.id)
+              .order('created_at', { ascending: false })
+              .then(({ data }) => { if (data) setPayments(data); });
           }}
         />
       )}

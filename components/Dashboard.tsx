@@ -59,7 +59,7 @@ import { UserProfile, UserRole } from '../types';
 import { useSchool } from '../contexts/SchoolContext';
 import { supabase, isValidUuid } from '../supabase';
 import { geminiService } from '../services/geminiService';
-import { RetryableError } from './RetryableError';
+import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFallback';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 import { formatStudentName, formatFullName } from '../utils/formatters';
 import { displayIdentifier, normalizeIdentifier } from '../utils/authHelpers';

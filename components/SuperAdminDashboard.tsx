@@ -16,7 +16,7 @@ import { AuditLogger } from '../utils/auditLogger';
 import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
 
 import { UserProfile, SchoolType } from '../types';
-import { RetryableError } from './RetryableError';
+import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFallback';
 import { SystemAlertsView } from './SystemAlertsView';
 import { BackupManagementView } from './BackupManagementView';
 import { SystemHealthView } from './SystemHealthView';

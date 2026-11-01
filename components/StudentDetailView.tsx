@@ -26,7 +26,7 @@ import { normalizeIdentifier, displayIdentifier } from '../utils/authHelpers';
 import { toast } from 'sonner';
 import Modal from './Modal';
 import { AuditLogger } from '../utils/auditLogger';
-import { RetryableError } from './RetryableError';
+import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFallback';
 import { getStudentAgeStatus } from '../utils/academicPath';
 import { useSchool } from '../contexts/SchoolContext';
 import StudentDocumentStatusModal from './StudentDocumentStatusModal';

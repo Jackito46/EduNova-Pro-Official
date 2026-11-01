@@ -1,13 +1,13 @@
 import React from 'react';
 import { RefreshCcw, AlertCircle } from 'lucide-react';
 
-interface RetryableErrorProps {
+interface ConnectionRetryFallbackProps {
   message?: string;
   onRetry: () => void;
   className?: string;
 }
 
-export const RetryableError: React.FC<RetryableErrorProps> = ({ 
+export const ConnectionRetryFallback: React.FC<ConnectionRetryFallbackProps> = ({ 
   message = "Une erreur de connexion est survenue.", 
   onRetry,
   className = ""
@@ -31,3 +31,6 @@ export const RetryableError: React.FC<RetryableErrorProps> = ({
     </div>
   );
 };
+
+export const RetryableError = ConnectionRetryFallback;
+export default ConnectionRetryFallback;

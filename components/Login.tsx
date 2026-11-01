@@ -351,7 +351,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
         } catch (e) {
           clearTimeout(profileTimeoutId!);
           // Chargement en arrière-plan pour réseau à basse vitesse
-          profilePromise.then(res => {
+          Promise.resolve(profilePromise).then(res => {
             if (!res.error && res.data) {
               try {
                 window.localStorage.setItem('edunova_user_profile', JSON.stringify({ ...res.data, current_session_id: sessionId }));

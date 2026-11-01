@@ -140,23 +140,11 @@ export function getSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
 
 /**
  * Recupere uniquement les méthodes de paiement ACTIVÉES par l'administration.
+ * Le choix de l'administration (activé / désactivé) est strictement respecté.
  */
 export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
   const allMethods = getSchoolPaymentMethods(school);
-  const activeGateway = school?.global_settings?.active_mobile_money_gateway;
-  
-  const active = allMethods.filter(m => {
-    if (m.enabled) return true;
-    // Si la passerelle Tranzak ou Kobara est active, rendre MonCash disponible au guichet
-    if ((m.code === 'MonCash' || m.id === 'MONCASH') && (activeGateway === 'tranzak' || activeGateway === 'kobara')) {
-      return true;
-    }
-    // Si Tranzak est actif, Natcash est également supporté
-    if ((m.code === 'Natcash' || m.id === 'NATCASH') && activeGateway === 'tranzak') {
-      return true;
-    }
-    return false;
-  });
+  const active = allMethods.filter(m => Boolean(m.enabled));
 
   // Securite : si aucune méthode n'est active, retourner au moins Cash & Dépôt Bancaire
   if (active.length === 0) {
@@ -169,6 +157,28 @@ export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[
     active.unshift(cashItem);
   }
   return active;
+}
+
+/**
+ * Vérifie si un opérateur mobile money (MonCash ou Natcash) est autorisé pour le renflouement de portefeuille élève.
+ * L'administration scolaire contrôle cette autorisation via l'activation dans "Modes de Règlement & Banques".
+ */
+export function isOperatorAllowedForWallet(school: any, operator: 'moncash' | 'natcash'): boolean {
+  const allMethods = getSchoolPaymentMethods(school);
+  const code = operator === 'moncash' ? 'MonCash' : 'Natcash';
+  const id = operator === 'moncash' ? 'MONCASH' : 'NATCASH';
+  const method = allMethods.find(m => m.code === code || m.id === id);
+  return method ? Boolean(method.enabled) : (operator === 'moncash');
+}
+
+/**
+ * Retourne la liste des opérateurs mobile money actuellement autorisés par l'école pour le renflouement de portefeuille.
+ */
+export function getAllowedWalletOperators(school: any): ('moncash' | 'natcash')[] {
+  const allowed: ('moncash' | 'natcash')[] = [];
+  if (isOperatorAllowedForWallet(school, 'moncash')) allowed.push('moncash');
+  if (isOperatorAllowedForWallet(school, 'natcash')) allowed.push('natcash');
+  return allowed;
 }
 
 /**
