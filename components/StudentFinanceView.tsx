@@ -27,7 +27,6 @@ import {
 import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
-import { StudentWalletDiagnosticsModal } from './StudentWalletDiagnosticsModal';
 import { isPaymentCompleted } from '../src/utils/payment';
 import { sendPaymentConfirmationSms } from '../services/paymentSmsService';
 
@@ -47,7 +46,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const [activeSection, setActiveSection] = useState<'all' | 'tuition' | 'misc' | 'campaigns' | 'wallet'>('all');
   const [walletBalance, setWalletBalance] = useState<number>(0);
   const [showWalletTopUpModal, setShowWalletTopUpModal] = useState<boolean>(false);
-  const [showDiagnosticsModal, setShowDiagnosticsModal] = useState<boolean>(false);
   const [isSyncingTranzak, setIsSyncingTranzak] = useState<boolean>(false);
 
   // Synchronisation et réconciliation automatique avec l'API Tranzak
@@ -75,39 +73,76 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
 
       const data = await res.json().catch(() => ({}));
       if (res.ok && data.success) {
-        if (data.newly_credited_amount > 0) {
+        if (data.new_balance !== undefined && data.new_balance !== null) {
           const updatedBal = Number(data.new_balance) || 0;
           setWalletBalance(updatedBal);
+        }
 
-          // Sécurisation persistante en base Supabase directe
-          try {
-            await supabase
-              .from('students')
-              .update({ wallet_balance_htg: updatedBal })
-              .eq('id', studentData.id);
-          } catch (e) {}
+        // 1. Fusionner avec la liste certifiée des versements fournie par le serveur
+        if (Array.isArray(data.payments) && data.payments.length > 0) {
+          setPayments(prevPayments => {
+            const merged = [...data.payments];
+            for (const p of prevPayments) {
+              const exists = merged.some(m => m.id === p.id || (p.reference_number && m.reference_number === p.reference_number));
+              if (!exists) {
+                merged.push(p);
+              }
+            }
+            return merged.sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+          });
+        }
 
-          // Rafraîchir l'historique des écritures comptables
-          const { data: pList } = await supabase
-            .from('payments')
-            .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-            .eq('student_id', studentData.id)
-            .order('created_at', { ascending: false });
-          if (pList) setPayments(pList);
+        // 2. Réconciliation locale garantie avec toutes les transactions Tranzak confirmées
+        const remoteTxs = Array.isArray(data.transactions) ? data.transactions : (Array.isArray(data.all_transactions) ? data.all_transactions : []);
+        if (remoteTxs.length > 0) {
+          setPayments(currentPayments => {
+            const merged = [...currentPayments];
+            for (const tx of remoteTxs) {
+              const txRef = tx.reference || tx.transaction_id;
+              const txId = tx.transaction_id;
+              const exists = merged.some(p => 
+                p.reference_number === txRef || 
+                p.reference_number === txId || 
+                p.moncash_order_id === txRef || 
+                p.moncash_transaction_id === txId ||
+                p.id === txId || 
+                p.id === txRef ||
+                (p.description && p.description.includes(txId))
+              );
 
+              if (!exists) {
+                const operator = (tx.payment_method || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+                const syntheticPayment = {
+                  id: txId || txRef,
+                  receipt_number: (txId || txRef || '').slice(-8).toUpperCase(),
+                  date: tx.completed_at || tx.created_at || new Date().toISOString(),
+                  created_at: tx.created_at || new Date().toISOString(),
+                  amount: Number(tx.amount),
+                  amount_htg_equivalent: Number(tx.amount),
+                  currency: tx.currency || 'HTG',
+                  fee_type: 'CREDIT_PORTEFEUILLE',
+                  nature: 'Recharge Portefeuille',
+                  payment_method: operator,
+                  method: `${operator} (Tranzak Live)`,
+                  reference_number: txRef || txId,
+                  moncash_order_id: txRef,
+                  moncash_transaction_id: txId,
+                  status: 'VALIDE',
+                  moncash_status: 'COMPLETED',
+                  description: `Recharge Portefeuille ${operator} - ${studentData.first_name || 'Élève'} • Tx: ${txId || txRef}`
+                };
+                merged.unshift(syntheticPayment);
+              }
+            }
+            return merged.sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+          });
+        }
+
+        if (data.newly_credited_amount > 0 || data.has_new_records) {
           localStorage.removeItem('edunova_pending_tranzak_payment_ref');
-          toast.success(`🎉 Dépôt Tranzak Digicel MonCash validé ! +${data.newly_credited_amount} HTG crédités au portefeuille.`);
+          toast.success(`🎉 Dépôt Tranzak Digicel MonCash validé ! Portefeuille synchronisé.`);
         } else if (isManual) {
-          // Re-vérifier le solde en base
-          const { data: st } = await supabase
-            .from('students')
-            .select('wallet_balance_htg')
-            .eq('id', studentData.id)
-            .maybeSingle();
-          if (st?.wallet_balance_htg !== undefined) {
-            setWalletBalance(st.wallet_balance_htg);
-          }
-          toast.info("Vérification Tranzak : votre solde est parfaitement synchronisé.");
+          toast.info("Vérification Tranzak : votre solde et votre historique sont parfaitement synchronisés.");
         }
       }
     } catch (err) {
@@ -604,15 +639,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         </div>
 
         <div className="flex items-center gap-2 self-stretch sm:self-auto flex-wrap">
-          <button
-            type="button"
-            onClick={() => setShowDiagnosticsModal(true)}
-            className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs rounded-xl border border-slate-300 shadow-2xs transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-            title="Ouvrir l'outil de diagnostic comparatif Tranzak / Base de données"
-          >
-            <Activity size={14} className="text-slate-600" />
-            <span>Diagnostic Portefeuille</span>
-          </button>
           <button
             type="button"
             onClick={() => setShowWalletTopUpModal(true)}
@@ -1218,31 +1244,6 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
         />
       )}
 
-      {/* Modal d'Outil de Diagnostic Avancé Portefeuille / Tranzak */}
-      {showDiagnosticsModal && studentData && (
-        <StudentWalletDiagnosticsModal
-          isOpen={showDiagnosticsModal}
-          onClose={() => setShowDiagnosticsModal(false)}
-          student={{
-            id: studentData.id,
-            first_name: studentData.first_name,
-            last_name: studentData.last_name,
-            reference_number: studentData.reference_number,
-            wallet_balance_htg: walletBalance,
-            school_id: studentData.school_id || school?.id || user.school_id
-          }}
-          schoolId={studentData.school_id || school?.id || user.school_id}
-          onReconciled={(newBal) => {
-            setWalletBalance(newBal);
-            supabase
-              .from('payments')
-              .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-              .eq('student_id', studentData.id)
-              .order('created_at', { ascending: false })
-              .then(({ data }) => { if (data) setPayments(data); });
-          }}
-        />
-      )}
 
     </div>
   );

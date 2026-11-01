@@ -3021,13 +3021,14 @@ async function startServer() {
             ? (isSimulated ? 'NatCash (Tranzak Test)' : 'NatCash (Tranzak)') 
             : (isSimulated ? 'MonCash (Tranzak Test)' : 'MonCash (Tranzak)'),
           fee_type: feeType,
-          nature: 'Scolarite',
+          nature: isWalletTopUp ? 'Recharge Portefeuille' : 'Scolarite',
           type: 'Revenu',
           reference_number: orderRef,
           moncash_order_id: orderRef,
+          moncash_transaction_id: transactionId,
           status: 'EN_ATTENTE',
           moncash_status: 'PENDING',
-          notes: `Paiement initié via Tranzak ${isSimulated ? 'Sandbox' : 'Production'} (${effectiveOperator}) • Réf: ${orderRef} • Tx: ${transactionId}`,
+          description: `Paiement initié via Tranzak ${isSimulated ? 'Sandbox' : 'Production'} (${effectiveOperator}) • Réf: ${orderRef} • Tx: ${transactionId}`,
           created_at: new Date().toISOString()
         }]);
       } catch (dbErr) {
@@ -3184,15 +3185,15 @@ async function startServer() {
           currency: 'HTG',
           payment_method: effectiveOperator === 'natcash' ? 'NatCash' : 'MonCash',
           method: `${operatorLabel} (Tranzak HMAC Direct)`,
-          fee_type: feeType,
-          nature: 'Scolarite',
+          fee_type: feeType || 'CREDIT_PORTEFEUILLE',
+          nature: 'Recharge Portefeuille',
           type: 'Revenu',
           reference_number: remoteTransactionId,
           moncash_order_id: orderRef,
-          receipt_number: receiptNumber,
+          moncash_transaction_id: remoteTransactionId,
           status: 'VALIDE',
           moncash_status: 'COMPLETED',
-          notes: `Paiement Direct Tranzak (Chiffrement PIN HMAC) • Réf: ${remoteTransactionId} • Récépissé: ${receiptNumber}`,
+          description: `Paiement Direct Tranzak (Chiffrement PIN HMAC) • Réf: ${remoteTransactionId}`,
           payment_date: new Date().toISOString().split('T')[0],
           created_at: new Date().toISOString()
         };
@@ -3971,7 +3972,7 @@ async function startServer() {
           const { data: pRec } = await supabase
             .from('payments')
             .select('id, student_id, amount, status, fee_type, payment_method')
-            .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`)
+            .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},description.ilike.%${transactionId}%`)
             .maybeSingle();
 
           if (pRec) {
@@ -3984,21 +3985,41 @@ async function startServer() {
                 .update({
                   status: 'VALIDE',
                   moncash_status: 'COMPLETED',
-                  notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
+                  description: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', pRec.id);
             }
-          } else {
-            await supabase
-              .from('payments')
-              .update({
-                status: 'VALIDE',
-                moncash_status: 'COMPLETED',
-                notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
-                updated_at: new Date().toISOString()
-              })
-              .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`);
+          } else if (finalStudentId) {
+            // Créer le paiement validé s'il n'avait pas été pré-inséré
+            try {
+              const { data: newP } = await supabase
+                .from('payments')
+                .insert([{
+                  school_id: schoolId || tranzakVerifyData?.data?.metadata?.school_id,
+                  student_id: finalStudentId,
+                  amount: effectiveCreditAmount,
+                  amount_htg_equivalent: effectiveCreditAmount,
+                  currency: 'HTG',
+                  payment_method: 'MonCash',
+                  method: 'MonCash (Tranzak Live)',
+                  fee_type: 'CREDIT_PORTEFEUILLE',
+                  nature: 'Recharge Portefeuille',
+                  type: 'Revenu',
+                  reference_number: transactionId,
+                  moncash_order_id: transactionId,
+                  moncash_transaction_id: transactionId,
+                  status: 'VALIDE',
+                  moncash_status: 'COMPLETED',
+                  description: `Recharge Portefeuille MonCash validée • Tx: ${transactionId}`,
+                  created_at: new Date().toISOString()
+                }])
+                .select()
+                .maybeSingle();
+              if (newP) paymentRecordFound = newP;
+            } catch (insErr) {
+              console.warn('[Verify Payment] Notice insertion fallback:', insErr);
+            }
           }
         } catch (dbErr) {}
 
@@ -4208,7 +4229,7 @@ async function startServer() {
                 .update({
                   status: 'VALIDE',
                   moncash_status: 'COMPLETED',
-                  notes: `Confirmé via Synchronisation Tranzak Live • Tx: ${txId}`,
+                  description: `Confirmé via Synchronisation Tranzak Live • Tx: ${txId}`,
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', p.id);
@@ -4220,38 +4241,44 @@ async function startServer() {
         } catch (dbCheckErr) {}
 
         if (!isAlreadyValidated) {
-          // Insérer la transaction validée dans payments
+          // Insérer la transaction validée dans payments avec les colonnes exactes reconnues par Supabase
           const operatorLabel = tx.payment_method === 'natcash' ? 'NatCash' : 'MonCash';
           try {
-            const { data: newP } = await dbClient
+            const insertPayload = {
+              school_id: tx.metadata?.school_id || schoolId,
+              student_id: studentId,
+              amount: txAmount,
+              amount_htg_equivalent: txAmount,
+              currency: tx.currency || 'HTG',
+              payment_method: operatorLabel,
+              method: `${operatorLabel} (Tranzak Live)`,
+              fee_type: 'CREDIT_PORTEFEUILLE',
+              nature: 'Recharge Portefeuille',
+              type: 'Revenu',
+              reference_number: txId || txRef,
+              moncash_order_id: txRef,
+              moncash_transaction_id: txId,
+              status: 'VALIDE',
+              moncash_status: 'COMPLETED',
+              description: `Recharge Portefeuille ${operatorLabel} - ${studentName || 'Élève'} • Tx: ${txId}`,
+              created_at: tx.created_at || new Date().toISOString()
+            };
+
+            const clientToUse = supabaseServiceKey ? supabase : (dbClient || supabase);
+            const { data: newP, error: insErr } = await clientToUse
               .from('payments')
-              .insert([{
-                school_id: tx.metadata?.school_id || schoolId,
-                student_id: studentId,
-                amount: txAmount,
-                amount_htg_equivalent: txAmount,
-                currency: tx.currency || 'HTG',
-                payment_method: operatorLabel,
-                method: `${operatorLabel} (Tranzak Live)`,
-                fee_type: 'CREDIT_PORTEFEUILLE',
-                nature: 'Scolarite',
-                type: 'Revenu',
-                reference_number: txId || txRef,
-                moncash_order_id: txRef,
-                receipt_number: `REC-TRZ-${txId || Date.now().toString().slice(-6)}`,
-                status: 'VALIDE',
-                moncash_status: 'COMPLETED',
-                notes: `Recharge MonCash confirmée sur Tranzak • Tx: ${txId} • Réf: ${txRef}`,
-                payment_date: tx.completed_at ? tx.completed_at.split('T')[0] : new Date().toISOString().split('T')[0],
-                created_at: tx.created_at || new Date().toISOString()
-              }])
+              .insert([insertPayload])
               .select()
               .maybeSingle();
 
-            newlyCreditedAmount += txAmount;
-            newlyValidatedList.push({ ...tx, payment_id: newP?.id });
-          } catch (insErr) {
-            console.warn('[Tranzak Sync] Notice insertion payments:', insErr);
+            if (insErr) {
+              console.warn('[Tranzak Sync] Erreur insertion payments:', insErr.message);
+            } else {
+              newlyCreditedAmount += txAmount;
+              newlyValidatedList.push({ ...tx, payment_id: newP?.id });
+            }
+          } catch (insErr: any) {
+            console.warn('[Tranzak Sync] Notice insertion payments:', insErr?.message || insErr);
           }
         }
       }
@@ -4311,6 +4338,61 @@ async function startServer() {
         console.warn('[Tranzak Sync] Erreur mise à jour wallet_balance_htg:', stUpErr);
       }
 
+      // Récupérer la liste complète des versements récents de cet élève pour synchronisation frontend instantanée
+      let allStudentPayments: any[] = [];
+      try {
+        const clientForRead = supabaseServiceKey ? supabase : (dbClient || supabase);
+        const { data: pData } = await clientForRead
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false });
+        if (pData) allStudentPayments = pData;
+      } catch (pReadErr) {}
+
+      // S'assurer que chaque transaction complétée sur Tranzak pour cet élève est bien présente dans la liste comptable renvoyée
+      for (const tx of matchedCompletedTx) {
+        const txAmount = Math.round(Number(tx.amount) || 0);
+        if (txAmount <= 0) continue;
+        const txRef = tx.reference || tx.transaction_id;
+        const txId = tx.transaction_id;
+
+        const alreadyInList = allStudentPayments.some((p: any) => 
+          p.reference_number === txRef || 
+          p.reference_number === txId || 
+          p.moncash_order_id === txRef || 
+          p.moncash_transaction_id === txId ||
+          p.id === txId ||
+          p.id === txRef ||
+          (p.description && p.description.includes(txId))
+        );
+
+        if (!alreadyInList) {
+          const operatorLabel = (tx.payment_method || '').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+          const syntheticRow = {
+            id: txId || txRef,
+            school_id: tx.metadata?.school_id || schoolId,
+            student_id: studentId,
+            amount: txAmount,
+            amount_htg_equivalent: txAmount,
+            currency: tx.currency || 'HTG',
+            payment_method: operatorLabel,
+            method: `${operatorLabel} (Tranzak Live)`,
+            fee_type: 'CREDIT_PORTEFEUILLE',
+            nature: 'Recharge Portefeuille',
+            type: 'Revenu',
+            reference_number: txId || txRef,
+            moncash_order_id: txRef,
+            moncash_transaction_id: txId,
+            status: 'VALIDE',
+            moncash_status: 'COMPLETED',
+            description: `Recharge Portefeuille ${operatorLabel} - ${studentName || 'Élève'} • Tx: ${txId}`,
+            created_at: tx.completed_at || tx.created_at || new Date().toISOString()
+          };
+          allStudentPayments.unshift(syntheticRow);
+        }
+      }
+
       return res.json({
         success: true,
         synced: true,
@@ -4318,7 +4400,12 @@ async function startServer() {
         total_tranzak_completed: totalTranzakCompleted,
         old_balance: currentBal,
         new_balance: newBal,
-        transactions: newlyValidatedList,
+        newly_credited_amount: newlyCreditedAmount,
+        has_new_records: Boolean(newlyValidatedList.length > 0),
+        transactions: matchedCompletedTx,
+        all_transactions: matchedCompletedTx,
+        newly_validated_transactions: newlyValidatedList,
+        payments: allStudentPayments,
         message: currentBal !== newBal
           ? `Solde du portefeuille rectifié au montant certifié Tranzak : ${newBal} HTG (auparavant ${currentBal} HTG).`
           : `Portefeuille certifié et conforme avec Tranzak (${newBal} HTG).`
