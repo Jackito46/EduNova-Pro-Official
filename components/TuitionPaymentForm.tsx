@@ -51,7 +51,7 @@ import { useSchool } from '../contexts/SchoolContext';
 import { AuditLogger } from '../utils/auditLogger';
 import { useUnsavedChanges } from '../hooks/useUnsavedChanges';
 import { UserProfile } from '../types';
-import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFallback';
+import { RetryableError } from './RetryableError';
 import { MonCashService } from '../services/moncashService';
 import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobilePaymentRouterService';
 import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';

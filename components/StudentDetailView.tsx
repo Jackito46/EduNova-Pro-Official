@@ -326,8 +326,55 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }))
       ];
       
+      // Synchronisation en direct des dépôts mobiles Tranzak (MonCash & NatCash)
+      try {
+        const syncRes = await fetch('/api/tranzak/sync-student-payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: studentId,
+            schoolId: user.school_id,
+            studentName: `${student.first_name || ''} ${student.last_name || ''}`.trim()
+          })
+        });
+        if (syncRes.ok) {
+          const syncJson = await syncRes.json().catch(() => ({}));
+          const remoteTxs = Array.isArray(syncJson?.transactions) ? syncJson.transactions : [];
+          for (const tx of remoteTxs) {
+            const txRef = tx.reference || tx.transaction_id;
+            const txId = tx.transaction_id;
+            const exists = normalizedPayments.some((p: any) =>
+              p.reference_number === txRef ||
+              p.reference_number === txId ||
+              p.id === txId ||
+              p.id === txRef
+            );
+            if (!exists) {
+              const operator = (tx.payment_method || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+              normalizedPayments.push({
+                id: txId || txRef,
+                date: tx.completed_at || tx.created_at || new Date().toISOString(),
+                label: `Recharge Portefeuille ${operator}`,
+                amount: Number(tx.amount || 0),
+                rawAmount: Number(tx.amount || 0),
+                currency: tx.currency || 'HTG',
+                exchange_rate_applied: 0,
+                status: 'VALIDE',
+                ad_hoc_campaign_id: null,
+                campaign_id: null,
+                campaign: null,
+                receipt_number: (txId || txRef || '').slice(-8).toUpperCase(),
+                reference_number: txRef || txId,
+                payment_method: operator,
+                nature: 'Recharge Portefeuille',
+                fee_type: 'CREDIT_PORTEFEUILLE'
+              });
+            }
+          }
+        }
+      } catch (e) {}
+
       normalizedPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-      
       setPayments(normalizedPayments);
 
       // 4. Disciplinary Records & 5. Ad-Hoc Campaigns (déjà préchargés)

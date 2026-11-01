@@ -4184,7 +4184,13 @@ async function startServer() {
         } catch (e) {}
       }
 
-      // Filtrer les transactions 'completed' qui correspondent à cet élève
+      // Filtrer les transactions 'completed' qui correspondent à cet élève (tolérant à l'inversion prénom/nom et ID)
+      const nameParts = (studentName || '')
+        .toLowerCase()
+        .split(/[\s,-]+/)
+        .map((s: string) => s.trim())
+        .filter((s: string) => s.length >= 2);
+
       const matchedCompletedTx = tranzakPayments.filter((t: any) => {
         if (t.status !== 'completed') return false;
         const txStudentId = t.metadata?.student_id;
@@ -4192,10 +4198,29 @@ async function startServer() {
         const txId = t.transaction_id;
         const txCustName = (t.customer?.name || '').toLowerCase();
         const txDesc = (t.description || '').toLowerCase();
+        const txMetaName = (t.metadata?.student_name || '').toLowerCase();
 
-        if (txStudentId && txStudentId === studentId) return true;
-        if (reference && (txRef === reference || txId === reference)) return true;
-        if (studentName && (txCustName.includes(studentName.toLowerCase()) || txDesc.includes(studentName.toLowerCase()))) return true;
+        // 1. Concordance sur studentId
+        if (txStudentId && (txStudentId === studentId || studentId.includes(txStudentId))) return true;
+
+        // 2. Concordance sur la référence ou numéro de transaction
+        if (reference && (txRef === reference || txId === reference || txDesc.includes(reference))) return true;
+
+        // 3. Concordance sur le nom de l'élève (tolérance inversion prénom/nom)
+        if (studentName) {
+          const sNameLower = studentName.toLowerCase();
+          if (txCustName.includes(sNameLower) || txDesc.includes(sNameLower) || txMetaName.includes(sNameLower)) return true;
+          if (nameParts.length > 0) {
+            const allInCustomer = nameParts.every(p => txCustName.includes(p));
+            const allInDesc = nameParts.every(p => txDesc.includes(p));
+            const allInMeta = nameParts.every(p => txMetaName.includes(p));
+            if (allInCustomer || allInDesc || allInMeta) return true;
+          }
+        }
+
+        // 4. Concordance si la description contient le début de l'ID ou du matricule
+        if (studentId && (txDesc.includes(studentId.slice(0, 8)) || txDesc.includes(studentId))) return true;
+
         return false;
       });
 

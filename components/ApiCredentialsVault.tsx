@@ -43,7 +43,6 @@ import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobi
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
-import { isMonCashPaymentActive, getSchoolPaymentMethods } from '../lib/paymentMethods';
 
 interface ApiCredentialsVaultProps {
   user: UserProfile;
@@ -553,20 +552,6 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
           <button
             type="button"
-            onClick={() => setActiveTab('audit')}
-            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
-              activeTab === 'audit'
-                ? 'bg-indigo-500 text-white border border-indigo-400'
-                : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30'
-            }`}
-            title="Consulter l'audit de connectivité et diagnostic des encaissements"
-          >
-            <Activity size={12} className={activeTab === 'audit' ? 'text-white' : 'text-indigo-300'} />
-            <span>Audit API</span>
-          </button>
-
-          <button
-            type="button"
             onClick={loadVaultData}
             disabled={loading}
             className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10 disabled:opacity-50"
@@ -644,7 +629,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         )}
 
         {/* 4 CARTES DE BASCULE INTERACTIVES COMPACTES */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-4 gap-2.5 sm:gap-3">
           {/* OPTION 1 : TRANZAK */}
           <div
             onClick={() => handleSwitchActiveGateway('tranzak')}
@@ -658,7 +643,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           >
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     isGatewaysEnabledForSchool && activeGateway === 'tranzak'
                       ? 'bg-blue-600 text-white shadow-xs'
@@ -666,8 +651,8 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   }`}>
                     <Layers size={13} />
                   </div>
-                  <div className="min-w-0 truncate">
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-[13px] font-bold text-white flex items-center gap-1.5 flex-wrap">
                       <span>Tranzak</span>
                       <span className="text-[8.5px] px-1 py-0.2 rounded bg-blue-500/30 text-blue-200 font-black shrink-0">DIRECT</span>
                     </h4>
@@ -716,7 +701,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           >
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     isGatewaysEnabledForSchool && activeGateway === 'kobara'
                       ? 'bg-orange-600 text-white shadow-xs'
@@ -724,8 +709,8 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   }`}>
                     <CreditCard size={13} />
                   </div>
-                  <div className="min-w-0 truncate">
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-[13px] font-bold text-white flex items-center gap-1.5 flex-wrap">
                       <span>Kobara</span>
                       <span className="text-[8.5px] px-1 py-0.2 rounded bg-orange-500/30 text-orange-200 font-black shrink-0">AGRÉGATEUR</span>
                     </h4>
@@ -774,7 +759,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           >
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     isGatewaysEnabledForSchool && activeGateway === 'moncash'
                       ? 'bg-red-600 text-white shadow-xs'
@@ -782,8 +767,8 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   }`}>
                     <Smartphone size={13} />
                   </div>
-                  <div className="min-w-0 truncate">
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-[13px] font-bold text-white flex items-center gap-1.5 flex-wrap">
                       <span>MonCash Direct</span>
                       <span className="text-[8.5px] px-1 py-0.2 rounded bg-red-500/30 text-red-200 font-black shrink-0">DIGICEL</span>
                     </h4>
@@ -830,7 +815,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           >
             <div className="space-y-1.5">
               <div className="flex items-center justify-between gap-1.5 min-w-0">
-                <div className="flex items-center gap-1.5 min-w-0">
+                <div className="flex items-center gap-1.5 min-w-0 flex-1">
                   <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 ${
                     !isGatewaysEnabledForSchool || activeGateway === 'none'
                       ? 'bg-amber-500 text-slate-950 shadow-xs'
@@ -838,8 +823,8 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
                   }`}>
                     <Coins size={13} />
                   </div>
-                  <div className="min-w-0 truncate">
-                    <h4 className="text-xs font-bold text-white flex items-center gap-1 truncate">
+                  <div className="min-w-0 flex-1">
+                    <h4 className="text-xs sm:text-[13px] font-bold text-white flex items-center gap-1.5 flex-wrap">
                       <span>Mode Manuel</span>
                       <span className="text-[8.5px] px-1 py-0.2 rounded bg-amber-500/30 text-amber-200 font-black shrink-0">COMPTOIR</span>
                     </h4>
@@ -980,10 +965,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           }`}
         >
           <Activity size={13} />
-          <span>Audit de Configuration API</span>
-          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/20 font-black uppercase text-inherit border border-current/20">
-            Diagnostic
-          </span>
+          <span>Audit &amp; Diagnostic API</span>
         </button>
       </div>
 
@@ -2241,7 +2223,7 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
           isGatewaysEnabledForSchool={isGatewaysEnabledForSchool}
           canManageAllCampuses={canManageAllCampuses}
           onSwitchActiveGateway={handleSwitchActiveGateway}
-          onNavigateToTab={(tab) => setActiveTab(tab)}
+          onNavigateToTab={(tab) => setActiveTab(tab as VaultTab)}
         />
       )}
     </div>

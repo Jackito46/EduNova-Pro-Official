@@ -464,12 +464,12 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
 
   return (
     <div className="space-y-3">
-      {/* BANDEAU D'ÉTAT D'ACTIVITÉ EN DIRECT */}
-      <div className={`p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 ${
+      {/* BANDEAU STATUT & ISOLATION COMPACT */}
+      <div className={`p-2.5 sm:p-3 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-2xs ${
         !isGatewaysEnabledForSchool
           ? 'bg-amber-50/80 border-amber-200 text-amber-950'
           : isActiveGateway 
-          ? 'bg-emerald-50 border-emerald-200 text-emerald-950 shadow-2xs' 
+          ? 'bg-gradient-to-r from-emerald-50 via-teal-50 to-blue-50 border-emerald-200/90 text-emerald-950' 
           : 'bg-slate-50 border-slate-200 text-slate-800'
       }`}>
         <div className="flex items-center gap-2.5 min-w-0">
@@ -480,33 +480,32 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
               ? 'bg-emerald-600 text-white shadow-xs' 
               : 'bg-slate-200 text-slate-600'
           }`}>
-            <Layers size={16} />
+            {isActiveGateway ? <CheckCircle2 size={16} /> : <Layers size={16} />}
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <span className="text-xs font-black tracking-tight">Passerelle Tranzak :</span>
+              <span className="text-xs sm:text-sm font-black tracking-tight">Passerelle Tranzak :</span>
               {!isGatewaysEnabledForSchool ? (
-                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-amber-500 text-white flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500 text-white flex items-center gap-1">
                   <Lock size={10} />
-                  <span>SUSPENDU (GOUVERNANCE SAAS)</span>
+                  <span>SUSPENDU (SAAS)</span>
                 </span>
               ) : isActiveGateway ? (
-                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-2xs flex items-center gap-1">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-emerald-600 text-white shadow-2xs flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse"></span>
                   <span>EN SERVICE • ACTIVE</span>
                 </span>
               ) : (
-                <span className="px-2 py-0.5 rounded-full text-[9.5px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700">
+                <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-slate-200 text-slate-700">
                   En Veille
                 </span>
               )}
+              <span className="px-2 py-0.5 rounded-full text-[9px] font-mono font-bold bg-blue-100 text-blue-800 border border-blue-200">
+                Isolation Établissement
+              </span>
             </div>
             <p className="text-[11px] text-slate-600 mt-0.5 truncate">
-              {!isGatewaysEnabledForSchool
-                ? "Passerelles API désactivées par le Super Admin pour cette école. Mode manuel actif."
-                : isActiveGateway 
-                ? 'Tranzak traite en direct tous les encaissements MonCash & NatCash.' 
-                : 'Passerelle sauvegardée. Une autre passerelle est prioritaire.'}
+              Établissement actif : <strong className="text-slate-900">{school?.name || 'Collège des Innovations'}</strong> (<span className="font-mono text-slate-500">{currentSchoolId || 'school_id'}</span>) • Clés chiffrées prioritaires
             </p>
           </div>
         </div>
@@ -521,17 +520,6 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
             <span>Activer Tranzak en 1 clic</span>
           </button>
         )}
-      </div>
-
-      {/* NOTICE ISOLATION TRANZAK POUR L'ÉCOLE */}
-      <div className="p-2.5 rounded-lg bg-blue-50/80 border border-blue-200/90 text-xs flex items-start gap-2.5 text-blue-900">
-        <ShieldCheck size={16} className="text-blue-600 shrink-0 mt-0.5" />
-        <div className="min-w-0">
-          <span className="font-bold text-blue-950">Clés Tranzak Propres à l'Établissement ({school?.name || 'Votre École'})</span>
-          <p className="text-[11px] text-blue-800/90 leading-relaxed mt-0.5">
-            Les clés API renseignées ci-dessous sont enregistrées avec l'identifiant de votre école (<code className="font-mono bg-blue-100/60 px-1 py-0.2 rounded text-[10px]">{currentSchoolId || 'school_id'}</code>). Elles se substituent aux clés globales de la plateforme et dirigent tous les encaissements MonCash &amp; NatCash directement sur votre compte marchand Tranzak.
-          </p>
-        </div>
       </div>
 
       {/* 1. GUIDE D'INTÉGRATION COMPACT TRANZAK DASHBOARD */}

@@ -298,7 +298,76 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
           return !p.academic_year_id || p.academic_year_id === activeYear.id;
         });
 
-        setPayments(validSessionPayments);
+        let allPayments = [...validSessionPayments];
+
+        // Synchronisation en temps réel des dépôts certifiés Tranzak (MonCash & NatCash)
+        try {
+          const session = (await supabase.auth.getSession()).data?.session;
+          const token = session?.access_token;
+          const syncRes = await fetch('/api/tranzak/sync-student-payments', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            },
+            body: JSON.stringify({
+              studentId: studentData.id,
+              schoolId: school?.id || studentData.school_id || user.school_id,
+              studentName: `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim()
+            })
+          });
+
+          if (syncRes.ok) {
+            const syncJson = await syncRes.json().catch(() => ({}));
+            if (syncJson?.success) {
+              if (syncJson.new_balance !== undefined && syncJson.new_balance !== null) {
+                setWalletBalance(Number(syncJson.new_balance) || 0);
+              }
+              const remoteTxs = Array.isArray(syncJson.transactions) ? syncJson.transactions : (Array.isArray(syncJson.all_transactions) ? syncJson.all_transactions : []);
+              for (const tx of remoteTxs) {
+                const txRef = tx.reference || tx.transaction_id;
+                const txId = tx.transaction_id;
+                const exists = allPayments.some(p =>
+                  p.reference_number === txRef ||
+                  p.reference_number === txId ||
+                  p.moncash_order_id === txRef ||
+                  p.moncash_transaction_id === txId ||
+                  p.id === txId ||
+                  p.id === txRef ||
+                  (p.description && p.description.includes(txId))
+                );
+
+                if (!exists) {
+                  const operator = (tx.payment_method || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+                  allPayments.unshift({
+                    id: txId || txRef,
+                    receipt_number: (txId || txRef || '').slice(-8).toUpperCase(),
+                    date: tx.completed_at || tx.created_at || new Date().toISOString(),
+                    created_at: tx.created_at || new Date().toISOString(),
+                    amount: Number(tx.amount),
+                    amount_htg_equivalent: Number(tx.amount),
+                    currency: tx.currency || 'HTG',
+                    fee_type: 'CREDIT_PORTEFEUILLE',
+                    nature: 'Recharge Portefeuille',
+                    payment_method: operator,
+                    method: `${operator} (Tranzak Live)`,
+                    reference_number: txRef || txId,
+                    moncash_order_id: txRef,
+                    moncash_transaction_id: txId,
+                    status: 'VALIDE',
+                    moncash_status: 'COMPLETED',
+                    description: `Recharge Portefeuille ${operator} - ${studentData.first_name || 'Élève'} • Tx: ${txId || txRef}`
+                  });
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[fetchFinances] Tranzak sync fallback notice:', e);
+        }
+
+        allPayments.sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
+        setPayments(allPayments);
 
         if (campaignErr) {
           console.error("Error fetching student campaigns: ", campaignErr);
