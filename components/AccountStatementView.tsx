@@ -51,7 +51,7 @@ import { useSecurity } from './SecurityGuard';
 import { addSecurityWatermark } from '../utils/pdfWatermark';
 import { fixOklchForCanvas } from '../utils/pdfFix';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
-import { isPaymentCompleted } from '../src/utils/payment';
+import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
 
 const getFeeRowDetails = (
   nativeHTG: number,

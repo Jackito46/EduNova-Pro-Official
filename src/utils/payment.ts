@@ -953,4 +953,43 @@ export function isPaymentCompleted(p: any): boolean {
   return st === 'VALIDE' || st === 'VALIDÉ' || st === 'CONFIRMED' || !st;
 }
 
+/**
+ * Détection stricte et universelle des dépôts et recharges de portefeuille.
+ * RÈGLE D'OR COMPTABLE :
+ * Une recharge de portefeuille est une réserve de fonds personnels (cantine, fournitures, réserve).
+ * Ce n'est PAS un règlement d'écolage, d'inscription ou de frais scolaire.
+ * Elle NE DOIT JAMAIS être comptabilisée comme un versement de frais scolaire ni modifier ou réduire les dettes dues,
+ * tant que l'élève ou le caissier n'utilise pas formellement ce solde au guichet pour acquitter une obligation scolaire.
+ */
+export function isWalletDeposit(p: any): boolean {
+  if (!p) return false;
+  const feeType = String(p.fee_type || '').toUpperCase().trim();
+  const nature = String(p.nature || '').toLowerCase().trim();
+  const desc = String(p.description || '').toLowerCase().trim();
+  const notes = String(p.notes || '').toLowerCase().trim();
+  const meth = String(p.payment_method || p.method || '').toLowerCase().trim();
+  const label = String(p.label || '').toLowerCase().trim();
+  const type = String(p.type || '').toLowerCase().trim();
+
+  return (
+    feeType === 'CREDIT_PORTEFEUILLE' ||
+    feeType === 'RECHARGE_PORTEFEUILLE' ||
+    feeType.includes('PORTEFEUILLE') ||
+    nature.includes('portefeuille') ||
+    desc.includes('recharge portefeuille') ||
+    desc.includes('dépôt portefeuille') ||
+    desc.includes('depot portefeuille') ||
+    desc.includes('alimentation portefeuille') ||
+    notes.includes('recharge moncash') ||
+    notes.includes('recharge natcash') ||
+    notes.includes('portefeuille crédité') ||
+    notes.includes('recharge portefeuille') ||
+    label.includes('recharge portefeuille') ||
+    label.includes('portefeuille') ||
+    type.includes('portefeuille') ||
+    meth.includes('tranzak test direct') ||
+    meth.includes('tranzak live')
+  );
+}
+
 export default handleMonCashWebhook;
