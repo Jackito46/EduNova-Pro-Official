@@ -689,26 +689,45 @@
       }
     });
 
+    // Détection adaptative des connexions lentes (2G/3G ou latence élevée en zones reculées)
+    var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    var isSlowNet = false;
+    if (connection) {
+      isSlowNet = Boolean(
+        connection.saveData || 
+        connection.effectiveType === 'slow-2g' || 
+        connection.effectiveType === '2g' || 
+        connection.effectiveType === '3g' ||
+        (connection.rtt && connection.rtt > 600)
+      );
+    }
+    if (isSlowNet) {
+      logDiag('NET_SPEED', 'Connexion basse vitesse / réseau éloigné détecté', connection.effectiveType);
+      var badge = document.querySelector('.edunova-status-badge');
+      if (badge) {
+        badge.innerHTML = '<span class="edunova-pulse-dot" style="background:#f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5);"></span><span>Réseau basse vitesse • Mode optimisé...</span>';
+      }
+    }
+
     function showEmergencyButtons(cause) {
       var actions = document.getElementById('edunova-splash-actions');
       if (actions && !window.__edunovaAppReady) {
         actions.style.display = 'flex';
         var hint = document.getElementById('edunova-splash-hint');
         if (hint) {
-          hint.textContent = 'Chargement prolongé détecté. Vous pouvez forcer l’accès direct ci-dessous.';
-          hint.style.color = '#94a3b8';
+          hint.textContent = 'Connexion réseau instable ou lente. Vous pouvez forcer l’accès direct ci-dessous.';
+          hint.style.color = '#64748b';
         }
         var btnLogin = document.getElementById('edunova-emergency-login');
-        if (btnLogin) btnLogin.onclick = clearStorageAndGoLogin;
+        if (btnLogin) btnLogin.onclick = fastTrackToLogin;
         var btnReload = document.getElementById('edunova-emergency-reload');
-        if (btnReload) btnReload.onclick = clearStorageAndGoLogin;
+        if (btnReload) btnReload.onclick = clearCacheAndReload;
       }
     }
 
-    // Gestionnaire de déblocage direct immédiat
-    function clearStorageAndGoLogin() {
-      logDiag('ACTION', 'Déblocage direct manuel : retrait immédiat du splashscreen');
-      // Retirer le splashscreen sans délai
+    // Accès direct sans purge destructrice des données locales
+    function fastTrackToLogin() {
+      logDiag('ACTION', 'Accès direct immédiat à la page de connexion');
       window.__dismissEduNovaSplash();
       var splash = document.getElementById('edunova-pwa-splash');
       if (splash) {
@@ -716,15 +735,15 @@
         if (splash.parentNode) splash.parentNode.removeChild(splash);
       }
       window.__edunovaAppReady = true;
+      window.location.hash = '#/';
+    }
 
+    // Vidage du cache et rechargement explicite
+    function clearCacheAndReload() {
+      logDiag('ACTION', 'Vidage du cache et rechargement demandé');
       try {
-        localStorage.removeItem('edunova_user_profile');
-        localStorage.removeItem('edunova-auth-token');
-        localStorage.removeItem('supabase.auth.token');
-        localStorage.setItem('edunova_logged_out', 'true');
         sessionStorage.clear();
       } catch(e) {}
-
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(regs) {
           for (var i = 0; i < regs.length; i++) {
@@ -739,20 +758,19 @@
           }
         });
       }
-
-      // Rediriger vers l'accueil / login
-      window.location.hash = '#/';
+      window.location.reload();
     }
 
-    // Watchdog de sécurité passif (25000ms au lieu de 6000ms) : n'interrompt pas le chargement en cours
+    // Watchdog de sécurité passif adaptatif : 4.5s sur réseau lent, 6s sinon
+    var watchdogDelay = isSlowNet ? 4500 : 6000;
     setTimeout(function() {
       if (!window.__edunovaAppReady) {
-        logDiag('WATCHDOG', 'Délai passif atteint (25s). Proposition des options de secours sans rechargement forcé.');
+        logDiag('WATCHDOG', 'Délai d’attente (' + watchdogDelay + 'ms) atteint. Affichage des options d’accès direct.');
         showEmergencyButtons('Délai d’attente');
       } else {
         logDiag('WATCHDOG', 'Vérification terminée : Application montée avec succès');
       }
-    }, 25000);
+    }, watchdogDelay);
   })();
 </script>
 <script type="module" src="/index.tsx"></script>

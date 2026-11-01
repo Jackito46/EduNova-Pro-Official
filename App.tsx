@@ -4,74 +4,14 @@ import { ShieldAlert, RefreshCw, Loader2, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import Sidebar from './components/Sidebar';
-import Dashboard from './components/Dashboard';
-import StudentForm from './components/StudentForm';
-import StudentList from './components/StudentList';
-import StudentDetailView from './components/StudentDetailView';
-import { StudentProfileView } from './components/StudentProfileView';
-import { StudentCoursesView } from './components/StudentCoursesView';
-import { StudentGradesView } from './components/StudentGradesView';
-import { StudentFinanceView } from './components/StudentFinanceView';
-import { StudentScheduleView } from './components/StudentScheduleView';
-import { StudentHeader } from './components/StudentHeader';
-import ClassManagement from './components/ClassManagement';
-import ClassForm from './components/ClassForm';
-import SubjectForm from './components/SubjectForm';
-import ClassSubjectManager from './components/ClassSubjectManager';
-import GradesView from './components/GradesView';
-import SyllabusHub from './components/SyllabusHub';
-import { HomeworkManager } from './components/HomeworkManager';
-import ReportCardsView from './components/ReportCardsView';
-import ScheduleView from './components/ScheduleView';
-import CourseSignatureView from './components/CourseSignatureView';
-import AttendanceView from './components/AttendanceView';
-import SettingsView from './components/SettingsView';
-import TuitionPaymentForm from './components/TuitionPaymentForm';
-import FeePlanningView from './components/FeePlanningView';
-import ReceiptManagementView from './components/ReceiptManagementView';
-import StudentPaymentTracking from './components/StudentPaymentTracking';
-import AccountStatementView from './components/AccountStatementView';
-import PaymentHistoryList from './components/PaymentHistoryList';
-import FinanceHub from './components/FinanceHub';
-import ExpensesView from './components/ExpensesView';
-import ExpenseForm from './components/ExpenseForm';
-import SuppliesView from './components/SuppliesView';
-import PayrollManagementView from './components/PayrollManagementView';
-import DiscountManagementView from './components/DiscountManagementView';
-import ReductionReportView from './components/ReductionReportView';
-import AdHocCampaignsView from './components/AdHocCampaignsView';
-import StaffManagement from './components/StaffManagement'; 
-import StaffForm from './components/StaffForm';
-import StaffAssignmentView from './components/StaffAssignmentView'; 
-import StaffAttendanceView from './components/StaffAttendanceView';
-import DisciplinaryView from './components/DisciplinaryView';
-import FinancialAuditView from './components/FinancialAuditView';
-import StudentCurrencyDiagnosticView from './components/StudentCurrencyDiagnosticView';
-import BudgetPlanningView from './components/BudgetPlanningView';
-import DebtorsListView from './components/DebtorsListView';
-import UserManagementView from './components/UserManagementView';
-import ReportsView from './components/ReportsView';
-import { MultiCampusDashboardView } from './components/MultiCampusDashboardView';
-// import GuideView from './components/GuideView';
-import { AuditLogsView } from './components/AuditLogsView';
-import ValidationList from './components/ValidationList';
-import { ForcePasswordChange } from './components/ForcePasswordChange';
 import ConnectivityBanner from './components/ConnectivityBanner';
-import { PwaInstallModal } from './components/PwaInstallModal';
-import { OfflineDashboard } from './components/OfflineDashboard';
 import Login from './components/Login';
-import { SuperAdminDashboard } from './components/SuperAdminDashboard';
 import { SuperAdminRoute } from './components/SuperAdminRoute';
-import { SystemHealthView } from './components/SystemHealthView';
 import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { UserProfile, UserRole } from './types';
 import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import EmailModule from './components/EmailModule';
-import SmsModule from './components/SmsModule';
-import PushModule from './components/PushModule';
-import WhatsAppModule from './components/WhatsAppModule';
 
 import { SessionGuard } from './components/SessionGuard';
 import { RoleGuard } from './components/RoleGuard';
@@ -89,7 +29,68 @@ import { PayrollSensitiveNotificationListener } from './components/PayrollSensit
 import { GlobalShortcuts } from './components/GlobalShortcuts';
 import { ModernDashboardSkeleton } from './components/SkeletonLoader';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
-import { PublicReceiptVerificationView } from './components/PublicReceiptVerificationView';
+
+// Lazy-loaded route components for high performance on slow / low-bandwidth mobile networks
+const Dashboard = React.lazy(() => import('./components/Dashboard'));
+const StudentForm = React.lazy(() => import('./components/StudentForm'));
+const StudentList = React.lazy(() => import('./components/StudentList'));
+const StudentDetailView = React.lazy(() => import('./components/StudentDetailView'));
+const StudentProfileView = React.lazy(() => import('./components/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
+const StudentCoursesView = React.lazy(() => import('./components/StudentCoursesView').then(m => ({ default: m.StudentCoursesView })));
+const StudentGradesView = React.lazy(() => import('./components/StudentGradesView').then(m => ({ default: m.StudentGradesView })));
+const StudentFinanceView = React.lazy(() => import('./components/StudentFinanceView').then(m => ({ default: m.StudentFinanceView })));
+const StudentScheduleView = React.lazy(() => import('./components/StudentScheduleView').then(m => ({ default: m.StudentScheduleView })));
+const StudentHeader = React.lazy(() => import('./components/StudentHeader').then(m => ({ default: m.StudentHeader })));
+const ClassManagement = React.lazy(() => import('./components/ClassManagement'));
+const ClassForm = React.lazy(() => import('./components/ClassForm'));
+const SubjectForm = React.lazy(() => import('./components/SubjectForm'));
+const ClassSubjectManager = React.lazy(() => import('./components/ClassSubjectManager'));
+const GradesView = React.lazy(() => import('./components/GradesView'));
+const SyllabusHub = React.lazy(() => import('./components/SyllabusHub'));
+const HomeworkManager = React.lazy(() => import('./components/HomeworkManager').then(m => ({ default: m.HomeworkManager })));
+const ReportCardsView = React.lazy(() => import('./components/ReportCardsView'));
+const ScheduleView = React.lazy(() => import('./components/ScheduleView'));
+const CourseSignatureView = React.lazy(() => import('./components/CourseSignatureView'));
+const AttendanceView = React.lazy(() => import('./components/AttendanceView'));
+const SettingsView = React.lazy(() => import('./components/SettingsView'));
+const TuitionPaymentForm = React.lazy(() => import('./components/TuitionPaymentForm'));
+const FeePlanningView = React.lazy(() => import('./components/FeePlanningView'));
+const ReceiptManagementView = React.lazy(() => import('./components/ReceiptManagementView'));
+const StudentPaymentTracking = React.lazy(() => import('./components/StudentPaymentTracking'));
+const AccountStatementView = React.lazy(() => import('./components/AccountStatementView'));
+const PaymentHistoryList = React.lazy(() => import('./components/PaymentHistoryList'));
+const FinanceHub = React.lazy(() => import('./components/FinanceHub'));
+const ExpensesView = React.lazy(() => import('./components/ExpensesView'));
+const ExpenseForm = React.lazy(() => import('./components/ExpenseForm'));
+const SuppliesView = React.lazy(() => import('./components/SuppliesView'));
+const PayrollManagementView = React.lazy(() => import('./components/PayrollManagementView'));
+const DiscountManagementView = React.lazy(() => import('./components/DiscountManagementView'));
+const ReductionReportView = React.lazy(() => import('./components/ReductionReportView'));
+const AdHocCampaignsView = React.lazy(() => import('./components/AdHocCampaignsView'));
+const StaffManagement = React.lazy(() => import('./components/StaffManagement')); 
+const StaffForm = React.lazy(() => import('./components/StaffForm'));
+const StaffAssignmentView = React.lazy(() => import('./components/StaffAssignmentView')); 
+const StaffAttendanceView = React.lazy(() => import('./components/StaffAttendanceView'));
+const DisciplinaryView = React.lazy(() => import('./components/DisciplinaryView'));
+const FinancialAuditView = React.lazy(() => import('./components/FinancialAuditView'));
+const StudentCurrencyDiagnosticView = React.lazy(() => import('./components/StudentCurrencyDiagnosticView'));
+const BudgetPlanningView = React.lazy(() => import('./components/BudgetPlanningView'));
+const DebtorsListView = React.lazy(() => import('./components/DebtorsListView'));
+const UserManagementView = React.lazy(() => import('./components/UserManagementView'));
+const ReportsView = React.lazy(() => import('./components/ReportsView'));
+const MultiCampusDashboardView = React.lazy(() => import('./components/MultiCampusDashboardView').then(m => ({ default: m.MultiCampusDashboardView })));
+const AuditLogsView = React.lazy(() => import('./components/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
+const ValidationList = React.lazy(() => import('./components/ValidationList'));
+const ForcePasswordChange = React.lazy(() => import('./components/ForcePasswordChange').then(m => ({ default: m.ForcePasswordChange })));
+const PwaInstallModal = React.lazy(() => import('./components/PwaInstallModal').then(m => ({ default: m.PwaInstallModal })));
+const OfflineDashboard = React.lazy(() => import('./components/OfflineDashboard').then(m => ({ default: m.OfflineDashboard })));
+const SuperAdminDashboard = React.lazy(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
+const SystemHealthView = React.lazy(() => import('./components/SystemHealthView').then(m => ({ default: m.SystemHealthView })));
+const PublicReceiptVerificationView = React.lazy(() => import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView })));
+const EmailModule = React.lazy(() => import('./components/EmailModule'));
+const SmsModule = React.lazy(() => import('./components/SmsModule'));
+const PushModule = React.lazy(() => import('./components/PushModule'));
+const WhatsAppModule = React.lazy(() => import('./components/WhatsAppModule'));
 
 // Intercept toast.error globally to prevent scary technical auth errors from showing to the user
 const originalToastError = toast.error;
@@ -238,7 +239,11 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
   }
 
   if (user.force_password_change) {
-    return <ForcePasswordChange user={user} onPasswordChanged={(updated) => purgeSystemState()} />;
+    return (
+      <React.Suspense fallback={<ModernDashboardSkeleton />}>
+        <ForcePasswordChange user={user} onPasswordChanged={(updated) => purgeSystemState()} />
+      </React.Suspense>
+    );
   }
 
   return (
@@ -273,7 +278,11 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
             isDashboard ? 'p-0' : 'p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8'
           }`}
         >
-          {user.role === UserRole.STUDENT && !isDashboard && <StudentHeader user={user} />}
+          {user.role === UserRole.STUDENT && !isDashboard && (
+            <React.Suspense fallback={<div className="h-16 animate-pulse bg-white/70 rounded-xl mb-4" />}>
+              <StudentHeader user={user} />
+            </React.Suspense>
+          )}
           {!isDashboard && (
             <>
               <ConnectivityBanner />
@@ -293,7 +302,8 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
                 transition={{ duration: 0.12, ease: 'easeOut' }}
                 className="w-full min-w-0"
               >
-                <Routes location={location}>
+                <React.Suspense fallback={<ModernDashboardSkeleton />}>
+                  <Routes location={location}>
               <Route path="/" element={<Dashboard user={user} />} />
               <Route path="/dashboard" element={<Navigate to="/" replace />} />
               <Route path="/offline" element={<RoleGuard user={user} allowedRoles={allStaffRoles}><OfflineDashboard user={user} /></RoleGuard>} />
@@ -413,6 +423,7 @@ const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?:
               
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+                </React.Suspense>
           </motion.div>
         </AnimatePresence>
       </ErrorBoundary>
@@ -1362,12 +1373,14 @@ const App: React.FC = () => {
 
   if (isPublicReceiptVerification) {
     return (
-      <PublicReceiptVerificationView
-        onBackToApp={() => {
-          window.location.hash = '#/';
-          window.location.reload();
-        }}
-      />
+      <React.Suspense fallback={<ModernDashboardSkeleton />}>
+        <PublicReceiptVerificationView
+          onBackToApp={() => {
+            window.location.hash = '#/';
+            window.location.reload();
+          }}
+        />
+      </React.Suspense>
     );
   }
 
@@ -1549,7 +1562,9 @@ const App: React.FC = () => {
       <SubscriptionGuard user={user} onLogout={purgeSystemState}>
         <AnimatedRoutes user={user} purgeSystemState={purgeSystemState} maintenanceMode={maintenanceMode} />
       </SubscriptionGuard>
-      <PwaInstallModal />
+      <React.Suspense fallback={null}>
+        <PwaInstallModal />
+      </React.Suspense>
     </HashRouter>
     </ErrorBoundary>
   );

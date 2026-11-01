@@ -338,7 +338,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           .single();
         
         const profileTimeout = new Promise<any>((_, reject) => 
-          profileTimeoutId = setTimeout(() => reject(new Error("Délai d'attente dépassé pour la récupération du profil.")), 12000)
+          profileTimeoutId = setTimeout(() => reject(new Error("Délai profil dépassé")), 3500)
         );
 
         let profile: any = null;
@@ -350,6 +350,14 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           }
         } catch (e) {
           clearTimeout(profileTimeoutId!);
+          // Chargement en arrière-plan pour réseau à basse vitesse
+          profilePromise.then(res => {
+            if (!res.error && res.data) {
+              try {
+                window.localStorage.setItem('edunova_user_profile', JSON.stringify({ ...res.data, current_session_id: sessionId }));
+              } catch(err) {}
+            }
+          }).catch(() => {});
         }
 
         // Robust fallback: If profile is not found or timed out, synthesize from user session metadata
@@ -357,7 +365,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
         if (profile) {
           finalProfile = profile as UserProfile;
         } else {
-          console.warn("Table profiles indisponible ou lente, synthèse du profil via authData");
+          console.warn("Table profiles lente ou inaccessible, synthèse immédiate du profil via session metadata");
           const meta = authData.user.user_metadata || {};
           const isSuper = Boolean(meta.is_super_admin || meta.role === 'SUPER_ADMIN' || targetEmail.toLowerCase().includes('jackito'));
           finalProfile = {
@@ -408,7 +416,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
           throw new Error("La plateforme EduNova Pro est actuellement en cours de maintenance. Seuls les Super Administrateurs ont accès.");
         }
 
-        // Check school status if not super admin with 2.5s timeout guard
+        // Check school status if not super admin with quick 3s timeout guard
         if (finalProfile.school_id && finalProfile.role !== 'SUPER_ADMIN' && !finalProfile.is_super_admin) {
           try {
             let schoolTimeoutId: NodeJS.Timeout;
@@ -418,7 +426,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
               .eq('id', finalProfile.school_id)
               .single();
             const schoolTimeout = new Promise<any>((_, reject) => 
-              schoolTimeoutId = setTimeout(() => reject(new Error("school check timeout")), 10000)
+              schoolTimeoutId = setTimeout(() => reject(new Error("school check timeout")), 3000)
             );
             const { data: schoolData, error: schoolErr } = await Promise.race([schoolPromise, schoolTimeout]);
             clearTimeout(schoolTimeoutId!);

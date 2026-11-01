@@ -27,7 +27,12 @@ import {
   CreditCard,
   ArrowUpRight,
   Clock,
-  XCircle
+  XCircle,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Search
 } from 'lucide-react';
 import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile } from '../types';
@@ -95,6 +100,9 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
     wallet_deposits_htg: number;
   } | null>(null);
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'REUSSIE' | 'ECHOUEE'>('ALL');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [searchQuery, setSearchQuery] = useState<string>('');
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [lastSyncTime, setLastSyncTime] = useState<string>(() => new Date().toLocaleTimeString('fr-FR'));
   const [secondsUntilNextPoll, setSecondsUntilNextPoll] = useState<number>(30);
@@ -407,22 +415,43 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
     return { totalHTG, netHTG, feesHTG, walletHTG, totalCount, validCount, failedCount, pendingCount: 0, successRate };
   }, [tranzakPayments, tranzakSummary]);
 
-  // Filtrage des transactions pour l'affichage selon les onglets
+  // Filtrage des transactions pour l'affichage selon les onglets et la recherche
   const filteredPayments = React.useMemo(() => {
+    let list = tranzakPayments;
     if (statusFilter === 'REUSSIE') {
-      return tranzakPayments.filter(p => {
+      list = list.filter(p => {
         const st = String(p.status || '').toUpperCase();
         return st === 'REUSSIE' || st === 'VALIDE' || st === 'COMPLETED' || st === 'PAID';
       });
-    }
-    if (statusFilter === 'ECHOUEE') {
-      return tranzakPayments.filter(p => {
+    } else if (statusFilter === 'ECHOUEE') {
+      list = list.filter(p => {
         const st = String(p.status || '').toUpperCase();
         return st === 'ECHOUEE' || st === 'FAILED' || st === 'ANNULE' || st === 'EXPIRED';
       });
     }
-    return tranzakPayments;
-  }, [tranzakPayments, statusFilter]);
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter(p => {
+        const txId = String(p.transaction_id || p.id || '').toLowerCase();
+        const ref = String(p.reference || p.reference_number || p.moncash_order_id || '').toLowerCase();
+        const name = String(p.customer_name || p.student_name || p.student?.last_name || p.student?.first_name || '').toLowerCase();
+        const phone = String(p.customer_phone || p.student?.reference_number || '').toLowerCase();
+        const method = String(p.payment_method || '').toLowerCase();
+        return txId.includes(q) || ref.includes(q) || name.includes(q) || phone.includes(q) || method.includes(q);
+      });
+    }
+    return list;
+  }, [tranzakPayments, statusFilter, searchQuery]);
+
+  const totalItems = filteredPayments.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), totalPages);
+
+  const paginatedPayments = React.useMemo(() => {
+    const start = (safeCurrentPage - 1) * pageSize;
+    return filteredPayments.slice(start, start + pageSize);
+  }, [filteredPayments, safeCurrentPage, pageSize]);
 
   if (loading) {
     return (
@@ -953,58 +982,117 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
           </div>
         </div>
 
-        {/* Onglets de filtrage par Statut identiques au Dashboard Tranzak */}
-        <div className="flex items-center gap-2 pt-2 border-t border-slate-100 flex-wrap">
-          <button
-            type="button"
-            onClick={() => setStatusFilter('ALL')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusFilter === 'ALL'
-                ? 'bg-slate-900 text-white shadow-xs'
-                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-            }`}
-          >
-            <span>Toutes</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-              statusFilter === 'ALL' ? 'bg-slate-800 text-slate-200' : 'bg-slate-200 text-slate-700'
-            }`}>
-              {stats.totalCount}
-            </span>
-          </button>
+        {/* Onglets de filtrage par Statut, Recherche et Sélecteur de Page */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-2 border-t border-slate-100 flex-wrap">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('ALL');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                statusFilter === 'ALL'
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+              }`}
+            >
+              <span>Toutes</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                statusFilter === 'ALL' ? 'bg-slate-800 text-slate-200' : 'bg-slate-200 text-slate-700'
+              }`}>
+                {stats.totalCount}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setStatusFilter('REUSSIE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusFilter === 'REUSSIE'
-                ? 'bg-emerald-600 text-white shadow-xs'
-                : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
-            }`}
-          >
-            <span>Réussies</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-              statusFilter === 'REUSSIE' ? 'bg-emerald-700 text-white' : 'bg-emerald-200/80 text-emerald-900'
-            }`}>
-              {stats.validCount}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('REUSSIE');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                statusFilter === 'REUSSIE'
+                  ? 'bg-emerald-600 text-white shadow-xs'
+                  : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200'
+              }`}
+            >
+              <span>Réussies</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                statusFilter === 'REUSSIE' ? 'bg-emerald-700 text-white' : 'bg-emerald-200/80 text-emerald-900'
+              }`}>
+                {stats.validCount}
+              </span>
+            </button>
 
-          <button
-            type="button"
-            onClick={() => setStatusFilter('ECHOUEE')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-              statusFilter === 'ECHOUEE'
-                ? 'bg-rose-600 text-white shadow-xs'
-                : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200'
-            }`}
-          >
-            <span>Échouées</span>
-            <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
-              statusFilter === 'ECHOUEE' ? 'bg-rose-700 text-white' : 'bg-rose-200/80 text-rose-900'
-            }`}>
-              {stats.failedCount}
-            </span>
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setStatusFilter('ECHOUEE');
+                setCurrentPage(1);
+              }}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                statusFilter === 'ECHOUEE'
+                  ? 'bg-rose-600 text-white shadow-xs'
+                  : 'bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200'
+              }`}
+            >
+              <span>Échouées</span>
+              <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                statusFilter === 'ECHOUEE' ? 'bg-rose-700 text-white' : 'bg-rose-200/80 text-rose-900'
+              }`}>
+                {stats.failedCount}
+              </span>
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2 flex-1 sm:flex-initial justify-between sm:justify-end flex-wrap">
+            {/* Barre de Recherche instantanée */}
+            <div className="relative min-w-[170px] max-w-xs flex-1">
+              <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setSearchQuery(e.target.value);
+                  setCurrentPage(1);
+                }}
+                placeholder="Rechercher réf, élève, tél..."
+                className="w-full pl-8 pr-7 py-1 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-purple-500 bg-white placeholder:text-slate-400"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setCurrentPage(1);
+                  }}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                  title="Effacer la recherche"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {/* Sélecteur d'éléments par page */}
+            <div className="flex items-center gap-1 text-[11px] text-slate-500 shrink-0">
+              <span className="hidden sm:inline">Par page :</span>
+              <select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 text-xs font-semibold bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:ring-1 focus:ring-purple-500 cursor-pointer"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
         </div>
 
         {/* Tableau des transactions Tranzak de l'établissement */}
@@ -1018,145 +1106,230 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
             <Receipt className="mx-auto text-slate-400 mb-1" size={24} />
             <p className="font-bold text-slate-700">Aucune transaction trouvée pour ce filtre</p>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Basculez sur l'onglet "Toutes" pour consulter l'historique complet des tentatives.
+              {searchQuery ? "Aucun résultat ne correspond à votre recherche." : "Basculez sur l'onglet 'Toutes' pour consulter l'historique complet des tentatives."}
             </p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
-                <tr>
-                  <th className="py-2.5 px-3">Date</th>
-                  <th className="py-2.5 px-3">Transaction</th>
-                  <th className="py-2.5 px-3">Client / Élève</th>
-                  <th className="py-2.5 px-3">Méthode &amp; Nature</th>
-                  <th className="py-2.5 px-3 text-right">Montant</th>
-                  <th className="py-2.5 px-3 text-center">Statut</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 font-medium">
-                {filteredPayments.map((p) => {
-                  const studentObj = p.student;
-                  const isWallet = p.is_wallet_deposit || 
-                    p.fee_type === 'CREDIT_PORTEFEUILLE' || 
-                    p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
-                    (p.description || p.notes || '').toLowerCase().includes('portefeuille');
-                  const pDate = p.created_at || p.date || p.payment_date;
-                  const formattedDate = pDate ? new Date(pDate).toLocaleDateString('fr-FR', {
-                    day: '2-digit',
-                    month: 'short',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  }) : '-';
-                  
-                  const txId = p.transaction_id || p.id || 'N/A';
-                  const refLabel = p.reference || p.reference_number || p.moncash_order_id || '-';
-                  const st = String(p.status || '').toUpperCase();
-                  const isSuccess = st === 'REUSSIE' || st === 'VALIDE' || st === 'COMPLETED' || st === 'PAID';
-                  const isPending = st === 'EN_ATTENTE' || st === 'PENDING' || st === 'EN_COURS';
+          <div className="space-y-2.5">
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 text-[10px] font-black uppercase tracking-wider text-slate-500 border-b border-slate-200">
+                  <tr>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Transaction</th>
+                    <th className="py-2.5 px-3">Client / Élève</th>
+                    <th className="py-2.5 px-3">Méthode &amp; Nature</th>
+                    <th className="py-2.5 px-3 text-right">Montant</th>
+                    <th className="py-2.5 px-3 text-center">Statut</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-medium">
+                  {paginatedPayments.map((p) => {
+                    const studentObj = p.student;
+                    const isWallet = p.is_wallet_deposit || 
+                      p.fee_type === 'CREDIT_PORTEFEUILLE' || 
+                      p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
+                      (p.description || p.notes || '').toLowerCase().includes('portefeuille');
+                    const pDate = p.created_at || p.date || p.payment_date;
+                    const formattedDate = pDate ? new Date(pDate).toLocaleDateString('fr-FR', {
+                      day: '2-digit',
+                      month: 'short',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    }) : '-';
+                    
+                    const txId = p.transaction_id || p.id || 'N/A';
+                    const refLabel = p.reference || p.reference_number || p.moncash_order_id || '-';
+                    const st = String(p.status || '').toUpperCase();
+                    const isSuccess = st === 'REUSSIE' || st === 'VALIDE' || st === 'COMPLETED' || st === 'PAID';
+                    const isPending = st === 'EN_ATTENTE' || st === 'PENDING' || st === 'EN_COURS';
 
-                  const clientName = p.customer_name || p.student_name || (
-                    studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : 'Client'
-                  );
-                  const clientPhone = p.customer_phone || (studentObj?.reference_number ? `Réf: ${studentObj.reference_number}` : '');
+                    const clientName = p.customer_name || p.student_name || (
+                      studentObj ? formatStudentName(studentObj.last_name, studentObj.first_name).fullName : 'Client'
+                    );
+                    const clientPhone = p.customer_phone || (studentObj?.reference_number ? `Réf: ${studentObj.reference_number}` : '');
 
-                  const methodLabel = (p.payment_method || '').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+                    const methodLabel = (p.payment_method || '').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
 
-                  return (
-                    <tr key={p.id || txId} className="hover:bg-slate-50/80 transition-colors">
-                      <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap text-[11px]">
-                        {formattedDate}
-                      </td>
+                    return (
+                      <tr key={p.id || txId} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="py-2.5 px-3 text-slate-500 whitespace-nowrap text-[11px]">
+                          {formattedDate}
+                        </td>
 
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="font-mono font-bold text-indigo-700 text-xs">
-                          #{txId}
-                        </div>
-                        <div className="font-mono text-[10px] text-slate-400">
-                          Réf. {refLabel}
-                        </div>
-                      </td>
-
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="font-bold text-slate-900 text-xs">
-                          {clientName}
-                        </div>
-                        {clientPhone && (
-                          <div className="font-mono text-[10px] text-slate-500">
-                            {clientPhone}
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <div className="font-mono font-bold text-indigo-700 text-xs">
+                            #{txId}
                           </div>
-                        )}
-                      </td>
+                          <div className="font-mono text-[10px] text-slate-400">
+                            Réf. {refLabel}
+                          </div>
+                        </td>
 
-                      <td className="py-2.5 px-3 whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold ${
-                            methodLabel === 'NatCash'
-                              ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                              : 'bg-rose-50 text-rose-800 border border-rose-200'
-                          }`}>
-                            <Zap size={10} className="shrink-0" />
-                            {methodLabel}
-                          </span>
-                          {isWallet && (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                              <Wallet size={10} className="text-emerald-600 shrink-0" />
-                              Portefeuille
-                            </span>
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <div className="font-bold text-slate-900 text-xs">
+                            {clientName}
+                          </div>
+                          {clientPhone && (
+                            <div className="font-mono text-[10px] text-slate-500">
+                              {clientPhone}
+                            </div>
                           )}
-                        </div>
-                      </td>
+                        </td>
 
-                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                        {isSuccess ? (
-                          <div>
-                            <span className="font-mono font-black text-slate-900 text-xs">
-                              {Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HTG
+                        <td className="py-2.5 px-3 whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-bold ${
+                              methodLabel === 'NatCash'
+                                ? 'bg-amber-50 text-amber-800 border border-amber-200'
+                                : 'bg-rose-50 text-rose-800 border border-rose-200'
+                            }`}>
+                              <Zap size={10} className="shrink-0" />
+                              {methodLabel}
                             </span>
-                            <div className="text-[10px] text-slate-500 font-mono">
-                              Frais {Number(p.fee || 0.90).toFixed(2)} • Net {Number(p.net_amount || (p.amount - 0.90)).toFixed(2)}
-                            </div>
+                            {isWallet && (
+                              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                                <Wallet size={10} className="text-emerald-600 shrink-0" />
+                                Portefeuille
+                              </span>
+                            )}
                           </div>
-                        ) : (
-                          <div>
-                            <span className="font-mono font-medium text-slate-400 line-through text-xs">
-                              {Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HTG
-                            </span>
-                            <div className="text-[10px] text-rose-500/80">
-                              Non prélevé
-                            </div>
-                          </div>
-                        )}
-                      </td>
+                        </td>
 
-                      <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                        {isSuccess ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            <CheckCircle2 size={11} className="text-emerald-600" />
-                            Réussie
-                          </span>
-                        ) : isPending ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
-                            <Clock size={11} />
-                            En cours
-                          </span>
-                        ) : (
-                          <div>
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
-                              <XCircle size={11} className="text-rose-600" />
-                              Échouée
-                            </span>
-                            <div className="text-[9.5px] text-slate-400 mt-0.5 max-w-[130px] truncate mx-auto" title={p.failure_reason || 'Expirée après 15 minutes sans validation'}>
-                              {p.failure_reason || 'Expirée (15 min)'}
+                        <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          {isSuccess ? (
+                            <div>
+                              <span className="font-mono font-black text-slate-900 text-xs">
+                                {Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HTG
+                              </span>
+                              <div className="text-[10px] text-slate-500 font-mono">
+                                Frais {Number(p.fee || 0.90).toFixed(2)} • Net {Number(p.net_amount || (p.amount - 0.90)).toFixed(2)}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                          ) : (
+                            <div>
+                              <span className="font-mono font-medium text-slate-400 line-through text-xs">
+                                {Number(p.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} HTG
+                              </span>
+                              <div className="text-[10px] text-rose-500/80">
+                                Non prélevé
+                              </div>
+                            </div>
+                          )}
+                        </td>
+
+                        <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                          {isSuccess ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                              <CheckCircle2 size={11} className="text-emerald-600" />
+                              Réussie
+                            </span>
+                          ) : isPending ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                              <Clock size={11} />
+                              En cours
+                            </span>
+                          ) : (
+                            <div>
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                                <XCircle size={11} className="text-rose-600" />
+                                Échouée
+                              </span>
+                              <div className="text-[9.5px] text-slate-400 mt-0.5 max-w-[130px] truncate mx-auto" title={p.failure_reason || 'Expirée après 15 minutes sans validation'}>
+                                {p.failure_reason || 'Expirée (15 min)'}
+                              </div>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Barre de Pagination Ergonomique & Réactive */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+              <div className="text-slate-600 font-medium text-[11px] text-center sm:text-left">
+                Affichage de <span className="font-bold text-slate-900">{totalItems === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1}</span> à <span className="font-bold text-slate-900">{Math.min(safeCurrentPage * pageSize, totalItems)}</span> sur <span className="font-bold text-slate-900 font-mono">{totalItems}</span> transaction{totalItems > 1 ? 's' : ''}
+                {searchQuery && <span className="text-purple-600 font-semibold ml-1">(filtré)</span>}
+              </div>
+
+              {totalPages > 1 && (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(1)}
+                    disabled={safeCurrentPage === 1}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:hover:bg-white text-slate-700 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                    title="Première page"
+                  >
+                    <ChevronsLeft size={13} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={safeCurrentPage === 1}
+                    className="px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:hover:bg-white text-slate-700 font-semibold transition-colors flex items-center gap-0.5 cursor-pointer disabled:cursor-not-allowed"
+                    title="Page précédente"
+                  >
+                    <ChevronLeft size={13} />
+                    <span className="hidden sm:inline text-[11px]">Précédent</span>
+                  </button>
+
+                  <div className="flex items-center gap-1 px-1">
+                    {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                      .filter(pNum => {
+                        // Sliding window : show current, adjacent pages, first and last
+                        if (pNum === 1 || pNum === totalPages) return true;
+                        return Math.abs(pNum - safeCurrentPage) <= 1;
+                      })
+                      .map((pNum, idx, arr) => {
+                        const prevNum = arr[idx - 1];
+                        const showEllipsis = prevNum && pNum - prevNum > 1;
+                        return (
+                          <React.Fragment key={pNum}>
+                            {showEllipsis && <span className="text-slate-400 px-1 text-xs">…</span>}
+                            <button
+                              type="button"
+                              onClick={() => setCurrentPage(pNum)}
+                              className={`min-w-[28px] h-7 px-2 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                                safeCurrentPage === pNum
+                                  ? 'bg-slate-900 text-white shadow-xs'
+                                  : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700'
+                              }`}
+                            >
+                              {pNum}
+                            </button>
+                          </React.Fragment>
+                        );
+                      })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={safeCurrentPage === totalPages}
+                    className="px-2 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:hover:bg-white text-slate-700 font-semibold transition-colors flex items-center gap-0.5 cursor-pointer disabled:cursor-not-allowed"
+                    title="Page suivante"
+                  >
+                    <span className="hidden sm:inline text-[11px]">Suivant</span>
+                    <ChevronRight size={13} />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setCurrentPage(totalPages)}
+                    disabled={safeCurrentPage === totalPages}
+                    className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 disabled:opacity-35 disabled:hover:bg-white text-slate-700 transition-colors cursor-pointer disabled:cursor-not-allowed"
+                    title="Dernière page"
+                  >
+                    <ChevronsRight size={13} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
