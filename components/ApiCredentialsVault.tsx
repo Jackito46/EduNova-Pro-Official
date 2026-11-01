@@ -31,12 +31,14 @@ import {
   ChevronDown,
   ChevronUp,
   Layers,
-  Coins
+  Coins,
+  Activity
 } from 'lucide-react';
 import { UserProfile } from '../types';
 import { ApiVaultService } from '../services/apiVaultService';
 import { MonCashGatewaySettings } from './MonCashGatewaySettings';
 import { TranzakGatewaySettings } from './TranzakGatewaySettings';
+import { ApiConfigAuditView } from './ApiConfigAuditView';
 import { MobilePaymentRouterService, MobileMoneyGateway } from '../services/mobilePaymentRouterService';
 import { toast } from 'sonner';
 import { supabase } from '../supabase';
@@ -53,7 +55,7 @@ interface ApiCredentialsVaultProps {
   isGatewaysEnabledForSchool?: boolean;
 }
 
-type VaultTab = 'tranzak' | 'kobara' | 'moncash' | 'natcash';
+type VaultTab = 'tranzak' | 'kobara' | 'moncash' | 'natcash' | 'audit';
 
 export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
   user,
@@ -551,6 +553,20 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-center">
           <button
             type="button"
+            onClick={() => setActiveTab('audit')}
+            className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer shadow-xs ${
+              activeTab === 'audit'
+                ? 'bg-indigo-500 text-white border border-indigo-400'
+                : 'bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 border border-indigo-500/30'
+            }`}
+            title="Consulter l'audit de connectivité et diagnostic des encaissements"
+          >
+            <Activity size={12} className={activeTab === 'audit' ? 'text-white' : 'text-indigo-300'} />
+            <span>Audit API</span>
+          </button>
+
+          <button
+            type="button"
             onClick={loadVaultData}
             disabled={loading}
             className="px-2.5 py-1.5 bg-white/10 hover:bg-white/20 active:bg-white/25 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer border border-white/10 disabled:opacity-50"
@@ -952,6 +968,22 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
         >
           <Smartphone size={13} />
           <span>Natcash</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('audit')}
+          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 ${
+            activeTab === 'audit'
+              ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-2xs'
+              : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200'
+          }`}
+        >
+          <Activity size={13} />
+          <span>Audit de Configuration API</span>
+          <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-white/20 font-black uppercase text-inherit border border-current/20">
+            Diagnostic
+          </span>
         </button>
       </div>
 
@@ -2198,6 +2230,19 @@ export const ApiCredentialsVault: React.FC<ApiCredentialsVaultProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* ===================== ONGLET AUDIT DE CONFIGURATION API ===================== */}
+      {activeTab === 'audit' && (
+        <ApiConfigAuditView
+          schoolId={user.school_id || ''}
+          user={user}
+          activeGateway={activeGateway}
+          isGatewaysEnabledForSchool={isGatewaysEnabledForSchool}
+          canManageAllCampuses={canManageAllCampuses}
+          onSwitchActiveGateway={handleSwitchActiveGateway}
+          onNavigateToTab={(tab) => setActiveTab(tab)}
+        />
       )}
     </div>
   );

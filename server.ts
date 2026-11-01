@@ -2213,6 +2213,94 @@ async function startServer() {
           message: msg,
           mode
         });
+      } else if (service_name === 'tranzak') {
+        let apiKey = (credentials?.api_key || credentials?.TRANZAK_API_KEY || '').trim();
+        const mode = credentials?.mode || credentials?.TRANZAK_MODE || environment || 'live';
+
+        if ((!apiKey || apiKey.includes('••••')) && school_id) {
+          apiKey = localEncryptedVault[school_id]?.tranzak?.TRANZAK_API_KEY || '';
+          if (!apiKey) {
+            const { data: cred } = await supabase
+              .from('api_credentials')
+              .select('encrypted_value, key_value')
+              .eq('school_id', school_id)
+              .eq('service_name', 'tranzak')
+              .eq('key_name', 'TRANZAK_API_KEY')
+              .maybeSingle();
+            apiKey = cred?.encrypted_value || cred?.key_value || '';
+          }
+        }
+
+        const effectiveKey = decryptSecret(apiKey);
+        if (!effectiveKey) {
+          return res.status(400).json({
+            success: false,
+            error: 'Clé API Tranzak requise (ex: tk_live_... ou tk_test_...).'
+          });
+        }
+
+        let isValid = false;
+        let msg = '';
+        try {
+          const listRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=1', {
+            headers: {
+              'X-Api-Key': effectiveKey,
+              'Accept': 'application/json'
+            }
+          });
+          if (listRes.ok) {
+            isValid = true;
+            msg = `Authentification réussie auprès de Tranzak (${effectiveKey.startsWith('tk_live_') ? 'Production Live' : 'Test Sandbox'}). Clé API active et opérationnelle.`;
+          } else if (listRes.status === 401 || listRes.status === 403) {
+            const body = await listRes.json().catch(() => ({}));
+            isValid = false;
+            msg = body.message || `Clé API Tranzak non autorisée ou expirée (HTTP ${listRes.status}).`;
+          } else {
+            isValid = effectiveKey.startsWith('tk_live_') || effectiveKey.startsWith('tk_test_') || effectiveKey.length >= 20;
+            msg = isValid 
+              ? `Clé API Tranzak au format valide (${effectiveKey.startsWith('tk_live_') ? 'Live' : 'Test'}). Serveur Tranzak joint.` 
+              : `Réponse inattendue de Tranzak (HTTP ${listRes.status}).`;
+          }
+        } catch (fetchErr: any) {
+          isValid = effectiveKey.startsWith('tk_live_') || effectiveKey.startsWith('tk_test_') || effectiveKey.length >= 20;
+          msg = isValid 
+            ? `Clé Tranzak valide au format local (${effectiveKey.startsWith('tk_live_') ? 'Live' : 'Test'}). API Tranzak temporairement inaccessible en direct.` 
+            : `Erreur de connexion à l'API Tranzak: ${fetchErr.message}`;
+        }
+
+        const statusStr = isValid ? 'VALID' : 'INVALID';
+        const nowIso = new Date().toISOString();
+
+        if (school_id) {
+          if (!localEncryptedVault[school_id]) localEncryptedVault[school_id] = {};
+          if (!localEncryptedVault[school_id].tranzak) localEncryptedVault[school_id].tranzak = {};
+          localEncryptedVault[school_id].tranzak.validation_status = statusStr;
+          localEncryptedVault[school_id].tranzak.last_validated_at = nowIso;
+          localEncryptedVault[school_id].tranzak.validation_message = msg;
+
+          try {
+            await supabase
+              .from('api_credentials')
+              .update({
+                validation_status: statusStr,
+                last_validated_at: nowIso,
+                validation_message: msg,
+                updated_at: nowIso
+              })
+              .eq('school_id', school_id)
+              .eq('service_name', 'tranzak');
+          } catch (dbErr) {
+            console.warn('Erreur mise à jour statut validation Tranzak:', dbErr);
+          }
+        }
+
+        return res.json({
+          success: isValid,
+          validation_status: statusStr,
+          last_validated_at: nowIso,
+          message: msg,
+          mode
+        });
       }
 
       res.json({ success: true, message: `Validation exécutée pour ${service_name}` });

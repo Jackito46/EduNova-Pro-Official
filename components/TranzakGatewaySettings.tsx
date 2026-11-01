@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   Key, 
   Lock, 
@@ -83,28 +83,73 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
   // Transactions Tranzak reçues par l'établissement
   const [tranzakPayments, setTranzakPayments] = useState<any[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
+  const [lastSyncTime, setLastSyncTime] = useState<string>(() => new Date().toLocaleTimeString('fr-FR'));
+  const [secondsUntilNextPoll, setSecondsUntilNextPoll] = useState<number>(30);
 
-  const loadTranzakTransactions = async () => {
+  const loadTranzakTransactions = useCallback(async (isSilent = false) => {
     if (!currentSchoolId) return;
-    setLoadingPayments(true);
+    if (!isSilent) setLoadingPayments(true);
     try {
       const { data, error } = await supabase
         .from('payments')
-        .select('id, receipt_number, amount, amount_htg_equivalent, currency, payment_method, reference_number, fee_type, status, payment_date, created_at, notes, student_id, student:students(id, first_name, last_name, matricule)')
+        .select('id, receipt_number, amount, amount_htg_equivalent, currency, payment_method, method, reference_number, fee_type, status, payment_date, created_at, notes, student_id, student:students(id, first_name, last_name, matricule)')
         .eq('school_id', currentSchoolId)
-        .or('payment_method.ilike.%tranzak%,reference_number.ilike.TZK-%,fee_type.eq.CREDIT_PORTEFEUILLE,fee_type.eq.RECHARGE_PORTEFEUILLE')
+        .or('payment_method.ilike.%tranzak%,method.ilike.%tranzak%,notes.ilike.%tranzak%,reference_number.ilike.TZK-%,reference_number.ilike.TRZ-%,fee_type.eq.CREDIT_PORTEFEUILLE,fee_type.eq.RECHARGE_PORTEFEUILLE')
         .order('created_at', { ascending: false })
-        .limit(30);
+        .limit(50);
 
       if (!error && data) {
         setTranzakPayments(data);
+        setLastSyncTime(new Date().toLocaleTimeString('fr-FR'));
       }
     } catch (err) {
       console.warn('Erreur chargement transactions Tranzak:', err);
     } finally {
-      setLoadingPayments(false);
+      if (!isSilent) setLoadingPayments(false);
     }
-  };
+  }, [currentSchoolId]);
+
+  // Polling automatique 30 secondes & Souscription Temps Réel Supabase
+  useEffect(() => {
+    if (!currentSchoolId) return;
+
+    // Chargement initial
+    loadTranzakTransactions(false);
+
+    // 1. Décompte visuel de seconde en seconde (de 30 à 0) pour polling prédictif
+    const countdownInterval = setInterval(() => {
+      setSecondsUntilNextPoll(prev => {
+        if (prev <= 1) {
+          loadTranzakTransactions(true);
+          return 30;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    // 2. Souscription Supabase Realtime pour captation instantanée dès l'arrivée du Webhook Tranzak / SAGACETECH
+    const channelName = `tranzak_journal_${currentSchoolId}_${Date.now()}`;
+    const realtimeSub = supabase.channel(channelName)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'payments',
+          filter: `school_id=eq.${currentSchoolId}`
+        },
+        () => {
+          loadTranzakTransactions(true);
+          setSecondsUntilNextPoll(30);
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(countdownInterval);
+      supabase.removeChannel(realtimeSub);
+    };
+  }, [currentSchoolId, loadTranzakTransactions]);
 
   // Charger les identifiants existants
   useEffect(() => {
@@ -142,7 +187,6 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
       }
     }
     loadTranzakConfig();
-    loadTranzakTransactions();
     return () => { isMounted = false; };
   }, [currentSchoolId]);
 
@@ -693,24 +737,38 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
       <div className="bg-white border border-slate-200 rounded-xl p-3 sm:p-4 space-y-3 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <div className="p-1.5 bg-purple-50 text-purple-700 rounded-lg border border-purple-200">
                 <Receipt size={16} />
               </div>
               <h5 className="font-bold text-slate-900 text-sm">
                 Journal des Encaissements &amp; Dépôts Reçus (Tranzak / SAGACETECH)
               </h5>
+              <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>Auto-sync (30s) • En direct</span>
+              </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
-              Montants directement perçus sur le compte Tranzak de l'établissement et répercutés sur les portefeuilles des élèves.
-            </p>
+            <div className="flex items-center gap-2 text-xs text-slate-500 mt-1 flex-wrap">
+              <span>Montants directement perçus sur le compte Tranzak de l'établissement et répercutés sur les portefeuilles des élèves.</span>
+              <span className="hidden sm:inline text-slate-300">•</span>
+              <span className="text-[11px] font-medium text-slate-600 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded inline-flex items-center gap-1">
+                <span>Dernière synchro :</span>
+                <strong className="font-mono text-slate-900">{lastSyncTime}</strong>
+                <span className="text-slate-400">({secondsUntilNextPoll}s)</span>
+              </span>
+            </div>
           </div>
 
           <button
             type="button"
-            onClick={loadTranzakTransactions}
+            onClick={() => {
+              setSecondsUntilNextPoll(30);
+              loadTranzakTransactions(false);
+            }}
             disabled={loadingPayments}
             className="px-2.5 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold transition-all flex items-center gap-1.5 self-start sm:self-auto cursor-pointer"
+            title="Rafraîchir immédiatement et réinitialiser le compte à rebours"
           >
             <RefreshCw size={13} className={loadingPayments ? "animate-spin text-purple-600" : "text-slate-500"} />
             <span>Actualiser</span>

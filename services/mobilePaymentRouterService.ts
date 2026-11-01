@@ -33,7 +33,8 @@ export interface MobilePaymentDispatchResult {
   is_simulated?: boolean;
 }
 
-let cachedGateway: { schoolId: string; gateway: MobileMoneyGateway; timestamp: number } | null = null;
+// Cache multi-tenant par établissement (TTL 5 secondes)
+const gatewayCache = new Map<string, { gateway: MobileMoneyGateway; timestamp: number }>();
 
 export class MobilePaymentRouterService {
   /**
@@ -42,10 +43,11 @@ export class MobilePaymentRouterService {
   static async getActiveGateway(schoolId: string): Promise<MobileMoneyGateway> {
     if (!schoolId) return 'none';
 
-    // Cache court de 5 secondes pour éviter le spam de requêtes
+    // Cache court de 5 secondes par établissement pour éviter le spam de requêtes tout en garantissant le multi-tenant
     const now = Date.now();
-    if (cachedGateway && cachedGateway.schoolId === schoolId && (now - cachedGateway.timestamp) < 5000) {
-      return cachedGateway.gateway;
+    const cached = gatewayCache.get(schoolId);
+    if (cached && (now - cached.timestamp) < 5000) {
+      return cached.gateway;
     }
 
     // 1. Vérification prioritaire : statut d'activation SaaS des passerelles pour cet établissement
@@ -57,7 +59,7 @@ export class MobilePaymentRouterService {
         .maybeSingle();
 
       if (schoolRow && schoolRow.has_api_gateways === false) {
-        cachedGateway = { schoolId, gateway: 'none', timestamp: now };
+        gatewayCache.set(schoolId, { gateway: 'none', timestamp: now });
         return 'none';
       }
 
@@ -65,7 +67,7 @@ export class MobilePaymentRouterService {
         const gs = typeof schoolRow.global_settings === 'string' ? JSON.parse(schoolRow.global_settings) : schoolRow.global_settings;
         if (gs?.active_mobile_money_gateway) {
           const gw = gs.active_mobile_money_gateway as MobileMoneyGateway;
-          cachedGateway = { schoolId, gateway: gw, timestamp: now };
+          gatewayCache.set(schoolId, { gateway: gw, timestamp: now });
           return gw;
         }
       }
@@ -85,7 +87,7 @@ export class MobilePaymentRouterService {
         const data = await res.json();
         if (data?.active_mobile_money_gateway) {
           const gw = data.active_mobile_money_gateway as MobileMoneyGateway;
-          cachedGateway = { schoolId, gateway: gw, timestamp: now };
+          gatewayCache.set(schoolId, { gateway: gw, timestamp: now });
           return gw;
         }
       }
@@ -120,7 +122,7 @@ export class MobilePaymentRouterService {
 
       const data = await res.json();
       if (res.ok && data.success) {
-        cachedGateway = { schoolId, gateway, timestamp: Date.now() };
+        gatewayCache.set(schoolId, { gateway, timestamp: Date.now() });
         return { success: true, message: data.message };
       }
       throw new Error(data.error || 'Erreur lors de la mise à jour');
@@ -145,7 +147,7 @@ export class MobilePaymentRouterService {
           .update({ global_settings: sSettings })
           .eq('id', schoolId);
 
-        cachedGateway = { schoolId, gateway, timestamp: Date.now() };
+        gatewayCache.set(schoolId, { gateway, timestamp: Date.now() });
         return { success: true, message: `Passerelle basculée sur ${gateway.toUpperCase()}` };
       } catch (dbErr: any) {
         return { success: false, error: dbErr.message || 'Impossible de mettre à jour la passerelle' };
