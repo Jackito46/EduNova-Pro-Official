@@ -25,7 +25,9 @@ import {
   Wallet,
   Receipt,
   CreditCard,
-  ArrowUpRight
+  ArrowUpRight,
+  Clock,
+  XCircle
 } from 'lucide-react';
 import { useSchool } from '../contexts/SchoolContext';
 import { UserProfile } from '../types';
@@ -92,15 +94,17 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
     try {
       const { data, error } = await supabase
         .from('payments')
-        .select('id, receipt_number, amount, amount_htg_equivalent, currency, payment_method, method, reference_number, fee_type, status, payment_date, created_at, notes, student_id, student:students(id, first_name, last_name, matricule)')
+        .select('id, amount, amount_htg_equivalent, currency, payment_method, method, reference_number, fee_type, status, date, created_at, description, moncash_order_id, moncash_transaction_id, moncash_status, student_id, student:students(id, first_name, last_name, reference_number)')
         .eq('school_id', currentSchoolId)
-        .or('payment_method.ilike.%tranzak%,method.ilike.%tranzak%,notes.ilike.%tranzak%,reference_number.ilike.TZK-%,reference_number.ilike.TRZ-%,fee_type.eq.CREDIT_PORTEFEUILLE,fee_type.eq.RECHARGE_PORTEFEUILLE')
+        .or('payment_method.ilike.%tranzak%,method.ilike.%tranzak%,description.ilike.%tranzak%,reference_number.ilike.TZK-%,reference_number.ilike.TRZ-%,fee_type.eq.CREDIT_PORTEFEUILLE,fee_type.eq.RECHARGE_PORTEFEUILLE,payment_method.ilike.%moncash%,payment_method.ilike.%natcash%')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (!error && data) {
         setTranzakPayments(data);
         setLastSyncTime(new Date().toLocaleTimeString('fr-FR'));
+      } else if (error) {
+        console.warn('Erreur chargement transactions Tranzak:', error);
       }
     } catch (err) {
       console.warn('Erreur chargement transactions Tranzak:', err);
@@ -311,14 +315,15 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
 
     for (const p of tranzakPayments) {
       const amt = Number(p.amount_htg_equivalent || p.amount || 0);
-      const isValide = !p.status || p.status.toUpperCase() === 'VALIDE' || p.status.toUpperCase() === 'PAID';
+      const st = String(p.status || '').toUpperCase();
+      const isValide = !p.status || st === 'VALIDE' || st === 'PAID' || st === 'COMPLETED';
       if (isValide) {
         totalHTG += amt;
         validCount++;
         if (
           p.fee_type === 'CREDIT_PORTEFEUILLE' || 
           p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
-          (p.notes || '').toLowerCase().includes('portefeuille')
+          (p.description || p.notes || '').toLowerCase().includes('portefeuille')
         ) {
           walletHTG += amt;
         }
@@ -854,19 +859,21 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
                   const studentObj = p.student;
                   const isWallet = p.fee_type === 'CREDIT_PORTEFEUILLE' || 
                     p.fee_type === 'RECHARGE_PORTEFEUILLE' || 
-                    (p.notes || '').toLowerCase().includes('portefeuille');
-                  const pDate = p.payment_date || p.created_at;
+                    (p.description || p.notes || '').toLowerCase().includes('portefeuille');
+                  const pDate = p.date || p.payment_date || p.created_at;
                   const formattedDate = pDate ? new Date(pDate).toLocaleDateString('fr-FR', {
                     day: '2-digit',
                     month: 'short',
                     hour: '2-digit',
                     minute: '2-digit'
                   }) : '-';
+                  const receiptLabel = p.reference_number || p.moncash_order_id || p.id?.slice(0, 8) || 'SANS-NO';
+                  const st = String(p.status || '').toUpperCase();
 
                   return (
                     <tr key={p.id} className="hover:bg-slate-50/80 transition-colors">
                       <td className="py-2 px-3 font-mono font-bold text-indigo-700 whitespace-nowrap">
-                        #{p.receipt_number || 'SANS-NO'}
+                        #{receiptLabel}
                       </td>
                       <td className="py-2 px-3 text-slate-500 whitespace-nowrap text-[11px]">
                         {formattedDate}
@@ -884,21 +891,33 @@ export const TranzakGatewaySettings: React.FC<TranzakGatewaySettingsProps> = ({
                           </span>
                         ) : (
                           <span className="text-slate-700 text-[11px]">
-                            {p.fee_type || 'Scolarité'}
+                            {p.fee_type || p.description || 'Scolarité'}
                           </span>
                         )}
                       </td>
                       <td className="py-2 px-3 font-mono text-[10.5px] text-purple-700 font-bold whitespace-nowrap">
-                        {p.reference_number || '-'}
+                        {p.reference_number || p.moncash_order_id || '-'}
                       </td>
                       <td className="py-2 px-3 text-right font-black text-slate-900 font-mono whitespace-nowrap">
                         {Number(p.amount_htg_equivalent || p.amount || 0).toLocaleString()} HTG
                       </td>
                       <td className="py-2 px-3 text-center whitespace-nowrap">
-                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          <CheckCircle2 size={10} />
-                          Validé
-                        </span>
+                        {st === 'EN_ATTENTE' ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <Clock size={10} />
+                            En attente
+                          </span>
+                        ) : st === 'ANNULE' ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-red-50 text-red-700 border border-red-200">
+                            <XCircle size={10} />
+                            Annulé
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 size={10} />
+                            Validé
+                          </span>
+                        )}
                       </td>
                     </tr>
                   );

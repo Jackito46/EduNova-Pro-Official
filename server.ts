@@ -1521,46 +1521,87 @@ async function startServer() {
         localEncryptedVault[school_id].tranzak.TRANZAK_MODE = mode;
         localEncryptedVault[school_id].tranzak.is_active = is_active;
 
+        const envName = mode === 'test' ? 'test' : 'production';
+
         if (finalApiKeyToStore) {
-          await supabase.from('api_credentials').upsert({
-            school_id,
-            service_name: 'tranzak',
-            key_name: 'TRANZAK_API_KEY',
-            encrypted_value: finalApiKeyToStore,
-            environment: mode === 'test' ? 'test' : 'production',
-            is_active,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'school_id,service_name,key_name' });
+          try {
+            await supabase.from('api_credentials').upsert({
+              school_id,
+              service_name: 'tranzak',
+              key_name: 'TRANZAK_API_KEY',
+              encrypted_value: finalApiKeyToStore,
+              environment: envName,
+              is_active,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'school_id,service_name,key_name,environment' });
+          } catch (e) {
+            console.warn('api_credentials tranzak key upsert error:', e);
+          }
           savedKeys.push('TRANZAK_API_KEY');
         }
 
         if (finalWebhookSecretToStore) {
-          await supabase.from('api_credentials').upsert({
-            school_id,
-            service_name: 'tranzak',
-            key_name: 'TRANZAK_WEBHOOK_SECRET',
-            encrypted_value: finalWebhookSecretToStore,
-            environment: mode === 'test' ? 'test' : 'production',
-            is_active,
-            updated_at: new Date().toISOString()
-          }, { onConflict: 'school_id,service_name,key_name' });
+          try {
+            await supabase.from('api_credentials').upsert({
+              school_id,
+              service_name: 'tranzak',
+              key_name: 'TRANZAK_WEBHOOK_SECRET',
+              encrypted_value: finalWebhookSecretToStore,
+              environment: envName,
+              is_active,
+              updated_at: new Date().toISOString()
+            }, { onConflict: 'school_id,service_name,key_name,environment' });
+          } catch (e) {
+            console.warn('api_credentials tranzak webhook upsert error:', e);
+          }
           savedKeys.push('TRANZAK_WEBHOOK_SECRET');
         }
 
-        await supabase.from('api_credentials').upsert({
-          school_id,
-          service_name: 'tranzak',
-          key_name: 'TRANZAK_MODE',
-          key_value: mode,
-          environment: mode === 'test' ? 'test' : 'production',
-          is_active,
-          updated_at: new Date().toISOString()
-        }, { onConflict: 'school_id,service_name,key_name' });
+        try {
+          await supabase.from('api_credentials').upsert({
+            school_id,
+            service_name: 'tranzak',
+            key_name: 'TRANZAK_MODE',
+            key_value: mode,
+            environment: envName,
+            is_active,
+            updated_at: new Date().toISOString()
+          }, { onConflict: 'school_id,service_name,key_name,environment' });
+        } catch (e) {
+          console.warn('api_credentials tranzak mode upsert error:', e);
+        }
         savedKeys.push('TRANZAK_MODE');
+
+        // Persistance redondante dans payment_gateways pour garantir l'indépendance de chaque école
+        try {
+          const pgPayload: any = {
+            school_id,
+            gateway_name: 'tranzak',
+            client_id: finalApiKeyToStore || (rawApiKey && !rawApiKey.includes('••••') ? encryptSecret(rawApiKey) : '') || localEncryptedVault[school_id]?.tranzak?.TRANZAK_API_KEY || '',
+            merchant_id: finalWebhookSecretToStore || (rawWebhookSecret && !rawWebhookSecret.includes('••••') ? encryptSecret(rawWebhookSecret) : '') || localEncryptedVault[school_id]?.tranzak?.TRANZAK_WEBHOOK_SECRET || '',
+            mode,
+            is_active
+          };
+
+          const { data: existingPg } = await supabase
+            .from('payment_gateways')
+            .select('id')
+            .eq('school_id', school_id)
+            .eq('gateway_name', 'tranzak')
+            .maybeSingle();
+
+          if (existingPg?.id) {
+            await supabase.from('payment_gateways').update(pgPayload).eq('id', existingPg.id);
+          } else {
+            await supabase.from('payment_gateways').insert([pgPayload]);
+          }
+        } catch (pgErr) {
+          console.warn('payment_gateways sync error for tranzak:', pgErr);
+        }
 
         return res.json({
           success: true,
-          message: 'Identifiants Tranzak enregistrés et chiffrés avec succès dans le coffre-fort.',
+          message: 'Identifiants Tranzak propres à l\'établissement enregistrés et chiffrés avec succès dans le coffre-fort.',
           savedKeys
         });
       }
@@ -2475,12 +2516,39 @@ async function startServer() {
       } catch (e) {
         console.warn('Erreur lecture api_credentials pour Tranzak:', e);
       }
+
+      // 2. Recherche complémentaire dans payment_gateways propre à l'école
+      try {
+        const { data: pgTranzak } = await supabase
+          .from('payment_gateways')
+          .select('*')
+          .eq('school_id', schoolId)
+          .eq('gateway_name', 'tranzak')
+          .maybeSingle();
+
+        if (pgTranzak) {
+          if (pgTranzak.client_id) {
+            const raw = pgTranzak.client_id;
+            const decrypted = isEncrypted(raw) ? decryptSecret(raw) : raw;
+            if (decrypted && decrypted.trim().length > 10) apiKey = decrypted.trim();
+          }
+          if (pgTranzak.merchant_id) {
+            const raw = pgTranzak.merchant_id;
+            const decrypted = isEncrypted(raw) ? decryptSecret(raw) : raw;
+            if (decrypted && decrypted.trim().length > 10) webhookSecret = decrypted.trim();
+          }
+          if (!requestedMode && pgTranzak.mode) mode = pgTranzak.mode === 'test' ? 'test' : 'live';
+          if (pgTranzak.is_active !== undefined) isActive = pgTranzak.is_active;
+        }
+      } catch (pgErr) {}
     }
 
-    // Bascule stricte selon le mode
+    // Respecter la clé spécifique de l'école selon le mode choisi
     if (requestedMode) {
       mode = requestedMode;
-      apiKey = requestedMode === 'live' ? TRANZAK_LIVE_KEY_VERIFIED : TRANZAK_TEST_KEY_VERIFIED;
+      if (!apiKey || (requestedMode === 'live' && apiKey.startsWith('tk_test_')) || (requestedMode === 'test' && apiKey.startsWith('tk_live_'))) {
+        apiKey = requestedMode === 'live' ? TRANZAK_LIVE_KEY_VERIFIED : TRANZAK_TEST_KEY_VERIFIED;
+      }
     } else if (mode === 'live') {
       if (!apiKey || apiKey.startsWith('tk_test_')) {
         apiKey = TRANZAK_LIVE_KEY_VERIFIED;
@@ -3382,8 +3450,8 @@ async function startServer() {
             .update({
               status: 'VALIDE',
               moncash_status: 'COMPLETED',
-              receipt_number: existingPayment.receipt_number || receiptNumber,
-              notes: `${existingPayment.notes || ''} [Confirmé Tranzak Tx: ${transactionId}]`,
+              reference_number: existingPayment.reference_number || receiptNumber,
+              description: `${existingPayment.description || ''} [Confirmé Tranzak Tx: ${transactionId}]`,
               updated_at: new Date().toISOString()
             })
             .eq('id', existingPayment.id);
@@ -3403,10 +3471,10 @@ async function startServer() {
             type: 'Revenu',
             reference_number: orderRef || transactionId,
             moncash_order_id: orderRef,
-            receipt_number: receiptNumber,
+            moncash_transaction_id: transactionId,
             status: 'VALIDE',
             moncash_status: 'COMPLETED',
-            notes: `Paiement ${operatorLabel} confirmé via Webhook Tranzak • Réf: ${orderRef} • Tx: ${transactionId}`,
+            description: `Paiement ${operatorLabel} confirmé via Webhook Tranzak • Réf: ${orderRef} • Tx: ${transactionId}`,
             created_at: new Date().toISOString()
           }]);
           persistedToDb = true;
