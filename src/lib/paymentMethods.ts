@@ -143,7 +143,21 @@ export function getSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
  */
 export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
   const allMethods = getSchoolPaymentMethods(school);
-  const active = allMethods.filter(m => m.enabled);
+  const activeGateway = school?.global_settings?.active_mobile_money_gateway;
+  
+  const active = allMethods.filter(m => {
+    if (m.enabled) return true;
+    // Si la passerelle Tranzak ou Kobara est active, rendre MonCash disponible au guichet
+    if ((m.code === 'MonCash' || m.id === 'MONCASH') && (activeGateway === 'tranzak' || activeGateway === 'kobara')) {
+      return true;
+    }
+    // Si Tranzak est actif, Natcash est également supporté
+    if ((m.code === 'Natcash' || m.id === 'NATCASH') && activeGateway === 'tranzak') {
+      return true;
+    }
+    return false;
+  });
+
   // Securite : si aucune méthode n'est active, retourner au moins Cash & Dépôt Bancaire
   if (active.length === 0) {
     return DEFAULT_PAYMENT_METHODS.filter(m => m.code === 'Cash' || m.code === 'Dépôt Bancaire');

@@ -2662,6 +2662,194 @@ async function startServer() {
     }
   });
 
+  // GET /api/tranzak/transactions
+  // Récupère les transactions réelles directement depuis l'API Tranzak avec la clé de l'école
+  // afin de refléter fidèlement le portail officiel Tranzak (Réussies vs Échouées)
+  app.get('/api/tranzak/transactions', async (req, res) => {
+    try {
+      const schoolId = (req.query.school_id as string) || '';
+      const mode = (req.query.mode as string) || '';
+      
+      const config = await getTranzakConfigForSchool(schoolId, mode === 'test' ? 'test' : 'live');
+      const apiKey = config.apiKey || TRANZAK_LIVE_KEY_VERIFIED;
+
+      let apiTransactions: any[] = [];
+      let tranzakApiSuccess = false;
+
+      try {
+        const tranzakRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=100', {
+          headers: {
+            'X-Api-Key': apiKey,
+            'Accept': 'application/json'
+          }
+        });
+
+        if (tranzakRes.ok) {
+          const resJson = await tranzakRes.json();
+          if (Array.isArray(resJson?.data)) {
+            apiTransactions = resJson.data;
+            tranzakApiSuccess = true;
+          }
+        } else {
+          const altRes = await fetch('https://tranzak.co/api/gateway/v1/payments?limit=100', {
+            headers: { 'X-Api-Key': apiKey, 'Accept': 'application/json' }
+          });
+          if (altRes.ok) {
+            const altJson = await altRes.json();
+            if (Array.isArray(altJson?.data)) {
+              apiTransactions = altJson.data;
+              tranzakApiSuccess = true;
+            }
+          }
+        }
+      } catch (fetchErr) {
+        console.warn('[Tranzak API /payments fetch error]:', fetchErr);
+      }
+
+      // Calcul des statistiques
+      let successfulCount = 0;
+      let failedCount = 0;
+      let pendingCount = 0;
+      let totalGrossHtg = 0;
+      let totalFeesHtg = 0;
+      let totalNetHtg = 0;
+      let walletDepositsHtg = 0;
+
+      const formattedList = apiTransactions.map((tx: any) => {
+        const rawStatus = String(tx.status || '').toLowerCase();
+        let normalizedStatus: 'REUSSIE' | 'ECHOUEE' | 'EN_COURS' = 'ECHOUEE';
+
+        const gross = Number(tx.amount || 0);
+        const fee = tx.fee !== undefined ? Number(tx.fee) : (rawStatus === 'completed' || rawStatus === 'successful' || rawStatus === 'paid' ? 0.90 : 0);
+        const net = tx.net_amount !== undefined ? Number(tx.net_amount) : (gross - fee);
+
+        if (rawStatus === 'completed' || rawStatus === 'successful' || rawStatus === 'paid') {
+          normalizedStatus = 'REUSSIE';
+          successfulCount++;
+          totalGrossHtg += gross;
+          totalFeesHtg += fee;
+          totalNetHtg += net;
+        } else if (rawStatus === 'pending' || rawStatus === 'processing') {
+          normalizedStatus = 'EN_COURS';
+          pendingCount++;
+        } else {
+          normalizedStatus = 'ECHOUEE';
+          failedCount++;
+        }
+
+        const isWallet = Boolean(
+          tx.metadata?.fee_type === 'CREDIT_PORTEFEUILLE' ||
+          tx.metadata?.fee_type === 'RECHARGE_PORTEFEUILLE' ||
+          (tx.description || '').toLowerCase().includes('portefeuille')
+        );
+
+        if (normalizedStatus === 'REUSSIE' && isWallet) {
+          walletDepositsHtg += gross;
+        }
+
+        return {
+          id: tx.transaction_id || tx.id || '',
+          transaction_id: tx.transaction_id || tx.id || '',
+          reference: tx.reference || tx.metadata?.order_id || '',
+          amount: gross,
+          fee: fee,
+          net_amount: net,
+          currency: tx.currency || 'HTG',
+          payment_method: tx.payment_method || tx.operator || 'moncash',
+          status: normalizedStatus,
+          raw_status: tx.status,
+          failure_reason: tx.failure_reason || (normalizedStatus === 'ECHOUEE' ? 'Transaction expirée ou refusée' : null),
+          customer_name: tx.customer?.name || tx.metadata?.student_name || 'Client',
+          customer_phone: tx.customer?.phone || '',
+          created_at: tx.created_at || new Date().toISOString(),
+          completed_at: tx.completed_at || null,
+          failed_at: tx.failed_at || null,
+          description: tx.description || '',
+          is_wallet_deposit: isWallet,
+          student_id: tx.metadata?.student_id || null,
+          student_name: tx.metadata?.student_name || tx.customer?.name || null
+        };
+      });
+
+      // Si l'API Tranzak n'a rien retourné (hors-ligne ou clé test), repli sur les transactions certifiées en base
+      if (!tranzakApiSuccess || formattedList.length === 0) {
+        try {
+          const { data: dbRows } = await supabase
+            .from('payments')
+            .select('id, amount, amount_htg_equivalent, currency, payment_method, method, reference_number, fee_type, status, date, created_at, description, moncash_order_id, moncash_transaction_id, moncash_status, student_id, student:students(id, first_name, last_name, reference_number)')
+            .eq('school_id', schoolId)
+            .or('reference_number.ilike.TRZ-%,reference_number.ilike.TZK-%,method.ilike.%(Tranzak)%,moncash_transaction_id.is.not.null')
+            .order('created_at', { ascending: false })
+            .limit(50);
+
+          if (dbRows && dbRows.length > 0) {
+            for (const row of dbRows) {
+              const gross = Number(row.amount_htg_equivalent || row.amount || 0);
+              const fee = 0.90;
+              const net = gross - fee;
+              const isValide = row.status === 'VALIDE' || row.moncash_status === 'COMPLETED';
+              const isWallet = Boolean(
+                row.fee_type === 'DIVERS' && (row.nature === 'Recharge Portefeuille' || (row.description || '').toLowerCase().includes('portefeuille'))
+              );
+
+              if (isValide) {
+                successfulCount++;
+                totalGrossHtg += gross;
+                totalFeesHtg += fee;
+                totalNetHtg += net;
+                if (isWallet) walletDepositsHtg += gross;
+              }
+
+              formattedList.push({
+                id: row.moncash_transaction_id || row.id,
+                transaction_id: row.moncash_transaction_id || row.reference_number,
+                reference: row.reference_number || row.moncash_order_id,
+                amount: gross,
+                fee: fee,
+                net_amount: net,
+                currency: row.currency || 'HTG',
+                payment_method: row.payment_method || 'MonCash',
+                status: isValide ? 'REUSSIE' : 'ECHOUEE',
+                raw_status: row.status,
+                failure_reason: null,
+                customer_name: row.student ? `${row.student.last_name} ${row.student.first_name}` : 'Élève',
+                customer_phone: '',
+                created_at: row.created_at || row.date,
+                completed_at: isValide ? row.created_at : null,
+                failed_at: null,
+                description: row.description || '',
+                is_wallet_deposit: isWallet,
+                student_id: row.student_id,
+                student_name: row.student ? `${row.student.last_name} ${row.student.first_name}` : null
+              });
+            }
+          }
+        } catch (dbErr) {
+          console.warn('[Fallback DB Tranzak query error]:', dbErr);
+        }
+      }
+
+      return res.json({
+        success: true,
+        source: tranzakApiSuccess ? 'tranzak_api_live' : 'db_fallback',
+        summary: {
+          total_count: formattedList.length,
+          successful_count: successfulCount,
+          failed_count: failedCount,
+          pending_count: pendingCount,
+          total_gross_htg: totalGrossHtg,
+          total_fees_htg: totalFeesHtg,
+          total_net_htg: totalNetHtg,
+          wallet_deposits_htg: walletDepositsHtg
+        },
+        transactions: formattedList
+      });
+    } catch (err: any) {
+      console.error('Erreur route /api/tranzak/transactions:', err);
+      return res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
   // API Route pour créer une session de paiement Tranzak (MonCash / NatCash)
   app.post('/api/tranzak/create-payment', async (req, res) => {
     try {
@@ -3458,6 +3646,8 @@ async function startServer() {
           persistedToDb = true;
         } else if (schoolId && amount > 0) {
           const operatorLabel = operator === 'natcash' ? 'NatCash' : 'MonCash';
+          const isWalletFee = feeType === 'CREDIT_PORTEFEUILLE' || feeType === 'RECHARGE_PORTEFEUILLE';
+          const dbFeeType = (feeType === 'INSCRIPTION' || feeType === 'SCOLARITE') ? feeType : 'DIVERS';
           await supabase.from('payments').insert([{
             school_id: schoolId,
             student_id: studentId,
@@ -3466,8 +3656,8 @@ async function startServer() {
             currency: currency,
             payment_method: operatorLabel,
             method: `${operatorLabel} (Tranzak)`,
-            fee_type: feeType,
-            nature: 'Scolarite',
+            fee_type: dbFeeType,
+            nature: isWalletFee ? 'Recharge Portefeuille' : 'Scolarite',
             type: 'Revenu',
             reference_number: orderRef || transactionId,
             moncash_order_id: orderRef,
