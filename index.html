@@ -367,19 +367,26 @@
       return window.__edunovaDiagnostics;
     };
 
+    var watchdogTimer = null;
+
     // Fonction de fermeture sécurisée du splashscreen
     window.__dismissEduNovaSplash = function() {
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
+      window.__edunovaAppReady = true;
       logDiag('LIFECYCLE', 'Signal de fermeture du splashscreen reçu');
       var splash = document.getElementById('edunova-pwa-splash');
       if (splash) {
-        splash.style.transition = 'opacity 0.25s ease-out';
+        splash.style.transition = 'opacity 0.2s ease-out';
         splash.style.opacity = '0';
         setTimeout(function() {
           if (splash && splash.parentNode) {
             splash.parentNode.removeChild(splash);
             logDiag('LIFECYCLE', 'Splashscreen retiré du DOM');
           }
-        }, 250);
+        }, 200);
       }
     };
 
@@ -689,20 +696,25 @@
       }
     });
 
-    // Détection adaptative des connexions lentes (2G/3G ou latence élevée en zones reculées)
+    // Détection adaptative des connexions lentes réelles (2G ou débit descendant critique)
     var connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     var isSlowNet = false;
     if (connection) {
-      isSlowNet = Boolean(
-        connection.saveData || 
-        connection.effectiveType === 'slow-2g' || 
-        connection.effectiveType === '2g' || 
-        connection.effectiveType === '3g' ||
-        (connection.rtt && connection.rtt > 600)
-      );
+      // Une vitesse mesurée de 1.5 Mbps ou plus (ex: 11 Mbps sur Fast.com) est un bon débit.
+      // Une latence réseau géographique (ex: Caraïbes vers serveurs US, RTT > 600ms) ne doit JAMAIS
+      // être confondue avec un réseau basse vitesse tant que la bande passante descendante est bonne.
+      var hasGoodBandwidth = (typeof connection.downlink === 'number' && connection.downlink >= 1.5);
+      if (!hasGoodBandwidth) {
+        isSlowNet = Boolean(
+          connection.saveData || 
+          connection.effectiveType === 'slow-2g' || 
+          connection.effectiveType === '2g' ||
+          (typeof connection.downlink === 'number' && connection.downlink < 0.6)
+        );
+      }
     }
     if (isSlowNet) {
-      logDiag('NET_SPEED', 'Connexion basse vitesse / réseau éloigné détecté', connection.effectiveType);
+      logDiag('NET_SPEED', 'Connexion basse vitesse / 2G détectée', connection.effectiveType);
       var badge = document.querySelector('.edunova-status-badge');
       if (badge) {
         badge.innerHTML = '<span class="edunova-pulse-dot" style="background:#f59e0b; box-shadow: 0 0 8px rgba(245,158,11,0.5);"></span><span>Réseau basse vitesse • Mode optimisé...</span>';
@@ -710,12 +722,13 @@
     }
 
     function showEmergencyButtons(cause) {
+      if (window.__edunovaAppReady) return;
       var actions = document.getElementById('edunova-splash-actions');
-      if (actions && !window.__edunovaAppReady) {
+      if (actions) {
         actions.style.display = 'flex';
         var hint = document.getElementById('edunova-splash-hint');
         if (hint) {
-          hint.textContent = 'Connexion réseau instable ou lente. Vous pouvez forcer l’accès direct ci-dessous.';
+          hint.textContent = 'Chargement prolongé détecté. Vous pouvez forcer l’accès direct ci-dessous.';
           hint.style.color = '#64748b';
         }
         var btnLogin = document.getElementById('edunova-emergency-login');
@@ -728,13 +741,16 @@
     // Accès direct sans purge destructrice des données locales
     function fastTrackToLogin() {
       logDiag('ACTION', 'Accès direct immédiat à la page de connexion');
-      window.__dismissEduNovaSplash();
+      window.__edunovaAppReady = true;
+      if (watchdogTimer) {
+        clearTimeout(watchdogTimer);
+        watchdogTimer = null;
+      }
       var splash = document.getElementById('edunova-pwa-splash');
       if (splash) {
         splash.style.display = 'none';
         if (splash.parentNode) splash.parentNode.removeChild(splash);
       }
-      window.__edunovaAppReady = true;
       window.location.hash = '#/';
     }
 
@@ -761,9 +777,10 @@
       window.location.reload();
     }
 
-    // Watchdog de sécurité passif adaptatif : 4.5s sur réseau lent, 6s sinon
-    var watchdogDelay = isSlowNet ? 4500 : 6000;
-    setTimeout(function() {
+    // Watchdog passif : avec le découpage modulaire (bundle initial ~450 KB), l'app démarre en <500ms sur 11 Mbps.
+    // Un délai de 9 à 14 secondes offre une marge sereine pour les réseaux fluctuants sans jamais interrompre inutilement l'utilisateur.
+    var watchdogDelay = isSlowNet ? 14000 : 9000;
+    watchdogTimer = setTimeout(function() {
       if (!window.__edunovaAppReady) {
         logDiag('WATCHDOG', 'Délai d’attente (' + watchdogDelay + 'ms) atteint. Affichage des options d’accès direct.');
         showEmergencyButtons('Délai d’attente');
