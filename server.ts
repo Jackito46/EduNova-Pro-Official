@@ -4297,6 +4297,30 @@ async function startServer() {
   });
 
   // API Route de Diagnostic Avancé pour StudentFinanceView :
+  app.get('/api/debug/solvency/:studentId', async (req, res) => {
+    try {
+      const dbClient = getSupabaseClient(req);
+      const studentId = req.params.studentId;
+      const { data: student } = await dbClient.from('students').select('*, class:classes(*)').eq('id', studentId).maybeSingle();
+      const { data: enrollments } = await dbClient.from('enrollments').select('*, academic_year:academic_years(*), class:classes(*)').eq('student_id', studentId);
+      const { data: feePlans } = await dbClient.from('fee_plans').select('*').eq('school_id', student?.school_id || 'a0ed9087-0554-40ae-ac26-86599a183b16');
+      const { data: payments } = await dbClient.from('payments').select('*').eq('student_id', studentId);
+      const { data: adHoc } = await dbClient.from('student_ad_hoc_fees').select('*, campaign:ad_hoc_campaigns(*)').eq('student_id', studentId);
+      const { data: years } = await dbClient.from('academic_years').select('*').eq('school_id', student?.school_id || 'a0ed9087-0554-40ae-ac26-86599a183b16');
+      let rpcDebt = null;
+      try {
+        const { data: d } = await dbClient.rpc('get_student_global_debt', { p_student_id: studentId });
+        rpcDebt = d;
+      } catch (e: any) {
+        rpcDebt = e.message;
+      }
+      const { data: supplies } = await dbClient.from('school_supplies').select('*').eq('student_id', studentId);
+      res.json({ student, enrollments, feePlans, payments, adHoc, years, rpcDebt, supplies });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
   // Compare les logs de la table Supabase 'transactions' / 'payments' de l'élève
   // avec les relevés Tranzak et les callbacks Webhook pour expliquer tout écart de solde
   app.get('/api/tranzak/diagnostics/:studentId', async (req, res) => {
