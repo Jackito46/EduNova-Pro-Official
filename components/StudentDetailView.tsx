@@ -62,6 +62,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [isClosingDossier, setIsClosingDossier] = useState(false);
   const [showCloseModal, setShowCloseModal] = useState(false);
   const [closeReason, setCloseReason] = useState('');
+  const [grandLivreFilter, setGrandLivreFilter] = useState<'all' | 'fees' | 'wallet'>('all');
 
   // Documents status modal state
   const [showDocsModal, setShowDocsModal] = useState(false);
@@ -273,7 +274,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
         
       // 3.5 Fournitures scolaires (déjà préchargées en parallèle)
-      const normalizedPayments = [
+      const normalizedPayments: any[] = [
         ...rawPayments.map((p: any) => {
           let tLabel = p.nature || p.type || p.fee_type || 'Frais Divers';
           if (p.campaign?.name) {
@@ -328,29 +329,32 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       
       // Synchronisation en direct des dépôts mobiles Tranzak (MonCash & NatCash)
       try {
+        const studentFullName = `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim();
         const syncRes = await fetch('/api/tranzak/sync-student-payments', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             studentId: studentId,
             schoolId: user.school_id,
-            studentName: `${student.first_name || ''} ${student.last_name || ''}`.trim()
+            studentName: studentFullName
           })
         });
         if (syncRes.ok) {
           const syncJson = await syncRes.json().catch(() => ({}));
           const remoteTxs = Array.isArray(syncJson?.transactions) ? syncJson.transactions : [];
           for (const tx of remoteTxs) {
-            const txRef = tx.reference || tx.transaction_id;
-            const txId = tx.transaction_id;
+            const txRef = tx.reference || tx.metadata?.order_id || tx.transaction_id;
+            const txId = tx.transaction_id || tx.id;
             const exists = normalizedPayments.some((p: any) =>
               p.reference_number === txRef ||
               p.reference_number === txId ||
               p.id === txId ||
-              p.id === txRef
+              p.id === txRef ||
+              p.moncash_order_id === txRef ||
+              p.moncash_transaction_id === txId
             );
             if (!exists) {
-              const operator = (tx.payment_method || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+              const operator = (tx.payment_method || tx.metadata?.operator || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
               normalizedPayments.push({
                 id: txId || txRef,
                 date: tx.completed_at || tx.created_at || new Date().toISOString(),
@@ -363,16 +367,24 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 ad_hoc_campaign_id: null,
                 campaign_id: null,
                 campaign: null,
-                receipt_number: (txId || txRef || '').slice(-8).toUpperCase(),
+                receipt_number: txRef || (txId || '').slice(-8).toUpperCase(),
                 reference_number: txRef || txId,
                 payment_method: operator,
                 nature: 'Recharge Portefeuille',
-                fee_type: 'CREDIT_PORTEFEUILLE'
+                fee_type: 'CREDIT_PORTEFEUILLE',
+                notes: tx.description || `Dépôt Portefeuille ${operator}`,
+                phone: tx.customer?.phone || null
               });
             }
           }
+          if (typeof syncJson?.new_balance === 'number' && syncJson.new_balance >= 0) {
+            studentData.wallet_balance_htg = syncJson.new_balance;
+            setStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: syncJson.new_balance } : prev);
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn('Sync Tranzak in StudentDetailView warning:', e);
+      }
 
       normalizedPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPayments(normalizedPayments);
@@ -511,6 +523,12 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const lastPayment = useMemo(() => {
     return validFeePayments.length > 0 ? validFeePayments[0] : null;
   }, [validFeePayments]);
+
+  const displayedPayments = useMemo(() => {
+    if (grandLivreFilter === 'fees') return validFeePayments;
+    if (grandLivreFilter === 'wallet') return walletDeposits;
+    return payments;
+  }, [grandLivreFilter, validFeePayments, walletDeposits, payments]);
 
   const isDossierSolde = studentDebt <= 0;
 
@@ -1525,6 +1543,103 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
           )}
 
+          {/* 💳 MODULE DE TRAÇABILITÉ DES DÉPÔTS PORTEFEUILLE ÉLÈVE */}
+          {walletDeposits.length > 0 && (
+            <div className="bg-gradient-to-br from-blue-50/70 via-white to-blue-50/40 rounded-2xl p-5 shadow-sm border border-blue-200/90 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                    <Wallet size={20} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
+                        Traçabilité des Dépôts Portefeuille Élève
+                      </h4>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
+                        {walletDeposits.length} dépôt(s) certifié(s)
+                      </span>
+                    </div>
+                    <p className="text-xs text-slate-500 font-medium">
+                      Historique des renflouements (MonCash / NatCash) enregistrés au crédit du portefeuille de l'élève.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-blue-200 shadow-2xs self-start sm:self-auto">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Solde Disponible :</span>
+                  <span className="font-mono text-base font-black text-blue-700">
+                    {(student.wallet_balance_htg || 0).toLocaleString()} HTG
+                  </span>
+                </div>
+              </div>
+
+              {/* Table de traçabilité des recharges */}
+              <div className="overflow-x-auto rounded-xl border border-blue-100 bg-white">
+                <table className="w-full text-left border-collapse text-xs">
+                  <thead>
+                    <tr className="bg-blue-50/60 border-b border-blue-100 text-[10px] font-black uppercase text-blue-900 tracking-wider">
+                      <th className="py-2.5 px-3.5">Date & Heure</th>
+                      <th className="py-2.5 px-3.5">Réf. Transaction / Reçu</th>
+                      <th className="py-2.5 px-3.5">Canal & Opérateur</th>
+                      <th className="py-2.5 px-3.5 text-right">Montant Crédité</th>
+                      <th className="py-2.5 px-3.5 text-center">Statut d'Accréditation</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-blue-50">
+                    {walletDeposits.map((tx: any, idx: number) => {
+                      const displayDate = tx.date ? new Date(tx.date).toLocaleString('fr-FR', {
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      }) : 'Date certifiée';
+
+                      return (
+                        <tr key={tx.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                          <td className="py-2.5 px-3.5 font-bold text-slate-800 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <Calendar size={13} className="text-blue-500 shrink-0" />
+                              <span>{displayDate}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3.5 font-mono text-[11px] font-bold text-blue-800 whitespace-nowrap">
+                            <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                              {tx.receipt_number || tx.reference_number || tx.id}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3.5 font-medium text-slate-700 whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-[10px] border border-slate-200">
+                              <Smartphone size={11} className="text-blue-600" />
+                              {tx.payment_method || 'MonCash'}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3.5 text-right font-mono font-black text-blue-700 whitespace-nowrap">
+                            +{Number(tx.amount || 0).toLocaleString()} HTG
+                          </td>
+                          <td className="py-2.5 px-3.5 text-center whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                              <ShieldCheck size={12} className="text-blue-600" />
+                              <span>DISPONIBLE AU GUICHET</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                <Info size={13} className="text-blue-600 shrink-0" />
+                <span>
+                  Les fonds rechargés constituent une réserve personnelle de l'élève. Ils restent utilisables pour tout règlement ultérieur au comptoir sans réaffectation unilatérale sur les dettes scolaires.
+                </span>
+              </div>
+            </div>
+          )}
+
           {/* 📜 GRAND LIVRE & HISTORIQUE DÉTAILLÉ DES RÈGLEMENTS */}
           <div id="grand-livre-paiements" className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
             <div className="px-5 py-4 bg-slate-900 text-white flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -1538,7 +1653,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       Grand Livre & Règlements de l'Élève
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
-                      {payments.length} versement(s) scellé(s)
+                      {payments.length} flux enregistré(s)
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-400">
@@ -1569,10 +1684,56 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
             </div>
 
+            {/* Filter bar for Grand Livre */}
+            <div className="px-5 py-2.5 bg-slate-100/90 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2 text-xs">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setGrandLivreFilter('all')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                    grandLivreFilter === 'all'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'bg-white text-slate-600 hover:bg-slate-200/80 border border-slate-200'
+                  }`}
+                >
+                  Tous les flux ({payments.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGrandLivreFilter('fees')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                    grandLivreFilter === 'fees'
+                      ? 'bg-emerald-700 text-white shadow-xs'
+                      : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+                  }`}
+                >
+                  Frais Scolaires ({validFeePayments.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGrandLivreFilter('wallet')}
+                  className={`px-3 py-1 rounded-lg font-bold text-xs transition-all cursor-pointer ${
+                    grandLivreFilter === 'wallet'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-white text-blue-700 hover:bg-blue-50 border border-blue-200'
+                  }`}
+                >
+                  Dépôts Portefeuille ({walletDeposits.length})
+                </button>
+              </div>
+
+              {walletDeposits.length > 0 && (
+                <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                  <Wallet size={12} />
+                  Solde Portefeuille : {(student.wallet_balance_htg || 0).toLocaleString()} HTG
+                </span>
+              )}
+            </div>
+
             {/* Table des versements */}
-            {payments.length === 0 ? (
+            {displayedPayments.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs italic">
-                Aucun versement n'a encore été enregistré pour ce dossier.
+                Aucun flux n'a été trouvé pour le filtre sélectionné.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -1588,7 +1749,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {payments.map((p: any, idx: number) => {
+                    {displayedPayments.map((p: any, idx: number) => {
                       const isWallet = isWalletDeposit(p);
                       const displayDate = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : 'Date scellée';
                       const isUSD = p.currency === 'USD';

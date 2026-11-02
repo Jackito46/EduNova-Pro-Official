@@ -34,7 +34,8 @@ import {
   PieChart,
   Wallet,
   ArrowRightLeft,
-  Coins
+  Coins,
+  Smartphone
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { toast } from 'sonner';
@@ -856,7 +857,63 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         plan = planData;
       }
 
-      const payments = rawPayments?.filter(p => !p.academic_year_id || p.academic_year_id === activeYearId) || [];
+      let payments = [...(rawPayments?.filter(p => !p.academic_year_id || p.academic_year_id === activeYearId) || [])];
+
+      // Synchronisation en direct des dépôts mobiles Tranzak (MonCash & NatCash) pour l'audit et le relevé
+      try {
+        const studentFullName = `${student.first_name || ''} ${student.last_name || ''}`.trim();
+        const syncRes = await fetch('/api/tranzak/sync-student-payments', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            studentId: student.id,
+            schoolId: user.school_id,
+            studentName: studentFullName
+          })
+        });
+        if (syncRes.ok) {
+          const syncJson = await syncRes.json().catch(() => ({}));
+          const remoteTxs = Array.isArray(syncJson?.transactions) ? syncJson.transactions : [];
+          for (const tx of remoteTxs) {
+            const txRef = tx.reference || tx.metadata?.order_id || tx.transaction_id;
+            const txId = tx.transaction_id || tx.id;
+            const exists = payments.some((p: any) =>
+              p.reference_number === txRef ||
+              p.reference_number === txId ||
+              p.id === txId ||
+              p.id === txRef ||
+              p.moncash_order_id === txRef ||
+              p.moncash_transaction_id === txId
+            );
+            if (!exists) {
+              const operator = (tx.payment_method || tx.metadata?.operator || 'moncash').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
+              payments.push({
+                id: txId || txRef,
+                created_at: tx.completed_at || tx.created_at || new Date().toISOString(),
+                date: tx.completed_at || tx.created_at || new Date().toISOString(),
+                amount: Number(tx.amount || 0),
+                amount_htg_equivalent: Number(tx.amount || 0),
+                currency: tx.currency || 'HTG',
+                fee_type: 'CREDIT_PORTEFEUILLE',
+                nature: 'Recharge Portefeuille',
+                payment_method: operator,
+                reference_number: txRef || txId,
+                receipt_number: txRef || (txId || '').slice(-8).toUpperCase(),
+                moncash_order_id: txRef,
+                moncash_transaction_id: txId,
+                status: 'VALIDE',
+                moncash_status: 'COMPLETED',
+                description: `Recharge Portefeuille ${operator} - ${studentFullName} • Tx: ${txId || txRef}`,
+                phone: tx.customer?.phone || null
+              });
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Sync Tranzak in loadStudentAudit warning:', e);
+      }
+
+      payments.sort((a, b) => new Date(b.date || b.created_at).getTime() - new Date(a.date || a.created_at).getTime());
       const exchangeRate = rateRes?.[0]?.rate_usd_to_htg || 132.50;
       const campaignData = campaignResData || [];
 
@@ -2800,6 +2857,112 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </table>
                 </div>
               </div>
+
+              {/* 💳 DÉTAIL & TRAÇABILITÉ DES RECHARGES PORTEFEUILLE ÉLÈVE DANS LE RELEVÉ */}
+              {(() => {
+                const walletHistory = filteredStudentHistory.filter(isWalletDeposit);
+                if (walletHistory.length === 0) return null;
+                const totalWalletCredited = walletHistory.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+                return (
+                  <div className="bg-gradient-to-br from-blue-50/70 via-white to-blue-50/30 rounded-2xl p-6 border border-blue-200/90 shadow-xs space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-blue-100 pb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
+                          <Wallet size={20} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
+                              Traçabilité des Dépôts Portefeuille Élève (Fonds d'Avance)
+                            </h4>
+                            <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
+                              {walletHistory.length} transaction(s) certifiée(s)
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-500 font-medium mt-0.5">
+                            Approvisionnements mobiles (MonCash / NatCash) enregistrés au crédit du portefeuille de l'élève.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 self-start sm:self-auto">
+                        <div className="bg-white px-3.5 py-1.5 rounded-xl border border-blue-200 shadow-2xs">
+                          <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider block">Total Rechargé :</span>
+                          <span className="font-mono text-sm font-black text-blue-700">+{totalWalletCredited.toLocaleString()} HTG</span>
+                        </div>
+                        <div className="bg-blue-600 text-white px-3.5 py-1.5 rounded-xl shadow-xs">
+                          <span className="text-[10px] text-blue-100 font-bold uppercase tracking-wider block">Solde Actuel :</span>
+                          <span className="font-mono text-sm font-black">{(selectedGenStudent.wallet_balance_htg || totalWalletCredited).toLocaleString()} HTG</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-xl border border-blue-100 bg-white">
+                      <table className="w-full min-w-[620px] text-left border-collapse text-xs">
+                        <thead>
+                          <tr className="bg-blue-50/60 border-b border-blue-100 text-[10px] font-black uppercase text-blue-900 tracking-wider">
+                            <th className="py-2.5 px-3.5">Date & Heure</th>
+                            <th className="py-2.5 px-3.5">Réf. Transaction / Reçu</th>
+                            <th className="py-2.5 px-3.5">Canal de Règlement</th>
+                            <th className="py-2.5 px-3.5 text-right">Montant Rechargé</th>
+                            <th className="py-2.5 px-3.5 text-center">Statut d'Accréditation</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-blue-50">
+                          {walletHistory.map((p, idx) => {
+                            const dateStr = p.created_at || p.date ? new Date(p.created_at || p.date).toLocaleString('fr-FR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'Date certifiée';
+
+                            return (
+                              <tr key={p.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                                <td className="py-2.5 px-3.5 font-bold text-slate-800 whitespace-nowrap">
+                                  <div className="flex items-center gap-1.5">
+                                    <Calendar size={13} className="text-blue-500 shrink-0" />
+                                    <span>{dateStr}</span>
+                                  </div>
+                                </td>
+                                <td className="py-2.5 px-3.5 font-mono text-[11px] font-bold text-blue-800 whitespace-nowrap">
+                                  <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                                    {p.receipt_number || p.reference_number || `TRZ-${p.id.slice(0, 8)}`}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3.5 font-medium text-slate-700 whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-bold text-[10px] border border-slate-200">
+                                    <Smartphone size={11} className="text-blue-600" />
+                                    {p.payment_method || 'MonCash'}
+                                  </span>
+                                </td>
+                                <td className="py-2.5 px-3.5 text-right font-mono font-black text-blue-700 whitespace-nowrap">
+                                  +{Number(p.amount || 0).toLocaleString()} HTG
+                                </td>
+                                <td className="py-2.5 px-3.5 text-center whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                                    <ShieldCheck size={12} className="text-blue-600" />
+                                    <span>RÉSERVE ÉLÈVE • DISPONIBLE GUICHET</span>
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1.5">
+                      <Info size={13} className="text-blue-600 shrink-0" />
+                      <span>
+                        Note comptable : Ces dépôts constituent une réserve financière de l'élève. Ils ne diminuent pas les engagements scolaires tant qu'aucun débit d'affectation n'est enregistré au guichet.
+                      </span>
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
           ) : (
             <div className="bg-slate-50/60 p-16 rounded-[3rem] border-2 border-dashed border-slate-200 text-center space-y-4 max-w-2xl mx-auto">
@@ -3103,84 +3266,168 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-50">
-                        {studentHistory.filter(p => p.status !== 'ANNULE' && !p.payment_method?.includes('REJETÉ') && isPaymentInDateRange(p, startDate, endDate)).map((p) => {
-                          const isUSD = p.currency === 'USD';
-                          const paidAmount = Number(p.amount || 0);
-                          const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
-                          const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
+                        {(() => {
+                          const feeHistory = studentHistory.filter(p => !isWalletDeposit(p) && p.status !== 'ANNULE' && !p.payment_method?.includes('REJETÉ') && isPaymentInDateRange(p, startDate, endDate));
+                          if (feeHistory.length === 0) {
+                            return (
+                              <tr>
+                                <td colSpan={6} className="py-8 text-center text-xs italic text-slate-400">Aucun versement de scolarité enregistré pour cette période.</td>
+                              </tr>
+                            );
+                          }
+                          return feeHistory.map((p) => {
+                            const isUSD = p.currency === 'USD';
+                            const paidAmount = Number(p.amount || 0);
+                            const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
+                            const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
-                          const isCamp = Boolean(
-                            p.ad_hoc_campaign_id || 
-                            p.fee_type === 'AD_HOC' || 
-                            p.campaign?.id || 
-                            (p.nature && (p.nature.toLowerCase().includes('campagne') || p.nature.toLowerCase().includes('assurance'))) ||
-                            (p.type && (p.type.toLowerCase().includes('campagne') || p.type.toLowerCase().includes('assurance')))
-                          );
-                          const isTuitionFee = !isCamp && (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité')));
-                          const isAdmissionFee = !isCamp && (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription");
-                          const isMiscFee = !isCamp && (p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers'));
-                          const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
-                          const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
-                          const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
-                          const isCampaignPlannedInUSD = Boolean(isCamp && p.campaign?.currency === 'USD');
-                          const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
+                            const isCamp = Boolean(
+                              p.ad_hoc_campaign_id || 
+                              p.fee_type === 'AD_HOC' || 
+                              p.campaign?.id || 
+                              (p.nature && (p.nature.toLowerCase().includes('campagne') || p.nature.toLowerCase().includes('assurance'))) ||
+                              (p.type && (p.type.toLowerCase().includes('campagne') || p.type.toLowerCase().includes('assurance')))
+                            );
+                            const isTuitionFee = !isCamp && (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité')));
+                            const isAdmissionFee = !isCamp && (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription");
+                            const isMiscFee = !isCamp && (p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers'));
+                            const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
+                            const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
+                            const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
+                            const isCampaignPlannedInUSD = Boolean(isCamp && p.campaign?.currency === 'USD');
+                            const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
-                          return (
-                            <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
-                              <td className="py-2 px-3 font-bold text-slate-600 whitespace-nowrap">{new Date(p.created_at).toLocaleDateString()}</td>
-                              <td className="py-2 px-3 font-mono text-slate-500 whitespace-nowrap">RCP-{p.id.substring(0,8).toUpperCase()}</td>
-                              <td className="py-2 px-3 font-bold text-slate-700 whitespace-nowrap">
-                                {p.campaign?.name 
-                                  ? `Campagne: ${p.campaign.name}` 
-                                  : p.ad_hoc_campaign_id 
-                                  ? 'Frais de Campagne' 
-                                  : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
-                                  ? 'Scolarité' 
-                                  : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
-                                  ? 'Inscription' 
-                                  : (p.nature || p.type || p.fee_type || 'Frais Divers'))}
-                              </td>
-                              <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
-                                {isUSD ? (
-                                  <div>
-                                    <span>${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</span>
-                                    <div className="text-[9px] text-amber-800 font-normal">× {appliedRate} G</div>
-                                  </div>
-                                ) : (
-                                  <span>{paidAmount.toLocaleString()} HTG</span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 text-center whitespace-nowrap">
-                                {isUSD ? (
-                                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] text-amber-950 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
-                                    <ShieldCheck size={11} className="text-amber-700 shrink-0" />
-                                    1 USD = {appliedRate} HTG
-                                  </span>
-                                ) : isFeePlannedInUSD ? (
-                                  <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap">
-                                    1 USD = {appliedRate} HTG (Barème)
-                                  </span>
-                                ) : (
-                                  <span className="text-[10px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded whitespace-nowrap">
-                                    Direct HTG (Sans conversion)
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap">
-                                {baseHTG.toLocaleString()} HTG
-                              </td>
-                            </tr>
-                          );
-                        })}
-                        {studentHistory.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="py-8 text-center text-xs italic text-slate-400">Aucun versement enregistré pour cette période.</td>
-                          </tr>
-                        )}
+                            return (
+                              <tr key={p.id} className="hover:bg-slate-50/30 transition-colors">
+                                <td className="py-2 px-3 font-bold text-slate-600 whitespace-nowrap">{new Date(p.created_at).toLocaleDateString()}</td>
+                                <td className="py-2 px-3 font-mono text-slate-500 whitespace-nowrap">RCP-{p.id.substring(0,8).toUpperCase()}</td>
+                                <td className="py-2 px-3 font-bold text-slate-700 whitespace-nowrap">
+                                  {p.campaign?.name 
+                                    ? `Campagne: ${p.campaign.name}` 
+                                    : p.ad_hoc_campaign_id 
+                                    ? 'Frais de Campagne' 
+                                    : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
+                                    ? 'Scolarité' 
+                                    : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
+                                    ? 'Inscription' 
+                                    : (p.nature || p.type || p.fee_type || 'Frais Divers'))}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-bold text-slate-800 whitespace-nowrap">
+                                  {isUSD ? (
+                                    <div>
+                                      <span>${paidAmount.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 2 })} USD</span>
+                                      <div className="text-[9px] text-amber-800 font-normal">× {appliedRate} G</div>
+                                    </div>
+                                  ) : (
+                                    <span>{paidAmount.toLocaleString()} HTG</span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-center whitespace-nowrap">
+                                  {isUSD ? (
+                                    <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] text-amber-950 bg-amber-50 border border-amber-300 px-2 py-0.5 rounded">
+                                      <ShieldCheck size={11} className="text-amber-700 shrink-0" />
+                                      1 USD = {appliedRate} HTG
+                                    </span>
+                                  ) : isFeePlannedInUSD ? (
+                                    <span className="inline-flex items-center gap-1 font-mono font-bold text-[10px] text-blue-900 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded whitespace-nowrap">
+                                      1 USD = {appliedRate} HTG (Barème)
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-medium text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded whitespace-nowrap">
+                                      Direct HTG (Sans conversion)
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-2 px-3 text-right font-mono font-black text-slate-900 whitespace-nowrap">
+                                  {baseHTG.toLocaleString()} HTG
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
                       </tbody>
                     </table>
                   </div>
                 </div>
+
+                {/* Approvisionnements Portefeuille Élève dans le Relevé Imprimé */}
+                {(() => {
+                  const walletHistory = studentHistory.filter(p => isWalletDeposit(p) && p.status !== 'ANNULE' && isPaymentInDateRange(p, startDate, endDate));
+                  if (walletHistory.length === 0) return null;
+                  const totalWallet = walletHistory.reduce((s, p) => s + Number(p.amount || 0), 0);
+                  const currentWallet = selectedGenStudent?.wallet_balance_htg ?? totalWallet;
+
+                  return (
+                    <div className="mb-8">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                          <Wallet size={14} className="text-blue-600" />
+                          <p className="text-[9px] font-black text-blue-900 uppercase tracking-[0.2em]">
+                            Approvisionnements du Portefeuille Élève (Fonds d'Avance & Dépôts Mobiles)
+                          </p>
+                        </div>
+                        <div className="text-[9px] font-bold text-slate-500">
+                          Solde Disponible au Guichet : <span className="font-mono font-black text-blue-700">{currentWallet.toLocaleString()} HTG</span>
+                        </div>
+                      </div>
+                      <div className="rounded-2xl border border-blue-100 overflow-x-auto text-xs bg-blue-50/20">
+                        <table className="w-full min-w-[620px] border-collapse">
+                          <thead>
+                            <tr className="bg-blue-50/70 border-b border-blue-100">
+                              <th className="py-2 px-3 text-left text-[9px] font-bold text-blue-900 uppercase tracking-widest whitespace-nowrap">Date & Heure</th>
+                              <th className="py-2 px-3 text-left text-[9px] font-bold text-blue-900 uppercase tracking-widest whitespace-nowrap">Réf. Transaction / Reçu</th>
+                              <th className="py-2 px-3 text-left text-[9px] font-bold text-blue-900 uppercase tracking-widest whitespace-nowrap">Canal Opérateur</th>
+                              <th className="py-2 px-3 text-right text-[9px] font-bold text-blue-900 uppercase tracking-widest whitespace-nowrap">Montant Crédité</th>
+                              <th className="py-2 px-3 text-center text-[9px] font-bold text-blue-900 uppercase tracking-widest whitespace-nowrap">Statut d'Accréditation</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-blue-100/60 bg-white">
+                            {walletHistory.map(p => {
+                              const dateStr = p.created_at || p.date ? new Date(p.created_at || p.date).toLocaleString('fr-FR', {
+                                day: '2-digit',
+                                month: '2-digit',
+                                year: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              }) : 'Date certifiée';
+                              const refStr = p.transaction_reference || p.receipt_number || p.reference || (p.id?.startsWith('wtx-') ? p.id.replace('wtx-', '') : p.id ? `RCP-${p.id.substring(0,8).toUpperCase()}` : 'N/A');
+                              const method = p.payment_method?.includes('MONCASH') || p.payment_method?.toLowerCase().includes('moncash') 
+                                ? 'MonCash (Digicel)' 
+                                : p.payment_method?.includes('NATCASH') || p.payment_method?.toLowerCase().includes('natcash')
+                                ? 'NatCash (Natcom)'
+                                : (p.payment_method || 'Portefeuille Électronique');
+                              const amount = Number(p.amount || 0);
+
+                              return (
+                                <tr key={p.id}>
+                                  <td className="py-2 px-3 font-semibold text-slate-700 whitespace-nowrap">{dateStr}</td>
+                                  <td className="py-2 px-3 font-mono font-bold text-blue-800 whitespace-nowrap">{refStr}</td>
+                                  <td className="py-2 px-3 font-medium text-slate-600 whitespace-nowrap">{method}</td>
+                                  <td className="py-2 px-3 text-right font-mono font-black text-blue-700 whitespace-nowrap">+{amount.toLocaleString()} HTG</td>
+                                  <td className="py-2 px-3 text-center whitespace-nowrap">
+                                    <span className="text-[9px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+                                      DISPONIBLE AU GUICHET
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                          <tfoot>
+                            <tr className="bg-blue-50/50 border-t border-blue-200 text-[10px] font-bold text-blue-900">
+                              <td colSpan={3} className="py-2 px-3 uppercase tracking-wider">Total Approvisionné sur la Période :</td>
+                              <td className="py-2 px-3 text-right font-mono font-black text-blue-800">+{totalWallet.toLocaleString()} HTG</td>
+                              <td className="py-2 px-3 text-center text-slate-500 font-medium">Réserve disponible pour futurs frais</td>
+                            </tr>
+                          </tfoot>
+                        </table>
+                      </div>
+                      <p className="text-[8.5px] italic text-slate-400 mt-1.5">
+                        * Les dépôts portefeuille sont des provisions d'avance non imputées aux dettes scolaires. Ils restent utilisables à tout moment au guichet pour régler les scolarités ou campagnes.
+                      </p>
+                    </div>
+                  );
+                })()}
 
                 {/* Final Balance Card & Signature */}
                 <div className="grid grid-cols-2 gap-8 pt-8 border-t-2 border-slate-900">
