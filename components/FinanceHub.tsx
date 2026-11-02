@@ -1467,52 +1467,6 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         </div>
       )}
 
-      {/* BANDEAU DIAGNOSTIC FINANCIER : BARÈME USD THÉORIQUE VS ENGAGEMENT RÉEL (Uniquement écoles multi-devises) */}
-      {isMultiCurrency && (
-        <div className="bg-gradient-to-r from-slate-950 via-indigo-950 to-slate-900 text-white rounded-2xl p-3 sm:p-3.5 border border-indigo-500/30 shadow-md flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 flex items-center justify-center shrink-0">
-              <Activity size={18} className="stroke-[2.5]" />
-            </div>
-            <div className="min-w-0 space-y-0.5">
-              <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="px-2 py-0.2 rounded-full bg-indigo-500/25 text-indigo-300 text-[9px] font-black uppercase tracking-wider border border-indigo-400/30">
-                  Audit Devise
-                </span>
-                <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 px-1.5 py-0.2 rounded border border-amber-400/30">
-                  Augustin Djenny (NS II) • ID: c3b12a55...
-                </span>
-                <span className="text-[9.5px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.2 rounded-full font-bold border border-emerald-400/30">
-                  Écart Amorti (+640 G)
-                </span>
-              </div>
-              <h4 className="text-xs sm:text-sm font-black text-white truncate">
-                Diagnostic Multi-Devises : Barème USD (99 600 G) vs Engagement Scellé (98 960 G)
-              </h4>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-            <button
-              type="button"
-              onClick={() => setIsDiagnosticModalOpen(true)}
-              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-            >
-              <Activity size={13} />
-              <span>Diagnostic Rapide</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/economat/diagnostic?student_id=c3b12a55-d5d1-460b-8a7d-c8eed32a727c')}
-              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-all border border-white/20 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-            >
-              <span>Plein Écran</span>
-              <ArrowRight size={13} />
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* DASHBOARD PREVIEW */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 sm:gap-3.5 items-start">
         <div className={`bg-white p-3.5 sm:p-4 rounded-2xl shadow-2xs border border-slate-200/80 space-y-3 sm:space-y-3.5 ${canViewSensitiveStats ? 'lg:col-span-8' : 'lg:col-span-12'}`}>

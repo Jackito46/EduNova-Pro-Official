@@ -372,15 +372,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     ];
 
-    const isWalletActive = isWalletPaymentActive(schoolDetails || school);
-    if (isWalletActive) {
-      opts.push({
-        value: 'CREDIT_PORTEFEUILLE',
-        label: 'Alimenter Portefeuille',
-        badge: 'Réserve',
-        icon: Wallet
-      });
-    }
+    // NOTE: Le rechargement de portefeuille n'est plus sélectionnable manuellement au guichet
+    // pour des raisons de prudence et d'audit; il s'opère automatiquement via les passerelles (MonCash/NatCash/Tranzak).
 
     if (selectedStudent?.adHocCampaigns && Array.isArray(selectedStudent.adHocCampaigns)) {
       selectedStudent.adHocCampaigns.forEach((c: any) => {

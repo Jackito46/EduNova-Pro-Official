@@ -2917,18 +2917,10 @@ async function startServer() {
       const effectiveOperator = (operator === 'natcash') ? 'natcash' : 'moncash';
 
       const baseUrl = process.env.APP_URL || 'https://edunova-pro.tech';
-      const normFeeType = String(feeType || '').toUpperCase().trim();
-      // Tout paiement associé à un élève (recharge portefeuille, frais en ligne) doit STRICTEMENT
-      // rediriger vers 'mon-economat' afin d'éviter tout blocage de RoleGuard sur /fees (réservé aux caissiers)
-      const isCashierAction = Boolean(req.body?.isCashierAction || req.body?.isCashierDesk);
-      const isWalletTopUp = normFeeType.includes('PORTEFEUILLE') || normFeeType.includes('WALLET') || (Boolean(studentId) && !isCashierAction);
+      const isWalletTopUp = feeType === 'CREDIT_PORTEFEUILLE' || feeType === 'RECHARGE_PORTEFEUILLE';
       const targetHash = isWalletTopUp ? 'mon-economat' : 'fees';
-
-      // Paramètres complets transmis à la fois dans le search (?) et le fragment (#) pour garantir
-      // qu'aucune passerelle ni redirection 302 ne tronque les paramètres de confirmation
-      const queryParams = `payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}&operator=${effectiveOperator}&redirect_to=${targetHash}`;
-      const successUrl = `${baseUrl}/?${queryParams}#/${targetHash}?${queryParams}`;
-      const cancelUrl = `${baseUrl}/?payment=cancel&ref=${encodeURIComponent(orderRef)}#/${targetHash}?payment=cancel`;
+      const successUrl = `${baseUrl}/#/${targetHash}?payment=success&ref=${encodeURIComponent(orderRef)}&amount=${finalAmountHTG}&student_id=${encodeURIComponent(studentId || '')}&operator=${effectiveOperator}`;
+      const cancelUrl = `${baseUrl}/#/${targetHash}?payment=cancel&ref=${encodeURIComponent(orderRef)}`;
       const callbackUrl = `${baseUrl}/api/tranzak/webhook`;
 
       const payload = {
@@ -3021,14 +3013,13 @@ async function startServer() {
             ? (isSimulated ? 'NatCash (Tranzak Test)' : 'NatCash (Tranzak)') 
             : (isSimulated ? 'MonCash (Tranzak Test)' : 'MonCash (Tranzak)'),
           fee_type: feeType,
-          nature: isWalletTopUp ? 'Recharge Portefeuille' : 'Scolarite',
+          nature: 'Scolarite',
           type: 'Revenu',
           reference_number: orderRef,
           moncash_order_id: orderRef,
-          moncash_transaction_id: transactionId,
           status: 'EN_ATTENTE',
           moncash_status: 'PENDING',
-          description: `Paiement initié via Tranzak ${isSimulated ? 'Sandbox' : 'Production'} (${effectiveOperator}) • Réf: ${orderRef} • Tx: ${transactionId}`,
+          notes: `Paiement initié via Tranzak ${isSimulated ? 'Sandbox' : 'Production'} (${effectiveOperator}) • Réf: ${orderRef} • Tx: ${transactionId}`,
           created_at: new Date().toISOString()
         }]);
       } catch (dbErr) {
@@ -3185,15 +3176,15 @@ async function startServer() {
           currency: 'HTG',
           payment_method: effectiveOperator === 'natcash' ? 'NatCash' : 'MonCash',
           method: `${operatorLabel} (Tranzak HMAC Direct)`,
-          fee_type: feeType || 'CREDIT_PORTEFEUILLE',
-          nature: 'Recharge Portefeuille',
+          fee_type: feeType,
+          nature: 'Scolarite',
           type: 'Revenu',
           reference_number: remoteTransactionId,
           moncash_order_id: orderRef,
-          moncash_transaction_id: remoteTransactionId,
+          receipt_number: receiptNumber,
           status: 'VALIDE',
           moncash_status: 'COMPLETED',
-          description: `Paiement Direct Tranzak (Chiffrement PIN HMAC) • Réf: ${remoteTransactionId}`,
+          notes: `Paiement Direct Tranzak (Chiffrement PIN HMAC) • Réf: ${remoteTransactionId} • Récépissé: ${receiptNumber}`,
           payment_date: new Date().toISOString().split('T')[0],
           created_at: new Date().toISOString()
         };
@@ -3921,7 +3912,7 @@ async function startServer() {
 
       let tranzakVerifyData: any = null;
       try {
-        const verifyRes = await fetch(`https://api.tranzak.co/api/gateway/v1/payments/${encodeURIComponent(transactionId)}/verify`, {
+        const verifyRes = await fetch(`https://tranzak.co/api/gateway/v1/payments/${encodeURIComponent(transactionId)}/verify`, {
           method: 'POST',
           headers: {
             'X-Api-Key': effectiveKey,
@@ -3933,37 +3924,12 @@ async function startServer() {
         console.warn('Tranzak POST /verify network error:', vfErr);
       }
 
-      // Si le POST direct /verify échoue ou ne renvoie pas completed (ex: si transactionId est une référence interne TRZ-...),
-      // rechercher la transaction dans la liste récente Tranzak Live
-      let matchedRemoteTx: any = null;
-      if (!tranzakVerifyData?.data?.status && !tranzakVerifyData?.status) {
-        try {
-          const listRes = await fetch('https://api.tranzak.co/api/gateway/v1/payments?limit=35', {
-            headers: {
-              'X-Api-Key': effectiveKey || TRANZAK_LIVE_KEY_VERIFIED,
-              'Accept': 'application/json'
-            }
-          });
-          if (listRes.ok) {
-            const listJson = await listRes.json().catch(() => ({}));
-            const txList = Array.isArray(listJson?.data) ? listJson.data : [];
-            matchedRemoteTx = txList.find((t: any) => 
-              t.reference === transactionId || 
-              t.transaction_id === transactionId || 
-              t.metadata?.order_id === transactionId
-            );
-          }
-        } catch (lErr) {
-          console.warn('Tranzak list fallback error:', lErr);
-        }
-      }
-
-      const status = tranzakVerifyData?.data?.status || tranzakVerifyData?.status || matchedRemoteTx?.status || 'completed';
+      const status = tranzakVerifyData?.data?.status || tranzakVerifyData?.status || 'completed';
       const isCompleted = status === 'completed' || status === 'SUCCESSFUL' || status === 'VALIDE';
 
       let newBalance: number | null = null;
-      let effectiveCreditAmount = Number(matchedRemoteTx?.amount) || depositAmount;
-      let finalStudentId = studentId || matchedRemoteTx?.metadata?.student_id || tranzakVerifyData?.data?.metadata?.student_id;
+      let effectiveCreditAmount = depositAmount;
+      let finalStudentId = studentId || tranzakVerifyData?.data?.metadata?.student_id;
       let paymentRecordFound: any = null;
 
       if (isCompleted) {
@@ -3972,7 +3938,7 @@ async function startServer() {
           const { data: pRec } = await supabase
             .from('payments')
             .select('id, student_id, amount, status, fee_type, payment_method')
-            .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},description.ilike.%${transactionId}%`)
+            .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`)
             .maybeSingle();
 
           if (pRec) {
@@ -3985,41 +3951,21 @@ async function startServer() {
                 .update({
                   status: 'VALIDE',
                   moncash_status: 'COMPLETED',
-                  description: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
+                  notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', pRec.id);
             }
-          } else if (finalStudentId) {
-            // Créer le paiement validé s'il n'avait pas été pré-inséré
-            try {
-              const { data: newP } = await supabase
-                .from('payments')
-                .insert([{
-                  school_id: schoolId || tranzakVerifyData?.data?.metadata?.school_id,
-                  student_id: finalStudentId,
-                  amount: effectiveCreditAmount,
-                  amount_htg_equivalent: effectiveCreditAmount,
-                  currency: 'HTG',
-                  payment_method: 'MonCash',
-                  method: 'MonCash (Tranzak Live)',
-                  fee_type: 'CREDIT_PORTEFEUILLE',
-                  nature: 'Recharge Portefeuille',
-                  type: 'Revenu',
-                  reference_number: transactionId,
-                  moncash_order_id: transactionId,
-                  moncash_transaction_id: transactionId,
-                  status: 'VALIDE',
-                  moncash_status: 'COMPLETED',
-                  description: `Recharge Portefeuille MonCash validée • Tx: ${transactionId}`,
-                  created_at: new Date().toISOString()
-                }])
-                .select()
-                .maybeSingle();
-              if (newP) paymentRecordFound = newP;
-            } catch (insErr) {
-              console.warn('[Verify Payment] Notice insertion fallback:', insErr);
-            }
+          } else {
+            await supabase
+              .from('payments')
+              .update({
+                status: 'VALIDE',
+                moncash_status: 'COMPLETED',
+                notes: `Paiement certifié via Tranzak verify • Tx: ${transactionId}`,
+                updated_at: new Date().toISOString()
+              })
+              .or(`reference_number.eq.${transactionId},moncash_order_id.eq.${transactionId},notes.ilike.%${transactionId}%`);
           }
         } catch (dbErr) {}
 
@@ -4184,13 +4130,7 @@ async function startServer() {
         } catch (e) {}
       }
 
-      // Filtrer les transactions 'completed' qui correspondent à cet élève (tolérant à l'inversion prénom/nom et ID)
-      const nameParts = (studentName || '')
-        .toLowerCase()
-        .split(/[\s,-]+/)
-        .map((s: string) => s.trim())
-        .filter((s: string) => s.length >= 2);
-
+      // Filtrer les transactions 'completed' qui correspondent à cet élève
       const matchedCompletedTx = tranzakPayments.filter((t: any) => {
         if (t.status !== 'completed') return false;
         const txStudentId = t.metadata?.student_id;
@@ -4198,29 +4138,10 @@ async function startServer() {
         const txId = t.transaction_id;
         const txCustName = (t.customer?.name || '').toLowerCase();
         const txDesc = (t.description || '').toLowerCase();
-        const txMetaName = (t.metadata?.student_name || '').toLowerCase();
 
-        // 1. Concordance sur studentId
-        if (txStudentId && (txStudentId === studentId || studentId.includes(txStudentId))) return true;
-
-        // 2. Concordance sur la référence ou numéro de transaction
-        if (reference && (txRef === reference || txId === reference || txDesc.includes(reference))) return true;
-
-        // 3. Concordance sur le nom de l'élève (tolérance inversion prénom/nom)
-        if (studentName) {
-          const sNameLower = studentName.toLowerCase();
-          if (txCustName.includes(sNameLower) || txDesc.includes(sNameLower) || txMetaName.includes(sNameLower)) return true;
-          if (nameParts.length > 0) {
-            const allInCustomer = nameParts.every(p => txCustName.includes(p));
-            const allInDesc = nameParts.every(p => txDesc.includes(p));
-            const allInMeta = nameParts.every(p => txMetaName.includes(p));
-            if (allInCustomer || allInDesc || allInMeta) return true;
-          }
-        }
-
-        // 4. Concordance si la description contient le début de l'ID ou du matricule
-        if (studentId && (txDesc.includes(studentId.slice(0, 8)) || txDesc.includes(studentId))) return true;
-
+        if (txStudentId && txStudentId === studentId) return true;
+        if (reference && (txRef === reference || txId === reference)) return true;
+        if (studentName && (txCustName.includes(studentName.toLowerCase()) || txDesc.includes(studentName.toLowerCase()))) return true;
         return false;
       });
 
@@ -4254,7 +4175,7 @@ async function startServer() {
                 .update({
                   status: 'VALIDE',
                   moncash_status: 'COMPLETED',
-                  description: `Confirmé via Synchronisation Tranzak Live • Tx: ${txId}`,
+                  notes: `Confirmé via Synchronisation Tranzak Live • Tx: ${txId}`,
                   updated_at: new Date().toISOString()
                 })
                 .eq('id', p.id);
@@ -4266,44 +4187,38 @@ async function startServer() {
         } catch (dbCheckErr) {}
 
         if (!isAlreadyValidated) {
-          // Insérer la transaction validée dans payments avec les colonnes exactes reconnues par Supabase
+          // Insérer la transaction validée dans payments
           const operatorLabel = tx.payment_method === 'natcash' ? 'NatCash' : 'MonCash';
           try {
-            const insertPayload = {
-              school_id: tx.metadata?.school_id || schoolId,
-              student_id: studentId,
-              amount: txAmount,
-              amount_htg_equivalent: txAmount,
-              currency: tx.currency || 'HTG',
-              payment_method: operatorLabel,
-              method: `${operatorLabel} (Tranzak Live)`,
-              fee_type: 'CREDIT_PORTEFEUILLE',
-              nature: 'Recharge Portefeuille',
-              type: 'Revenu',
-              reference_number: txId || txRef,
-              moncash_order_id: txRef,
-              moncash_transaction_id: txId,
-              status: 'VALIDE',
-              moncash_status: 'COMPLETED',
-              description: `Recharge Portefeuille ${operatorLabel} - ${studentName || 'Élève'} • Tx: ${txId}`,
-              created_at: tx.created_at || new Date().toISOString()
-            };
-
-            const clientToUse = supabaseServiceKey ? supabase : (dbClient || supabase);
-            const { data: newP, error: insErr } = await clientToUse
+            const { data: newP } = await dbClient
               .from('payments')
-              .insert([insertPayload])
+              .insert([{
+                school_id: tx.metadata?.school_id || schoolId,
+                student_id: studentId,
+                amount: txAmount,
+                amount_htg_equivalent: txAmount,
+                currency: tx.currency || 'HTG',
+                payment_method: operatorLabel,
+                method: `${operatorLabel} (Tranzak Live)`,
+                fee_type: 'CREDIT_PORTEFEUILLE',
+                nature: 'Scolarite',
+                type: 'Revenu',
+                reference_number: txId || txRef,
+                moncash_order_id: txRef,
+                receipt_number: `REC-TRZ-${txId || Date.now().toString().slice(-6)}`,
+                status: 'VALIDE',
+                moncash_status: 'COMPLETED',
+                notes: `Recharge MonCash confirmée sur Tranzak • Tx: ${txId} • Réf: ${txRef}`,
+                payment_date: tx.completed_at ? tx.completed_at.split('T')[0] : new Date().toISOString().split('T')[0],
+                created_at: tx.created_at || new Date().toISOString()
+              }])
               .select()
               .maybeSingle();
 
-            if (insErr) {
-              console.warn('[Tranzak Sync] Erreur insertion payments:', insErr.message);
-            } else {
-              newlyCreditedAmount += txAmount;
-              newlyValidatedList.push({ ...tx, payment_id: newP?.id });
-            }
-          } catch (insErr: any) {
-            console.warn('[Tranzak Sync] Notice insertion payments:', insErr?.message || insErr);
+            newlyCreditedAmount += txAmount;
+            newlyValidatedList.push({ ...tx, payment_id: newP?.id });
+          } catch (insErr) {
+            console.warn('[Tranzak Sync] Notice insertion payments:', insErr);
           }
         }
       }
@@ -4363,61 +4278,6 @@ async function startServer() {
         console.warn('[Tranzak Sync] Erreur mise à jour wallet_balance_htg:', stUpErr);
       }
 
-      // Récupérer la liste complète des versements récents de cet élève pour synchronisation frontend instantanée
-      let allStudentPayments: any[] = [];
-      try {
-        const clientForRead = supabaseServiceKey ? supabase : (dbClient || supabase);
-        const { data: pData } = await clientForRead
-          .from('payments')
-          .select('*, campaign:ad_hoc_campaigns(id, name, currency, amount)')
-          .eq('student_id', studentId)
-          .order('created_at', { ascending: false });
-        if (pData) allStudentPayments = pData;
-      } catch (pReadErr) {}
-
-      // S'assurer que chaque transaction complétée sur Tranzak pour cet élève est bien présente dans la liste comptable renvoyée
-      for (const tx of matchedCompletedTx) {
-        const txAmount = Math.round(Number(tx.amount) || 0);
-        if (txAmount <= 0) continue;
-        const txRef = tx.reference || tx.transaction_id;
-        const txId = tx.transaction_id;
-
-        const alreadyInList = allStudentPayments.some((p: any) => 
-          p.reference_number === txRef || 
-          p.reference_number === txId || 
-          p.moncash_order_id === txRef || 
-          p.moncash_transaction_id === txId ||
-          p.id === txId ||
-          p.id === txRef ||
-          (p.description && p.description.includes(txId))
-        );
-
-        if (!alreadyInList) {
-          const operatorLabel = (tx.payment_method || '').toLowerCase().includes('natcash') ? 'NatCash' : 'MonCash';
-          const syntheticRow = {
-            id: txId || txRef,
-            school_id: tx.metadata?.school_id || schoolId,
-            student_id: studentId,
-            amount: txAmount,
-            amount_htg_equivalent: txAmount,
-            currency: tx.currency || 'HTG',
-            payment_method: operatorLabel,
-            method: `${operatorLabel} (Tranzak Live)`,
-            fee_type: 'CREDIT_PORTEFEUILLE',
-            nature: 'Recharge Portefeuille',
-            type: 'Revenu',
-            reference_number: txId || txRef,
-            moncash_order_id: txRef,
-            moncash_transaction_id: txId,
-            status: 'VALIDE',
-            moncash_status: 'COMPLETED',
-            description: `Recharge Portefeuille ${operatorLabel} - ${studentName || 'Élève'} • Tx: ${txId}`,
-            created_at: tx.completed_at || tx.created_at || new Date().toISOString()
-          };
-          allStudentPayments.unshift(syntheticRow);
-        }
-      }
-
       return res.json({
         success: true,
         synced: true,
@@ -4425,12 +4285,7 @@ async function startServer() {
         total_tranzak_completed: totalTranzakCompleted,
         old_balance: currentBal,
         new_balance: newBal,
-        newly_credited_amount: newlyCreditedAmount,
-        has_new_records: Boolean(newlyValidatedList.length > 0),
-        transactions: matchedCompletedTx,
-        all_transactions: matchedCompletedTx,
-        newly_validated_transactions: newlyValidatedList,
-        payments: allStudentPayments,
+        transactions: newlyValidatedList,
         message: currentBal !== newBal
           ? `Solde du portefeuille rectifié au montant certifié Tranzak : ${newBal} HTG (auparavant ${currentBal} HTG).`
           : `Portefeuille certifié et conforme avec Tranzak (${newBal} HTG).`

@@ -140,11 +140,23 @@ export function getSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
 
 /**
  * Recupere uniquement les méthodes de paiement ACTIVÉES par l'administration.
- * Le choix de l'administration (activé / désactivé) est strictement respecté.
  */
 export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[] {
   const allMethods = getSchoolPaymentMethods(school);
-  const active = allMethods.filter(m => Boolean(m.enabled));
+  const activeGateway = school?.global_settings?.active_mobile_money_gateway;
+  
+  const active = allMethods.filter(m => {
+    if (m.enabled) return true;
+    // Si la passerelle Tranzak ou Kobara est active, rendre MonCash disponible au guichet
+    if ((m.code === 'MonCash' || m.id === 'MONCASH') && (activeGateway === 'tranzak' || activeGateway === 'kobara')) {
+      return true;
+    }
+    // Si Tranzak est actif, Natcash est également supporté
+    if ((m.code === 'Natcash' || m.id === 'NATCASH') && activeGateway === 'tranzak') {
+      return true;
+    }
+    return false;
+  });
 
   // Securite : si aucune méthode n'est active, retourner au moins Cash & Dépôt Bancaire
   if (active.length === 0) {
@@ -157,28 +169,6 @@ export function getActiveSchoolPaymentMethods(school: any): PaymentMethodConfig[
     active.unshift(cashItem);
   }
   return active;
-}
-
-/**
- * Vérifie si un opérateur mobile money (MonCash ou Natcash) est autorisé pour le renflouement de portefeuille élève.
- * L'administration scolaire contrôle cette autorisation via l'activation dans "Modes de Règlement & Banques".
- */
-export function isOperatorAllowedForWallet(school: any, operator: 'moncash' | 'natcash'): boolean {
-  const allMethods = getSchoolPaymentMethods(school);
-  const code = operator === 'moncash' ? 'MonCash' : 'Natcash';
-  const id = operator === 'moncash' ? 'MONCASH' : 'NATCASH';
-  const method = allMethods.find(m => m.code === code || m.id === id);
-  return method ? Boolean(method.enabled) : (operator === 'moncash');
-}
-
-/**
- * Retourne la liste des opérateurs mobile money actuellement autorisés par l'école pour le renflouement de portefeuille.
- */
-export function getAllowedWalletOperators(school: any): ('moncash' | 'natcash')[] {
-  const allowed: ('moncash' | 'natcash')[] = [];
-  if (isOperatorAllowedForWallet(school, 'moncash')) allowed.push('moncash');
-  if (isOperatorAllowedForWallet(school, 'natcash')) allowed.push('natcash');
-  return allowed;
 }
 
 /**
@@ -211,4 +201,34 @@ export function isWalletPaymentActive(school: any): boolean {
  */
 export function isMonCashPaymentActive(school: any): boolean {
   return isPaymentMethodActive('MONCASH', school) || isPaymentMethodActive('MonCash', school);
+}
+
+/**
+ * Retourne les opérateurs mobile money autorisés pour le rechargement du portefeuille ('moncash', 'natcash').
+ * Respecte les modes de règlement et passerelles actives de l'établissement (Multi-Tenant).
+ */
+export function getAllowedWalletOperators(school: any): ('moncash' | 'natcash')[] {
+  const activeGateway = school?.global_settings?.active_mobile_money_gateway || 'tranzak';
+  const operators: ('moncash' | 'natcash')[] = [];
+
+  const moncashActive = isPaymentMethodActive('MONCASH', school) || isPaymentMethodActive('MonCash', school);
+  const natcashActive = isPaymentMethodActive('NATCASH', school) || isPaymentMethodActive('Natcash', school);
+
+  if (moncashActive) {
+    operators.push('moncash');
+  }
+  if (natcashActive) {
+    operators.push('natcash');
+  }
+
+  // Si aucun n'est explicitement restreint ou si la passerelle Tranzak est active
+  if (operators.length === 0) {
+    if (activeGateway === 'tranzak') {
+      operators.push('moncash', 'natcash');
+    } else {
+      operators.push('moncash');
+    }
+  }
+
+  return operators;
 }
