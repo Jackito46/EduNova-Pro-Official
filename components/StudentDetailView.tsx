@@ -37,7 +37,7 @@ import {
   normalizeStudentDocuments,
   calculateDocumentsCompleteness 
 } from '../utils/documentRequirements';
-import { isPaymentCompleted } from '../src/utils/payment';
+import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
 
 const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { id } = useParams<{ id: string }>();
@@ -495,17 +495,22 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   }, [id, user?.school_id, fetchStudentData]);
 
   // Calculs financiers synthétiques pour la mise en avant immédiate (Solde, Paiements, Solvabilité)
-  const validPayments = useMemo(() => {
-    return (payments || []).filter(isPaymentCompleted);
+  // Les paiements de scolarité/frais scolaires excluent rigoureusement les recharges de portefeuille
+  const validFeePayments = useMemo(() => {
+    return (payments || []).filter(p => isPaymentCompleted(p) && !isWalletDeposit(p));
+  }, [payments]);
+
+  const walletDeposits = useMemo(() => {
+    return (payments || []).filter(p => isPaymentCompleted(p) && isWalletDeposit(p));
   }, [payments]);
 
   const totalPaidHTG = useMemo(() => {
-    return validPayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
-  }, [validPayments]);
+    return validFeePayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
+  }, [validFeePayments]);
 
   const lastPayment = useMemo(() => {
-    return validPayments.length > 0 ? validPayments[0] : null;
-  }, [validPayments]);
+    return validFeePayments.length > 0 ? validFeePayments[0] : null;
+  }, [validFeePayments]);
 
   const isDossierSolde = studentDebt <= 0;
 
@@ -1024,7 +1029,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <span className="text-xs font-bold text-emerald-600">HTG</span>
             </div>
             <div className="mt-2 flex items-center justify-between text-[10px] font-bold text-slate-500">
-              <span>{validPayments.length} versement(s) scellé(s)</span>
+              <span>{validFeePayments.length} versement(s) scellé(s)</span>
               <span className="text-emerald-700 font-mono">Certifié</span>
             </div>
           </div>
@@ -1584,15 +1589,16 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {payments.map((p: any, idx: number) => {
+                      const isWallet = isWalletDeposit(p);
                       const displayDate = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : 'Date scellée';
                       const isUSD = p.currency === 'USD';
                       const appliedRate = Number(p.exchange_rate_applied || 0);
 
                       return (
-                        <tr key={p.id || idx} className="hover:bg-slate-50/60 transition-colors">
+                        <tr key={p.id || idx} className={`transition-colors ${isWallet ? 'bg-blue-50/25 hover:bg-blue-50/50' : 'hover:bg-slate-50/60'}`}>
                           <td className="py-3 px-4">
                             <div className="flex flex-col">
-                              <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[10px] w-fit">
+                              <span className={`font-mono font-bold px-1.5 py-0.5 rounded text-[10px] w-fit border ${isWallet ? 'text-blue-700 bg-blue-50 border-blue-200' : 'text-indigo-700 bg-indigo-50 border-indigo-100'}`}>
                                 {p.receipt_number || p.reference_number || `Reçu #${p.id.slice(0, 8)}`}
                               </span>
                               <span className="text-[10px] text-slate-400 mt-0.5">
@@ -1601,17 +1607,31 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </div>
                           </td>
                           <td className="py-3 px-4">
-                            <div className="font-bold text-slate-800 text-xs">
-                              {p.label || p.nature}
-                            </div>
-                            {p.fee_type && (
-                              <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
-                                Type: {p.fee_type}
-                              </span>
+                            {isWallet ? (
+                              <div>
+                                <div className="font-bold text-blue-900 text-xs flex items-center gap-1.5">
+                                  <Wallet size={13} className="text-blue-600 shrink-0" />
+                                  <span>Recharge Portefeuille Élève</span>
+                                </div>
+                                <span className="text-[9px] uppercase tracking-wider text-blue-600 font-semibold block">
+                                  Dépôt Portefeuille • Fonds Non Affectés aux Frais Scolaires
+                                </span>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="font-bold text-slate-800 text-xs">
+                                  {p.label || p.nature}
+                                </div>
+                                {p.fee_type && (
+                                  <span className="text-[9px] uppercase tracking-wider text-slate-400 font-semibold">
+                                    Type: {p.fee_type}
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </td>
                           <td className="py-3 px-4">
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[10.5px] font-medium border border-slate-200/60">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10.5px] font-medium border ${isWallet ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-700 border-slate-200/60'}`}>
                               {p.payment_method || 'Cash'}
                             </span>
                           </td>
@@ -1634,15 +1654,28 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             )}
                           </td>
                           <td className="py-3 px-4 text-right">
-                            <span className="font-mono font-black text-emerald-700 text-xs bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
-                              +{Number(p.amount || 0).toLocaleString()} HTG
-                            </span>
+                            {isWallet ? (
+                              <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 border border-blue-200 px-2 py-0.5 rounded inline-block" title="Fonds disponibles sur le portefeuille élève. Ce montant n'est pas débité pour les dettes scolaires.">
+                                +{Number(p.amount || 0).toLocaleString()} HTG (Portefeuille)
+                              </span>
+                            ) : (
+                              <span className="font-mono font-black text-emerald-700 text-xs bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded inline-block">
+                                +{Number(p.amount || 0).toLocaleString()} HTG
+                              </span>
+                            )}
                           </td>
                           <td className="py-3 px-4 text-center">
-                            <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                              <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
-                              <span>{p.status || 'VALIDE'}</span>
-                            </span>
+                            {isWallet ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
+                                <Wallet size={11} className="text-blue-600 shrink-0" />
+                                <span>PORTEFEUILLE DISPONIBLE</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                                <CheckCircle2 size={11} className="text-emerald-600 shrink-0" />
+                                <span>{p.status || 'VALIDE'}</span>
+                              </span>
+                            )}
                           </td>
                         </tr>
                       );
@@ -1651,7 +1684,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <tfoot>
                     <tr className="bg-slate-50 font-black border-t-2 border-slate-200 text-slate-800">
                       <td colSpan={4} className="py-3.5 px-4 text-right uppercase tracking-wider text-[10px] text-slate-500">
-                        Total Encaissé Certifié (Session) :
+                        Total Frais Scolaires Encaissés (Session) :
                       </td>
                       <td className="py-3.5 px-4 text-right font-mono text-sm text-emerald-700">
                         +{totalPaidHTG.toLocaleString()} HTG
@@ -1660,6 +1693,19 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         {isDossierSolde ? 'Soldé à 100%' : 'Partiel'}
                       </td>
                     </tr>
+                    {Boolean(student?.wallet_balance_htg && Number(student.wallet_balance_htg) > 0) && (
+                      <tr className="bg-blue-50/30 border-t border-blue-100 font-bold text-slate-700 text-xs">
+                        <td colSpan={4} className="py-2 px-4 text-right uppercase tracking-wider text-[10px] text-blue-700">
+                          Solde Portefeuille Disponible (Fonds d'avance élève) :
+                        </td>
+                        <td className="py-2 px-4 text-right font-mono text-xs text-blue-700">
+                          +{Number(student.wallet_balance_htg || 0).toLocaleString()} HTG
+                        </td>
+                        <td className="py-2 px-4 text-center text-[10px] text-blue-700 font-bold">
+                          Réserve Élève
+                        </td>
+                      </tr>
+                    )}
                   </tfoot>
                 </table>
               </div>

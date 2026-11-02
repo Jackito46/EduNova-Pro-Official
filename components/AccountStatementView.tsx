@@ -514,7 +514,9 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
           const inscriptionHTG = plan ? (isReenroll ? Number(plan.reenrollment_fee || 0) : Number(plan.inscription_fee || 0)) : 0;
           const inscriptionUSD = plan ? (isReenroll ? Number(plan.reenrollment_fee_usd || 0) : Number(plan.inscription_fee_usd || 0)) : 0;
           
-          const tuitionFee = plan ? (Number(plan.tuition_fee || 0) + Number(plan.tuition_fee_usd || 0) * exchangeRate) : 0;
+          const tuitionHTG = plan ? Number(plan.tuition_fee || 0) : 0;
+          const tuitionUSD = plan ? Number(plan.tuition_fee_usd || 0) : 0;
+          const tuitionFee = tuitionHTG + (tuitionUSD * exchangeRate);
           const miscHTG = plan && plan.is_misc_mandatory ? Number(plan.misc_fee_htg || 0) : 0;
           const miscUSD = plan && plan.is_misc_mandatory ? Number(plan.misc_fee_usd || 0) : 0;
           const campaignsExpected = adHocMap[student.id] || 0;
@@ -535,6 +537,9 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             // Exclusion formelle des paiements annulés, rejetés ou en attente non aboutis
             if (!isPaymentCompleted(p)) return false;
+
+            // Exclusion formelle des recharges de portefeuille (fonds personnels de l'élève, non amortis)
+            if (isWalletDeposit(p)) return false;
 
             // Plage de dates
             return isPaymentInDateRange(p, startDate, endDate);
@@ -585,17 +590,24 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           const admPayments = studentPayments.filter(p => !isCampaignPayment(p) && isAdmissionPayment(p));
           const miscPayments = studentPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && isMiscPayment(p));
+          const tuitionPayments = studentPayments.filter(p => !isCampaignPayment(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
+          const campaignPayments = studentPayments.filter(p => isCampaignPayment(p));
+
+          const totalDiscount = tuitionDiscount + studentDiscount;
 
           const admBreakdown = computeFeeCategoryBalance(inscriptionHTG, inscriptionUSD, admPayments, exchangeRate);
-          const effectiveAdmissionDue = admBreakdown.isPaid ? admBreakdown.paidHTGEquiv : admBreakdown.effectiveDueHTG;
+          const effectiveAdmissionDue = admBreakdown.effectiveDueHTG;
 
           const miscBreakdown = computeFeeCategoryBalance(miscHTG, miscUSD, miscPayments, exchangeRate);
-          const effectiveMiscDue = miscBreakdown.isPaid ? miscBreakdown.paidHTGEquiv : miscBreakdown.effectiveDueHTG;
+          const effectiveMiscDue = miscBreakdown.effectiveDueHTG;
 
-          const originalDue = effectiveAdmissionDue + tuitionFee + effectiveMiscDue + tuitionAddition + campaignsExpected;
+          const tuitionBreakdown = computeFeeCategoryBalance(tuitionHTG, tuitionUSD, tuitionPayments, exchangeRate, totalDiscount);
+          const effectiveTuitionDue = tuitionBreakdown.effectiveDueHTG;
 
-          // Calcul du montant payé
-          const paid = studentPayments.reduce((acc, p) => {
+          const originalDue = effectiveAdmissionDue + effectiveTuitionDue + effectiveMiscDue + tuitionAddition + campaignsExpected;
+
+          // Calcul du montant payé certifié
+          const paid = admBreakdown.paidHTGEquiv + miscBreakdown.paidHTGEquiv + tuitionBreakdown.paidHTGEquiv + campaignPayments.reduce((acc, p) => {
             let amt = Number(p.amount_htg_equivalent);
             if (!amt || isNaN(amt)) {
               amt = Number(p.amount || 0);
@@ -607,7 +619,6 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
             return acc + amt;
           }, 0);
 
-          const totalDiscount = tuitionDiscount + studentDiscount;
           const totalDue = Math.max(paid, originalDue - totalDiscount);
 
           return {
@@ -861,7 +872,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         })
         .filter((c: any) => c !== null && c.academic_year_id === activeYearId);
 
-      const campaignsExpected = activeCampaigns.reduce((sum, camp) => {
+      let campaignsExpected = activeCampaigns.reduce((sum, camp) => {
         const required = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
         return sum + required;
       }, 0);
@@ -944,14 +955,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       };
 
       const validPayments = payments?.filter(p => 
-        p.status !== 'ANNULE' && 
-        p.status !== 'EN_ATTENTE' && 
-        p.status !== 'REJETE' && 
-        p.status !== 'ECHEC' && 
-        p.moncash_status !== 'PENDING' && 
-        p.moncash_status !== 'CANCELLED' && 
-        !p.payment_method?.includes('REJETÉ') &&
-        !p.payment_method?.includes('EN ATTENTE') &&
+        isPaymentCompleted(p) && 
+        !isWalletDeposit(p) &&
         isPaymentInDateRange(p, startDate, endDate)
       ) || [];
 
@@ -966,8 +971,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         admissionPayments,
         exchangeRate
       );
-      const admissionExpected = admissionBreakdown.isPaid ? admissionBreakdown.paidHTGEquiv : admissionBreakdown.effectiveDueHTG;
-      const admissionPaid = admissionPayments.reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * exchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
+      const admissionExpected = admissionBreakdown.effectiveDueHTG;
+      const admissionPaid = admissionBreakdown.paidHTGEquiv;
 
       const miscBreakdown = computeFeeCategoryBalance(
         miscHTG,
@@ -975,21 +980,41 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         miscPayments,
         exchangeRate
       );
-      const rawMiscPaid = miscPayments.reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * exchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-      const planMiscFee = miscBreakdown.isPaid ? rawMiscPaid : miscBreakdown.effectiveDueHTG;
+      const planMiscFee = miscBreakdown.effectiveDueHTG;
+      const miscPaid = miscBreakdown.paidHTGEquiv;
 
-      const tuitionFee = tuitionHTG + (tuitionUSD * exchangeRate);
-      const campaignsPaid = campaignPayments.reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * exchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-      const rawTuitionPaid = tuitionPayments.reduce((sum, p) => sum + Number(p.currency === 'USD' ? p.amount * exchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
+      const tuitionBreakdown = computeFeeCategoryBalance(
+        tuitionHTG,
+        tuitionUSD,
+        tuitionPayments,
+        exchangeRate,
+        totalDiscount
+      );
+      const tuitionFee = tuitionBreakdown.effectiveDueHTG;
+      const tuitionPaid = tuitionBreakdown.paidHTGEquiv;
 
-      const neededMisc = Math.max(0, planMiscFee - rawMiscPaid);
-      const miscCoverFromTuition = Math.min(neededMisc, rawTuitionPaid);
-      const miscPaid = rawMiscPaid + miscCoverFromTuition;
-      const tuitionPaid = rawTuitionPaid - miscCoverFromTuition;
+      campaignsExpected = 0;
+      let campaignsPaid = 0;
+      let campaignsRemaining = 0;
+
+      activeCampaigns.forEach((camp: any) => {
+        const cAmt = Number(camp.custom_amount !== null && camp.custom_amount !== undefined ? camp.custom_amount : camp.amount || 0);
+        const cCurr = String(camp.currency || 'HTG').toUpperCase();
+        const pHTG = cCurr === 'USD' ? 0 : cAmt;
+        const pUSD = cCurr === 'USD' ? cAmt : 0;
+        const cPayments = campaignPayments.filter((p: any) => 
+          (camp.id && (p.ad_hoc_campaign_id === camp.id || p.campaign_id === camp.id)) ||
+          ((p.nature || p.label || p.description || '').toLowerCase().includes((camp.name || '').toLowerCase()))
+        );
+        const cBreakdown = computeFeeCategoryBalance(pHTG, pUSD, cPayments, exchangeRate);
+        campaignsExpected += cBreakdown.effectiveDueHTG;
+        campaignsPaid += cBreakdown.paidHTGEquiv;
+        campaignsRemaining += cBreakdown.remainingHTGEquiv;
+      });
 
       const originalDue = admissionExpected + tuitionFee + planMiscFee + tuitionAddition + campaignsExpected;
-      const paid = validPayments.reduce((acc, p) => acc + Number(p.amount_htg_equivalent || p.amount || 0), 0);
-
+      const paid = admissionPaid + tuitionPaid + miscPaid + campaignsPaid;
+      const balance = admissionBreakdown.remainingHTGEquiv + tuitionBreakdown.remainingHTGEquiv + miscBreakdown.remainingHTGEquiv + campaignsRemaining;
       const totalDue = Math.max(paid, originalDue - totalDiscount);
 
       if (enrollment?.class_id) {
@@ -1029,7 +1054,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
         totalDiscount,
         totalDue,
         paid,
-        balance: Math.max(0, totalDue - paid),
+        balance,
         className: enrollment?.class?.name || classes.find(c => c.id === student.class_id)?.name || 'N/A',
         academicYear: academicYears.find(y => y.id === activeYearId)?.label || activeYearId
       });
@@ -2602,21 +2627,22 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     </thead>
                     <tbody className="divide-y divide-slate-100">
                       {filteredStudentHistory.map((p) => {
+                        const isWallet = isWalletDeposit(p);
                         const isUSD = p.currency === 'USD';
                         const paidAmount = Number(p.amount || 0);
                         const appliedRate = Number(p.exchange_rate_applied || schoolDetails?.exchange_rate || 140);
                         const baseHTG = Number(p.amount_htg_equivalent || (isUSD ? paidAmount * appliedRate : paidAmount));
 
-                        const isCamp = Boolean(
+                        const isCamp = !isWallet && Boolean(
                           p.ad_hoc_campaign_id || 
                           p.fee_type === 'AD_HOC' || 
                           p.campaign?.id || 
                           (p.nature && (p.nature.toLowerCase().includes('campagne') || p.nature.toLowerCase().includes('assurance'))) ||
                           (p.type && (p.type.toLowerCase().includes('campagne') || p.type.toLowerCase().includes('assurance')))
                         );
-                        const isTuitionFee = !isCamp && (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité')));
-                        const isAdmissionFee = !isCamp && (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription");
-                        const isMiscFee = !isCamp && (p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers'));
+                        const isTuitionFee = !isWallet && !isCamp && (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité')));
+                        const isAdmissionFee = !isWallet && !isCamp && (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription");
+                        const isMiscFee = !isWallet && !isCamp && (p.fee_type === 'DIVERS' || p.nature?.toLowerCase().includes('divers'));
                         const isTuitionPlannedInUSD = Boolean(isTuitionFee && ((selectedGenStudent?.scolariteUSD || 0) > 0 || (selectedGenStudent?.plan?.tuition_fee_usd || 0) > 0));
                         const isAdmissionPlannedInUSD = Boolean(isAdmissionFee && ((selectedGenStudent?.inscriptionUSD || 0) > 0 || (selectedGenStudent?.plan?.inscription_fee_usd || 0) > 0));
                         const isMiscPlannedInUSD = Boolean(isMiscFee && (selectedGenStudent?.miscNativeUSD || 0) > 0);
@@ -2624,7 +2650,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         const isFeePlannedInUSD = isTuitionPlannedInUSD || isAdmissionPlannedInUSD || isMiscPlannedInUSD || isCampaignPlannedInUSD;
 
                         return (
-                          <tr key={p.id} className="group hover:bg-slate-50 transition-colors">
+                          <tr key={p.id} className={`group hover:bg-slate-50 transition-colors ${isWallet ? 'bg-blue-50/20' : ''}`}>
                             <td className="px-4 py-3.5 whitespace-nowrap">
                               <div className="flex items-center gap-2 whitespace-nowrap">
                                 <Calendar size={14} className="text-slate-400 shrink-0" />
@@ -2632,22 +2658,29 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               </div>
                             </td>
                             <td className="px-4 py-3.5 whitespace-nowrap">
-                              <span className="bg-slate-100 text-slate-700 px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold border border-slate-200 whitespace-nowrap inline-block">
+                              <span className={`px-2.5 py-1 rounded-lg font-mono text-[10px] font-bold border whitespace-nowrap inline-block ${isWallet ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-slate-100 text-slate-700 border-slate-200'}`}>
                                 RCP-{p.id.substring(0,8).toUpperCase()}
                               </span>
                             </td>
                             <td className="px-4 py-3.5 whitespace-nowrap">
-                              <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-tight bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/50 whitespace-nowrap inline-block">
-                                {p.campaign?.name 
-                                  ? `Campagne: ${p.campaign.name}` 
-                                  : p.ad_hoc_campaign_id 
-                                  ? 'Frais de Campagne' 
-                                  : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
-                                  ? 'Scolarité' 
-                                  : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
-                                  ? 'Inscription' 
-                                  : (p.nature || p.type || p.fee_type || 'Frais Divers'))}
-                              </span>
+                              {isWallet ? (
+                                <span className="text-[10px] font-extrabold text-blue-800 uppercase tracking-tight bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200 whitespace-nowrap inline-flex items-center gap-1.5">
+                                  <Wallet size={12} className="text-blue-600 shrink-0" />
+                                  <span>Recharge Portefeuille</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-extrabold text-slate-700 uppercase tracking-tight bg-slate-100 px-2.5 py-1 rounded-lg border border-slate-200/50 whitespace-nowrap inline-block">
+                                  {p.campaign?.name 
+                                    ? `Campagne: ${p.campaign.name}` 
+                                    : p.ad_hoc_campaign_id 
+                                    ? 'Frais de Campagne' 
+                                    : (p.fee_type === 'SCOLARITE' || (!p.fee_type && (!p.nature || p.nature === 'SCOLARITE' || p.nature === 'Scolarité'))) 
+                                    ? 'Scolarité' 
+                                    : ((p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") 
+                                    ? 'Inscription' 
+                                    : (p.nature || p.type || p.fee_type || 'Frais Divers'))}
+                                </span>
+                              )}
                             </td>
                             <td className="px-4 py-3.5 whitespace-nowrap">
                               <span className="text-[10px] font-bold text-slate-600 uppercase tracking-tight whitespace-nowrap inline-block">{p.payment_method || 'Comptant'}</span>
@@ -2671,7 +2704,20 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               )}
                             </td>
                             <td className="px-4 py-3.5 text-center whitespace-nowrap">
-                              {isUSD ? (
+                              {isWallet ? (
+                                <div 
+                                  className="inline-flex flex-col items-center gap-0.5"
+                                  title="Dépôt sur le portefeuille électronique de l'élève (MonCash / NatCash). Fonds personnels conservés pour règlements futurs au guichet. Non amorti sur les dettes scolaires."
+                                >
+                                  <span className="inline-flex items-center gap-1.5 bg-blue-50 text-blue-900 border border-blue-200 px-2.5 py-1 rounded-md text-[11px] font-bold whitespace-nowrap shadow-2xs">
+                                    <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0"></span>
+                                    <span className="font-mono">Crédit Portefeuille</span>
+                                  </span>
+                                  <span className="text-[9px] font-semibold text-blue-700 tracking-tight">
+                                    Fonds disponibles • Non amorti
+                                  </span>
+                                </div>
+                              ) : isUSD ? (
                                 <div className="inline-flex flex-col items-center gap-1 py-0.5">
                                   <div 
                                     className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-50 via-amber-100/90 to-amber-50 text-amber-950 border border-amber-300 px-2.5 py-1 rounded-lg text-[11px] font-mono font-black whitespace-nowrap shadow-xs hover:border-amber-400 hover:shadow-sm transition-all cursor-help" 
@@ -2716,8 +2762,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </td>
                             <td className="px-4 py-3.5 text-right font-semibold font-mono text-slate-900 whitespace-nowrap">
                               <div className="flex items-center justify-end gap-1.5 whitespace-nowrap">
-                                <span className="text-xs sm:text-sm font-black text-slate-900 whitespace-nowrap">
-                                  {baseHTG.toLocaleString()} G
+                                <span className={`text-xs sm:text-sm font-black whitespace-nowrap ${isWallet ? 'text-blue-700 font-mono' : 'text-slate-900'}`}>
+                                  {isWallet ? `+${paidAmount.toLocaleString()} G (Portefeuille)` : `${baseHTG.toLocaleString()} G`}
                                 </span>
 
                                 {/* Bouton déclencheur infobulle anti-coupure */}

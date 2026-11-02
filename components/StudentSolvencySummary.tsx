@@ -7,6 +7,7 @@ import {
 import { supabase } from '../supabase';
 import { useSchool } from '../contexts/SchoolContext';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
+import { isWalletDeposit } from '../src/utils/payment';
 
 export interface StudentSolvencySummaryProps {
   studentId: string;
@@ -236,12 +237,13 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         rawPaymentsData = paymentsData || [];
       }
 
-      // Filtrer les paiements valides (non annulés, non rejetés)
+      // Filtrer les paiements valides de frais scolaires (non annulés, non rejetés, hors dépôts portefeuille)
       const validPayments = (rawPaymentsData || []).filter((p: any) => {
         const status = String(p.status || '').toUpperCase();
         if (status.includes('ANNUL') || status.includes('REJET') || status.includes('CANCEL')) return false;
         const method = String(p.payment_method || '').toUpperCase();
         if (method.includes('REJETÉ') || method.includes('REJETE') || method.includes('EN ATTENTE')) return false;
+        if (isWalletDeposit(p)) return false;
         return true;
       });
 

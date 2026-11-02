@@ -538,6 +538,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
   const campaignBreakdowns = adHocCampaigns.map(camp => {
     const campPayments = payments.filter((p: any) => {
       if (!isPaymentCompleted(p)) return false;
+      if (isWalletDeposit(p)) return false;
       if (p.ad_hoc_campaign_id === camp.id) return true;
       if (p.campaign?.id === camp.id) return true;
       const campName = (camp.name || '').toLowerCase();
