@@ -136,14 +136,8 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
     }
   }, [activeSchoolId]);
 
-  useEffect(() => {
-    if (isOpen && activeSchoolId) {
-      fetchAuditLogs();
-    }
-  }, [isOpen, activeSchoolId, fetchAuditLogs]);
-
   // Exécution du diagnostic en temps réel
-  const handleRunDiagnostic = async () => {
+  const handleRunDiagnostic = useCallback(async () => {
     if (!activeSchoolId) {
       toast.error("Identifiant d'établissement manquant.");
       return;
@@ -175,7 +169,14 @@ export const GatewayDiagnosticModal: React.FC<GatewayDiagnosticModalProps> = ({
     } finally {
       setRunning(false);
     }
-  };
+  }, [activeSchoolId, selectedGateway, selectedOperator, mode, testAmount, testPhone, selectedStudentId, fetchAuditLogs]);
+
+  useEffect(() => {
+    if (isOpen && activeSchoolId) {
+      fetchAuditLogs();
+      handleRunDiagnostic();
+    }
+  }, [isOpen, activeSchoolId]);
 
   const handleCopy = (text: string, key: string) => {
     navigator.clipboard.writeText(text);

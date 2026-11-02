@@ -68,8 +68,9 @@ import { NotificationBanner } from './NotificationBanner';
 import { AutonomousAdminWarningBanner } from './AutonomousAdminWarningBanner';
 import { PayrollSensitiveNotificationListener } from './PayrollSensitiveNotificationListener';
 import { AiQuotaAlertBanner } from './AiQuotaAlertBanner';
-import { isPaymentCompleted } from '../src/utils/payment';
 import { AddressBarInstallHint } from './AddressBarInstallHint';
+import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
+import { computeFeeCategoryBalance } from '../utils/financeCalculations';
 import { SecretaryDashboardView } from './SecretaryDashboardView';
 import { ParentDashboardView } from './ParentDashboardView';
 import { StudentDashboardGrid } from './StudentDashboardGrid';
@@ -1052,7 +1053,8 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           const validStudentPayments = (allStudentPayments || []).filter((p: any) => 
             !p.payment_method?.toUpperCase().includes('EN ATTENTE') && 
-            !p.payment_method?.toUpperCase().includes('REJETÉ')
+            !p.payment_method?.toUpperCase().includes('REJETÉ') &&
+            !isWalletDeposit(p)
           );
 
           // Payments for this session (including untagged payments)
@@ -1085,9 +1087,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               desc.includes('inscri') ||
               desc.includes('admiss') ||
               desc.includes('reinscri') ||
-              desc.includes('réinscri') ||
-              Number(p.amount) === 3375 ||
-              Number(p.amount_htg_equivalent) === 3375
+              desc.includes('réinscri')
             );
           };
 
@@ -1108,16 +1108,24 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             );
           };
 
-          // Separate payments into four distinct categories matching classical school economics
-          const admissionPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && isAdmissionPayment(p));
-          const campaignPayments = activePayments.filter((p: any) => !!p.ad_hoc_campaign_id);
-          const miscPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && isMiscPayment(p));
-          const tuitionPayments = activePayments.filter((p: any) => !p.ad_hoc_campaign_id && !isAdmissionPayment(p) && !isMiscPayment(p));
+          const isCampaignPayment = (p: any) => Boolean(
+            p.ad_hoc_campaign_id ||
+            p.fee_type === 'AD_HOC' ||
+            p.fee_type === 'CAMPAGNE' ||
+            p.fee_type === 'CAMPAIGN' ||
+            p.campaign_id ||
+            p.campaign?.id ||
+            (p.nature || '').toLowerCase().includes('campagne') ||
+            (p.nature || '').toLowerCase().includes('assurance') ||
+            (p.type || '').toLowerCase().includes('campagne') ||
+            (p.type || '').toLowerCase().includes('assurance')
+          );
 
-          const admissionPaid = admissionPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-          const campaignsPaid = campaignPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-          const miscPaid = miscPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
-          const tuitionPaid = tuitionPayments.reduce((acc, p) => acc + Number(p.currency === 'USD' ? p.amount * currentExchangeRate : (p.amount_htg_equivalent || p.amount || 0)), 0);
+          // Separate payments into four distinct categories matching classical school economics
+          const admissionPayments = activePayments.filter((p: any) => !isCampaignPayment(p) && isAdmissionPayment(p));
+          const miscPayments = activePayments.filter((p: any) => !isCampaignPayment(p) && !isAdmissionPayment(p) && isMiscPayment(p));
+          const tuitionPayments = activePayments.filter((p: any) => !isCampaignPayment(p) && !isAdmissionPayment(p) && !isMiscPayment(p));
+          const campaignPayments = activePayments.filter((p: any) => isCampaignPayment(p));
 
           // Determine if returning to calculate registration fee
           const { data: enrollmentsData } = await supabase
@@ -1126,53 +1134,63 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             .eq('student_id', studentData.id);
           const hasPriorEnrollments = enrollmentsData?.some((e: any) => e.academic_year_id !== activeYear.id) || false;
           
-          const registrationExpected = hasPriorEnrollments 
-            ? Number(planData?.reenrollment_fee || 3375) 
+          const plannedAdmHTG = hasPriorEnrollments 
+            ? Number(planData?.reenrollment_fee || (planData?.inscription_fee ? 0 : 3375)) 
             : Number(planData?.inscription_fee || 3375);
+          const plannedAdmUSD = hasPriorEnrollments
+            ? Number(planData?.reenrollment_fee_usd || 0)
+            : Number(planData?.inscription_fee_usd || 0);
 
-          const admissionExpected = registrationExpected;
-          
-          // Tuition expected (re-evaluable and default 85000)
-          const baseFee = planData?.tuition_fee || 85000;
-          const applicableFee = studentData.is_foreign && planData?.foreign_tuition_fee ? planData.foreign_tuition_fee : baseFee;
-          
-          // Fetch misc fee
-          const miscHTG = planData?.is_misc_mandatory ? Number(planData.misc_fee_htg || 0) : 0;
-          const miscUSD = planData?.is_misc_mandatory ? Number(planData.misc_fee_usd || 0) : 0;
-          const planMiscFee = miscHTG + (miscUSD * currentExchangeRate);
+          const baseFeeHTG = Number(planData?.tuition_fee || 85000);
+          const baseFeeUSD = Number(planData?.tuition_fee_usd || 0);
+          const plannedTuitionHTG = studentData.is_foreign && planData?.foreign_tuition_fee ? Number(planData.foreign_tuition_fee) : baseFeeHTG;
+          const plannedTuitionUSD = baseFeeUSD;
 
-          let remainingDiscount = Number(studentData.discount_amount || 0);
+          const plannedMiscHTG = planData?.is_misc_mandatory ? Number(planData.misc_fee_htg || 0) : 0;
+          const plannedMiscUSD = planData?.is_misc_mandatory ? Number(planData.misc_fee_usd || 0) : 0;
 
-          const unpaidTuitionNeeded = Math.max(0, applicableFee - tuitionPaid);
-          const tuitionDiscountApplied = Math.min(unpaidTuitionNeeded, remainingDiscount);
-          const tuitionExpected = applicableFee - tuitionDiscountApplied;
-          remainingDiscount -= tuitionDiscountApplied;
+          const studentDiscount = Number(studentData.discount_amount || 0);
 
-          const unpaidAdmissionNeeded = Math.max(0, admissionExpected - admissionPaid);
-          const admissionDiscountApplied = Math.min(unpaidAdmissionNeeded, remainingDiscount);
-          const adjAdmissionExpected = admissionExpected - admissionDiscountApplied;
-          remainingDiscount -= admissionDiscountApplied;
+          const admBreakdown = computeFeeCategoryBalance(plannedAdmHTG, plannedAdmUSD, admissionPayments, currentExchangeRate);
+          const tuitionBreakdown = computeFeeCategoryBalance(plannedTuitionHTG, plannedTuitionUSD, tuitionPayments, currentExchangeRate, studentDiscount);
+          const miscBreakdown = computeFeeCategoryBalance(plannedMiscHTG, plannedMiscUSD, miscPayments, currentExchangeRate);
 
-          const unpaidMiscNeeded = Math.max(0, planMiscFee - miscPaid);
-          const miscDiscountApplied = Math.min(unpaidMiscNeeded, remainingDiscount);
-          const adjPlanMiscFee = planMiscFee - miscDiscountApplied;
-          remainingDiscount -= miscDiscountApplied;
+          // Campagnes et activités parascolaires
+          let campTotalExpected = 0;
+          let campPaid = 0;
+          let campRemaining = 0;
 
-          const unpaidCampaignsNeeded = Math.max(0, campaignsExpected - campaignsPaid);
-          const campaignsDiscountApplied = Math.min(unpaidCampaignsNeeded, remainingDiscount);
-          const adjCampaignsExpected = campaignsExpected - campaignsDiscountApplied;
-          remainingDiscount -= campaignsDiscountApplied;
+          if (activeCampaignFees.length > 0) {
+            activeCampaignFees.forEach((fee: any) => {
+              const reqAmt = fee.custom_amount !== null && fee.custom_amount !== undefined ? Number(fee.custom_amount) : Number(fee.campaign?.amount || 0);
+              const curr = String(fee.currency || fee.campaign?.currency || 'HTG').toUpperCase();
+              const pHTG = curr === 'USD' ? 0 : reqAmt;
+              const pUSD = curr === 'USD' ? reqAmt : 0;
+              const fId = fee.id || fee.campaign?.id || fee.campaign_id;
+              const fName = (fee.name || fee.campaign?.name || '').toLowerCase();
 
-          const admissionBalance = Math.max(adjAdmissionExpected - admissionPaid, 0);
-          const tuitionBalance = Math.max(tuitionExpected - tuitionPaid, 0);
-          const miscBalance = Math.max(adjPlanMiscFee - miscPaid, 0);
-          const campaignsBalance = Math.max(adjCampaignsExpected - campaignsPaid, 0);
+              const cPayments = campaignPayments.filter((p: any) => {
+                if (fId && (p.ad_hoc_campaign_id === fId || p.campaign_id === fId)) return true;
+                if (p.campaign?.id && fId && p.campaign.id === fId) return true;
+                const nat = (p.nature || p.label || p.type || p.description || '').toLowerCase();
+                return fName && nat && (nat.includes(fName) || (fName.includes('assurance') && nat.includes('assurance')));
+              });
 
-          const totalPaid = admissionPaid + tuitionPaid + miscPaid + campaignsPaid;
-          const totalExpected = adjAdmissionExpected + tuitionExpected + adjPlanMiscFee + adjCampaignsExpected;
-          const totalBalance = Math.max(0, totalExpected - totalPaid);
+              const cBreakdown = computeFeeCategoryBalance(pHTG, pUSD, cPayments, currentExchangeRate);
+              campTotalExpected += cBreakdown.effectiveDueHTG;
+              campPaid += cBreakdown.paidHTGEquiv;
+              campRemaining += cBreakdown.remainingHTGEquiv;
+            });
+          } else if (campaignsExpected > 0) {
+            campTotalExpected = campaignsExpected;
+            const cBreakdown = computeFeeCategoryBalance(campaignsExpected, 0, campaignPayments, currentExchangeRate);
+            campPaid = cBreakdown.paidHTGEquiv;
+            campRemaining = cBreakdown.remainingHTGEquiv;
+          }
 
-          const globalDebt = totalBalance;
+          const totalPaid = admBreakdown.paidHTGEquiv + tuitionBreakdown.paidHTGEquiv + miscBreakdown.paidHTGEquiv + campPaid;
+          const totalExpected = admBreakdown.effectiveDueHTG + tuitionBreakdown.effectiveDueHTG + miscBreakdown.effectiveDueHTG + campTotalExpected;
+          const globalDebt = admBreakdown.remainingHTGEquiv + tuitionBreakdown.remainingHTGEquiv + miscBreakdown.remainingHTGEquiv + campRemaining;
 
           setStudentStats({
             className: studentData.class?.name || 'Non assigné',
@@ -1182,20 +1200,20 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             globalDebt,
             totalPaid,
             totalDue: totalExpected,
-            admissionExpected: adjAdmissionExpected,
-            admissionPaid,
-            admissionBalance,
-            tuitionExpected: tuitionExpected,
-            tuitionPaid,
-            tuitionBalance,
-            miscExpected: adjPlanMiscFee,
-            miscPaid,
-            miscBalance,
-            campaignsExpected: adjCampaignsExpected,
-            campaignsPaid,
-            campaignsBalance,
-            discountAmount: Number(studentData.discount_amount || 0),
-            hasCampaigns: activeCampaignFees.length > 0,
+            admissionExpected: admBreakdown.effectiveDueHTG,
+            admissionPaid: admBreakdown.paidHTGEquiv,
+            admissionBalance: admBreakdown.remainingHTGEquiv,
+            tuitionExpected: tuitionBreakdown.effectiveDueHTG,
+            tuitionPaid: tuitionBreakdown.paidHTGEquiv,
+            tuitionBalance: tuitionBreakdown.remainingHTGEquiv,
+            miscExpected: miscBreakdown.effectiveDueHTG,
+            miscPaid: miscBreakdown.paidHTGEquiv,
+            miscBalance: miscBreakdown.remainingHTGEquiv,
+            campaignsExpected: campTotalExpected,
+            campaignsPaid: campPaid,
+            campaignsBalance: campRemaining,
+            discountAmount: studentDiscount,
+            hasCampaigns: activeCampaignFees.length > 0 || campTotalExpected > 0,
             wallet_balance_htg: Number(studentData.wallet_balance_htg || 0),
             wallet_balance_usd: Number(studentData.wallet_balance_usd || 0)
           });
