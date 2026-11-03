@@ -46,39 +46,55 @@ export function computeFeeCategoryBalance(
   for (const p of payments) {
     if (!p) continue;
     const isUSD = p.currency === 'USD';
-    const amount = Number(p.amount || 0);
-    
+    let nativeAmount = Number(p.rawAmount ?? p.amount ?? 0);
+    let htgEquivalent = Number(p.amount_htg_equivalent || 0);
+
     // Détection du taux de change scellé historique de la transaction
     let pRate = rate;
     if (p.exchange_rate_applied && Number(p.exchange_rate_applied) > 1) {
       pRate = Number(p.exchange_rate_applied);
-    } else if (isUSD && p.amount_htg_equivalent && amount > 0) {
-      pRate = Number(p.amount_htg_equivalent) / amount;
-    } else if (!isUSD && plannedUSD > 0 && amount > 0) {
+    } else if (isUSD && htgEquivalent > 0 && nativeAmount > 0) {
+      pRate = htgEquivalent / nativeAmount;
+    } else if (!isUSD && plannedUSD > 0 && nativeAmount > 0) {
       // Détection rétrospective pour les anciens versements en HTG d'un frais planifié en USD
-      const impliedRate = amount / plannedUSD;
+      const impliedRate = nativeAmount / plannedUSD;
       if (impliedRate >= 50 && impliedRate <= 300) {
         pRate = impliedRate;
       }
     }
 
     if (isUSD) {
-      const usdVal = Number(p.amount_usd_equivalent) || amount;
-      paidUSDDirect += amount;
+      // Protection anti double-conversion : si p.rawAmount existe ou si nativeAmount > 2000,
+      // la valeur dans p.amount était déjà convertie en HTG (ex: 20 250 HTG pour 150 USD)
+      let usdVal = nativeAmount;
+      let htgVal = htgEquivalent;
+
+      if (p.rawAmount !== undefined && p.rawAmount !== null && Number(p.rawAmount) > 0) {
+        usdVal = Number(p.rawAmount);
+        htgVal = htgEquivalent > 0 ? htgEquivalent : (Number(p.amount) > 2000 ? Number(p.amount) : usdVal * pRate);
+      } else if (nativeAmount > 2000) {
+        // En Haïti un frais K-12 en USD ne dépasse jamais 2000 USD. C'est déjà une contre-valeur HTG !
+        htgVal = nativeAmount;
+        usdVal = pRate > 0 ? htgVal / pRate : htgVal / rate;
+      } else {
+        htgVal = htgEquivalent > 0 ? htgEquivalent : (usdVal * pRate);
+      }
+
+      paidUSDDirect += usdVal;
       totalPaidUSD += usdVal;
-      totalPaidHTG += Number(p.amount_htg_equivalent) || (amount * pRate);
+      totalPaidHTG += htgVal;
     } else {
-      const htgAmount = Number(p.amount_htg_equivalent) || amount;
-      paidHTGDirect += amount;
+      const htgAmount = htgEquivalent > 0 ? htgEquivalent : nativeAmount;
+      paidHTGDirect += nativeAmount;
       totalPaidHTG += htgAmount;
       
       // Valeur amortie en USD : priorité à la valeur scellée de la transaction
       if (p.amount_usd_equivalent && Number(p.amount_usd_equivalent) > 0) {
         totalPaidUSD += Number(p.amount_usd_equivalent);
-      } else if (plannedUSD > 0 && amount > 0) {
+      } else if (plannedUSD > 0 && nativeAmount > 0) {
         // Si le versement en Gourdes correspondait au barème USD à un taux historique plausible (ex: 27 000 G @ 135 = 200 USD)
-        const impliedRate = amount / plannedUSD;
-        if (impliedRate >= 50 && impliedRate <= 300 && Math.abs((amount / pRate) - plannedUSD) > 0.5) {
+        const impliedRate = nativeAmount / plannedUSD;
+        if (impliedRate >= 50 && impliedRate <= 300 && Math.abs((nativeAmount / pRate) - plannedUSD) > 0.5) {
           totalPaidUSD += plannedUSD;
         } else {
           totalPaidUSD += (pRate > 0 ? htgAmount / pRate : htgAmount / rate);

@@ -288,14 +288,24 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
           } else if (p.fee_type === 'INSCRIPTION' || p.nature === 'INSCRIPTION' || p.nature === "Frais d'inscription") {
             tLabel = 'Inscription';
           }
+          const isUSD = p.currency === 'USD';
+          const rawAmt = Number(p.amount || 0);
+          const htgEq = Number(p.amount_htg_equivalent || 0);
+          const pRate = Number(p.exchange_rate_applied || 0) || Number(school?.exchange_rate || 135);
+          const finalHTG = htgEq > 0 ? htgEq : (isUSD ? (rawAmt > 2000 ? rawAmt : rawAmt * pRate) : rawAmt);
+          const finalUSD = isUSD ? (rawAmt > 2000 ? rawAmt / pRate : rawAmt) : (p.amount_usd_equivalent ? Number(p.amount_usd_equivalent) : 0);
+
           return {
             id: p.id,
+            student_id: p.student_id || studentId,
             date: p.date || p.payment_date || p.created_at,
             label: tLabel,
-            amount: Number(p.amount_htg_equivalent || p.amount || 0),
-            rawAmount: Number(p.amount || 0),
+            amount: finalHTG,
+            rawAmount: isUSD ? (rawAmt > 2000 ? rawAmt / pRate : rawAmt) : rawAmt,
+            amount_htg_equivalent: finalHTG,
+            amount_usd_equivalent: finalUSD,
             currency: p.currency || 'HTG',
-            exchange_rate_applied: Number(p.exchange_rate_applied || 0),
+            exchange_rate_applied: pRate,
             status: p.status || 'VALIDE',
             ad_hoc_campaign_id: p.ad_hoc_campaign_id || (p.campaign?.id) || null,
             campaign_id: p.campaign_id || p.ad_hoc_campaign_id || (p.campaign?.id) || null,
@@ -995,7 +1005,9 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </span>
               {solvencyInfo && (
                 <span className="text-[9px] text-slate-500 font-normal">
-                  {isDossierSolde ? '0 arriéré' : `${solvencyInfo.coveragePercentage}% réglé`}
+                  {isDossierSolde 
+                    ? '0 arriéré' 
+                    : `${Math.min(99.9, solvencyInfo.coveragePercentage)}% réglé`}
                 </span>
               )}
             </div>

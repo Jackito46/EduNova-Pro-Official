@@ -239,6 +239,8 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
 
       // Filtrer les paiements valides de frais scolaires (non annulés, non rejetés, hors dépôts portefeuille)
       const validPayments = (rawPaymentsData || []).filter((p: any) => {
+        // Isolation stricte par élève : interdire formellement toute fuite de paiement d'un autre élève
+        if (p.student_id && p.student_id !== studentId) return false;
         const status = String(p.status || '').toUpperCase();
         if (status.includes('ANNUL') || status.includes('REJET') || status.includes('CANCEL')) return false;
         const method = String(p.payment_method || '').toUpperCase();
@@ -247,13 +249,28 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         return true;
       });
 
+      // Fonction utilitaire d'extraction robuste de la contre-valeur HTG réelle d'un paiement
+      const getPaymentHTG = (p: any): number => {
+        const isUSD = p.currency === 'USD';
+        const htgEq = Number(p.amount_htg_equivalent || 0);
+        if (htgEq > 0) return htgEq;
+        const rawAmt = Number(p.rawAmount ?? p.amount ?? 0);
+        if (isUSD) {
+          // Si rawAmt > 2000, c'est déjà une contre-valeur en HTG et non du USD
+          if (rawAmt > 2000) return rawAmt;
+          const pRate = Number(p.exchange_rate_applied || 0) || exchangeRate;
+          return Math.round(rawAmt * pRate);
+        }
+        return rawAmt;
+      };
+
       // 6. Identifier le dernier versement
       let lastPaymentDate: string | null = null;
       let lastPaymentAmount: number | null = null;
       if (validPayments.length > 0) {
         const firstP = validPayments[0];
         lastPaymentDate = firstP.payment_date || firstP.date || firstP.created_at || null;
-        lastPaymentAmount = Number(firstP.amount_htg_equivalent) || Number(firstP.amount) || 0;
+        lastPaymentAmount = getPaymentHTG(firstP);
       }
 
       // 7. Ventilation des paiements par catégorie
@@ -370,15 +387,36 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
         }
       });
 
-      // 10. Synthèse consolidée multi-catégories
-      const totalExpected = admissionBalance.effectiveDueHTG + miscBalance.effectiveDueHTG + tuitionBalance.effectiveDueHTG + adHocTotalExpected;
-      const totalPaid = admissionBalance.paidHTGEquiv + miscBalance.paidHTGEquiv + tuitionBalance.paidHTGEquiv + adHocPaid;
-      const netDue = totalExpected;
-      const remainingBalance = admissionBalance.remainingHTGEquiv + miscBalance.remainingHTGEquiv + tuitionBalance.remainingHTGEquiv + adHocRemaining;
+      // 10. Synthèse consolidée multi-catégories & Séparation stricte Micro vs Macro
+      let totalExpected = admissionBalance.effectiveDueHTG + miscBalance.effectiveDueHTG + tuitionBalance.effectiveDueHTG + adHocTotalExpected;
+      let totalPaid = admissionBalance.paidHTGEquiv + miscBalance.paidHTGEquiv + tuitionBalance.paidHTGEquiv + adHocPaid;
+      let remainingBalance = admissionBalance.remainingHTGEquiv + miscBalance.remainingHTGEquiv + tuitionBalance.remainingHTGEquiv + adHocRemaining;
 
-      const coveragePercentage = netDue > 0 
-        ? Math.min(100, Math.round((totalPaid / netDue) * 100)) 
-        : (totalPaid > 0 ? 100 : 100);
+      // Calcul direct des paiements réels individuels de cet élève
+      const studentTotalPaidSum = validPayments.reduce((acc: number, p: any) => {
+        return acc + getPaymentHTG(p);
+      }, 0);
+
+      // Protection absolue contre les anomalies de périmètre (scope leak macro-comptable)
+      // Un contrat annuel d'élève individuel en Haïti se situe toujours entre 15 000 et 120 000 HTG.
+      // Tout chiffre supérieur provient d'un macro-budget ou d'une mauvaise isolation.
+      if (totalPaid > 150000 || Math.abs(totalPaid - studentTotalPaidSum) > 500) {
+        totalPaid = studentTotalPaidSum;
+      }
+
+      // Normalisation de l'assiette contractuelle individuelle : total versé + solde dû restant
+      if (totalExpected > 150000 || totalExpected <= 0 || (totalPaid + remainingBalance > 0 && Math.abs(totalExpected - (totalPaid + remainingBalance)) > 5000)) {
+        totalExpected = totalPaid + remainingBalance;
+      }
+
+      const netDue = Math.max(totalExpected, totalPaid + remainingBalance);
+
+      // Calcul précis du taux de recouvrement individuel
+      // Règle d'or : si un reliquat existe (> 0), le taux reflète strictement l'avancement individuel (ex: 95.0% ou 95.9%) et ne peut JAMAIS être arrondi à 100%
+      const rawCoverage = netDue > 0 ? (totalPaid / netDue) * 100 : (remainingBalance === 0 ? 100 : 0);
+      const coveragePercentage = remainingBalance > 0
+        ? Math.min(99.9, Math.round(rawCoverage * 10) / 10)
+        : (totalPaid > 0 || netDue === 0 ? 100 : 0);
 
       let solvencyStatus: 'SOLVED' | 'PARTIAL' | 'UNPAID' = 'UNPAID';
       if (remainingBalance === 0 && (totalPaid > 0 || netDue === 0)) {
@@ -522,17 +560,17 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
           {isSolved ? (
             <>
               <CheckCircle2 size={12} className="text-emerald-600 shrink-0" />
-              <span>À jour (100%)</span>
+              <span>COMPTE SOLDÉ (100%)</span>
             </>
           ) : isPartial ? (
             <>
               <Clock size={12} className="text-amber-600 shrink-0" />
-              <span>Reliquat ({data.coveragePercentage}%)</span>
+              <span>ARRIÉRÉ ({data.remainingBalance.toLocaleString()} HTG)</span>
             </>
           ) : (
             <>
               <AlertCircle size={12} className="text-rose-600 shrink-0" />
-              <span>Attente Paiement</span>
+              <span>ATTENTE PAIEMENT</span>
             </>
           )}
         </span>
@@ -564,18 +602,18 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
             )}
           </div>
 
-          {/* Jauge de couverture financière */}
+          {/* Jauge d'acquittement financière synchronisée sur les montants réels */}
           <div className="mt-3 space-y-1.5">
-            <div className="flex justify-between items-center text-[10px] font-semibold text-slate-600">
-              <span>Recouvrement : {data.coveragePercentage}%</span>
-              <span className="font-mono text-slate-500">
-                {data.totalPaid.toLocaleString()} / {data.netDue.toLocaleString()} HTG
+            <div className="flex justify-between items-center text-[10.5px] font-bold text-slate-700">
+              <span>Taux d'acquittement : {data.coveragePercentage}%</span>
+              <span className="font-mono text-slate-600 font-semibold">
+                Reste dû : {data.remainingBalance.toLocaleString()} HTG
               </span>
             </div>
-            <div className="w-full h-2 bg-slate-200/80 rounded-full overflow-hidden">
+            <div className="w-full h-2.5 bg-slate-200/80 rounded-full overflow-hidden">
               <div 
                 className={`h-full transition-all duration-500 rounded-full ${
-                  isSolved ? 'bg-emerald-500' : isPartial ? 'bg-indigo-600' : 'bg-rose-500'
+                  isSolved ? 'bg-emerald-500' : isPartial ? 'bg-amber-500' : 'bg-rose-500'
                 }`}
                 style={{ width: `${Math.min(100, Math.max(data.coveragePercentage, isSolved ? 100 : 0))}%` }}
               />
@@ -583,30 +621,32 @@ export const StudentSolvencySummary: React.FC<StudentSolvencySummaryProps> = ({
           </div>
         </div>
 
-        {/* Détails ventilés compacts */}
+        {/* Détails ventilés micro-comptables individuels (Dernier règlement & Situation dossier) */}
         <div className="grid grid-cols-2 gap-2 text-xs">
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Total Net Exigé</p>
-            <p className="font-mono font-bold text-slate-800 text-sm mt-0.5">
-              {data.netDue.toLocaleString()} <span className="text-[10px] font-normal text-slate-500">HTG</span>
+          <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-100">
+            <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">DERNIER RÈGLEMENT</p>
+            <p className="font-mono font-black text-slate-900 text-sm mt-0.5">
+              {data.lastPaymentAmount !== null && data.lastPaymentAmount > 0 
+                ? `+${data.lastPaymentAmount.toLocaleString()} HTG` 
+                : 'Aucun versement'}
             </p>
-            {data.totalDiscount > 0 && (
-              <p className="text-[9px] text-emerald-600 font-semibold mt-0.5 flex items-center gap-1">
-                <Award size={10} /> Bourse: -{data.totalDiscount.toLocaleString()} G
-              </p>
-            )}
+            <p className="text-[9px] text-slate-400 truncate mt-0.5">
+              {data.lastPaymentDate 
+                ? `Reçu le ${new Date(data.lastPaymentDate).toLocaleDateString('fr-FR')}` 
+                : 'Aucun reçu certifié'}
+            </p>
           </div>
 
-          <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-            <p className="text-[9.5px] font-bold text-slate-400 uppercase tracking-wider">Total Encaissé</p>
-            <p className="font-mono font-bold text-emerald-700 text-sm mt-0.5">
-              +{data.totalPaid.toLocaleString()} <span className="text-[10px] font-normal text-emerald-600">HTG</span>
+          <div className="p-3 bg-slate-50/90 rounded-xl border border-slate-100">
+            <p className="text-[9.5px] font-bold text-slate-500 uppercase tracking-wider">SITUATION DOSSIER</p>
+            <p className={`font-black text-sm mt-0.5 ${
+              isSolved ? 'text-emerald-700' : isPartial ? 'text-amber-700' : 'text-rose-700'
+            }`}>
+              {isSolved ? 'Dossier Soldé' : isPartial ? 'Arriéré Actif' : 'Non Réglé'}
             </p>
-            {data.lastPaymentDate && (
-              <p className="text-[9px] text-slate-400 truncate mt-0.5">
-                Dernier: {new Date(data.lastPaymentDate).toLocaleDateString('fr-FR')}
-              </p>
-            )}
+            <p className="text-[9px] text-slate-400 truncate mt-0.5 font-medium">
+              {data.paymentsCount} reçu(s) certifié(s)
+            </p>
           </div>
         </div>
 
