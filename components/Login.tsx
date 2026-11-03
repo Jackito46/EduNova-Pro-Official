@@ -567,7 +567,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
                   className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-2xl" 
                 />
                 <Logo 
-                  src="/logo.png" 
+                  src="/logo.webp" 
                   size="xl" 
                   className="w-20 h-20 sm:w-24 sm:h-24 relative z-10 transform group-hover:scale-[1.03] transition-transform duration-500 shadow-xl shadow-blue-500/15 ring-1 ring-blue-500/20 rounded-2xl" 
                   imgClassName="object-contain w-full h-full scale-[1.02]" 

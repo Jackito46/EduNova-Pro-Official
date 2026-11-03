@@ -16,12 +16,19 @@ const Logo: React.FC<LogoProps> = ({
   imgClassName = "",
   size = 'md' 
 }) => {
-  const primaryLogo = src || "/logo.png";
-  const [currentSrc, setCurrentSrc] = useState<string>(primaryLogo);
+  // Priorité absolue au format WebP haute performance pour le logo par défaut
+  const resolveTargetSrc = (rawSrc?: string | null): string => {
+    if (!rawSrc || rawSrc === '/logo.png' || rawSrc === '/logo.jpg') {
+      return '/logo.webp';
+    }
+    return rawSrc;
+  };
+
+  const [currentSrc, setCurrentSrc] = useState<string>(resolveTargetSrc(src));
   const [errorCount, setErrorCount] = useState(0);
 
   useEffect(() => {
-    setCurrentSrc(src || "/logo.png");
+    setCurrentSrc(resolveTargetSrc(src));
     setErrorCount(0);
   }, [src]);
 
@@ -47,24 +54,30 @@ const Logo: React.FC<LogoProps> = ({
   };
 
   const handleError = () => {
-    if (errorCount === 0 && currentSrc !== '/logo.png') {
+    if (errorCount === 0 && currentSrc === '/logo.webp') {
       setCurrentSrc('/logo.png');
       setErrorCount(1);
-    } else if (errorCount <= 1 && currentSrc !== '/logo.jpg') {
-      setCurrentSrc('/logo.jpg');
+    } else if (errorCount <= 1 && currentSrc !== '/logo.png') {
+      setCurrentSrc('/logo.png');
       setErrorCount(2);
-    } else if (errorCount <= 2 && currentSrc !== '/favicon.png') {
-      setCurrentSrc('/favicon.png');
+    } else if (errorCount <= 2 && currentSrc !== '/logo.jpg') {
+      setCurrentSrc('/logo.jpg');
       setErrorCount(3);
-    } else {
+    } else if (errorCount <= 3 && currentSrc !== '/pwa-192x192.png') {
+      setCurrentSrc('/pwa-192x192.png');
       setErrorCount(4);
+    } else if (errorCount <= 4 && currentSrc !== '/favicon.png') {
+      setCurrentSrc('/favicon.png');
+      setErrorCount(5);
+    } else {
+      setErrorCount(6);
     }
   };
 
   const hasCustomSize = className.includes('w-') || className.includes('h-');
   const dimensionsClass = hasCustomSize ? '' : sizeClasses[size];
 
-  if (errorCount >= 4) {
+  if (errorCount >= 6) {
     const isSchoolName = alt && alt !== "Logo" && alt !== "EduNova Logo" && alt !== "Logo École" && alt !== "EduNova";
     const defaultLetter = isSchoolName ? alt.charAt(0).toUpperCase() : null;
 
@@ -86,6 +99,8 @@ const Logo: React.FC<LogoProps> = ({
       <img 
         src={currentSrc} 
         alt={alt} 
+        loading="eager"
+        decoding="async"
         className={`w-full h-full object-contain transition-all duration-300 group-hover:scale-[1.04] ${imgClassName}`}
         onError={handleError}
         referrerPolicy="no-referrer"

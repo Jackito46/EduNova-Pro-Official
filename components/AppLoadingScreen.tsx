@@ -225,7 +225,7 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
 
             <div className="relative z-10 w-20 h-20 sm:w-22 sm:h-22 p-2.5 rounded-2xl bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_12px_28px_-6px_rgba(15,23,42,0.08),0_4px_12px_-2px_rgba(15,23,42,0.04)] flex items-center justify-center">
               <Logo
-                src="/logo.png"
+                src="/logo.webp"
                 size="xl"
                 className="w-full h-full object-contain"
                 imgClassName="object-contain w-full h-full scale-[1.02]"
