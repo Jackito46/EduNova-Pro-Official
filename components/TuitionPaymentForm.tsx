@@ -162,6 +162,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [showReceipt, setShowReceipt] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [transactionRef, setTransactionRef] = useState('');
+  const [sealedReceiptData, setSealedReceiptData] = useState<any | null>(null);
   const [apiError, setApiError] = useState<string | null>(null);
 
   // État de polling et attente de confirmation pour MonCash
@@ -1599,12 +1600,27 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         let autoFeeType = 'SCOLARITE';
         let autoCurrency: 'HTG' | 'USD' = 'HTG';
 
-        if (effectiveInscriptionDue > inscriptionPaid + 450 && !admissionBreakdown.isPaid) {
+        if (effectiveInscriptionDue > inscriptionPaid + 50 && !admissionBreakdown.isPaid) {
           autoFeeType = 'INSCRIPTION';
           autoCurrency = (inscriptionUSD_val > 0 && inscriptionHTG_val === 0) ? 'USD' : 'HTG';
-        } else if (effectiveMiscDue > miscPaid + 450 && plan?.is_misc_mandatory && !miscBreakdown.isPaid) {
+        } else if (effectiveMiscDue > miscPaid + 50 && !miscBreakdown.isPaid) {
           autoFeeType = 'DIVERS';
           autoCurrency = (miscUSD_val > 0 && miscHTG === 0) ? 'USD' : 'HTG';
+        } else if (tuitionBreakdown.isPaid || scolaritePaid >= scolariteDue) {
+          // Si la scolarité est déjà acquittée, vérifier immédiatement s'il existe une campagne ou des frais divers avec arriéré
+          const campaignWithArriere = campaignsList.find(c => c && c.remaining > 0);
+          if (campaignWithArriere) {
+            autoFeeType = `ADHOC_${campaignWithArriere.id}`;
+            autoCurrency = campaignWithArriere.currency === 'USD' ? 'USD' : 'HTG';
+          } else if (effectiveMiscDue > miscPaid) {
+            autoFeeType = 'DIVERS';
+            autoCurrency = (miscUSD_val > 0 && miscHTG === 0) ? 'USD' : 'HTG';
+          } else {
+            autoFeeType = 'SCOLARITE';
+            const tuitionUSD = Number(plan?.tuition_fee_usd || 0);
+            const tuitionHTG = Number(plan?.tuition_fee || 0);
+            autoCurrency = (tuitionUSD > 0 && tuitionHTG === 0) ? 'USD' : 'HTG';
+          }
         } else {
           autoFeeType = 'SCOLARITE';
           const tuitionUSD = Number(plan?.tuition_fee_usd || 0);
@@ -1981,6 +1997,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     setShowReceipt(false);
     setShowWhatsAppModal(false);
     setTransactionRef('');
+    setSealedReceiptData(null);
     setGlobalDebt(0);
     setDossierAuditSessions([]);
     setAllStudentTransactions([]);
@@ -2073,6 +2090,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       setIsSubmitting(true);
       try {
         const amount = parseFloat(montantReel);
+        if (isNaN(amount) || amount <= 0) {
+          toast.error("Le montant du règlement doit être strictement supérieur à 0.");
+          setIsSubmitting(false);
+          return;
+        }
+
         const validationResult = tuitionPaymentSchema.safeParse({
           amount: amount,
           currency: currency,
@@ -2097,7 +2120,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         // Validation: Ne pas autoriser un paiement supérieur ou égal lorsque la dette restante est déjà nulle
         if (paymentLogic && feeType !== 'CREDIT_PORTEFEUILLE') {
           if (paymentLogic.isFullyPaid || (paymentLogic.resteTotal <= 0 && (!paymentLogic.resteUSD || paymentLogic.resteUSD <= 0))) {
-            toast.error(`Ce frais a déjà été entièrement acquitté (réglé). Aucun versement supplémentaire n'est requis.`);
+            toast.error(`Ce motif (${feeTypeOptions.find(o => o.value === feeType)?.label || feeType}) a déjà été entièrement acquitté (Reste : 0). Veuillez sélectionner un autre frais avec arriéré.`);
             setIsSubmitting(false);
             return;
           }
@@ -2131,6 +2154,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         if (paymentMethod === 'Portefeuille') {
           const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+          if (walletBalance <= 0) {
+            toast.error(`Le solde du portefeuille de l'${terminology.student?.toLowerCase() || 'élève'} est de 0 ${currency}. Veuillez recharger le portefeuille ou choisir un autre mode de paiement.`);
+            setIsSubmitting(false);
+            return;
+          }
           if (walletBalance < amount) {
             toast.error(`Le solde du portefeuille de l'${terminology.student?.toLowerCase() || 'étudiant'} (${walletBalance.toLocaleString()} ${currency}) est insuffisant pour effectuer ce paiement de ${amount.toLocaleString()} ${currency}.`);
             setIsSubmitting(false);
@@ -2306,13 +2334,15 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           if (paymentMethod === 'Portefeuille') {
             const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
             const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
-            const newBalance = walletBalance - amount;
+            const newBalance = Math.max(0, walletBalance - amount);
             await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+            setSelectedStudent((prev: any) => prev ? { ...prev, [updateField]: newBalance } : prev);
           } else if (feeType === 'CREDIT_PORTEFEUILLE') {
             const updateField = currency === 'USD' ? 'wallet_balance_usd' : 'wallet_balance_htg';
             const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
             const newBalance = walletBalance + amount;
             await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+            setSelectedStudent((prev: any) => prev ? { ...prev, [updateField]: newBalance } : prev);
           }
 
           // AUTO-ENROLLMENT LOGIC: Si l'étudiant n'était pas inscrit, on l'inscrit automatiquement
@@ -2339,7 +2369,53 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             }
           }
 
-          setTransactionRef(referenceNumber ? referenceNumber : `RCP-${data.id.substring(0, 8).toUpperCase()}`);
+          const refCode = referenceNumber ? referenceNumber : `RCP-${data.id.substring(0, 8).toUpperCase()}`;
+          setTransactionRef(refCode);
+
+          const studentWalletBefore = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+          const studentWalletAfter = paymentMethod === 'Portefeuille'
+            ? Math.max(0, studentWalletBefore - amount)
+            : feeType === 'CREDIT_PORTEFEUILLE'
+            ? (studentWalletBefore + amount)
+            : studentWalletBefore;
+
+          const frozenSealedReceipt = {
+            receiptNumber: refCode,
+            amount: amount,
+            currency: currency,
+            feeType: feeType,
+            feeTypeLabel: mappedType,
+            paymentMethod: finalPaymentMethod,
+            bankName: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') ? bankName : null,
+            depositDate: (paymentMethod === 'Dépôt Bancaire' && depositDate) ? depositDate : getLocalTodayString(),
+            paymentDateTime: `${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}`,
+            cashierName: cashierName || user?.full_name || 'Comptabilité',
+            student: {
+              id: selectedStudent.id,
+              fullName: selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim(),
+              classe: selectedStudent.classe || selectedStudent.class?.name || 'Non assignée',
+              reference_number: selectedStudent.reference_number || null,
+              campus_id: selectedStudent.campus_id || currentCampusId,
+              campus_name: selectedStudent.campus_name
+            },
+            financialSnapshot: {
+              dueText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due'),
+              paidText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid'),
+              resteText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', montantReel, currency, paymentLogic),
+              soldeText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', montantReel, currency),
+              plannedUSD: (feeType === 'DIVERS' ? selectedStudent?.miscUSD : feeType === 'SCOLARITE' ? selectedStudent?.scolariteUSD : feeType === 'INSCRIPTION' ? selectedStudent?.inscriptionUSD : 0) || 0,
+              walletBalanceBefore: studentWalletBefore,
+              walletBalanceAfter: studentWalletAfter
+            },
+            exchangeRate: currentExchangeRate,
+            moncashTransactionData: moncashTransactionData || (finalPaymentMethod === 'MonCash' ? {
+              orderId: moncashOrderId,
+              transactionId: referenceNumber || undefined,
+              serverStatus: 'VALIDE'
+            } : null)
+          };
+
+          setSealedReceiptData(frozenSealedReceipt);
           
           // SYNC STATUS LOGIC: Update student and enrollment status based on results
           try {
@@ -2453,7 +2529,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </span>
                 <span className="text-slate-300 font-bold select-none shrink-0">•</span>
                 <span className="bg-emerald-50 text-emerald-800 font-mono font-black text-[11px] sm:text-xs px-2.5 py-0.5 rounded border border-emerald-200/90 shrink-0 whitespace-nowrap shadow-2xs">
-                  {parseFloat(montantReel || '0').toLocaleString()} {currency}
+                  {(sealedReceiptData?.amount ?? parseFloat(montantReel || '0')).toLocaleString()} {sealedReceiptData?.currency || currency}
                 </span>
               </div>
             </div>
@@ -2721,7 +2797,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             {/* TITRE DU DOCUMENT AVEC CODE-BARRES */}
             <div className="w-full text-center mb-2.5 py-1.5 bg-gray-100 rounded border border-gray-300 print:bg-gray-100">
               <h2 className={`${posFormat === '58mm' ? 'text-[10px]' : 'text-[12px]'} font-black tracking-widest uppercase`}>REÇU DE CAISSE OFFICIEL</h2>
-              <p className={`${posFormat === '58mm' ? 'text-[8px]' : 'text-[9px]'} font-black font-mono mt-0.5`}>#{transactionRef}</p>
+              <p className={`${posFormat === '58mm' ? 'text-[8px]' : 'text-[9px]'} font-black font-mono mt-0.5`}>#{sealedReceiptData?.receiptNumber || transactionRef}</p>
               {/* Pattern simulation code-barres thermique propre */}
               <div className={`${posFormat === '58mm' ? 'w-24' : 'w-32'} mx-auto my-1 flex justify-center items-center gap-[1.5px] opacity-80 h-3 overflow-hidden select-none`} aria-hidden="true">
                 {[1, 2, 1, 3, 1, 2, 1, 1, 3, 2, 1, 1, 2, 3, 1, 2, 1, 3, 2, 1, 2, 1, 3, 1, 2].map((w, idx) => (
@@ -2739,20 +2815,20 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="space-y-1">
                 <div>
                   <p className="text-[7px] uppercase font-black text-gray-500">Date & Heure</p>
-                  <p className="font-bold leading-none">{new Date().toLocaleDateString('fr-FR')} {new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}</p>
+                  <p className="font-bold leading-none">{sealedReceiptData?.paymentDateTime || `${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}`}</p>
                 </div>
                 <div>
                   <p className="text-[7px] uppercase font-black text-gray-500">Caissier</p>
-                  <p className="font-bold leading-none">{cashierName || 'Comptabilité'}</p>
+                  <p className="font-bold leading-none">{sealedReceiptData?.cashierName || cashierName || 'Comptabilité'}</p>
                 </div>
               </div>
               <div className="space-y-1 text-right border-l border-gray-200 pl-2">
                 <div>
                   <p className="text-[7px] uppercase font-black text-gray-500">Élève</p>
-                  <p className="font-black text-[10px] leading-tight">{selectedStudent.fullName}</p>
-                  <p className="text-[8px] font-bold text-gray-600 italic">{selectedStudent.classe || 'Non assignée'}</p>
-                  {selectedStudent.reference_number && (
-                    <p className="text-[7px] font-mono text-gray-500">Mat: {selectedStudent.reference_number}</p>
+                  <p className="font-black text-[10px] leading-tight">{sealedReceiptData?.student?.fullName || selectedStudent.fullName}</p>
+                  <p className="text-[8px] font-bold text-gray-600 italic">{sealedReceiptData?.student?.classe || selectedStudent.classe || 'Non assignée'}</p>
+                  {(sealedReceiptData?.student?.reference_number || selectedStudent.reference_number) && (
+                    <p className="text-[7px] font-mono text-gray-500">Mat: {sealedReceiptData?.student?.reference_number || selectedStudent.reference_number}</p>
                   )}
                 </div>
               </div>
@@ -2764,27 +2840,31 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <span className="font-bold uppercase text-gray-600 shrink-0">Type de Frais Payé :</span>
                 <div className="text-right pl-2">
                   <span className="font-black text-[11px] block text-black uppercase">
-                    {feeType.startsWith('ADHOC_') 
-                      ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
-                      : feeType === 'INSCRIPTION' 
-                      ? (selectedStudent.isReenrollment ? 'Frais de Réinscription' : "Frais d'Inscription") 
-                      : feeType === 'SCOLARITE' 
-                      ? `Frais de Scolarité (${terminology.tuition})` 
-                      : feeType === 'DIVERS'
-                      ? 'Frais Divers Obligatoires'
-                      : feeType === 'CREDIT_PORTEFEUILLE'
-                      ? 'Recharge Portefeuille Élève'
-                      : 'Frais Divers'}
+                    {sealedReceiptData?.feeTypeLabel || (
+                      feeType.startsWith('ADHOC_') 
+                        ? selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''))?.name || 'Campagne Spéciale'
+                        : feeType === 'INSCRIPTION' 
+                        ? (selectedStudent.isReenrollment ? 'Frais de Réinscription' : "Frais d'Inscription") 
+                        : feeType === 'SCOLARITE' 
+                        ? `Frais de Scolarité (${terminology.tuition})` 
+                        : feeType === 'DIVERS'
+                        ? 'Frais Divers Obligatoires'
+                        : feeType === 'CREDIT_PORTEFEUILLE'
+                        ? 'Recharge Portefeuille Élève'
+                        : 'Frais Divers'
+                    )}
                   </span>
                   {/* Mention explicite si barème initialement fixé en USD */}
                   {(() => {
-                    let plannedUSD = 0;
-                    if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
-                    else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
-                    else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
-                    else if (feeType.startsWith('ADHOC_')) {
-                      const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
-                      if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                    let plannedUSD = sealedReceiptData?.financialSnapshot?.plannedUSD || 0;
+                    if (!plannedUSD) {
+                      if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
+                      else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
+                      else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
+                      else if (feeType.startsWith('ADHOC_')) {
+                        const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
+                        if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                      }
                     }
 
                     if (plannedUSD > 0) {
@@ -2800,26 +2880,26 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               </div>
               <div className="flex justify-between items-center py-0.5">
                 <span className="font-bold uppercase text-gray-600">Mode de Règlement :</span>
-                <span className="font-black text-[10px] text-black">{paymentMethod}</span>
+                <span className="font-black text-[10px] text-black">{sealedReceiptData?.paymentMethod || paymentMethod}</span>
               </div>
-              {paymentMethod === 'MonCash' && (
+              {(sealedReceiptData?.paymentMethod === 'MonCash' || paymentMethod === 'MonCash') && (
                 <>
-                  {(moncashTransactionData?.transactionId || referenceNumber) && (
+                  {(sealedReceiptData?.moncashTransactionData?.transactionId || moncashTransactionData?.transactionId || referenceNumber) && (
                     <div className="flex justify-between items-center py-0.5 text-[8px]">
                       <span className="font-bold uppercase text-gray-500">ID Trans. MonCash:</span>
-                      <span className="font-mono font-black">{moncashTransactionData?.transactionId || referenceNumber}</span>
+                      <span className="font-mono font-black">{sealedReceiptData?.moncashTransactionData?.transactionId || moncashTransactionData?.transactionId || referenceNumber}</span>
                     </div>
                   )}
-                  {moncashTransactionData?.orderId && (
+                  {(sealedReceiptData?.moncashTransactionData?.orderId || moncashTransactionData?.orderId) && (
                     <div className="flex justify-between items-center py-0.5 text-[7.5px]">
                       <span className="font-medium uppercase text-gray-500">Réf. Commande:</span>
-                      <span className="font-mono font-bold text-gray-700">{moncashTransactionData.orderId}</span>
+                      <span className="font-mono font-bold text-gray-700">{sealedReceiptData?.moncashTransactionData?.orderId || moncashTransactionData?.orderId}</span>
                     </div>
                   )}
                   <div className="flex justify-between items-center py-0.5 text-[7.5px]">
                     <span className="font-semibold uppercase text-gray-500">Validation:</span>
                     <span className="font-bold text-black uppercase">
-                      {moncashTransactionData?.serverStatus === 'VALIDE' ? 'CERTIFIÉ DIGICEL EN TEMPS RÉEL' : (moncashTransactionData?.serverStatus || 'VALIDÉ')}
+                      {sealedReceiptData?.moncashTransactionData?.serverStatus === 'VALIDE' || moncashTransactionData?.serverStatus === 'VALIDE' ? 'CERTIFIÉ DIGICEL EN TEMPS RÉEL' : 'VALIDÉ'}
                     </span>
                   </div>
                 </>
@@ -2830,11 +2910,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="w-full space-y-1 text-[9px] mb-3 bg-gray-50 p-2 rounded border border-gray-200 print:bg-white print:border-black">
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-gray-600">Total Dû (Engagement) :</span>
-                <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due')}</span>
+                <span className="font-bold">{sealedReceiptData?.financialSnapshot?.dueText || getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due')}</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="font-semibold text-gray-600">Déjà Versé :</span>
-                <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid')}</span>
+                <span className="font-bold">{sealedReceiptData?.financialSnapshot?.paidText || getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid')}</span>
               </div>
             </div>
 
@@ -2842,30 +2922,33 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="w-full border-2 border-black rounded-lg p-2.5 mb-3 text-center bg-gray-50 text-black">
               <p className="text-[8px] font-black uppercase tracking-wider text-gray-700">Net Perçu (Montant Réglé)</p>
               <p className={`${posFormat === '58mm' ? 'text-[14px]' : 'text-[17px]'} font-black tracking-tight leading-none mt-1 text-black font-mono`}>
-                {parseFloat(montantReel || '0').toLocaleString()} <span className={`${posFormat === '58mm' ? 'text-[9.5px]' : 'text-[11px]'} font-bold`}>{currency}</span>
+                {(sealedReceiptData?.amount ?? parseFloat(montantReel || '0')).toLocaleString()} <span className={`${posFormat === '58mm' ? 'text-[9.5px]' : 'text-[11px]'} font-bold`}>{sealedReceiptData?.currency || currency}</span>
               </p>
 
               {/* BLOC CONVERSION DE TAUX DE CHANGE TRANSPARENT ET EXPLICITE */}
               {(() => {
-                const paidAmount = parseFloat(montantReel || '0');
-                const isUSD = currency === 'USD';
-                let plannedUSD = 0;
-                if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
-                else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
-                else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
-                else if (feeType.startsWith('ADHOC_')) {
-                  const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
-                  if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                const paidAmount = sealedReceiptData?.amount ?? parseFloat(montantReel || '0');
+                const isUSD = (sealedReceiptData?.currency || currency) === 'USD';
+                const rate = sealedReceiptData?.exchangeRate || currentExchangeRate || 140;
+                let plannedUSD = sealedReceiptData?.financialSnapshot?.plannedUSD || 0;
+                if (!plannedUSD) {
+                  if (feeType === 'DIVERS') plannedUSD = selectedStudent?.miscUSD || 0;
+                  else if (feeType === 'SCOLARITE') plannedUSD = selectedStudent?.scolariteUSD || 0;
+                  else if (feeType === 'INSCRIPTION') plannedUSD = selectedStudent?.inscriptionUSD || 0;
+                  else if (feeType.startsWith('ADHOC_')) {
+                    const camp = selectedStudent.adHocCampaigns?.find((c: any) => c.id === feeType.replace('ADHOC_', ''));
+                    if (camp?.currency === 'USD') plannedUSD = camp.amount || 0;
+                  }
                 }
 
                 if (isUSD) {
-                  const equivHTG = Math.round((paidAmount * currentExchangeRate) * 100) / 100;
+                  const equivHTG = Math.round((paidAmount * rate) * 100) / 100;
                   return (
                     <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
                       <div className="flex justify-between items-center text-[8.5px] font-black text-black">
                         <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
                         <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                          1 USD = {currentExchangeRate} HTG
+                          1 USD = {rate} HTG
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
@@ -2880,14 +2963,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   );
                 }
 
-                if (!isUSD && plannedUSD > 0 && currentExchangeRate > 0) {
-                  const equivUSD = (paidAmount / currentExchangeRate).toFixed(2);
+                if (!isUSD && plannedUSD > 0 && rate > 0) {
+                  const equivUSD = (paidAmount / rate).toFixed(2);
                   return (
                     <div className="mt-2 pt-2 border-t border-black/25 text-left space-y-1 bg-white p-2 rounded border border-black/10">
                       <div className="flex justify-between items-center text-[8.5px] font-black text-black">
                         <span className="uppercase text-gray-700">Taux de conversion appliqué :</span>
                         <span className="font-mono bg-black text-white px-1.5 py-0.5 rounded text-[8px] font-black">
-                          1 USD = {currentExchangeRate} HTG
+                          1 USD = {rate} HTG
                         </span>
                       </div>
                       <div className="flex justify-between items-center text-[8px] font-bold text-gray-800">
@@ -2912,21 +2995,27 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
             {/* ENGAGEMENT ET RESTE */}
             <div className="w-full space-y-1 text-[9px] mb-4 border-b border-black pb-2">
-              {feeType === 'CREDIT_PORTEFEUILLE' ? (
+              {(sealedReceiptData?.feeType || feeType) === 'CREDIT_PORTEFEUILLE' ? (
                 <div className="flex justify-between items-center font-bold">
-                  <span>Nouveau Solde Est.:</span>
-                  <span>{(((currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0)) + parseFloat(montantReel || '0'))).toLocaleString()} {currency}</span>
+                  <span>Nouveau Solde Portefeuille :</span>
+                  <span>{(sealedReceiptData?.financialSnapshot?.walletBalanceAfter ?? (((currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0)) + parseFloat(montantReel || '0')))).toLocaleString()} {sealedReceiptData?.currency || currency}</span>
                 </div>
               ) : (
                 <>
                   <div className="flex justify-between items-center font-bold">
                     <span>Reste sur Motif :</span>
-                    <span className="text-[10px] font-black">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', montantReel, currency, paymentLogic)}</span>
+                    <span className="text-[10px] font-black">{sealedReceiptData?.financialSnapshot?.resteText || getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', montantReel, currency, paymentLogic)}</span>
                   </div>
                   <div className="flex justify-between items-center text-[8px] text-gray-600 italic">
                     <span>Solde Global (Session) :</span>
-                    <span className="font-bold">{getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', montantReel, currency)}</span>
+                    <span className="font-bold">{sealedReceiptData?.financialSnapshot?.soldeText || getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', montantReel, currency)}</span>
                   </div>
+                  {sealedReceiptData?.financialSnapshot?.walletBalanceAfter !== undefined && (sealedReceiptData?.paymentMethod === 'Portefeuille' || paymentMethod === 'Portefeuille') && (
+                    <div className="flex justify-between items-center text-[8px] text-indigo-950 font-bold bg-indigo-50/90 px-1.5 py-0.5 rounded border border-indigo-200 mt-1">
+                      <span>Nouveau Solde Portefeuille Élève :</span>
+                      <span className="font-mono font-black">{sealedReceiptData.financialSnapshot.walletBalanceAfter.toLocaleString()} {sealedReceiptData?.currency || currency}</span>
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -4463,10 +4552,54 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                 const walletBalance = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
                 const newBalance = walletBalance + (parseFloat(montantReel) || monCashPendingData.amount);
                 await supabase.from('students').update({ [updateField]: newBalance }).eq('id', selectedStudent.id);
+                setSelectedStudent((prev: any) => prev ? { ...prev, [updateField]: newBalance } : prev);
               } catch (wErr) {
                 console.warn('Wallet balance sync warning:', wErr);
               }
             }
+
+            const refCode = confirmedPayment?.id ? `RCP-${confirmedPayment.id.substring(0, 8).toUpperCase()}` : transactionRef;
+            setTransactionRef(refCode);
+
+            const studentWalletBefore = currency === 'USD' ? (selectedStudent?.wallet_balance_usd || 0) : (selectedStudent?.wallet_balance_htg || 0);
+            const studentWalletAfter = feeType === 'CREDIT_PORTEFEUILLE'
+              ? (studentWalletBefore + monCashPendingData.amount)
+              : studentWalletBefore;
+
+            setSealedReceiptData({
+              receiptNumber: refCode,
+              amount: monCashPendingData.amount,
+              currency: monCashPendingData.currency,
+              feeType: feeType,
+              feeTypeLabel: monCashPendingData.feeTypeLabel,
+              paymentMethod: 'MonCash',
+              depositDate: getLocalTodayString(),
+              paymentDateTime: `${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'})}`,
+              cashierName: cashierName || user?.full_name || 'Comptabilité',
+              student: {
+                id: selectedStudent?.id,
+                fullName: selectedStudent?.fullName || monCashPendingData.studentName,
+                classe: selectedStudent?.classe || monCashPendingData.studentClass || 'Non assignée',
+                reference_number: selectedStudent?.reference_number || null,
+                campus_id: selectedStudent?.campus_id || currentCampusId,
+                campus_name: selectedStudent?.campus_name
+              },
+              financialSnapshot: {
+                dueText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due'),
+                paidText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid'),
+                resteText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', monCashPendingData.amount.toString(), monCashPendingData.currency, paymentLogic),
+                soldeText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', monCashPendingData.amount.toString(), monCashPendingData.currency),
+                plannedUSD: (feeType === 'DIVERS' ? selectedStudent?.miscUSD : feeType === 'SCOLARITE' ? selectedStudent?.scolariteUSD : feeType === 'INSCRIPTION' ? selectedStudent?.inscriptionUSD : 0) || 0,
+                walletBalanceBefore: studentWalletBefore,
+                walletBalanceAfter: studentWalletAfter
+              },
+              exchangeRate: currentExchangeRate,
+              moncashTransactionData: {
+                orderId: monCashPendingData.orderId,
+                transactionId: confirmedPayment?.transaction_reference || confirmedPayment?.reference_number,
+                serverStatus: 'VALIDE'
+              }
+            });
 
             if (selectedStudent?.id && targetYearId) {
               await loadStudentDetails(selectedStudent.id, targetYearId);

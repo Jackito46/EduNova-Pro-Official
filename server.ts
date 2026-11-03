@@ -4223,11 +4223,50 @@ async function startServer() {
         }
       }
 
-      // Calcul certifié et idempotent du total réel validé sur Tranzak pour cet élève
+      // 1. Calcul certifié et idempotent du total des recharges validées sur Tranzak pour cet élève
       const totalTranzakCompleted = matchedCompletedTx.reduce((sum: number, tx: any) => sum + (Math.round(Number(tx.amount)) || 0), 0);
 
+      // 2. Récupérer TOUS les paiements effectués en débitant le portefeuille élève (dépenses scolaires)
+      let totalWalletDebitsHTG = 0;
+      try {
+        const { data: debits } = await dbClient
+          .from('payments')
+          .select('amount, amount_htg_equivalent, currency')
+          .eq('student_id', studentId)
+          .eq('payment_method', 'Portefeuille')
+          .eq('status', 'VALIDE');
+
+        totalWalletDebitsHTG = (debits || []).reduce((sum: number, p: any) => {
+          return sum + (Number(p.amount_htg_equivalent || p.amount) || 0);
+        }, 0);
+      } catch (debErr) {
+        console.warn('[Tranzak Sync] Erreur calcul débits portefeuille:', debErr);
+      }
+
+      // 3. Récupérer d'autres recharges manuelles en base (fee_type = 'CREDIT_PORTEFEUILLE')
+      let totalManualCreditsHTG = 0;
+      try {
+        const { data: manualCredits } = await dbClient
+          .from('payments')
+          .select('amount, amount_htg_equivalent, reference_number, moncash_order_id')
+          .eq('student_id', studentId)
+          .eq('fee_type', 'CREDIT_PORTEFEUILLE')
+          .eq('status', 'VALIDE');
+
+        const tranzakRefs = new Set(matchedCompletedTx.map((t: any) => t.reference || t.transaction_id));
+        totalManualCreditsHTG = (manualCredits || [])
+          .filter((p: any) => !tranzakRefs.has(p.reference_number) && !tranzakRefs.has(p.moncash_order_id))
+          .reduce((sum: number, p: any) => sum + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+      } catch (credErr) {
+        console.warn('[Tranzak Sync] Erreur calcul crédits manuels:', credErr);
+      }
+
+      // 4. Le solde certifié net = (Recharges Tranzak + Recharges Manuelles) - Débits Portefeuille réglés
+      const totalCreditsAll = totalTranzakCompleted + totalManualCreditsHTG;
+      const expectedBalance = Math.max(0, totalCreditsAll - totalWalletDebitsHTG);
+
       let currentBal = 0;
-      let newBal = totalTranzakCompleted;
+      let newBal = expectedBalance;
 
       try {
         const { data: stRow } = await dbClient
@@ -4238,10 +4277,9 @@ async function startServer() {
 
         currentBal = Number(stRow?.wallet_balance_htg) || 0;
 
-        // Si le solde en base est différent du total certifié Tranzak (ex: 40 HTG au lieu de 20 HTG suite à un double appel de test),
-        // nous rectifions immédiatement le solde au montant réel certifié !
-        if (currentBal !== totalTranzakCompleted) {
-          newBal = totalTranzakCompleted;
+        // On ne rectifie que si le solde en base s'écarte du solde net certifié (Crédits - Débits)
+        if (currentBal !== expectedBalance) {
+          newBal = expectedBalance;
           await dbClient
             .from('students')
             .update({
@@ -4267,7 +4305,7 @@ async function startServer() {
             http_status: 200,
             simulated: false,
             status: 'VALIDE',
-            notes: `Réconciliation certifiée Tranzak : solde portefeuille rectifié de ${currentBal} HTG à ${newBal} HTG (Total réel Tranzak)`,
+            notes: `Réconciliation certifiée : solde portefeuille ajusté à ${newBal} HTG (Recharges: ${totalCreditsAll} HTG, Débits: ${totalWalletDebitsHTG} HTG)`,
             student_name: studentName || studentId
           });
           if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
@@ -4283,12 +4321,13 @@ async function startServer() {
         synced: true,
         matched_transactions_count: matchedCompletedTx.length,
         total_tranzak_completed: totalTranzakCompleted,
+        total_wallet_debits: totalWalletDebitsHTG,
         old_balance: currentBal,
         new_balance: newBal,
         transactions: newlyValidatedList,
         message: currentBal !== newBal
-          ? `Solde du portefeuille rectifié au montant certifié Tranzak : ${newBal} HTG (auparavant ${currentBal} HTG).`
-          : `Portefeuille certifié et conforme avec Tranzak (${newBal} HTG).`
+          ? `Solde portefeuille régularisé : ${newBal} HTG (Recharges: ${totalCreditsAll} HTG, Versements réglés par portefeuille: ${totalWalletDebitsHTG} HTG).`
+          : `Portefeuille certifié et conforme (${newBal} HTG).`
       });
     } catch (err: any) {
       console.error('[Tranzak Sync Error]:', err);
@@ -4487,8 +4526,41 @@ async function startServer() {
         });
       }
 
+      // Récupérer les débits réels effectués par le portefeuille (dépenses scolaires)
+      let totalWalletDebitsHTG = 0;
+      try {
+        const { data: debits } = await dbClient
+          .from('payments')
+          .select('amount, amount_htg_equivalent, currency')
+          .eq('student_id', studentId)
+          .eq('payment_method', 'Portefeuille')
+          .eq('status', 'VALIDE');
+
+        totalWalletDebitsHTG = (debits || []).reduce((sum: number, p: any) => {
+          return sum + (Number(p.amount_htg_equivalent || p.amount) || 0);
+        }, 0);
+      } catch (debErr) {}
+
+      // Récupérer les recharges manuelles
+      let totalManualCreditsHTG = 0;
+      try {
+        const { data: manualCredits } = await dbClient
+          .from('payments')
+          .select('amount, amount_htg_equivalent, reference_number, moncash_order_id')
+          .eq('student_id', studentId)
+          .eq('fee_type', 'CREDIT_PORTEFEUILLE')
+          .eq('status', 'VALIDE');
+
+        const tranzakRefs = new Set(tranzakGatewayRecords.map((t: any) => t.reference || t.transaction_id));
+        totalManualCreditsHTG = (manualCredits || [])
+          .filter((p: any) => !tranzakRefs.has(p.reference_number) && !tranzakRefs.has(p.moncash_order_id))
+          .reduce((sum: number, p: any) => sum + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+      } catch (credErr) {}
+
+      const totalCreditsAll = totalTranzakCompletedAmount + totalManualCreditsHTG;
+      const expectedWalletBalance = Math.max(0, totalCreditsAll - totalWalletDebitsHTG);
       const currentBalance = Number(studentRecord?.wallet_balance_htg) || 0;
-      const discrepancyAmount = Math.max(0, totalTranzakCompletedAmount - currentBalance);
+      const discrepancyAmount = Math.abs(expectedWalletBalance - currentBalance);
       const isHealthy = discrepancyAmount === 0 && missedCallbackCount === 0;
 
       return res.json({
@@ -4502,7 +4574,10 @@ async function startServer() {
         },
         metrics: {
           total_tranzak_completed_htg: totalTranzakCompletedAmount,
-          total_db_validated_htg: totalDbValidatedAmount,
+          total_manual_credits_htg: totalManualCreditsHTG,
+          total_wallet_credits_htg: totalCreditsAll,
+          total_wallet_debits_htg: totalWalletDebitsHTG,
+          expected_wallet_balance_htg: expectedWalletBalance,
           current_wallet_balance_htg: currentBalance,
           discrepancy_amount_htg: discrepancyAmount,
           tranzak_transactions_found: tranzakGatewayRecords.length,
@@ -4518,8 +4593,8 @@ async function startServer() {
         diagnostic_summary: {
           has_discrepancy: discrepancyAmount > 0,
           explanation: discrepancyAmount > 0
-            ? `Écart détecté de ${discrepancyAmount} HTG : Tranzak a validé ${totalTranzakCompletedAmount} HTG, mais le solde affiché dans l'UI est de ${currentBalance} HTG. Utilisez le bouton "Résoudre & Synchroniser" pour corriger immédiatement.`
-            : `Parfait : Les relevés Tranzak et le solde Supabase (${currentBalance} HTG) sont en totale concordance.`
+            ? `Écart détecté de ${discrepancyAmount} HTG : Total recharges certifiées = ${totalCreditsAll} HTG, Versements payés par portefeuille = ${totalWalletDebitsHTG} HTG. Solde théorique = ${expectedWalletBalance} HTG (Solde actuel en UI : ${currentBalance} HTG). Cliquez sur "Résoudre & Synchroniser" pour ajuster.`
+            : `Parfait : Le solde en base (${currentBalance} HTG) est en totale concordance certifiée avec les recharges (${totalCreditsAll} HTG) et débits portefeuille (${totalWalletDebitsHTG} HTG).`
         }
       });
     } catch (err: any) {
