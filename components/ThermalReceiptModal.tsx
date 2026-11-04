@@ -191,7 +191,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
       `NET REGLE : ${Number(receiptData.amount).toLocaleString('fr-FR')} ${receiptData.currency}`,
       receiptData.currency === 'USD' && receiptData.exchangeRateApplied ? `Taux applique : 1 USD = ${receiptData.exchangeRateApplied} HTG` : null,
       receiptData.currency === 'USD' && receiptData.convertedAmountHTG ? `Contre-valeur : ${Number(receiptData.convertedAmountHTG).toLocaleString('fr-FR')} HTG` : null,
-      receiptData.currency !== 'USD' && receiptData.originalAmountUSD && receiptData.exchangeRateApplied ? `Bareme en USD : $${receiptData.originalAmountUSD} USD (Taux: ${receiptData.exchangeRateApplied} HTG)` : null,
+      receiptData.currency !== 'USD' && receiptData.originalAmountUSD && receiptData.originalAmountUSD >= 1 && receiptData.exchangeRateApplied ? `Bareme en USD : $${receiptData.originalAmountUSD} USD (Taux: ${receiptData.exchangeRateApplied} HTG)` : null,
       receiptData.notes ? `Note : ${receiptData.notes}` : null,
       receiptData.remainingAmount !== undefined ? `Reste sur ce motif : ${Number(receiptData.remainingAmount).toLocaleString('fr-FR')} ${receiptData.currency}` : null,
       receiptData.globalRemaining !== undefined ? `Solde total session : ${Number(receiptData.globalRemaining).toLocaleString('fr-FR')} HTG` : null,
@@ -511,7 +511,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
                 )}
 
                 {/* DÉTAILS SI PAIEMENT EN GOURDES AVEC BARÈME USD */}
-                {receiptData.currency !== 'USD' && receiptData.originalAmountUSD && receiptData.originalAmountUSD > 0 && (
+                {receiptData.currency !== 'USD' && receiptData.originalAmountUSD && receiptData.originalAmountUSD >= 1 && (
                   <div className="mt-1.5 pt-1.5 border-t border-black/20 text-left space-y-0.5 bg-white p-1.5 rounded text-[7.5px]">
                     <div className="flex justify-between items-center font-bold">
                       <span className="text-gray-700">Barème fixé en Dollars :</span>
@@ -747,7 +747,7 @@ export const ThermalReceiptModal: React.FC<ThermalReceiptModalProps> = ({
               {receiptData.convertedAmountHTG ? ` (Eq: ${Number(receiptData.convertedAmountHTG).toLocaleString('fr-FR')} HTG)` : ''}
             </p>
           )}
-          {receiptData.currency !== 'USD' && receiptData.originalAmountUSD && receiptData.originalAmountUSD > 0 && (
+          {receiptData.currency !== 'USD' && receiptData.originalAmountUSD && receiptData.originalAmountUSD >= 1 && (
             <p className="text-[6.5px] font-bold mt-0.5">
               Barème: ${receiptData.originalAmountUSD} USD {receiptData.exchangeRateApplied ? `(@${receiptData.exchangeRateApplied} HTG)` : ''}
             </p>

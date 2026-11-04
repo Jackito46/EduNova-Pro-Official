@@ -161,7 +161,7 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       status: printPreview.status,
       exchangeRateApplied: printPreview.exchange_rate_applied || schoolDetails?.exchange_rate,
       convertedAmountHTG: equivHTG,
-      originalAmountUSD: printPreview.planned_usd_bareme || (printPreview.currency === 'USD' ? paidAmt : undefined)
+      originalAmountUSD: (printPreview.planned_usd_bareme && printPreview.planned_usd_bareme >= 1) ? printPreview.planned_usd_bareme : (printPreview.currency === 'USD' ? paidAmt : undefined)
     };
   }, [printPreview, cashierName, schoolDetails, activeCampusName]);
 
@@ -361,18 +361,18 @@ const ReceiptManagementView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     }
 
-    // Détection du barème fixé en USD (campagne USD, mention dans description, etc.)
+    // Détection rigoureuse du barème fixé en USD (uniquement si le frais a été nativement configuré en USD)
+    // Ne jamais confondre amount_usd_equivalent (simple conversion comptable) avec un barème exigible en USD.
     let plannedUSD = 0;
-    if (p.campaign?.currency === 'USD') {
+    if (p.campaign && p.campaign.currency === 'USD') {
       plannedUSD = Number(p.campaign.amount || 0);
-    } else if (p.description) {
-      const match = p.description.match(/Barème:\s*\$?(\d+(?:\.\d+)?)\s*USD/i);
-      if (match && match[1]) {
+    } else if (p.description && (p.description.includes('Barème:') || p.description.includes('Bareme:'))) {
+      const match = p.description.match(/Bar[èe]me:\s*\$?(\d+(?:\.\d+)?)\s*USD/i);
+      if (match && match[1] && Number(match[1]) >= 1) {
         plannedUSD = Number(match[1]);
       }
-    }
-    if (plannedUSD === 0 && !isUSD && p.amount_usd_equivalent > 0 && (p.fee_type === 'DIVERS' || p.ad_hoc_campaign_id || p.description?.includes('USD'))) {
-      plannedUSD = Number(p.amount_usd_equivalent);
+    } else if (p.fee_type === 'DIVERS' && p.is_usd_native) {
+      plannedUSD = Number(p.original_amount || p.amount || 0);
     }
 
     const effectiveStudent = studentObj || p.student || students.find((s: any) => s.id === (p.student_id || p.student?.id));

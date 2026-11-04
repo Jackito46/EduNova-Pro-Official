@@ -35,7 +35,13 @@ import {
   Wallet,
   ArrowRightLeft,
   Coins,
-  Smartphone
+  Smartphone,
+  MoveHorizontal,
+  Maximize2,
+  Minimize2,
+  ChevronLeft,
+  ChevronRight,
+  Check
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { toast } from 'sonner';
@@ -717,6 +723,95 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     currentPage * itemsPerPage
   );
 
+  // States pour l'ascenseur horizontal et vertical de la table du Registre des Soldes d'Élèves
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState<boolean>(false);
+  const [canScrollRight, setCanScrollRight] = useState<boolean>(false);
+  const [isScrollable, setIsScrollable] = useState<boolean>(false);
+  const [isScrollHeightMode, setIsScrollHeightMode] = useState<boolean>(false);
+
+  const checkScroll = useCallback(() => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 5;
+    setIsScrollable(hasOverflow);
+    setCanScrollLeft(el.scrollLeft > 15);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 15);
+  }, []);
+
+  const scrollTable = (direction: 'left' | 'right') => {
+    const el = tableContainerRef.current;
+    if (!el) return;
+    const delta = direction === 'left' ? -350 : 350;
+    el.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  // States pour l'ascenseur horizontal du comparatif Facturé vs Encaissé (audit_data)
+  const auditTableContainerRef = useRef<HTMLDivElement>(null);
+  const [canAuditScrollLeft, setCanAuditScrollLeft] = useState<boolean>(false);
+  const [canAuditScrollRight, setCanAuditScrollRight] = useState<boolean>(false);
+  const [isAuditScrollable, setIsAuditScrollable] = useState<boolean>(false);
+  const [isAuditScrollHeightMode, setIsAuditScrollHeightMode] = useState<boolean>(false);
+
+  const checkAuditScroll = useCallback(() => {
+    const el = auditTableContainerRef.current;
+    if (!el) return;
+    const hasOverflow = el.scrollWidth > el.clientWidth + 5;
+    setIsAuditScrollable(hasOverflow);
+    setCanAuditScrollLeft(el.scrollLeft > 15);
+    setCanAuditScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 15);
+  }, []);
+
+  const scrollAuditTable = (direction: 'left' | 'right') => {
+    const el = auditTableContainerRef.current;
+    if (!el) return;
+    const delta = direction === 'left' ? -350 : 350;
+    el.scrollBy({ left: delta, behavior: 'smooth' });
+  };
+
+  // Surveillance dynamique du scroll horizontal et redimensionnement pour le Registre des Soldes
+  useEffect(() => {
+    checkScroll();
+    const el = tableContainerRef.current;
+    let observer: ResizeObserver | null = null;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        checkScroll();
+      });
+      observer.observe(el);
+    }
+    const handleResize = () => checkScroll();
+    window.addEventListener('resize', handleResize);
+    const timeout = setTimeout(checkScroll, 100);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeout);
+    };
+  }, [checkScroll, currentPage, isScrollHeightMode, filteredBalances.length, activeView]);
+
+  // Surveillance dynamique du scroll horizontal pour le Comparatif Facturé vs Encaissé
+  useEffect(() => {
+    if (activeView !== 'audit_data') return;
+    checkAuditScroll();
+    const el = auditTableContainerRef.current;
+    let observer: ResizeObserver | null = null;
+    if (el && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(() => {
+        checkAuditScroll();
+      });
+      observer.observe(el);
+    }
+    const handleResize = () => checkAuditScroll();
+    window.addEventListener('resize', handleResize);
+    const timeout = setTimeout(checkAuditScroll, 100);
+    return () => {
+      if (observer) observer.disconnect();
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timeout);
+    };
+  }, [checkAuditScroll, currentPage, isAuditScrollHeightMode, filteredBalances.length, activeView]);
+
   useEffect(() => {
     const fetchGenEnrollments = async () => {
       if (!genYear || !user.school_id) return;
@@ -1336,47 +1431,47 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
     <div className="max-w-7xl mx-auto space-y-6 animate-in fade-in duration-500 pb-20 print:p-0">
       
       {/* NAVIGATION & HEADER MULTI-CAMPUS */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5 print:hidden bg-white p-5 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80">
-        <div className="space-y-1 min-w-0 shrink-0">
-          <div className="flex items-center gap-2 text-indigo-600 font-extrabold text-[10px] uppercase tracking-[0.2em]">
-            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse" />
+      <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-5 print:hidden bg-white p-4 sm:p-6 rounded-3xl shadow-xs border border-slate-200/80">
+        <div className="space-y-1 min-w-0">
+          <div className="flex items-center gap-2 text-indigo-600 font-extrabold text-[10px] uppercase tracking-[0.2em] flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-indigo-600 animate-pulse shrink-0" />
             <span>ÉCONOMAT • AUDIT FINANCIER</span>
             {!isSingleCampus && activeCampusName && (
               <>
                 <span className="text-slate-300">•</span>
                 <span className="bg-indigo-50 text-indigo-800 px-2.5 py-0.5 rounded-full border border-indigo-100 font-extrabold flex items-center gap-1.5 shadow-2xs">
-                  <Globe size={11} className="text-indigo-600" />
-                  {activeCampusName}
+                  <Globe size={11} className="text-indigo-600 shrink-0" />
+                  <span>{activeCampusName}</span>
                 </span>
               </>
             )}
           </div>
-          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight sm:whitespace-nowrap">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight">
             Relevé de Compte & Audit Financier
           </h2>
         </div>
 
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full lg:w-auto shrink-0 flex-wrap sm:flex-nowrap gap-1">
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full xl:w-auto flex-wrap sm:flex-nowrap gap-1 sm:gap-1.5 overflow-x-auto no-scrollbar">
           <button 
             onClick={() => setActiveView('balances')}
-            className={`flex-1 lg:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer ${activeView === 'balances' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'}`}
+            className={`flex-1 sm:flex-initial px-3.5 sm:px-4 md:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${activeView === 'balances' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'}`}
           >
-            <History size={16} />
-            Registre des Soldes
+            <History size={16} className="shrink-0" />
+            <span>Registre des Soldes</span>
           </button>
           <button 
             onClick={() => setActiveView('audit_data')}
-            className={`flex-1 lg:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer ${activeView === 'audit_data' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'}`}
+            className={`flex-1 sm:flex-initial px-3.5 sm:px-4 md:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${activeView === 'audit_data' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'}`}
           >
-            <SearchCheck size={16} />
-            Facturé vs Encaissé
+            <SearchCheck size={16} className="shrink-0" />
+            <span>Facturé vs Encaissé</span>
           </button>
           <button 
             onClick={() => { setActiveView('generator'); setSelectedGenStudent(null); }}
-            className={`flex-1 lg:flex-none px-4 sm:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer ${activeView === 'generator' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'}`}
+            className={`flex-1 sm:flex-initial px-3.5 sm:px-4 md:px-5 py-2.5 rounded-xl text-xs font-bold tracking-tight transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${activeView === 'generator' ? 'bg-white text-indigo-700 shadow-xs ring-1 ring-slate-200/80 font-black' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/70'}`}
           >
-            <FileText size={16} />
-            Audit Individuel
+            <FileText size={16} className="shrink-0" />
+            <span>Audit Individuel</span>
           </button>
         </div>
       </div>
@@ -1647,9 +1742,9 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           {/* TABLEAU DES SOLDES */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
-            <div className="px-8 py-5 bg-slate-900 text-white flex flex-col md:flex-row items-center justify-between gap-4">
+            <div className="px-5 sm:px-8 py-4 sm:py-5 bg-slate-900 text-white flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-white/10 rounded-xl border border-white/10">
+                <div className="p-2.5 bg-white/10 rounded-xl border border-white/10 shrink-0">
                   <TrendingUp size={18} className="text-emerald-400" />
                 </div>
                 <div>
@@ -1659,13 +1754,93 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </p>
                 </div>
               </div>
-              <div className="text-right">
+              <div className="text-left md:text-right w-full md:w-auto flex md:flex-col justify-between items-center md:items-end">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Solde Total Filtré</span>
                 <span className="text-lg font-black text-rose-400">{totalBalanceSum.toLocaleString()} HTG</span>
               </div>
             </div>
+
+            {/* BARRE D'ASCENSEUR & NAVIGATION ERGONOMIQUE (ADAPTATIVE SELON LA TAILLE D'ÉCRAN : MOBILE, TABLETTE, LAPTOP, GRAND ÉCRAN) */}
+            <div className="px-3 sm:px-6 py-2 sm:py-2.5 bg-slate-800 text-slate-300 border-b border-slate-700/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 text-xs print:hidden">
+              <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+                {isScrollable ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-bold text-[10.5px] sm:text-[11px] border border-indigo-500/30 whitespace-nowrap animate-in fade-in duration-200">
+                      <MoveHorizontal size={13} className="text-indigo-400 shrink-0" />
+                      <span>Ascenseur horizontal actif ↔</span>
+                    </span>
+                    <span className="text-slate-400 text-[10.5px] sm:text-[11px] sm:hidden">
+                      (Glissez pour naviguer)
+                    </span>
+                    <span className="text-slate-400 text-[11px] hidden lg:inline">
+                      (Colonnes étendues : défilez avec l'ascenseur ou les flèches sans devoir réduire la barre latérale)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 font-bold text-[10.5px] sm:text-[11px] border border-emerald-500/25 whitespace-nowrap animate-in fade-in duration-200">
+                      <Check size={13} className="text-emerald-400 shrink-0" />
+                      <span>Vue intégrale (Grand écran)</span>
+                    </span>
+                    <span className="text-slate-400 text-[10.5px] sm:text-[11px] hidden sm:inline">
+                      (Toutes les colonnes sont directement visibles sans défilement horizontal)
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end gap-2">
+                {/* Bascule mode hauteur déroulante avec ascenseur vertical */}
+                <button
+                  type="button"
+                  onClick={() => setIsScrollHeightMode(!isScrollHeightMode)}
+                  className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-[10.5px] sm:text-[11px] transition-all cursor-pointer border flex-1 sm:flex-none whitespace-nowrap ${
+                    isScrollHeightMode
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                      : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/10'
+                  }`}
+                  title={isScrollHeightMode ? "Revenir à la hauteur normale par page" : "Activer la vue déroulante avec ascenseur vertical et en-tête figé"}
+                >
+                  {isScrollHeightMode ? <Minimize2 size={12} className="shrink-0" /> : <Maximize2 size={12} className="shrink-0" />}
+                  <span>{isScrollHeightMode ? 'Ascenseur vertical actif' : 'Mode Déroulant'}</span>
+                </button>
+
+                {/* Boutons de défilement horizontal rapide ◄ ► (affichés UNIQUEMENT si l'écran a besoin de défiler) */}
+                {isScrollable && (
+                  <div className="flex items-center gap-0.5 sm:gap-1 bg-white/10 p-0.5 rounded-lg border border-white/10 shrink-0 animate-in fade-in duration-200">
+                    <button
+                      type="button"
+                      onClick={() => scrollTable('left')}
+                      disabled={!canScrollLeft}
+                      className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/20 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Défiler le tableau vers la gauche"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-[10px] font-mono px-0.5 sm:px-1 text-slate-400 font-bold select-none">◄ ►</span>
+                    <button
+                      type="button"
+                      onClick={() => scrollTable('right')}
+                      disabled={!canScrollRight}
+                      className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/20 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Défiler le tableau vers la droite"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
             
-            <div className="overflow-x-auto print:overflow-visible custom-scrollbar">
+            <div 
+              ref={tableContainerRef}
+              onScroll={checkScroll}
+              className={`w-full overflow-x-auto ${isScrollable ? 'table-scrollbar' : 'custom-scrollbar'} print:overflow-visible transition-all overscroll-x-contain touch-pan-x ${
+                isScrollHeightMode 
+                  ? 'max-h-[58vh] sm:max-h-[68vh] lg:max-h-[70vh] 2xl:max-h-[750px] overflow-y-auto relative overscroll-contain' 
+                  : ''
+              }`}
+            >
               {isCalculatingBalances ? (
                 <div className="p-20 text-center space-y-3">
                   <RefreshCcw className="animate-spin text-indigo-600 mx-auto" size={36} />
@@ -1673,7 +1848,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               ) : (
                 <table className="w-full text-left border-collapse min-w-[880px]">
-                  <thead>
+                  <thead className={isScrollHeightMode ? 'sticky top-0 z-20 shadow-2xs' : ''}>
                     <tr className="bg-slate-50 text-slate-500 text-[10px] font-black uppercase tracking-widest border-b border-slate-100">
                       <th className="px-6 py-4 whitespace-nowrap">{terminology.student}</th>
                       <th className="px-4 py-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px] md:min-w-[170px]">
@@ -2009,7 +2184,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
           {/* TABLEAU COMPARATIF DÉTAILLÉ PAR ÉLÈVE */}
           <div className="bg-white rounded-2xl shadow-sm border border-slate-200/90 overflow-hidden">
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/80">
+            <div className="p-4 sm:p-6 border-b border-slate-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-slate-50/80">
               <div>
                 <h4 className="font-black text-slate-900 text-sm tracking-tight">Tableau d'Audit : Facturé vs Encaissé par Élève</h4>
                 <p className="text-slate-600 text-xs font-medium mt-0.5">Vérification de chaque compte d'élève avec statut des reçus et du solde dues.</p>
@@ -2019,9 +2194,87 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </span>
             </div>
 
-            <div className="overflow-x-auto custom-scrollbar">
+            {/* BARRE D'ASCENSEUR & NAVIGATION ERGONOMIQUE (AUDIT FACTURÉ VS ENCAISSÉ) */}
+            <div className="px-3 sm:px-6 py-2 sm:py-2.5 bg-slate-800 text-slate-300 border-b border-slate-700/80 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 text-xs print:hidden">
+              <div className="flex items-center justify-between sm:justify-start gap-2 flex-wrap">
+                {isAuditScrollable ? (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-indigo-500/20 text-indigo-300 font-bold text-[10.5px] sm:text-[11px] border border-indigo-500/30 whitespace-nowrap animate-in fade-in duration-200">
+                      <MoveHorizontal size={13} className="text-indigo-400 shrink-0" />
+                      <span>Ascenseur horizontal actif ↔</span>
+                    </span>
+                    <span className="text-slate-400 text-[10.5px] sm:text-[11px] sm:hidden">
+                      (Glissez pour naviguer)
+                    </span>
+                    <span className="text-slate-400 text-[11px] hidden lg:inline">
+                      (Colonnes étendues : défilez avec l'ascenseur ou les flèches sans devoir réduire la barre latérale)
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-emerald-500/15 text-emerald-300 font-bold text-[10.5px] sm:text-[11px] border border-emerald-500/25 whitespace-nowrap animate-in fade-in duration-200">
+                      <Check size={13} className="text-emerald-400 shrink-0" />
+                      <span>Vue intégrale (Grand écran)</span>
+                    </span>
+                    <span className="text-slate-400 text-[10.5px] sm:text-[11px] hidden sm:inline">
+                      (Toutes les colonnes sont directement visibles sans défilement horizontal)
+                    </span>
+                  </>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between sm:justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAuditScrollHeightMode(!isAuditScrollHeightMode)}
+                  className={`inline-flex items-center justify-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg font-bold text-[10.5px] sm:text-[11px] transition-all cursor-pointer border flex-1 sm:flex-none whitespace-nowrap ${
+                    isAuditScrollHeightMode
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-xs'
+                      : 'bg-white/10 hover:bg-white/20 text-slate-200 border-white/10'
+                  }`}
+                  title={isAuditScrollHeightMode ? "Revenir à la hauteur normale par page" : "Activer la vue déroulante avec ascenseur vertical et en-tête figé"}
+                >
+                  {isAuditScrollHeightMode ? <Minimize2 size={12} className="shrink-0" /> : <Maximize2 size={12} className="shrink-0" />}
+                  <span>{isAuditScrollHeightMode ? 'Ascenseur vertical actif' : 'Mode Déroulant'}</span>
+                </button>
+
+                {isAuditScrollable && (
+                  <div className="flex items-center gap-0.5 sm:gap-1 bg-white/10 p-0.5 rounded-lg border border-white/10 shrink-0 animate-in fade-in duration-200">
+                    <button
+                      type="button"
+                      onClick={() => scrollAuditTable('left')}
+                      disabled={!canAuditScrollLeft}
+                      className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/20 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Défiler le tableau vers la gauche"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="text-[10px] font-mono px-0.5 sm:px-1 text-slate-400 font-bold select-none">◄ ►</span>
+                    <button
+                      type="button"
+                      onClick={() => scrollAuditTable('right')}
+                      disabled={!canAuditScrollRight}
+                      className="p-1 rounded text-slate-300 hover:text-white hover:bg-white/20 disabled:opacity-30 disabled:pointer-events-none transition-colors cursor-pointer"
+                      title="Défiler le tableau vers la droite"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div 
+              ref={auditTableContainerRef}
+              onScroll={checkAuditScroll}
+              className={`w-full overflow-x-auto ${isAuditScrollable ? 'table-scrollbar' : 'custom-scrollbar'} print:overflow-visible transition-all overscroll-x-contain touch-pan-x ${
+                isAuditScrollHeightMode 
+                  ? 'max-h-[58vh] sm:max-h-[68vh] lg:max-h-[70vh] 2xl:max-h-[750px] overflow-y-auto relative overscroll-contain' 
+                  : ''
+              }`}
+            >
               <table className="w-full text-left text-xs border-collapse min-w-[1080px]">
-                <thead>
+                <thead className={isAuditScrollHeightMode ? 'sticky top-0 z-20 shadow-2xs' : ''}>
                   <tr className="border-b border-slate-200 bg-slate-100/80 text-slate-700 font-black uppercase text-[10px] tracking-wider">
                     <th className="p-4 pl-6 whitespace-nowrap">Élève / Matricule</th>
                     <th className="p-4 whitespace-nowrap min-w-[120px] sm:min-w-[140px] md:min-w-[170px]">
