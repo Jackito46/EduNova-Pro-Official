@@ -31,7 +31,9 @@ import {
   Sliders,
   Radio,
   Building2,
-  Activity
+  Activity,
+  Landmark,
+  Coins
 } from 'lucide-react';
 import { UserProfile, UserRole } from '../types';
 import { toast } from 'sonner';
@@ -1079,75 +1081,108 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   return (
     <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 lg:space-y-4.5 animate-in fade-in duration-500 pb-8">
       
-      {/* HEADER HUB TITLE BANNER */}
-      <div className="bg-white p-4 sm:p-5 lg:p-5.5 rounded-2xl shadow-xs border border-slate-200/90 relative overflow-hidden">
-        {/* Subtle decorative background shapes */}
-        <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-indigo-50/50 rounded-full blur-2xl pointer-events-none" />
-        <div className="absolute right-1/3 -top-10 w-40 h-40 bg-emerald-50/40 rounded-full blur-xl pointer-events-none" />
+      {/* HEADER HUB TITLE BANNER (HARMONISÉ AVEC LE STYLE CONSOLE SUPER ADMINISTRATEUR) */}
+      <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white p-5 sm:p-6 lg:p-7 rounded-2xl sm:rounded-[2rem] shadow-xl border border-slate-800 relative overflow-hidden">
+        {/* Decorative glow overlays */}
+        <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute right-1/3 -top-10 w-48 h-48 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-3.5 sm:gap-4">
-          <div className="space-y-1 sm:space-y-1.5 min-w-0">
-            <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
-              <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 bg-indigo-50 border border-indigo-200 text-indigo-700 rounded-full text-[10px] sm:text-[11px] font-bold tracking-wide">
-                <Building2 size={12} className="text-emerald-600 shrink-0" />
+        <div className="relative z-10 flex flex-col xl:flex-row xl:items-center justify-between gap-5 sm:gap-6">
+          <div className="space-y-2.5 sm:space-y-3 min-w-0">
+            {/* Badges Eyebrow */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
+              <span className="px-2.5 sm:px-3 py-1 bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 text-[10px] font-black uppercase tracking-widest rounded-full backdrop-blur-md flex items-center gap-1.5 shadow-2xs">
+                <Building2 size={12} className="text-emerald-400 shrink-0" />
                 <span className="truncate max-w-[200px] sm:max-w-xs">{school?.name || 'Établissement Connecté'}</span>
-                <span className="text-indigo-300">•</span>
-                <span>Unité de Pilotage Financier</span>
-              </div>
+              </span>
+              <span className="px-2.5 py-1 bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-[10px] font-black uppercase tracking-wider rounded-full flex items-center gap-1.5 shadow-2xs">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                <span>UNITÉ DE PILOTAGE FINANCIER</span>
+              </span>
             </div>
 
-            <h1 className="text-lg sm:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight leading-tight">
-              Direction de l'Économat
-            </h1>
-            <p className="text-slate-500 text-xs sm:text-xs md:text-sm font-medium max-w-2xl leading-relaxed line-clamp-2">
-              Plateforme centrale de recouvrement, contrôle de caisse quotidien et audit financier académique.
-            </p>
+            {/* Titre & Description */}
+            <div>
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tight text-white flex items-center gap-2.5 sm:gap-3">
+                <div className="p-2 sm:p-2.5 bg-indigo-500/20 border border-indigo-400/30 rounded-xl sm:rounded-2xl text-indigo-400 flex items-center justify-center shrink-0 shadow-inner">
+                  <Landmark size={24} className="text-indigo-300 shrink-0" />
+                </div>
+                <span>Direction de l'Économat</span>
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-300 font-medium mt-1 max-w-2xl leading-relaxed">
+                Plateforme centrale de recouvrement, contrôle de caisse quotidien et audit financier académique.
+              </p>
+            </div>
+
+            {/* Live Metric Badges (Harmonisés avec le style Super Administrateur) */}
+            <div className="pt-0.5 flex flex-wrap items-center gap-2 sm:gap-2.5 text-xs font-bold text-slate-300">
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/60 text-[11px] sm:text-xs shadow-2xs backdrop-blur-md">
+                <Receipt size={13} className="text-indigo-400 shrink-0" />
+                <span><strong className="text-white font-black">{todayTransactions}</strong> Tx Aujourd'hui</span>
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/60 text-[11px] sm:text-xs shadow-2xs backdrop-blur-md">
+                <TrendingUp size={13} className="text-emerald-400 shrink-0" />
+                <span><strong className="text-white font-black">{activeCollectionRate.toFixed(1)}%</strong> Recouvrement</span>
+              </div>
+              <div className="flex items-center gap-1.5 sm:gap-2 bg-slate-800/80 px-2.5 sm:px-3 py-1 sm:py-1.5 rounded-xl border border-slate-700/60 text-[11px] sm:text-xs shadow-2xs backdrop-blur-md">
+                <Coins size={13} className="text-amber-400 shrink-0" />
+                <span><strong className="text-white font-black">1 USD = {exchangeRate || 132.5}</strong> HTG</span>
+              </div>
+            </div>
           </div>
 
-          {/* DYNAMICALLY RESPONSIVE ACTION TOOLBAR */}
-          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2 w-full xl:w-auto xl:justify-end pt-2 xl:pt-0 shrink-0">
-            {/* Action 1: Encaisser (Action primaire mise en avant) */}
+          {/* DYNAMICALLY RESPONSIVE ACTION TOOLBAR AVEC CONTRASTE ET VISIBILITÉ HAUT DE GAMME */}
+          <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full xl:w-auto xl:justify-end shrink-0 pt-2 xl:pt-0">
+            {/* Action 1: Encaisser (Action primaire mise en avant - Vert Émeraude Vibrant haute visibilité) */}
             <button
               type="button"
               onClick={() => navigate('/economat/frais')}
-              className="h-9 px-3 sm:px-3.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-emerald-600/30 whitespace-nowrap cursor-pointer shrink-0"
+              className="h-10 sm:h-11 px-3.5 sm:px-4 bg-gradient-to-r from-emerald-500 via-emerald-600 to-teal-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-black text-xs sm:text-sm rounded-xl sm:rounded-2xl shadow-xl shadow-emerald-950/60 hover:shadow-emerald-500/25 transition-all flex items-center justify-center gap-2 active:scale-95 border border-emerald-400/40 whitespace-nowrap cursor-pointer shrink-0"
               title={`Encaisser un versement de ${terminology.tuition} ou autre frais`}
             >
-              <PlusCircle size={15} className="shrink-0 text-white" />
-              <span>Encaisser</span>
+              <div className="w-6 h-6 rounded-lg bg-white/20 flex items-center justify-center shrink-0">
+                <PlusCircle size={15} className="shrink-0 text-white" strokeWidth={2.5} />
+              </div>
+              <span className="font-black tracking-tight">Encaisser</span>
             </button>
 
-            {/* Action 2: Clôture de Caisse */}
+            {/* Action 2: Clôture Caisse (Bouton contrasté fond sombre + bordure et icône émeraude) */}
             <button
               type="button"
               onClick={() => setIsClosureModalOpen(true)}
-              className="h-9 px-3 sm:px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-slate-200 whitespace-nowrap cursor-pointer shrink-0"
+              className="h-10 sm:h-11 px-3 sm:px-3.5 bg-slate-800/90 hover:bg-slate-700/90 text-white hover:text-emerald-300 font-bold text-xs rounded-xl sm:rounded-2xl transition-all shadow-md shadow-slate-950/40 flex items-center justify-center gap-2 active:scale-95 border border-slate-700 hover:border-emerald-400/40 whitespace-nowrap cursor-pointer shrink-0 backdrop-blur-md"
               title="Rapport officiel de clôture et audit de caisse journalière"
             >
-              <ShieldCheck size={15} className="shrink-0 text-emerald-600" />
-              <span>Clôture Caisse</span>
+              <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-400">
+                <ShieldCheck size={14} className="shrink-0 text-emerald-400" />
+              </div>
+              <span className="text-slate-100 tracking-tight">Clôture Caisse</span>
             </button>
 
-            {/* Action 3: Diagnostic Passerelles API (Tranzak, Kobara & MonCash) */}
+            {/* Action 3: Diagnostic Passerelles API (Fond violet lumineux + texte contrasté) */}
             <button
               type="button"
               onClick={() => setIsGatewayDiagnosticOpen(true)}
-              className="h-9 px-3 sm:px-3.5 bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-purple-200 whitespace-nowrap cursor-pointer shrink-0"
+              className="h-10 sm:h-11 px-3 sm:px-3.5 bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 hover:text-white font-bold text-xs rounded-xl sm:rounded-2xl transition-all shadow-md shadow-purple-950/40 flex items-center justify-center gap-2 active:scale-95 border border-purple-400/40 whitespace-nowrap cursor-pointer shrink-0 backdrop-blur-md"
               title="Diagnostic en temps réel des clés API Tranzak, Kobara & MonCash sans impacter les soldes des élèves"
             >
-              <Radio size={14} className="shrink-0 text-purple-600" />
-              <span>Passerelles & API</span>
+              <div className="w-6 h-6 rounded-lg bg-purple-400/20 border border-purple-400/30 flex items-center justify-center shrink-0 text-purple-300">
+                <Radio size={14} className="shrink-0 text-purple-300" />
+              </div>
+              <span className="text-purple-100 tracking-tight">Passerelles & API</span>
             </button>
 
-            {/* Action 4: Réévaluer Objectif */}
+            {/* Action 4: Réévaluer Objectif (Fond indigo lumineux) */}
             <button
               type="button"
               onClick={() => setIsReevaluationModalOpen(true)}
-              className="h-9 px-2.5 sm:px-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-indigo-200 whitespace-nowrap cursor-pointer shrink-0"
+              className="h-10 sm:h-11 px-3 sm:px-3.5 bg-indigo-500/20 hover:bg-indigo-500/30 text-indigo-200 hover:text-white font-bold text-xs rounded-xl sm:rounded-2xl transition-all shadow-md shadow-indigo-950/40 flex items-center justify-center gap-2 active:scale-95 border border-indigo-400/40 whitespace-nowrap cursor-pointer shrink-0 backdrop-blur-md"
               title={`Recalculer l'objectif net après déduction des bourses et réductions de ${terminology.tuition}`}
             >
-              <Calculator size={14} className="shrink-0 text-indigo-600" />
-              <span>Réévaluer</span>
+              <div className="w-6 h-6 rounded-lg bg-indigo-400/20 border border-indigo-400/30 flex items-center justify-center shrink-0 text-indigo-300">
+                <Calculator size={14} className="shrink-0 text-indigo-300" />
+              </div>
+              <span className="text-indigo-100 tracking-tight">Réévaluer</span>
             </button>
 
             {/* Action 5: Diagnostic Barème USD (Visible uniquement pour écoles avec 2 devises activées) */}
@@ -1155,11 +1190,13 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               <button
                 type="button"
                 onClick={() => setIsDiagnosticModalOpen(true)}
-                className="h-9 px-2.5 sm:px-3 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs rounded-xl transition-all shadow-2xs flex items-center justify-center gap-1.5 active:scale-[0.98] border border-slate-200 whitespace-nowrap cursor-pointer shrink-0"
+                className="h-10 sm:h-11 px-3 sm:px-3.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 hover:text-white font-bold text-xs rounded-xl sm:rounded-2xl transition-all shadow-md shadow-cyan-950/40 flex items-center justify-center gap-2 active:scale-95 border border-cyan-400/40 whitespace-nowrap cursor-pointer shrink-0 backdrop-blur-md"
                 title="Diagnostic comparatif du Total Dû théorique (barème USD) vs montant réellement enregistré dans l'engagement"
               >
-                <Activity size={14} className="shrink-0 text-indigo-600" />
-                <span>Barème USD</span>
+                <div className="w-6 h-6 rounded-lg bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center shrink-0 text-cyan-300">
+                  <Activity size={14} className="shrink-0 text-cyan-300" />
+                </div>
+                <span className="text-cyan-100 tracking-tight">Barème USD</span>
               </button>
             )}
 
@@ -1168,11 +1205,11 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
               type="button"
               onClick={() => fetchFinanceData(false)}
               disabled={isRefreshing || loading}
-              className="h-9 w-9 p-0 bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 font-medium text-xs rounded-xl transition-all border border-slate-200 flex items-center justify-center active:scale-[0.98] cursor-pointer shrink-0"
+              className="h-10 sm:h-11 w-10 sm:w-11 p-0 bg-slate-800/90 hover:bg-slate-700 text-slate-300 hover:text-white font-medium text-xs rounded-xl sm:rounded-2xl transition-all border border-slate-700/80 hover:border-slate-600 flex items-center justify-center active:scale-95 cursor-pointer shrink-0 shadow-md backdrop-blur-md"
               title="Rafraîchir les données financières en temps réel"
               aria-label="Rafraîchir"
             >
-              <RefreshCcw size={14} className={`shrink-0 ${(isRefreshing || loading) ? 'animate-spin text-indigo-600' : ''}`} />
+              <RefreshCcw size={15} className={`shrink-0 ${(isRefreshing || loading) ? 'animate-spin text-indigo-400' : 'text-slate-300'}`} />
             </button>
           </div>
         </div>
