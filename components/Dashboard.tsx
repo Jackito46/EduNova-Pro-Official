@@ -1192,12 +1192,34 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
           const totalExpected = admBreakdown.effectiveDueHTG + tuitionBreakdown.effectiveDueHTG + miscBreakdown.effectiveDueHTG + campTotalExpected;
           const globalDebt = admBreakdown.remainingHTGEquiv + tuitionBreakdown.remainingHTGEquiv + miscBreakdown.remainingHTGEquiv + campRemaining;
 
+          // Interrogation de l'audit de dette globale officiel par RPC pour conformité totale avec l'Administration
+          let certifiedRpcDebt: number | null = null;
+          try {
+            const { data: d } = await supabase.rpc('get_student_global_debt', { p_student_id: studentData.id });
+            if (d !== null && d !== undefined) certifiedRpcDebt = Number(d);
+          } catch (e) {}
+
+          const effectiveGlobalDebt = certifiedRpcDebt !== null ? certifiedRpcDebt : globalDebt;
+
+          // Calcul dynamique certifié du portefeuille (Crédits dépôts - Débits règlements)
+          const walletCredits = (allStudentPayments || []).filter((p: any) => isPaymentCompleted(p) && isWalletDeposit(p));
+          const walletDebits = (allStudentPayments || []).filter((p: any) => isPaymentCompleted(p) && (
+            p.payment_method === 'Portefeuille' ||
+            (p.payment_method && String(p.payment_method).toLowerCase().includes('portefeuille')) ||
+            (p.method && String(p.method).toLowerCase().includes('portefeuille'))
+          ));
+          const totalCredits = walletCredits.reduce((s: number, p: any) => s + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+          const totalDebits = walletDebits.reduce((s: number, p: any) => s + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+          const certifiedWalletHTG = (walletCredits.length > 0 || walletDebits.length > 0)
+            ? Math.max(0, totalCredits - totalDebits)
+            : Number(studentData.wallet_balance_htg || 0);
+
           setStudentStats({
             className: studentData.class?.name || 'Non assigné',
             attendanceRate: 85,
             averageGrade: Number(avg.toFixed(2)),
-            paymentsStatus: globalDebt > 0 ? 'En retard' : 'À jour',
-            globalDebt,
+            paymentsStatus: effectiveGlobalDebt > 0 ? 'En retard' : 'À jour',
+            globalDebt: effectiveGlobalDebt,
             totalPaid,
             totalDue: totalExpected,
             admissionExpected: admBreakdown.effectiveDueHTG,
@@ -1214,7 +1236,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             campaignsBalance: campRemaining,
             discountAmount: studentDiscount,
             hasCampaigns: activeCampaignFees.length > 0 || campTotalExpected > 0,
-            wallet_balance_htg: Number(studentData.wallet_balance_htg || 0),
+            wallet_balance_htg: certifiedWalletHTG,
             wallet_balance_usd: Number(studentData.wallet_balance_usd || 0)
           });
         }

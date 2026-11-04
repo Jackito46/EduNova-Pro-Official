@@ -340,9 +340,13 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       // Synchronisation en direct des dépôts mobiles Tranzak (MonCash & NatCash)
       try {
         const studentFullName = `${studentData.first_name || ''} ${studentData.last_name || ''}`.trim();
+        const token = (await supabase.auth.getSession()).data.session?.access_token;
         const syncRes = await fetch('/api/tranzak/sync-student-payments', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+          },
           body: JSON.stringify({
             studentId: studentId,
             schoolId: user.school_id,
@@ -351,7 +355,10 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
         });
         if (syncRes.ok) {
           const syncJson = await syncRes.json().catch(() => ({}));
-          const remoteTxs = Array.isArray(syncJson?.transactions) ? syncJson.transactions : [];
+          const remoteTxs = Array.isArray(syncJson?.all_transactions)
+            ? syncJson.all_transactions
+            : (Array.isArray(syncJson?.transactions) ? syncJson.transactions : []);
+
           for (const tx of remoteTxs) {
             const txRef = tx.reference || tx.metadata?.order_id || tx.transaction_id;
             const txId = tx.transaction_id || tx.id;
@@ -525,6 +532,41 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const walletDeposits = useMemo(() => {
     return (payments || []).filter(p => isPaymentCompleted(p) && isWalletDeposit(p));
   }, [payments]);
+
+  // Débits réels du portefeuille : règlements de frais scolaires effectués par le mode Portefeuille
+  const walletDebits = useMemo(() => {
+    return (payments || []).filter(p => isPaymentCompleted(p) && (
+      p.payment_method === 'Portefeuille' || 
+      (p.payment_method && String(p.payment_method).toLowerCase().includes('portefeuille')) ||
+      (p.method && String(p.method).toLowerCase().includes('portefeuille'))
+    ));
+  }, [payments]);
+
+  const totalWalletCreditsHTG = useMemo(() => {
+    return walletDeposits.reduce((acc: number, p: any) => acc + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+  }, [walletDeposits]);
+
+  const totalWalletDebitsHTG = useMemo(() => {
+    return walletDebits.reduce((acc: number, p: any) => acc + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+  }, [walletDebits]);
+
+  // Solde certifié en temps réel : Crédits (Recharges) - Débits (Règlements réglés par portefeuille)
+  const certifiedWalletBalanceHTG = useMemo(() => {
+    if (walletDeposits.length > 0 || walletDebits.length > 0) {
+      return Math.max(0, totalWalletCreditsHTG - totalWalletDebitsHTG);
+    }
+    return Number(student?.wallet_balance_htg || 0);
+  }, [walletDeposits, walletDebits, totalWalletCreditsHTG, totalWalletDebitsHTG, student?.wallet_balance_htg]);
+
+  // Auto-réconciliation du solde persistant si écart détecté avec l'historique comptable
+  useEffect(() => {
+    if (student?.id && (walletDeposits.length > 0 || walletDebits.length > 0)) {
+      if (Number(student.wallet_balance_htg) !== certifiedWalletBalanceHTG) {
+        supabase.from('students').update({ wallet_balance_htg: certifiedWalletBalanceHTG }).eq('id', student.id).then();
+        setStudent((prev: any) => prev ? { ...prev, wallet_balance_htg: certifiedWalletBalanceHTG } : prev);
+      }
+    }
+  }, [student?.id, certifiedWalletBalanceHTG, walletDeposits.length, walletDebits.length]);
 
   const totalPaidHTG = useMemo(() => {
     return validFeePayments.reduce((acc: number, p: any) => acc + Number(p.amount || 0), 0);
@@ -1073,7 +1115,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <div className="flex items-baseline justify-between">
               <div>
                 <span className="text-xl font-black font-mono text-slate-900 tracking-tight">
-                  {(student.wallet_balance_htg || 0).toLocaleString()}
+                  {certifiedWalletBalanceHTG.toLocaleString()}
                 </span>
                 <span className="text-[10px] font-bold text-slate-500 ml-1">HTG</span>
               </div>
@@ -1446,40 +1488,33 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               </table>
             </div>
           </div>
-          {/* Ad-Hoc Campaigns */}
+          {/* Ad-Hoc Campaigns / Campagnes & Événements (Tableau aligné en pleine largeur avec Parcours Académique) */}
           {adHocCampaigns.length > 0 && (
-            <div className="bg-gradient-to-r from-indigo-50 to-blue-50 rounded-2xl shadow-sm border border-indigo-100 overflow-hidden">
-              <div className="px-6 py-4 border-b border-indigo-100/50 flex items-center gap-3">
-                <Rocket className="text-indigo-600" size={20} />
-                <h3 className="font-bold text-indigo-900 text-sm uppercase tracking-wider">Campagnes & Événements</h3>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="px-6 py-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between gap-3 flex-wrap">
+                <div className="flex items-center gap-3">
+                  <Rocket className="text-indigo-600" size={20} />
+                  <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">Campagnes & Événements</h3>
+                </div>
+                <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono">
+                  {adHocCampaigns.length} campagne(s)
+                </span>
               </div>
-              <div className="p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {adHocCampaigns.map((camp, idx) => (
-                  <div key={idx} className="bg-white rounded-xl p-4 border border-indigo-100 shadow-sm flex flex-col gap-2 relative overflow-hidden group hover:shadow-md transition-shadow">
-                    <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-indigo-100 to-transparent -mr-8 -mt-8 rounded-full opacity-50 group-hover:scale-110 transition-transform"></div>
-                    <div className="flex items-start justify-between gap-2 z-10">
-                      <div>
-                        <h4 className="font-bold text-gray-900 text-sm truncate">{camp.name}</h4>
-                        <p className="text-[10px] font-bold text-indigo-400 capitalize">{camp.type?.toLowerCase() || 'autre'} • {camp.academic_year?.label}</p>
-                      </div>
-                      <span className={`shrink-0 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                        camp.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
-                        camp.status === 'PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200' :
-                        'bg-gray-50 text-gray-600 border-gray-200'
-                      }`}>
-                        {camp.status === 'PROGRESS' ? 'En Cours' : camp.status === 'COMPLETED' ? 'Clôturée' : 'Brouillon'}
-                      </span>
-                    </div>
-                    <div className="mt-1 flex flex-col gap-1 z-10">
-                      {camp.due_date && (
-                        <p className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
-                          <Calendar size={12} className="text-indigo-400" />
-                          <span>Échéance: {new Date(camp.due_date).toLocaleDateString()}</span>
-                        </p>
-                      )}
-                    </div>
-
-                    {(() => {
+              <div className="overflow-x-auto">
+                <table className="w-full text-left min-w-[700px]">
+                  <thead>
+                    <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+                      <th className="px-6 py-3">Campagne & Type</th>
+                      <th className="px-6 py-3">Session & Échéance</th>
+                      <th className="px-6 py-3">Statut</th>
+                      <th className="px-6 py-3 text-right">Barème</th>
+                      <th className="px-6 py-3 text-right">Réglé</th>
+                      <th className="px-6 py-3 text-right">Solde Dû</th>
+                      <th className="px-6 py-3">Reçu(s) Scellé(s)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {adHocCampaigns.map((camp, idx) => {
                       const campPayments = payments.filter((p: any) => {
                         if (!isPaymentCompleted(p)) return false;
                         if (p.ad_hoc_campaign_id && (p.ad_hoc_campaign_id === camp.id || p.ad_hoc_campaign_id === camp.fee_id)) return true;
@@ -1493,64 +1528,98 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       const requiredCampAmount = camp.custom_amount !== null && camp.custom_amount !== undefined ? Number(camp.custom_amount) : Number(camp.amount);
                       const campBalance = Math.max(requiredCampAmount - totalPaidForCamp, 0);
                       const isCampSolde = campBalance === 0;
-                      
-                      return (
-                        <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex flex-col gap-2 z-10 text-xs">
-                          {/* Synthèse Barème / Réglé / Solde */}
-                          <div className="grid grid-cols-3 gap-1.5 text-center bg-slate-50 p-2 rounded-xl border border-slate-100">
-                            <div>
-                              <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Barème</p>
-                              <p className="text-xs font-black text-slate-800 font-mono mt-0.5">
-                                {requiredCampAmount.toLocaleString()} {camp.currency}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] uppercase font-bold text-emerald-600 tracking-wider">Réglé</p>
-                              <p className="text-xs font-black text-emerald-700 font-mono mt-0.5">
-                                {totalPaidForCamp.toLocaleString()} {camp.currency}
-                              </p>
-                            </div>
-                            <div>
-                              <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">Reste</p>
-                              <p className={`text-xs font-black font-mono mt-0.5 ${isCampSolde ? 'text-emerald-700' : 'text-rose-700'}`}>
-                                {isCampSolde ? '0 (Soldé)' : `${campBalance.toLocaleString()} ${camp.currency}`}
-                              </p>
-                            </div>
-                          </div>
 
-                          {campPayments.length > 0 && (
-                            <div className="mt-1 bg-white rounded-lg p-2 border border-slate-200/80 space-y-1.5">
-                              <div className="flex items-center justify-between text-[9px] font-black uppercase text-slate-400 tracking-wider">
-                                <span>Reçu(s) Scellé(s)</span>
-                                <span className="text-indigo-600 font-mono">{campPayments.length} versement(s)</span>
-                              </div>
-                              <div className="space-y-1 max-h-[100px] overflow-y-auto">
+                      return (
+                        <tr key={camp.id || idx} className="hover:bg-gray-50/70 transition-colors">
+                          <td className="px-6 py-4">
+                            <span className="font-bold text-gray-900 text-sm block tracking-tight">{camp.name}</span>
+                            <span className="text-[10px] font-bold text-indigo-500 uppercase tracking-wide">
+                              {camp.type?.toLowerCase() || 'activité'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-blue-100 text-blue-700 w-fit">
+                                {camp.academic_year?.label || 'Session Active'}
+                              </span>
+                              {camp.due_date && (
+                                <span className="text-xs font-medium text-gray-500 flex items-center gap-1.5">
+                                  <Calendar size={12} className="text-gray-400" />
+                                  <span>Échéance: {new Date(camp.due_date).toLocaleDateString()}</span>
+                                </span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${
+                              camp.status === 'COMPLETED' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                              camp.status === 'PROGRESS' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                              'bg-gray-50 text-gray-600 border-gray-200'
+                            }`}>
+                              {camp.status === 'PROGRESS' ? 'En Cours' : camp.status === 'COMPLETED' ? 'Clôturée' : 'Brouillon'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="text-sm font-black font-mono text-slate-800">
+                              {requiredCampAmount.toLocaleString()} {camp.currency}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <span className="text-sm font-black font-mono text-emerald-600">
+                              {totalPaidForCamp > 0 ? `+${totalPaidForCamp.toLocaleString()} ${camp.currency}` : `0 ${camp.currency}`}
+                            </span>
+                            {campPayments.length > 0 && (
+                              <span className="block text-[10px] font-medium text-slate-400 font-mono">
+                                {campPayments.length} versement(s)
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            {isCampSolde ? (
+                              <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-lg">
+                                ✅ Soldé
+                              </span>
+                            ) : (
+                              <span className="text-sm font-black font-mono text-rose-600">
+                                {campBalance.toLocaleString()} {camp.currency}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4">
+                            {campPayments.length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5 max-w-[340px]">
                                 {campPayments.map((p: any, pIdx: number) => {
-                                  const pDate = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : 'Date scellée';
+                                  const pDate = p.date ? new Date(p.date).toLocaleDateString('fr-FR') : 'Scellé';
                                   return (
-                                    <div key={p.id || pIdx} className="flex justify-between items-center text-[10px] font-medium text-slate-700 border-b border-slate-100 pb-1 last:border-0 last:pb-0">
-                                      <div className="flex items-center gap-1.5 truncate">
-                                        <span className="font-mono font-bold text-indigo-700 bg-indigo-50 border border-indigo-100 px-1.5 py-0.5 rounded text-[9.5px]">
-                                          {p.receipt_number || p.reference_number || `Reçu #${p.id.slice(0, 8)}`}
-                                        </span>
-                                        <span className="text-[9px] text-slate-400 truncate">
-                                          {pDate} • {p.payment_method || 'Cash'}
-                                        </span>
-                                      </div>
-                                      <span className="font-black font-mono text-emerald-700 shrink-0 ml-1">
+                                    <div
+                                      key={p.id || pIdx}
+                                      className="inline-flex items-center gap-1.5 px-2 py-1 bg-slate-50 hover:bg-indigo-50/70 border border-slate-200 rounded-lg text-[10px] font-medium text-slate-700 transition-colors shadow-2xs"
+                                      title={`${pDate} • ${p.payment_method || 'Cash'}`}
+                                    >
+                                      <span className="font-mono font-bold text-indigo-700">
+                                        {p.receipt_number || p.reference_number || `Reçu #${p.id.slice(0, 8)}`}
+                                      </span>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="text-[9.5px] text-slate-500">{pDate}</span>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="text-[9.5px] text-slate-500 font-semibold">{p.payment_method || 'Cash'}</span>
+                                      <span className="text-slate-300">•</span>
+                                      <span className="font-bold font-mono text-emerald-700">
                                         +{Number(p.amount).toLocaleString()} {p.currency || 'HTG'}
                                       </span>
                                     </div>
                                   );
                                 })}
                               </div>
-                            </div>
-                          )}
-                        </div>
+                            ) : (
+                              <span className="text-xs text-gray-400 italic">Aucun versement</span>
+                            )}
+                          </td>
+                        </tr>
                       );
-                    })()}
-                  </div>
-                ))}
+                    })}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -1581,7 +1650,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="flex items-center gap-2 bg-white px-3.5 py-2 rounded-xl border border-blue-200 shadow-2xs self-start sm:self-auto">
                   <span className="text-[10px] font-black uppercase tracking-wider text-slate-500">Solde Disponible :</span>
                   <span className="font-mono text-base font-black text-blue-700">
-                    {(student.wallet_balance_htg || 0).toLocaleString()} HTG
+                    {certifiedWalletBalanceHTG.toLocaleString()} HTG
                   </span>
                 </div>
               </div>
@@ -1737,7 +1806,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               {walletDeposits.length > 0 && (
                 <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-200 px-2.5 py-0.5 rounded-full flex items-center gap-1">
                   <Wallet size={12} />
-                  Solde Portefeuille : {(student.wallet_balance_htg || 0).toLocaleString()} HTG
+                  Solde Portefeuille : {certifiedWalletBalanceHTG.toLocaleString()} HTG
                 </span>
               )}
             </div>
@@ -1866,13 +1935,13 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         {isDossierSolde ? 'Soldé à 100%' : 'Partiel'}
                       </td>
                     </tr>
-                    {Boolean(student?.wallet_balance_htg && Number(student.wallet_balance_htg) > 0) && (
+                    {Boolean(certifiedWalletBalanceHTG > 0) && (
                       <tr className="bg-blue-50/30 border-t border-blue-100 font-bold text-slate-700 text-xs">
                         <td colSpan={4} className="py-2 px-4 text-right uppercase tracking-wider text-[10px] text-blue-700">
                           Solde Portefeuille Disponible (Fonds d'avance élève) :
                         </td>
                         <td className="py-2 px-4 text-right font-mono text-xs text-blue-700">
-                          +{Number(student.wallet_balance_htg || 0).toLocaleString()} HTG
+                          +{certifiedWalletBalanceHTG.toLocaleString()} HTG
                         </td>
                         <td className="py-2 px-4 text-center text-[10px] text-blue-700 font-bold">
                           Réserve Élève
@@ -1944,7 +2013,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">
                     <p className="text-[9px] text-slate-500 uppercase font-bold tracking-wider">Solde HTG</p>
                     <p className="text-sm font-black text-emerald-700 font-mono mt-0.5">
-                      {(student.wallet_balance_htg || 0).toLocaleString()} <span className="text-[10px] font-normal">G</span>
+                      {certifiedWalletBalanceHTG.toLocaleString()} <span className="text-[10px] font-normal">G</span>
                     </p>
                   </div>
                   <div className="bg-slate-50 rounded-xl p-2.5 border border-slate-100 text-center">

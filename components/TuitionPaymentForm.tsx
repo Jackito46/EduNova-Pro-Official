@@ -78,7 +78,7 @@ import {
   isWalletPaymentActive
 } from '../lib/paymentMethods';
 import { computeFeeCategoryBalance } from '../utils/financeCalculations';
-import { isPaymentCompleted, cancelMonCashPayment } from '../src/utils/payment';
+import { isPaymentCompleted, cancelMonCashPayment, isWalletDeposit } from '../src/utils/payment';
 
 const getReceiptFeeText = (
   feeType: string,
@@ -604,6 +604,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   // Handle fee type change to enforce currency rules
   const handleFeeTypeChange = (newFeeType: string) => {
+    // Rechargement au guichet interdit : les recharges s'effectuent exclusivement en ligne via MonCash / Natcash
+    if (newFeeType === 'CREDIT_PORTEFEUILLE' || newFeeType === 'RECHARGE_PORTEFEUILLE') {
+      toast.info("Le rechargement de portefeuille s'effectue en ligne via MonCash/Natcash depuis l'Espace Élève/Parent.");
+      return;
+    }
     setFeeType(newFeeType);
     
     // Automatically set currency based on the fee type's native plan currency
@@ -1115,7 +1120,6 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         supabase
           .from('payments')
           .select('*, campaign:ad_hoc_campaigns(id, name)')
-          .eq('school_id', user.school_id)
           .eq('student_id', studentId)
           .order('created_at', { ascending: false }),
         supabase
@@ -1220,6 +1224,46 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
 
         let allStudentPayments: any[] = pData || [];
+
+        // Calcul dynamique certifié du solde portefeuille élève (Recharges certifiées - Règlements effectués par portefeuille)
+        const walletCredits = (allStudentPayments || []).filter((p: any) => isPaymentCompleted(p) && isWalletDeposit(p));
+        const walletDebits = (allStudentPayments || []).filter((p: any) => isPaymentCompleted(p) && (
+          p.payment_method === 'Portefeuille' ||
+          (p.payment_method && String(p.payment_method).toLowerCase().includes('portefeuille')) ||
+          (p.method && String(p.method).toLowerCase().includes('portefeuille'))
+        ));
+        const totalCredits = walletCredits.reduce((s: number, p: any) => s + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+        const totalDebits = walletDebits.reduce((s: number, p: any) => s + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
+        let certifiedWalletHTG = (walletCredits.length > 0 || walletDebits.length > 0)
+          ? Math.max(0, totalCredits - totalDebits)
+          : Number(data.wallet_balance_htg || 0);
+
+        // Synchronisation directe avec l'API Tranzak pour garantir la parité instantanée avec le Dossier Élève
+        try {
+          const studentFullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+          const session = (await supabase.auth.getSession()).data?.session;
+          const token = session?.access_token;
+          const syncRes = await fetch(`/api/tranzak/sync/${studentId}?schoolId=${user.school_id}&studentName=${encodeURIComponent(studentFullName)}`, {
+            headers: {
+              'Content-Type': 'application/json',
+              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+            }
+          });
+          if (syncRes.ok) {
+            const syncJson = await syncRes.json().catch(() => ({}));
+            if (typeof syncJson?.new_balance === 'number') {
+              certifiedWalletHTG = syncJson.new_balance;
+            }
+            if (Array.isArray(syncJson?.payments) && syncJson.payments.length > 0) {
+              allStudentPayments = syncJson.payments;
+            }
+          }
+        } catch (syncErr) {
+          console.warn('Tranzak sync notice in TuitionPaymentForm:', syncErr);
+        }
+
+        data.wallet_balance_htg = certifiedWalletHTG;
+
         // Mise à jour immédiate des transactions pour afficher la liste sans délai
         setAllStudentTransactions(allStudentPayments);
 
@@ -1635,6 +1679,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         setSelectedStudent({
           ...data,
+          wallet_balance_htg: certifiedWalletHTG,
           last_name: formatted.lastName,
           first_name: formatted.firstName,
           fullName: formatted.fullName,
@@ -3497,37 +3542,26 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                    </div>
                  )}
               </div>
-              {feeType === 'CREDIT_PORTEFEUILLE' ? (
-                <div className="bg-gradient-to-br from-blue-50 to-indigo-50/60 p-4 sm:p-5 rounded-2xl shadow-xs border border-blue-200 text-left flex flex-col justify-between min-h-[140px]">
-                  <p className="text-[11px] font-black uppercase tracking-wider text-blue-700 flex items-center gap-1.5">
-                    Mode Portefeuille <Sparkles size={13} />
+              <button 
+                type="button" 
+                onClick={() => setMontantReel(paymentLogic?.suggestion?.toString() || '')} 
+                className="bg-gradient-to-br from-emerald-50/90 to-teal-50/40 p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-200 text-left group hover:border-emerald-400 hover:bg-emerald-100/50 transition-all cursor-pointer flex flex-col justify-between min-h-[140px]"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
+                    Versement Suggéré <Zap size={13} className="text-emerald-600" />
                   </p>
-                  <p className="text-xs text-blue-900/80 leading-relaxed font-medium">
-                    Alimentation des fonds en réserve pour régler ultérieurement les frais scolaires via le mode <strong>Portefeuille</strong>.
-                  </p>
+                  <span className="text-[9px] font-bold text-emerald-700 bg-emerald-200/70 group-hover:bg-emerald-300/80 px-2 py-0.5 rounded-full transition-colors">
+                    Appliquer
+                  </span>
                 </div>
-              ) : (
-                <button 
-                  type="button" 
-                  onClick={() => setMontantReel(paymentLogic?.suggestion?.toString() || '')} 
-                  className="bg-gradient-to-br from-emerald-50/90 to-teal-50/40 p-4 sm:p-5 rounded-2xl shadow-xs border border-emerald-200 text-left group hover:border-emerald-400 hover:bg-emerald-100/50 transition-all cursor-pointer flex flex-col justify-between min-h-[140px]"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-black uppercase tracking-wider text-emerald-800 flex items-center gap-1.5">
-                      Versement Suggéré <Zap size={13} className="text-emerald-600" />
-                    </p>
-                    <span className="text-[9px] font-bold text-emerald-700 bg-emerald-200/70 group-hover:bg-emerald-300/80 px-2 py-0.5 rounded-full transition-colors">
-                      Appliquer
-                    </span>
-                  </div>
-                  <div className="mt-2 sm:mt-auto">
-                    <h5 className="text-2xl sm:text-3xl font-black text-emerald-950 font-mono tracking-tight">
-                      {paymentLogic?.suggestion?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '0'} 
-                      <span className="text-xs font-bold text-emerald-700 ml-1.5">{currency}</span>
-                    </h5>
-                  </div>
-                </button>
-              )}
+                <div className="mt-2 sm:mt-auto">
+                  <h5 className="text-2xl sm:text-3xl font-black text-emerald-950 font-mono tracking-tight">
+                    {paymentLogic?.suggestion?.toLocaleString(undefined, { maximumFractionDigits: 2 }) ?? '0'} 
+                    <span className="text-xs font-bold text-emerald-700 ml-1.5">{currency}</span>
+                  </h5>
+                </div>
+              </button>
             </div>
             </div>
             );
@@ -3881,15 +3915,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                             <div className="flex-1 min-w-0">
                               <span className="font-bold text-rose-300 block">Solde à 0.00 {currency}</span>
                               <p className="text-[11px] text-rose-200/90 mt-0.5 leading-snug">
-                                L'élève ne dispose d'aucun fonds dans son portefeuille. Veuillez sélectionner <strong>Cash / Espèces</strong> ou <strong>Dépôt Bancaire</strong>, ou alimenter d'abord son compte.
+                                L'élève ne dispose d'aucun fonds dans son portefeuille. Les renflouements s'effectuent exclusivement en ligne par l'élève ou le parent via MonCash ou Natcash depuis leur Espace Personnel. Veuillez sélectionner <strong>Cash / Espèces</strong> ou <strong>Dépôt Bancaire</strong> pour encaisser ce versement au guichet.
                               </p>
-                              <button
-                                type="button"
-                                onClick={() => handleFeeTypeChange('CREDIT_PORTEFEUILLE')}
-                                className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 bg-rose-600 hover:bg-rose-500 text-white rounded-lg text-[10.5px] font-bold transition-all cursor-pointer shadow-xs active:scale-95"
-                              >
-                                <Plus size={12} /> Alimenter / Recharger le Portefeuille
-                              </button>
                             </div>
                           </div>
                         );

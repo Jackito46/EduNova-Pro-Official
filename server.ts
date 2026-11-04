@@ -12,7 +12,7 @@ import { GoogleGenAI } from '@google/genai';
 import { BackupBackendService } from './services/backupBackendService.ts';
 import { exportProjectToGitHub, getProjectFiles } from './services/githubExporterService.ts';
 import AdmZip from 'adm-zip';
-import { handleMonCashWebhook } from './src/utils/payment.ts';
+import { handleMonCashWebhook, isWalletDeposit } from './src/utils/payment.ts';
 import { sendMonCashPaymentPushNotification } from './services/moncashPushService.ts';
 import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault.ts';
 
@@ -4078,9 +4078,16 @@ async function startServer() {
 
   // API Route pour synchroniser et réconcilier en temps réel les paiements Tranzak d'un élève
   // Détecte automatiquement les transactions 'completed' (ex: 20 HTG MonCash) et crédite le portefeuille
-  app.post('/api/tranzak/sync-student-payments', async (req, res) => {
+  const executeTranzakStudentSync = async (params: {
+    studentId: string;
+    schoolId?: string;
+    reference?: string;
+    studentName?: string;
+    req: express.Request;
+    res: express.Response;
+  }) => {
+    const { studentId, schoolId, reference, studentName, req, res } = params;
     try {
-      const { studentId, schoolId, reference, studentName } = req.body || {};
       if (!studentId) {
         return res.status(400).json({ success: false, error: 'Identifiant élève (studentId) requis.' });
       }
@@ -4130,18 +4137,37 @@ async function startServer() {
         } catch (e) {}
       }
 
-      // Filtrer les transactions 'completed' qui correspondent à cet élève
+      // Filtrer les transactions 'completed' qui correspondent à cet élève avec tolérance d'inversion Nom/Prénom
+      const nameParts = (studentName || '')
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/gi, ' ')
+        .split(/\s+/)
+        .filter(p => p.length >= 2);
+
+      const studentIdPrefix = studentId ? studentId.split('-')[0].toLowerCase() : '';
+
       const matchedCompletedTx = tranzakPayments.filter((t: any) => {
         if (t.status !== 'completed') return false;
-        const txStudentId = t.metadata?.student_id;
-        const txRef = t.reference || t.metadata?.order_id;
-        const txId = t.transaction_id;
-        const txCustName = (t.customer?.name || '').toLowerCase();
-        const txDesc = (t.description || '').toLowerCase();
+        const txStudentId = String(t.metadata?.student_id || '').toLowerCase();
+        const txRef = String(t.reference || t.metadata?.order_id || '').toLowerCase();
+        const txId = String(t.transaction_id || '').toLowerCase();
+        const txCustName = String(t.customer?.name || '').toLowerCase();
+        const txDesc = String(t.description || '').toLowerCase();
+        const txNotes = String(t.notes || '').toLowerCase();
+        const allTxText = `${txRef} ${txId} ${txCustName} ${txDesc} ${txNotes} ${txStudentId}`;
 
-        if (txStudentId && txStudentId === studentId) return true;
-        if (reference && (txRef === reference || txId === reference)) return true;
-        if (studentName && (txCustName.includes(studentName.toLowerCase()) || txDesc.includes(studentName.toLowerCase()))) return true;
+        // 1. Identifiant étudiant explicite ou préfixe UUID
+        if (txStudentId && (txStudentId === studentId.toLowerCase() || (studentIdPrefix && txStudentId.includes(studentIdPrefix)))) return true;
+        if (studentIdPrefix && allTxText.includes(studentIdPrefix)) return true;
+
+        // 2. Référence de commande ou transaction
+        if (reference && (txRef === reference.toLowerCase() || txId === reference.toLowerCase() || allTxText.includes(reference.toLowerCase()))) return true;
+
+        // 3. Rapprochement par nom/prénom (même inversé comme 'Woodley ALEXANDRE' vs 'Alexandre Woodley')
+        if (nameParts.length > 0 && nameParts.every(part => allTxText.includes(part))) {
+          return true;
+        }
+
         return false;
       });
 
@@ -4175,6 +4201,8 @@ async function startServer() {
                 .update({
                   status: 'VALIDE',
                   moncash_status: 'COMPLETED',
+                  nature: 'Recharge Portefeuille',
+                  fee_type: 'CREDIT_PORTEFEUILLE',
                   notes: `Confirmé via Synchronisation Tranzak Live • Tx: ${txId}`,
                   updated_at: new Date().toISOString()
                 })
@@ -4201,13 +4229,14 @@ async function startServer() {
                 payment_method: operatorLabel,
                 method: `${operatorLabel} (Tranzak Live)`,
                 fee_type: 'CREDIT_PORTEFEUILLE',
-                nature: 'Scolarite',
+                nature: 'Recharge Portefeuille',
                 type: 'Revenu',
                 reference_number: txId || txRef,
                 moncash_order_id: txRef,
                 receipt_number: `REC-TRZ-${txId || Date.now().toString().slice(-6)}`,
                 status: 'VALIDE',
                 moncash_status: 'COMPLETED',
+                description: `Recharge Portefeuille ${operatorLabel} - ${studentName || 'Élève'} • Tx: ${txId}`,
                 notes: `Recharge MonCash confirmée sur Tranzak • Tx: ${txId} • Réf: ${txRef}`,
                 payment_date: tx.completed_at ? tx.completed_at.split('T')[0] : new Date().toISOString().split('T')[0],
                 created_at: tx.created_at || new Date().toISOString()
@@ -4226,36 +4255,39 @@ async function startServer() {
       // 1. Calcul certifié et idempotent du total des recharges validées sur Tranzak pour cet élève
       const totalTranzakCompleted = matchedCompletedTx.reduce((sum: number, tx: any) => sum + (Math.round(Number(tx.amount)) || 0), 0);
 
-      // 2. Récupérer TOUS les paiements effectués en débitant le portefeuille élève (dépenses scolaires)
+      // 2. Récupérer TOUS les paiements effectués en débitant le portefeuille élève (règlements de frais scolaires)
       let totalWalletDebitsHTG = 0;
       try {
         const { data: debits } = await dbClient
           .from('payments')
-          .select('amount, amount_htg_equivalent, currency')
+          .select('amount, amount_htg_equivalent, currency, payment_method, method')
           .eq('student_id', studentId)
-          .eq('payment_method', 'Portefeuille')
           .eq('status', 'VALIDE');
 
-        totalWalletDebitsHTG = (debits || []).reduce((sum: number, p: any) => {
-          return sum + (Number(p.amount_htg_equivalent || p.amount) || 0);
-        }, 0);
+        totalWalletDebitsHTG = (debits || [])
+          .filter((p: any) => {
+            const meth = String(p.payment_method || p.method || '').toLowerCase();
+            return meth.includes('portefeuille');
+          })
+          .reduce((sum: number, p: any) => {
+            return sum + (Number(p.amount_htg_equivalent || p.amount) || 0);
+          }, 0);
       } catch (debErr) {
         console.warn('[Tranzak Sync] Erreur calcul débits portefeuille:', debErr);
       }
 
-      // 3. Récupérer d'autres recharges manuelles en base (fee_type = 'CREDIT_PORTEFEUILLE')
+      // 3. Récupérer d'autres recharges en base (fee_type = 'CREDIT_PORTEFEUILLE' ou nature portefeuille)
       let totalManualCreditsHTG = 0;
       try {
-        const { data: manualCredits } = await dbClient
+        const { data: allStudentPayments } = await dbClient
           .from('payments')
-          .select('amount, amount_htg_equivalent, reference_number, moncash_order_id')
+          .select('amount, amount_htg_equivalent, reference_number, moncash_order_id, fee_type, nature, description, notes, payment_method, method, status')
           .eq('student_id', studentId)
-          .eq('fee_type', 'CREDIT_PORTEFEUILLE')
           .eq('status', 'VALIDE');
 
         const tranzakRefs = new Set(matchedCompletedTx.map((t: any) => t.reference || t.transaction_id));
-        totalManualCreditsHTG = (manualCredits || [])
-          .filter((p: any) => !tranzakRefs.has(p.reference_number) && !tranzakRefs.has(p.moncash_order_id))
+        totalManualCreditsHTG = (allStudentPayments || [])
+          .filter((p: any) => isWalletDeposit(p) && !tranzakRefs.has(p.reference_number) && !tranzakRefs.has(p.moncash_order_id))
           .reduce((sum: number, p: any) => sum + (Number(p.amount_htg_equivalent || p.amount) || 0), 0);
       } catch (credErr) {
         console.warn('[Tranzak Sync] Erreur calcul crédits manuels:', credErr);
@@ -4316,15 +4348,31 @@ async function startServer() {
         console.warn('[Tranzak Sync] Erreur mise à jour wallet_balance_htg:', stUpErr);
       }
 
+      let latestPayments: any[] = [];
+      try {
+        const { data: lp } = await dbClient
+          .from('payments')
+          .select('*, campaign:ad_hoc_campaigns(id, name)')
+          .eq('student_id', studentId)
+          .order('created_at', { ascending: false });
+        latestPayments = lp || [];
+      } catch (lpErr) {}
+
       return res.json({
         success: true,
         synced: true,
         matched_transactions_count: matchedCompletedTx.length,
         total_tranzak_completed: totalTranzakCompleted,
+        total_wallet_credits: totalCreditsAll,
         total_wallet_debits: totalWalletDebitsHTG,
         old_balance: currentBal,
         new_balance: newBal,
-        transactions: newlyValidatedList,
+        newly_credited_amount: newlyCreditedAmount,
+        has_new_records: Boolean(newlyValidatedList.length > 0),
+        transactions: matchedCompletedTx,
+        all_transactions: matchedCompletedTx,
+        newly_validated_transactions: newlyValidatedList,
+        payments: latestPayments,
         message: currentBal !== newBal
           ? `Solde portefeuille régularisé : ${newBal} HTG (Recharges: ${totalCreditsAll} HTG, Versements réglés par portefeuille: ${totalWalletDebitsHTG} HTG).`
           : `Portefeuille certifié et conforme (${newBal} HTG).`
@@ -4333,6 +4381,21 @@ async function startServer() {
       console.error('[Tranzak Sync Error]:', err);
       return res.status(500).json({ success: false, error: err.message || 'Erreur lors de la synchronisation Tranzak' });
     }
+  };
+
+  // POST : Synchronisation depuis StudentFinanceView
+  app.post('/api/tranzak/sync-student-payments', async (req, res) => {
+    const { studentId, schoolId, reference, studentName } = req.body || {};
+    return executeTranzakStudentSync({ studentId, schoolId, reference, studentName, req, res });
+  });
+
+  // GET : Synchronisation depuis StudentDetailView et TuitionPaymentForm
+  app.get('/api/tranzak/sync/:studentId', async (req, res) => {
+    const studentId = req.params.studentId;
+    const schoolId = (req.query.schoolId as string) || '';
+    const studentName = (req.query.studentName as string) || '';
+    const reference = (req.query.reference as string) || '';
+    return executeTranzakStudentSync({ studentId, schoolId, reference, studentName, req, res });
   });
 
   // API Route de Diagnostic Avancé pour StudentFinanceView :
