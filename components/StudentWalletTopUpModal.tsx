@@ -548,7 +548,7 @@ _Ce crédit est disponible immédiatement à la cantine, à l'économat et pour 
                 </span>
               </div>
               <h3 className="text-base font-black tracking-tight text-white mt-0.5">
-                Recharger le Portefeuille Élève
+                Recharger le Portefeuille {terminology.student || 'Élève'}
               </h3>
             </div>
           </div>

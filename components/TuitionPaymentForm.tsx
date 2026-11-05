@@ -308,7 +308,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       : feeType === 'DIVERS'
       ? 'Frais Divers Obligatoires'
       : feeType === 'CREDIT_PORTEFEUILLE'
-      ? 'Recharge Portefeuille Élève'
+      ? `Recharge Portefeuille ${terminology.student || 'Élève'}`
       : 'Frais Divers';
 
     generateReceiptQRCode({
@@ -2278,7 +2278,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           ? (adHocCampaign ? `Campagne: ${adHocCampaign.name}` : 'Frais de Campagne')
           : feeType === 'SCOLARITE' ? terminology.tuition 
           : feeType === 'INSCRIPTION' ? (selectedStudent.isReenrollment ? 'Frais de Réinscription' : "Frais d'Inscription")
-          : feeType === 'CREDIT_PORTEFEUILLE' ? 'Recharge Portefeuille Élève'
+          : feeType === 'CREDIT_PORTEFEUILLE' ? `Recharge Portefeuille ${terminology.student || 'Élève'}`
           : 'Frais Divers Obligatoires';
 
         const isMiscUSD = feeType === 'DIVERS' && (selectedStudent?.miscUSD || 0) > 0;
@@ -2895,7 +2895,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                         : feeType === 'DIVERS'
                         ? 'Frais Divers Obligatoires'
                         : feeType === 'CREDIT_PORTEFEUILLE'
-                        ? 'Recharge Portefeuille Élève'
+                        ? `Recharge Portefeuille ${terminology.student || 'Élève'}`
                         : 'Frais Divers'
                     )}
                   </span>
@@ -3057,7 +3057,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                   {sealedReceiptData?.financialSnapshot?.walletBalanceAfter !== undefined && (sealedReceiptData?.paymentMethod === 'Portefeuille' || paymentMethod === 'Portefeuille') && (
                     <div className="flex justify-between items-center text-[8px] text-indigo-950 font-bold bg-indigo-50/90 px-1.5 py-0.5 rounded border border-indigo-200 mt-1">
-                      <span>Nouveau Solde Portefeuille Élève :</span>
+                      <span>Nouveau Solde Portefeuille {terminology.student || 'Élève'} :</span>
                       <span className="font-mono font-black">{sealedReceiptData.financialSnapshot.walletBalanceAfter.toLocaleString()} {sealedReceiptData?.currency || currency}</span>
                     </div>
                   )}

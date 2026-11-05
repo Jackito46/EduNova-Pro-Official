@@ -38,6 +38,7 @@ import {
   calculateDocumentsCompleteness 
 } from '../utils/documentRequirements';
 import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
+import { ResponsiveTableWrapper } from './ResponsiveTableWrapper';
 
 const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   const { id } = useParams<{ id: string }>();
@@ -998,7 +999,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 });
               }}
               className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title="Enregistrer un nouveau paiement pour cet élève"
+              title={`Enregistrer un nouveau paiement pour cet(te) ${terminology.student?.toLowerCase() || 'élève'}`}
             >
               <PlusCircle size={14} />
               <span>Nouveau Règlement</span>
@@ -1109,7 +1110,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
           {/* KPI 4 : Portefeuille Électronique */}
           <div className="p-4 rounded-xl border border-slate-200 bg-white">
             <div className="flex items-center justify-between mb-1">
-              <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">Portefeuille Élève</span>
+              <span className="text-[10px] font-black uppercase tracking-wider text-slate-600">Portefeuille {terminology.student}</span>
               <Wallet size={16} className="text-blue-600" />
             </div>
             <div className="flex items-baseline justify-between">
@@ -1287,7 +1288,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   </div>
                   {student.parent_phone && (
                     <a
-                      href={`https://wa.me/${student.parent_phone.replace(/\D/g, '').length === 8 ? '509' + student.parent_phone.replace(/\D/g, '') : student.parent_phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${student.parent_name || 'Parent'},\nConcernant l'élève ${formatStudentName(student.last_name, student.first_name).fullName} (Classe: ${student.class?.name || ''}) à ${school?.name || 'EduNova Pro'}...`)}`}
+                      href={`https://wa.me/${student.parent_phone.replace(/\D/g, '').length === 8 ? '509' + student.parent_phone.replace(/\D/g, '') : student.parent_phone.replace(/\D/g, '')}?text=${encodeURIComponent(`Bonjour ${student.parent_name || 'Parent'},\nConcernant l'${terminology.student?.toLowerCase() || 'élève'} ${formatStudentName(student.last_name, student.first_name).fullName} (${terminology.class || 'Classe'}: ${student.class?.name || ''}) à ${school?.name || 'EduNova Pro'}...`)}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow transition-all shrink-0 active:scale-95"
@@ -1437,27 +1438,27 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               <GraduationCap className="text-amber-600" size={20} />
               <h3 className="font-bold text-gray-900 text-sm uppercase tracking-wider">Parcours Académique</h3>
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[600px]">
+            <ResponsiveTableWrapper minWidth="min-w-[620px]" className="border-0 rounded-none">
+              <table className="w-full text-left">
                 <thead>
                   <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                    <th className="px-6 py-3">Session</th>
-                    <th className="px-6 py-3">Classe</th>
-                    <th className="px-6 py-3">Niveau</th>
-                    <th className="px-6 py-3">Statut Financier</th>
-                    <th className="px-6 py-3">Date d'Inscription</th>
+                    <th className="px-6 py-3 whitespace-nowrap">Session</th>
+                    <th className="px-6 py-3 whitespace-nowrap">{terminology.class}</th>
+                    <th className="px-6 py-3 whitespace-nowrap">Niveau</th>
+                    <th className="px-6 py-3 whitespace-nowrap">Statut Financier</th>
+                    <th className="px-6 py-3 whitespace-nowrap">Date d'Inscription</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {enrollments.map((env) => (
                     <tr key={env.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${env.academic_year?.is_active ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>
                           {env.academic_year?.label}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-sm font-bold text-gray-900">{env.class?.name}</td>
-                      <td className="px-6 py-4 text-xs font-medium text-gray-500">{env.class?.level}</td>
+                      <td className="px-6 py-4 text-sm font-bold text-gray-900 whitespace-nowrap">{env.class?.name}</td>
+                      <td className="px-6 py-4 text-xs font-medium text-gray-500 whitespace-nowrap">{env.class?.level}</td>
                       <td className="px-6 py-4">
                         {(env.tuition_discount > 0 || env.tuition_addition > 0) ? (
                           <div className="flex flex-col gap-1">
@@ -1476,7 +1477,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <span className="text-xs text-gray-400 italic">Standard</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-xs text-gray-400">{new Date(env.created_at).toLocaleDateString()}</td>
+                      <td className="px-6 py-4 text-xs text-gray-400 whitespace-nowrap">{new Date(env.created_at).toLocaleDateString()}</td>
                     </tr>
                   ))}
                   {enrollments.length === 0 && (
@@ -1486,7 +1487,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   )}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableWrapper>
           </div>
           {/* Ad-Hoc Campaigns / Campagnes & Événements (Tableau aligné en pleine largeur avec Parcours Académique) */}
           {adHocCampaigns.length > 0 && (
@@ -1500,17 +1501,17 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   {adHocCampaigns.length} campagne(s)
                 </span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left min-w-[700px]">
+              <ResponsiveTableWrapper minWidth="min-w-[740px]" className="border-0 rounded-none">
+                <table className="w-full text-left">
                   <thead>
                     <tr className="bg-gray-50/50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
-                      <th className="px-6 py-3">Campagne & Type</th>
-                      <th className="px-6 py-3">Session & Échéance</th>
-                      <th className="px-6 py-3">Statut</th>
-                      <th className="px-6 py-3 text-right">Barème</th>
-                      <th className="px-6 py-3 text-right">Réglé</th>
-                      <th className="px-6 py-3 text-right">Solde Dû</th>
-                      <th className="px-6 py-3">Reçu(s) Scellé(s)</th>
+                      <th className="px-6 py-3 whitespace-nowrap">Campagne & Type</th>
+                      <th className="px-6 py-3 whitespace-nowrap">Session & Échéance</th>
+                      <th className="px-6 py-3 whitespace-nowrap">Statut</th>
+                      <th className="px-6 py-3 text-right whitespace-nowrap">Barème</th>
+                      <th className="px-6 py-3 text-right whitespace-nowrap">Réglé</th>
+                      <th className="px-6 py-3 text-right whitespace-nowrap">Solde Dû</th>
+                      <th className="px-6 py-3 whitespace-nowrap">Reçu(s) Scellé(s)</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1620,29 +1621,29 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTableWrapper>
             </div>
           )}
 
-          {/* 💳 MODULE DE TRAÇABILITÉ DES DÉPÔTS PORTEFEUILLE ÉLÈVE */}
+          {/* 💳 MODULE DE TRAÇABILITÉ DES DÉPÔTS PORTEFEUILLE */}
           {walletDeposits.length > 0 && (
-            <div className="bg-gradient-to-br from-blue-50/70 via-white to-blue-50/40 rounded-2xl p-5 shadow-sm border border-blue-200/90 space-y-4">
+            <div className="bg-gradient-to-br from-blue-50/70 via-white to-blue-50/40 rounded-2xl p-4 sm:p-5 shadow-sm border border-blue-200/90 space-y-3.5 sm:space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-sm shrink-0">
+                  <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs shrink-0">
                     <Wallet size={20} />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
-                        Traçabilité des Dépôts Portefeuille Élève
+                        Traçabilité des Dépôts Portefeuille {terminology.student}
                       </h4>
                       <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
                         {walletDeposits.length} dépôt(s) certifié(s)
                       </span>
                     </div>
-                    <p className="text-xs text-slate-500 font-medium">
-                      Historique des renflouements (MonCash / NatCash) enregistrés au crédit du portefeuille de l'élève.
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
+                      Renflouements MonCash & NatCash certifiés en réserve personnelle.
                     </p>
                   </div>
                 </div>
@@ -1655,16 +1656,16 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 </div>
               </div>
 
-              {/* Table de traçabilité des recharges */}
-              <div className="overflow-x-auto rounded-xl border border-blue-100 bg-white">
+              {/* Table de traçabilité des recharges avec ascenseur ergonomique pour écrans 13"-14" */}
+              <ResponsiveTableWrapper minWidth="min-w-[720px]" className="border-blue-200">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
-                    <tr className="bg-blue-50/60 border-b border-blue-100 text-[10px] font-black uppercase text-blue-900 tracking-wider">
-                      <th className="py-2.5 px-3.5">Date & Heure</th>
-                      <th className="py-2.5 px-3.5">Réf. Transaction / Reçu</th>
-                      <th className="py-2.5 px-3.5">Canal & Opérateur</th>
-                      <th className="py-2.5 px-3.5 text-right">Montant Crédité</th>
-                      <th className="py-2.5 px-3.5 text-center">Statut d'Accréditation</th>
+                    <tr className="bg-blue-50/70 border-b border-blue-100 text-[10px] font-black uppercase text-blue-900 tracking-wider">
+                      <th className="py-2.5 px-3.5 whitespace-nowrap">Date & Heure</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap">Réf. Transaction / Reçu</th>
+                      <th className="py-2.5 px-3.5 whitespace-nowrap">Canal & Opérateur</th>
+                      <th className="py-2.5 px-3.5 text-right whitespace-nowrap">Montant Crédité</th>
+                      <th className="py-2.5 px-3.5 text-center whitespace-nowrap">Statut d'Accréditation</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-blue-50">
@@ -1678,7 +1679,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       }) : 'Date certifiée';
 
                       return (
-                        <tr key={tx.id || idx} className="hover:bg-blue-50/30 transition-colors">
+                        <tr key={tx.id || idx} className="hover:bg-blue-50/40 transition-colors">
                           <td className="py-2.5 px-3.5 font-bold text-slate-800 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               <Calendar size={13} className="text-blue-500 shrink-0" />
@@ -1686,7 +1687,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                             </div>
                           </td>
                           <td className="py-2.5 px-3.5 font-mono text-[11px] font-bold text-blue-800 whitespace-nowrap">
-                            <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200">
+                            <span className="bg-blue-50 px-2 py-0.5 rounded border border-blue-200 select-all">
                               {tx.receipt_number || tx.reference_number || tx.id}
                             </span>
                           </td>
@@ -1710,12 +1711,12 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     })}
                   </tbody>
                 </table>
-              </div>
+              </ResponsiveTableWrapper>
 
-              <div className="flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+              <div className="flex items-center gap-2 text-[10.5px] text-slate-600 font-medium bg-blue-50/60 p-2.5 rounded-xl border border-blue-100/90">
                 <Info size={13} className="text-blue-600 shrink-0" />
                 <span>
-                  Les fonds rechargés constituent une réserve personnelle de l'élève. Ils restent utilisables pour tout règlement ultérieur au comptoir sans réaffectation unilatérale sur les dettes scolaires.
+                  Réserve personnelle de l'{terminology.student?.toLowerCase() || 'élève'} mobilisable pour tout règlement au comptoir (non imputée unilatéralement).
                 </span>
               </div>
             </div>
@@ -1731,7 +1732,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="font-black text-sm uppercase tracking-wider text-slate-100">
-                      Grand Livre & Règlements de l'Élève
+                      Grand Livre & Règlements de l'{terminology.student}
                     </h3>
                     <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-500/30 text-indigo-200 border border-indigo-400/30">
                       {payments.length} flux enregistré(s)
@@ -1811,22 +1812,22 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
               )}
             </div>
 
-            {/* Table des versements */}
+            {/* Table des versements avec ascenseur responsive pour écrans 13"-14" */}
             {displayedPayments.length === 0 ? (
               <div className="p-8 text-center text-slate-400 text-xs italic">
                 Aucun flux n'a été trouvé pour le filtre sélectionné.
               </div>
             ) : (
-              <div className="overflow-x-auto">
+              <ResponsiveTableWrapper minWidth="min-w-[780px]" className="border-0 rounded-none">
                 <table className="w-full text-left border-collapse text-xs">
                   <thead>
                     <tr className="bg-slate-50/90 border-b border-slate-200 text-[10px] font-black uppercase text-slate-500 tracking-wider">
-                      <th className="py-3 px-4">Réf. / Date</th>
-                      <th className="py-3 px-4">Rubrique & Nature</th>
-                      <th className="py-3 px-4">Mode</th>
-                      <th className="py-3 px-4 text-right">Encaissé</th>
-                      <th className="py-3 px-4 text-right">Équivalent Comptable</th>
-                      <th className="py-3 px-4 text-center">Statut</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Réf. / Date</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Rubrique & Nature</th>
+                      <th className="py-3 px-4 whitespace-nowrap">Mode</th>
+                      <th className="py-3 px-4 text-right whitespace-nowrap">Encaissé</th>
+                      <th className="py-3 px-4 text-right whitespace-nowrap">Équivalent Comptable</th>
+                      <th className="py-3 px-4 text-center whitespace-nowrap">Statut</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1853,7 +1854,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                               <div>
                                 <div className="font-bold text-blue-900 text-xs flex items-center gap-1.5">
                                   <Wallet size={13} className="text-blue-600 shrink-0" />
-                                  <span>Recharge Portefeuille Élève</span>
+                                  <span>Recharge Portefeuille {terminology.student}</span>
                                 </div>
                                 <span className="text-[9px] uppercase tracking-wider text-blue-600 font-semibold block">
                                   Dépôt Portefeuille • Fonds Non Affectés aux Frais Scolaires
@@ -1897,7 +1898,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           </td>
                           <td className="py-3 px-4 text-right">
                             {isWallet ? (
-                              <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 border border-blue-200 px-2 py-0.5 rounded inline-block" title="Fonds disponibles sur le portefeuille élève. Ce montant n'est pas débité pour les dettes scolaires.">
+                              <span className="font-mono font-black text-blue-700 text-xs bg-blue-50 border border-blue-200 px-2 py-0.5 rounded inline-block" title={`Fonds disponibles sur le portefeuille de l'${terminology.student?.toLowerCase() || 'élève'}. Ce montant n'est pas débité pour les dettes scolaires.`}>
                                 +{Number(p.amount || 0).toLocaleString()} HTG (Portefeuille)
                               </span>
                             ) : (
@@ -1938,19 +1939,19 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     {Boolean(certifiedWalletBalanceHTG > 0) && (
                       <tr className="bg-blue-50/30 border-t border-blue-100 font-bold text-slate-700 text-xs">
                         <td colSpan={4} className="py-2 px-4 text-right uppercase tracking-wider text-[10px] text-blue-700">
-                          Solde Portefeuille Disponible (Fonds d'avance élève) :
+                          Solde Portefeuille Disponible (Fonds d'avance {terminology.student?.toLowerCase() || 'élève'}) :
                         </td>
                         <td className="py-2 px-4 text-right font-mono text-xs text-blue-700">
                           +{certifiedWalletBalanceHTG.toLocaleString()} HTG
                         </td>
                         <td className="py-2 px-4 text-center text-[10px] text-blue-700 font-bold">
-                          Réserve Élève
+                          Réserve {terminology.student || 'Élève'}
                         </td>
                       </tr>
                     )}
                   </tfoot>
                 </table>
-              </div>
+              </ResponsiveTableWrapper>
             )}
           </div>
 
@@ -2219,7 +2220,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <div className="mt-2 p-2.5 bg-indigo-50/80 border border-indigo-100 rounded-xl text-[11px] text-indigo-950 flex items-start gap-2">
                   <Info size={14} className="text-indigo-600 shrink-0 mt-0.5" />
                   <div>
-                    <span>Connexion simplifiée : le parent ou l'élève pourra se connecter avec son pseudo <strong>{accessEmail.trim().toUpperCase()}</strong> (identifiant système : <code className="text-indigo-700 font-mono font-bold">{normalizeIdentifier(accessEmail)}</code>).</span>
+                    <span>Connexion simplifiée : le parent ou l'{terminology.student?.toLowerCase() || 'élève'} pourra se connecter avec son pseudo <strong>{accessEmail.trim().toUpperCase()}</strong> (identifiant système : <code className="text-indigo-700 font-mono font-bold">{normalizeIdentifier(accessEmail)}</code>).</span>
                   </div>
                 </div>
               ) : accessEmail && accessEmail.includes('@') ? (

@@ -28,6 +28,7 @@ import { toast } from 'sonner';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { StudentWalletTopUpModal } from './StudentWalletTopUpModal';
 import { isPaymentCompleted } from '../src/utils/payment';
+import { ResponsiveTableWrapper } from './ResponsiveTableWrapper';
 import { sendPaymentConfirmationSms } from '../services/paymentSmsService';
 
 interface StudentFinanceViewProps {
@@ -35,7 +36,7 @@ interface StudentFinanceViewProps {
 }
 
 export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) => {
-  const { school } = useSchool();
+  const { school, terminology } = useSchool();
   const isMultiCurrency = Boolean(school?.global_settings?.multi_currency_enabled);
   const { studentData, activeYear, loading: studentLoading } = useStudent(user);
   const [payments, setPayments] = useState<any[]>([]);
@@ -1085,8 +1086,8 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
             Aucun versement enregistré pour cette catégorie de frais.
           </div>
         ) : (
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full text-left border-collapse min-w-[700px]">
+          <ResponsiveTableWrapper minWidth="min-w-[700px]" className="border-0 rounded-none">
+            <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 text-slate-600 text-xs font-bold border-b border-slate-200 uppercase tracking-wider">
                   <th className="py-3.5 px-4 whitespace-nowrap">Date & Reçu #</th>
@@ -1102,7 +1103,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                   const isWallet = isWalletDeposit(payment);
                   let displayNature = payment.nature || payment.type || payment.fee_type || 'Frais Divers';
                   if (isWallet) {
-                    displayNature = 'Recharge Portefeuille Élève';
+                    displayNature = `Recharge Portefeuille ${terminology.student || 'Élève'}`;
                   } else if (payment.campaign?.name) {
                     displayNature = `Campagne: ${payment.campaign.name}`;
                   } else if (payment.ad_hoc_campaign_id) {
@@ -1208,7 +1209,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                           <div className="inline-flex flex-col items-center gap-0.5">
                             <span 
                               className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-900 border border-indigo-200 px-2.5 py-1 rounded-md text-[11px] font-mono font-bold whitespace-nowrap shadow-2xs"
-                              title="Dépôt sur le portefeuille de l'élève. Ces fonds ne sont pas encore affectés aux frais scolaires."
+                              title={`Dépôt sur le portefeuille de l'${terminology.student?.toLowerCase() || 'élève'}. Ces fonds ne sont pas encore affectés aux frais scolaires.`}
                             >
                               <Wallet size={12} className="text-indigo-600 shrink-0" />
                               <span>Crédit Portefeuille</span>
@@ -1282,7 +1283,7 @@ export const StudentFinanceView: React.FC<StudentFinanceViewProps> = ({ user }) 
                 })}
               </tbody>
             </table>
-          </div>
+          </ResponsiveTableWrapper>
         )}
       </div>
 

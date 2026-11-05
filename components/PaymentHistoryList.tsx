@@ -1919,10 +1919,10 @@ const PaymentHistoryList: React.FC<{ user: UserProfile }> = ({ user }) => {
               <div className="flex flex-col">
                 <span className="text-xs font-bold text-gray-900 flex items-center gap-1.5">
                   <Wallet size={14} className="text-blue-600" />
-                  Rembourser sous forme d'avoir / Portefeuille élève
+                  Rembourser sous forme d'avoir / Portefeuille {terminology.student?.toLowerCase() || 'élève'}
                 </span>
                 <span className="text-[11px] text-gray-500">
-                  Crédite automatiquement le portefeuille de l'élève au lieu d'une restitution en espèces.
+                  Crédite automatiquement le portefeuille de l'{terminology.student?.toLowerCase() || 'élève'} au lieu d'une restitution en espèces.
                 </span>
               </div>
             </label>

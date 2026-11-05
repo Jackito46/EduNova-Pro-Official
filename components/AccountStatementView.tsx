@@ -59,6 +59,7 @@ import { addSecurityWatermark } from '../utils/pdfWatermark';
 import { fixOklchForCanvas } from '../utils/pdfFix';
 import { computeFeeCategoryBalance, getFormattedFeeRowDetails } from '../utils/financeCalculations';
 import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
+import { ResponsiveTableWrapper } from './ResponsiveTableWrapper';
 
 const getFeeRowDetails = (
   nativeHTG: number,
@@ -3127,14 +3128,14 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <div>
                           <div className="flex items-center gap-2">
                             <h4 className="font-black text-sm uppercase tracking-wider text-slate-900">
-                              Traçabilité des Dépôts Portefeuille Élève (Fonds d'Avance)
+                              Traçabilité des Dépôts Portefeuille {terminology.student} (Fonds d'Avance)
                             </h4>
                             <span className="px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-blue-100 text-blue-800 border border-blue-200">
                               {walletHistory.length} transaction(s) certifiée(s)
                             </span>
                           </div>
                           <p className="text-xs text-slate-500 font-medium mt-0.5">
-                            Approvisionnements mobiles (MonCash / NatCash) enregistrés au crédit du portefeuille de l'élève.
+                            Approvisionnements mobiles (MonCash / NatCash) enregistrés au crédit du portefeuille de l'{terminology.student?.toLowerCase() || 'élève'}.
                           </p>
                         </div>
                       </div>
@@ -3151,8 +3152,8 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                       </div>
                     </div>
 
-                    <div className="overflow-x-auto rounded-xl border border-blue-100 bg-white">
-                      <table className="w-full min-w-[620px] text-left border-collapse text-xs">
+                    <ResponsiveTableWrapper minWidth="min-w-[680px]" className="border-blue-100 bg-white">
+                      <table className="w-full text-left border-collapse text-xs">
                         <thead>
                           <tr className="bg-blue-50/60 border-b border-blue-100 text-[10px] font-black uppercase text-blue-900 tracking-wider">
                             <th className="py-2.5 px-3.5">Date & Heure</th>
@@ -3197,7 +3198,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 <td className="py-2.5 px-3.5 text-center whitespace-nowrap">
                                   <span className="inline-flex items-center gap-1 text-[10px] font-extrabold text-blue-700 bg-blue-50 px-2.5 py-0.5 rounded-full border border-blue-200">
                                     <ShieldCheck size={12} className="text-blue-600" />
-                                    <span>RÉSERVE ÉLÈVE • DISPONIBLE GUICHET</span>
+                                    <span>RÉSERVE {terminology.student?.toUpperCase() || 'ÉLÈVE'} • DISPONIBLE GUICHET</span>
                                   </span>
                                 </td>
                               </tr>
@@ -3205,12 +3206,12 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                           })}
                         </tbody>
                       </table>
-                    </div>
+                    </ResponsiveTableWrapper>
 
                     <p className="text-[10px] text-slate-500 font-medium flex items-center gap-1.5">
                       <Info size={13} className="text-blue-600 shrink-0" />
                       <span>
-                        Note comptable : Ces dépôts constituent une réserve financière de l'élève. Ils ne diminuent pas les engagements scolaires tant qu'aucun débit d'affectation n'est enregistré au guichet.
+                        Note comptable : Ces dépôts constituent une réserve financière de l'{terminology.student?.toLowerCase() || 'élève'}. Ils ne diminuent pas les engagements scolaires tant qu'aucun débit d'affectation n'est enregistré au guichet.
                       </span>
                     </p>
                   </div>
@@ -3616,7 +3617,7 @@ const AccountStatementView: React.FC<{ user: UserProfile }> = ({ user }) => {
                         <div className="flex items-center gap-2">
                           <Wallet size={14} className="text-blue-600" />
                           <p className="text-[9px] font-black text-blue-900 uppercase tracking-[0.2em]">
-                            Approvisionnements du Portefeuille Élève (Fonds d'Avance & Dépôts Mobiles)
+                            Approvisionnements du Portefeuille {terminology.student} (Fonds d'Avance & Dépôts Mobiles)
                           </p>
                         </div>
                         <div className="text-[9px] font-bold text-slate-500">
