@@ -30,67 +30,108 @@ import { GlobalShortcuts } from './components/GlobalShortcuts';
 import { ModernDashboardSkeleton } from './components/SkeletonLoader';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
 
-// Lazy-loaded route components for high performance on slow / low-bandwidth mobile networks
-const Dashboard = React.lazy(() => import('./components/Dashboard'));
-const StudentForm = React.lazy(() => import('./components/StudentForm'));
-const StudentList = React.lazy(() => import('./components/StudentList'));
-const StudentDetailView = React.lazy(() => import('./components/StudentDetailView'));
-const StudentProfileView = React.lazy(() => import('./components/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
-const StudentCoursesView = React.lazy(() => import('./components/StudentCoursesView').then(m => ({ default: m.StudentCoursesView })));
-const StudentGradesView = React.lazy(() => import('./components/StudentGradesView').then(m => ({ default: m.StudentGradesView })));
-const StudentFinanceView = React.lazy(() => import('./components/StudentFinanceView').then(m => ({ default: m.StudentFinanceView })));
-const StudentScheduleView = React.lazy(() => import('./components/StudentScheduleView').then(m => ({ default: m.StudentScheduleView })));
-const StudentHeader = React.lazy(() => import('./components/StudentHeader').then(m => ({ default: m.StudentHeader })));
-const ClassManagement = React.lazy(() => import('./components/ClassManagement'));
-const ClassForm = React.lazy(() => import('./components/ClassForm'));
-const SubjectForm = React.lazy(() => import('./components/SubjectForm'));
-const ClassSubjectManager = React.lazy(() => import('./components/ClassSubjectManager'));
-const GradesView = React.lazy(() => import('./components/GradesView'));
-const SyllabusHub = React.lazy(() => import('./components/SyllabusHub'));
-const HomeworkManager = React.lazy(() => import('./components/HomeworkManager').then(m => ({ default: m.HomeworkManager })));
-const ReportCardsView = React.lazy(() => import('./components/ReportCardsView'));
-const ScheduleView = React.lazy(() => import('./components/ScheduleView'));
-const CourseSignatureView = React.lazy(() => import('./components/CourseSignatureView'));
-const AttendanceView = React.lazy(() => import('./components/AttendanceView'));
-const SettingsView = React.lazy(() => import('./components/SettingsView'));
-const TuitionPaymentForm = React.lazy(() => import('./components/TuitionPaymentForm'));
-const FeePlanningView = React.lazy(() => import('./components/FeePlanningView'));
-const ReceiptManagementView = React.lazy(() => import('./components/ReceiptManagementView'));
-const StudentPaymentTracking = React.lazy(() => import('./components/StudentPaymentTracking'));
-const AccountStatementView = React.lazy(() => import('./components/AccountStatementView'));
-const PaymentHistoryList = React.lazy(() => import('./components/PaymentHistoryList'));
-const FinanceHub = React.lazy(() => import('./components/FinanceHub'));
-const ExpensesView = React.lazy(() => import('./components/ExpensesView'));
-const ExpenseForm = React.lazy(() => import('./components/ExpenseForm'));
-const SuppliesView = React.lazy(() => import('./components/SuppliesView'));
-const PayrollManagementView = React.lazy(() => import('./components/PayrollManagementView'));
-const DiscountManagementView = React.lazy(() => import('./components/DiscountManagementView'));
-const ReductionReportView = React.lazy(() => import('./components/ReductionReportView'));
-const AdHocCampaignsView = React.lazy(() => import('./components/AdHocCampaignsView'));
-const StaffManagement = React.lazy(() => import('./components/StaffManagement')); 
-const StaffForm = React.lazy(() => import('./components/StaffForm'));
-const StaffAssignmentView = React.lazy(() => import('./components/StaffAssignmentView')); 
-const StaffAttendanceView = React.lazy(() => import('./components/StaffAttendanceView'));
-const DisciplinaryView = React.lazy(() => import('./components/DisciplinaryView'));
-const FinancialAuditView = React.lazy(() => import('./components/FinancialAuditView'));
-const StudentCurrencyDiagnosticView = React.lazy(() => import('./components/StudentCurrencyDiagnosticView'));
-const BudgetPlanningView = React.lazy(() => import('./components/BudgetPlanningView'));
-const DebtorsListView = React.lazy(() => import('./components/DebtorsListView'));
-const UserManagementView = React.lazy(() => import('./components/UserManagementView'));
-const ReportsView = React.lazy(() => import('./components/ReportsView'));
-const MultiCampusDashboardView = React.lazy(() => import('./components/MultiCampusDashboardView').then(m => ({ default: m.MultiCampusDashboardView })));
-const AuditLogsView = React.lazy(() => import('./components/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
-const ValidationList = React.lazy(() => import('./components/ValidationList'));
-const ForcePasswordChange = React.lazy(() => import('./components/ForcePasswordChange').then(m => ({ default: m.ForcePasswordChange })));
-const PwaInstallModal = React.lazy(() => import('./components/PwaInstallModal').then(m => ({ default: m.PwaInstallModal })));
-const OfflineDashboard = React.lazy(() => import('./components/OfflineDashboard').then(m => ({ default: m.OfflineDashboard })));
-const SuperAdminDashboard = React.lazy(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
-const SystemHealthView = React.lazy(() => import('./components/SystemHealthView').then(m => ({ default: m.SystemHealthView })));
-const PublicReceiptVerificationView = React.lazy(() => import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView })));
-const EmailModule = React.lazy(() => import('./components/EmailModule'));
-const SmsModule = React.lazy(() => import('./components/SmsModule'));
-const PushModule = React.lazy(() => import('./components/PushModule'));
-const WhatsAppModule = React.lazy(() => import('./components/WhatsAppModule'));
+// Robust dynamic import wrapper with automated retry against chunk fetch failures and network drops
+const lazyWithRetry = <T extends React.ComponentType<any>>(
+  factory: () => Promise<{ default: T } | any>
+) =>
+  React.lazy(async () => {
+    try {
+      return await factory();
+    } catch (error: any) {
+      console.warn('Erreur de chargement dynamique du module, nouvelle tentative...', error);
+      try {
+        await new Promise(resolve => setTimeout(resolve, 350));
+        return await factory();
+      } catch (retryError: any) {
+        console.warn('Deuxième tentative de chargement dynamique...', retryError);
+        try {
+          await new Promise(resolve => setTimeout(resolve, 750));
+          return await factory();
+        } catch (finalError: any) {
+          console.error('Échec définitif du chargement dynamique:', finalError);
+          const errorMsg = String(finalError?.message || finalError || '').toLowerCase();
+          if (
+            errorMsg.includes('failed to fetch dynamically imported module') ||
+            errorMsg.includes('importing a module script failed') ||
+            errorMsg.includes('error loading dynamically imported module')
+          ) {
+            const reloadKey = 'vite_chunk_auto_reload';
+            const lastReload = typeof window !== 'undefined' ? sessionStorage.getItem(reloadKey) : null;
+            const now = Date.now();
+            if (!lastReload || now - Number(lastReload) > 20000) {
+              if (typeof window !== 'undefined') {
+                sessionStorage.setItem(reloadKey, String(now));
+                window.location.reload();
+              }
+            }
+          }
+          throw finalError;
+        }
+      }
+    }
+  });
+
+// Lazy-loaded route components with retry resilience for slow / low-bandwidth mobile networks & iframe reconnects
+const Dashboard = lazyWithRetry(() => import('./components/Dashboard'));
+const StudentForm = lazyWithRetry(() => import('./components/StudentForm'));
+const StudentList = lazyWithRetry(() => import('./components/StudentList'));
+const StudentDetailView = lazyWithRetry(() => import('./components/StudentDetailView'));
+const StudentProfileView = lazyWithRetry(() => import('./components/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
+const StudentCoursesView = lazyWithRetry(() => import('./components/StudentCoursesView').then(m => ({ default: m.StudentCoursesView })));
+const StudentGradesView = lazyWithRetry(() => import('./components/StudentGradesView').then(m => ({ default: m.StudentGradesView })));
+const StudentFinanceView = lazyWithRetry(() => import('./components/StudentFinanceView').then(m => ({ default: m.StudentFinanceView })));
+const StudentScheduleView = lazyWithRetry(() => import('./components/StudentScheduleView').then(m => ({ default: m.StudentScheduleView })));
+const StudentHeader = lazyWithRetry(() => import('./components/StudentHeader').then(m => ({ default: m.StudentHeader })));
+const ClassManagement = lazyWithRetry(() => import('./components/ClassManagement'));
+const ClassForm = lazyWithRetry(() => import('./components/ClassForm'));
+const SubjectForm = lazyWithRetry(() => import('./components/SubjectForm'));
+const ClassSubjectManager = lazyWithRetry(() => import('./components/ClassSubjectManager'));
+const GradesView = lazyWithRetry(() => import('./components/GradesView'));
+const SyllabusHub = lazyWithRetry(() => import('./components/SyllabusHub'));
+const HomeworkManager = lazyWithRetry(() => import('./components/HomeworkManager').then(m => ({ default: m.HomeworkManager })));
+const ReportCardsView = lazyWithRetry(() => import('./components/ReportCardsView'));
+const ScheduleView = lazyWithRetry(() => import('./components/ScheduleView'));
+const CourseSignatureView = lazyWithRetry(() => import('./components/CourseSignatureView'));
+const AttendanceView = lazyWithRetry(() => import('./components/AttendanceView'));
+const SettingsView = lazyWithRetry(() => import('./components/SettingsView'));
+const TuitionPaymentForm = lazyWithRetry(() => import('./components/TuitionPaymentForm'));
+const FeePlanningView = lazyWithRetry(() => import('./components/FeePlanningView'));
+const ReceiptManagementView = lazyWithRetry(() => import('./components/ReceiptManagementView'));
+const StudentPaymentTracking = lazyWithRetry(() => import('./components/StudentPaymentTracking'));
+const AccountStatementView = lazyWithRetry(() => import('./components/AccountStatementView'));
+const PaymentHistoryList = lazyWithRetry(() => import('./components/PaymentHistoryList'));
+const FinanceHub = lazyWithRetry(() => import('./components/FinanceHub'));
+const ExpensesView = lazyWithRetry(() => import('./components/ExpensesView'));
+const ExpenseForm = lazyWithRetry(() => import('./components/ExpenseForm'));
+const SuppliesView = lazyWithRetry(() => import('./components/SuppliesView'));
+const PayrollManagementView = lazyWithRetry(() => import('./components/PayrollManagementView'));
+const DiscountManagementView = lazyWithRetry(() => import('./components/DiscountManagementView'));
+const ReductionReportView = lazyWithRetry(() => import('./components/ReductionReportView'));
+const AdHocCampaignsView = lazyWithRetry(() => import('./components/AdHocCampaignsView'));
+const StaffManagement = lazyWithRetry(() => import('./components/StaffManagement')); 
+const StaffForm = lazyWithRetry(() => import('./components/StaffForm'));
+const StaffAssignmentView = lazyWithRetry(() => import('./components/StaffAssignmentView')); 
+const StaffAttendanceView = lazyWithRetry(() => import('./components/StaffAttendanceView'));
+const DisciplinaryView = lazyWithRetry(() => import('./components/DisciplinaryView'));
+const FinancialAuditView = lazyWithRetry(() => import('./components/FinancialAuditView'));
+const StudentCurrencyDiagnosticView = lazyWithRetry(() => import('./components/StudentCurrencyDiagnosticView'));
+const BudgetPlanningView = lazyWithRetry(() => import('./components/BudgetPlanningView'));
+const DebtorsListView = lazyWithRetry(() => import('./components/DebtorsListView'));
+const UserManagementView = lazyWithRetry(() => import('./components/UserManagementView'));
+const ReportsView = lazyWithRetry(() => import('./components/ReportsView'));
+const MultiCampusDashboardView = lazyWithRetry(() => import('./components/MultiCampusDashboardView').then(m => ({ default: m.MultiCampusDashboardView })));
+const AuditLogsView = lazyWithRetry(() => import('./components/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
+const ValidationList = lazyWithRetry(() => import('./components/ValidationList'));
+const ForcePasswordChange = lazyWithRetry(() => import('./components/ForcePasswordChange').then(m => ({ default: m.ForcePasswordChange })));
+const PwaInstallModal = lazyWithRetry(() => import('./components/PwaInstallModal').then(m => ({ default: m.PwaInstallModal })));
+const OfflineDashboard = lazyWithRetry(() => import('./components/OfflineDashboard').then(m => ({ default: m.OfflineDashboard })));
+const SuperAdminDashboard = lazyWithRetry(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
+const SystemHealthView = lazyWithRetry(() => import('./components/SystemHealthView').then(m => ({ default: m.SystemHealthView })));
+const PublicReceiptVerificationView = lazyWithRetry(() => import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView })));
+const EmailModule = lazyWithRetry(() => import('./components/EmailModule'));
+const SmsModule = lazyWithRetry(() => import('./components/SmsModule'));
+const PushModule = lazyWithRetry(() => import('./components/PushModule'));
+const WhatsAppModule = lazyWithRetry(() => import('./components/WhatsAppModule'));
 
 // Intercept toast.error globally to prevent scary technical auth errors from showing to the user
 const originalToastError = toast.error;
