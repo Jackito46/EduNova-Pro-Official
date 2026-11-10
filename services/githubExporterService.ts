@@ -10,7 +10,7 @@ const ALLOWED_ROOT_FILES = new Set([
   'App.tsx', 'index.tsx', 'index.html', 'index.css', 'types.ts', 'supabase.ts', 'server.ts',
   'vite.config.ts', 'tsconfig.json', 'package.json', 'package-lock.json', 'Dockerfile',
   '.gitignore', '.npmrc', '.dockerignore', '.env.example', 'metadata.json', 'nginx.conf.template', 'render.yaml',
-  'GUIDE_DEPLOIEMENT_VPS.md', 'GUIDE_TECHNIQUE_LOCAL.md', 'GUIDE_UTILISATEUR.md', 'README_LOCAL.md', 'README.md'
+  'GUIDE_DEPLOIEMENT_VPS.md', 'GUIDE_TECHNIQUE_LOCAL.md', 'GUIDE_UTILISATEUR.md', 'GUIDE_ENV_ET_SECURITE_TRANZAK.md', 'README_LOCAL.md', 'README.md'
 ]);
 
 const ALLOWED_DIRS = new Set([
