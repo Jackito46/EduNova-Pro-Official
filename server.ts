@@ -12,7 +12,7 @@ import { GoogleGenAI } from '@google/genai';
 import { BackupBackendService } from './services/backupBackendService.ts';
 import { exportProjectToGitHub, getProjectFiles } from './services/githubExporterService.ts';
 import AdmZip from 'adm-zip';
-import { handleMonCashWebhook, isWalletDeposit } from './src/utils/payment.ts';
+import { handleMonCashWebhook, isWalletDeposit } from './utils/payment.ts';
 import { sendMonCashPaymentPushNotification } from './services/moncashPushService.ts';
 import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault.ts';
 
@@ -3278,6 +3278,12 @@ async function startServer() {
         return res.status(400).json({ success: false, error: 'Identifiant de l’élève (studentId) obligatoire.' });
       }
 
+      // Contrôle de sécurité strict : Seul un administrateur peut déclencher une simulation créditant un compte
+      const auth = await authorizeSchoolAdmin(req, schoolId);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+
       const depositAmount = Math.max(10, Math.round(Number(amount) || 100));
       const orderRef = `TRZ-MC-${Date.now().toString().slice(-6)}-${Math.floor(Math.random() * 1000)}`;
       const receiptNumber = `REC-MC-${Date.now().toString().slice(-6)}`;
@@ -3589,42 +3595,45 @@ async function startServer() {
 
       // Configuration Tranzak pour l'école ou repli sécurisé global
       const config = await getTranzakConfigForSchool(schoolId);
-      const activeSecret = config.webhookSecret || 'whsec_b87caead9c17eec19ff312a7ea52a706648cfa17a355acc0c3d2de237a544ed1';
+      const activeSecret = config.webhookSecret || (process.env.TRANZAK_WEBHOOK_SECRET || '').trim();
 
-      // Validation de la signature cryptographique HMAC-SHA256
-      let signatureStatus: 'valid' | 'invalid' | 'missing' = 'valid';
-      if (rawSignature && activeSecret) {
-        const rawBuffer = (req as any).rawBody || Buffer.from(JSON.stringify(payload));
-        const isValid = isValidTranzakSignature(rawSignature, rawBuffer, activeSecret);
-        if (!isValid) {
-          console.warn(`[Tranzak Webhook] Signature HMAC rejetée pour school ${schoolId || 'global'}`);
-          signatureStatus = 'invalid';
-          
-          webhookAuditLogs.unshift({
-            id: `wh-trz-${Date.now()}`,
-            timestamp: new Date().toISOString(),
-            school_id: schoolId || undefined,
-            gateway: 'tranzak',
-            operator: operator,
-            event_type: String(eventType),
-            order_id: orderRef,
-            transaction_id: transactionId,
-            amount: amount,
-            currency: currency,
-            signature_status: 'invalid',
-            persisted_to_db: false,
-            http_status: 403,
-            simulated: false,
-            status: 'ECHOUE',
-            notes: 'Signature HMAC invalide',
-            raw_payload: payload
-          });
-          if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+      // Validation stricte de la signature cryptographique HMAC-SHA256 (Fail-closed)
+      if (!rawSignature) {
+        console.warn(`[Tranzak Webhook] Signature manquante pour school ${schoolId || 'global'}`);
+        return res.status(401).json({ success: false, error: 'Signature de webhook Tranzak requise (x-tranzak-signature).' });
+      }
 
-          return res.status(403).json({ success: false, error: 'Signature invalide.' });
-        }
-      } else if (!rawSignature && activeSecret) {
-        signatureStatus = 'missing';
+      if (!activeSecret) {
+        console.warn(`[Tranzak Webhook] Secret de webhook non configuré pour school ${schoolId || 'global'}`);
+        return res.status(500).json({ success: false, error: 'Secret de webhook Tranzak non configuré.' });
+      }
+
+      const rawBuffer = (req as any).rawBody || Buffer.from(JSON.stringify(payload));
+      const isValid = isValidTranzakSignature(rawSignature, rawBuffer, activeSecret);
+      if (!isValid) {
+        console.warn(`[Tranzak Webhook] Signature HMAC rejetée pour school ${schoolId || 'global'}`);
+        webhookAuditLogs.unshift({
+          id: `wh-trz-${Date.now()}`,
+          timestamp: new Date().toISOString(),
+          school_id: schoolId || undefined,
+          gateway: 'tranzak',
+          operator: operator,
+          event_type: String(eventType),
+          order_id: orderRef,
+          transaction_id: transactionId,
+          amount: amount,
+          currency: currency,
+          signature_status: 'invalid',
+          persisted_to_db: false,
+          http_status: 403,
+          simulated: false,
+          status: 'ECHOUE',
+          notes: 'Signature HMAC invalide',
+          raw_payload: payload
+        });
+        if (webhookAuditLogs.length > 100) webhookAuditLogs.pop();
+
+        return res.status(403).json({ success: false, error: 'Signature invalide.' });
       }
 
       const isSuccess = eventType === 'payment.success' || status === 'completed' || status === 'successful' || status === 'paid';
@@ -3758,7 +3767,7 @@ async function startServer() {
         amount: amount,
         currency: currency,
         payer_phone: data?.customer?.phone || undefined,
-        signature_status: signatureStatus,
+        signature_status: 'valid',
         persisted_to_db: persistedToDb,
         http_status: 200,
         simulated: false,
@@ -4039,6 +4048,11 @@ async function startServer() {
   // API Route pour annuler formellement une commande Tranzak non aboutie
   app.post('/api/tranzak/cancel-payment', async (req, res) => {
     try {
+      const auth = await authenticateRequest(req);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+
       const { order_id, transaction_id, reason } = req.body || {};
       const ref = (order_id || transaction_id || '').trim();
       if (!ref) {
@@ -4401,6 +4415,11 @@ async function startServer() {
   // API Route de Diagnostic Avancé pour StudentFinanceView :
   app.get('/api/debug/solvency/:studentId', async (req, res) => {
     try {
+      const auth = await authenticateRequest(req);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+
       const dbClient = getSupabaseClient(req);
       const studentId = req.params.studentId;
       const { data: student } = await dbClient.from('students').select('*, class:classes(*)').eq('id', studentId).maybeSingle();
@@ -4427,6 +4446,11 @@ async function startServer() {
   // avec les relevés Tranzak et les callbacks Webhook pour expliquer tout écart de solde
   app.get('/api/tranzak/diagnostics/:studentId', async (req, res) => {
     try {
+      const auth = await authenticateRequest(req);
+      if (!auth.authorized) {
+        return res.status(auth.status).json({ success: false, error: auth.error });
+      }
+
       const studentId = req.params.studentId;
       const schoolId = (req.query.schoolId as string) || '';
       const studentName = (req.query.studentName as string) || '';

@@ -349,13 +349,23 @@ export async function handleMonCashWebhook(
         processedAt
       };
     }
-  } else {
-    // Si aucun jeton n'est configuré dans le système, avertir dans les logs
-    console.warn(
-      '[MonCash Webhook] Attention: Aucun jeton de sécurité attendu configuré. ' +
-      'Veuillez définir MONCASH_WEBHOOK_SECRET ou passer expectedSecurityToken pour sécuriser vos webhooks.'
-    );
+  } else if (options.verifyWithMonCashApi && options.moncashConfig?.client_id && options.moncashConfig?.client_secret) {
+    // Si pas de jeton fixe mais que l'API officielle Digicel est configurée pour vérification directe
     isTokenVerified = true;
+  } else {
+    console.error(
+      '[MonCash Webhook] REJET DE SÉCURITÉ : Aucun jeton secret MonCash configuré (MONCASH_WEBHOOK_SECRET).'
+    );
+    return {
+      success: false,
+      verified: false,
+      status: 'INVALID_TOKEN',
+      httpStatusCode: 401,
+      currency: 'HTG',
+      message: 'Sécurité MonCash non initialisée : Définissez MONCASH_WEBHOOK_SECRET pour autoriser les réceptions.',
+      error: 'SECURITY_TOKEN_UNCONFIGURED',
+      processedAt
+    };
   }
 
   // 4. Extraction et normalisation des attributs de transaction

@@ -435,13 +435,13 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       // Étape 2 : Lancement PARALLÈLE des requêtes de données massives (colonnes ciblées pour vitesse maximale)
       let studentsQuery = supabase.from('students').select('id, reference_number, first_name, last_name, gender, status, class_id, campus_id, discount_amount, discount_label, created_at').eq('school_id', user.school_id);
-      let paymentsQuery = supabase.from('payments').select('id, amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, fee_type, nature, ad_hoc_campaign_id, created_at, student_id, academic_year_id, campus_id').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      let paymentsQuery = supabase.from('payments').select('id, amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, fee_type, nature, ad_hoc_campaign_id, created_at, student_id, academic_year_id, campus_id').eq('school_id', user.school_id).or(`academic_year_id.eq.${activeYear.id},academic_year_id.is.null`);
       let staffQuery = supabase.from('staff').select('id, first_name, last_name, status, role, campus_id, amount, pay_type, contract_type, weekly_hours').eq('school_id', user.school_id);
-      let expensesQuery = supabase.from('expenses').select('id, amount, amount_htg_equivalent, currency, academic_year_id, campus_id').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      let expensesQuery = supabase.from('expenses').select('id, amount, amount_htg_equivalent, currency, academic_year_id, campus_id').eq('school_id', user.school_id).or(`academic_year_id.eq.${activeYear.id},academic_year_id.is.null`);
       let classesQuery = supabase.from('classes').select('id', { count: 'exact', head: true }).eq('school_id', user.school_id);
-      let assignmentsQuery = supabase.from('staff_assignments').select('staff_id, duration_hours, hourly_rate').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      let assignmentsQuery = supabase.from('staff_assignments').select('staff_id, duration_hours, hourly_rate').eq('school_id', user.school_id).or(`academic_year_id.eq.${activeYear.id},academic_year_id.is.null`);
 
-      let suppliesQuery = supabase.from('school_supplies').select('id, transaction_id, student_id, total_amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, academic_year_id, campus_id, created_at').eq('school_id', user.school_id).eq('academic_year_id', activeYear.id);
+      let suppliesQuery = supabase.from('school_supplies').select('id, transaction_id, student_id, total_amount, amount_htg_equivalent, currency, payment_method, status, moncash_status, academic_year_id, campus_id, created_at, payments:supply_payments(amount, amount_htg_equivalent, currency, payment_date)').eq('school_id', user.school_id).or(`academic_year_id.eq.${activeYear.id},academic_year_id.is.null`);
       let enrollmentsQuery = supabase.from('enrollments').select('student_id, academic_year_id, class_id').eq('school_id', user.school_id);
       let catalogQuery = supabase.from('supply_catalog').select('id, name, stock_quantity, low_stock_threshold, sell_price, cost_price').eq('school_id', user.school_id);
       
@@ -610,8 +610,10 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
               (expectedGross > 0 && Math.abs(discount - expectedGross) <= (15 * (currentExchangeRate || 1))) ||
               (expectedGrossHTG > 0 && baseUSD_raw + miscUSD_raw === 0 && discount >= expectedGrossHTG);
 
-            const eligibleHTG = isCompleteScholarship ? expectedGrossHTG : tuitionHTG;
-            const eligibleUSD_raw = isCompleteScholarship ? expectedGrossUSD : tuitionUSD_raw;
+            // Règle d'or Économat : L'inscription/réinscription est obligatoire pour valider l'admission
+            // La bourse s'applique sur la scolarité et les frais annexes, jamais sur l'inscription
+            const eligibleHTG = isCompleteScholarship ? (tuitionHTG + miscHTG) : tuitionHTG;
+            const eligibleUSD_raw = isCompleteScholarship ? (tuitionUSD_raw + miscUSD_raw) : tuitionUSD_raw;
 
             if (isCompleteScholarship) {
               // Prise en charge intégrale : annulation totale dans les devises respectives (0 HTG et 0 USD dû)
@@ -632,7 +634,7 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
             }
 
             // Sécurité de cohérence avec l'allocation enregistrée en base pour les cas 100% HTG
-            if (baseUSD_raw + miscUSD_raw === 0 && discount > 0 && studentReductionsHTG < discount && discount <= expectedGrossHTG) {
+            if (baseUSD_raw + miscUSD_raw === 0 && discount > 0 && studentReductionsHTG < discount && discount <= eligibleHTG) {
               studentReductionsHTG = discount;
             }
           }
@@ -647,12 +649,19 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       });
 
-      const validPayments = fetchedPayments.filter(isPaymentCompleted);
+      const validPayments = fetchedPayments.filter(p => 
+        !p.payment_method?.includes('EN ATTENTE') && 
+        !p.payment_method?.includes('REJETÉ') &&
+        p.status !== 'ANNULE' &&
+        p.status !== 'EN_ATTENTE' &&
+        p.moncash_status !== 'PENDING'
+      );
 
       const validSupplies = suppliesRes.data?.filter(s => 
         s.status !== 'ANNULE' && 
         !s.payment_method?.includes('EN ATTENTE') && 
-        !s.payment_method?.includes('REJETÉ')
+        !s.payment_method?.includes('REJETÉ') &&
+        s.moncash_status !== 'PENDING'
       ) || [];
 
       const collectedTuitionHTG = validPayments.filter(p => !p.currency || p.currency === 'HTG').reduce((acc, p) => acc + Number(p.amount || 0), 0);
@@ -717,13 +726,26 @@ const Dashboard: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       });
       
-      const collectedSupplies = validSupplies.reduce((acc, s) => {
+      const collectedSupplies = validSupplies.reduce((acc, s: any) => {
+        if (s.payments && s.payments.length > 0) {
+          return acc + (s.payments.reduce((pSum: number, p: any) => pSum + Number(p.amount_htg_equivalent || p.amount || 0), 0) || 0);
+        }
         let amt = Number(s.amount_htg_equivalent || s.total_amount || 0);
         if (!s.amount_htg_equivalent && s.currency === 'USD') amt *= currentExchangeRate;
         return acc + amt;
       }, 0);
-      const collectedSuppliesHTG = validSupplies.filter(s => !s.currency || s.currency === 'HTG').reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
-      const collectedSuppliesUSD = validSupplies.filter(s => s.currency === 'USD').reduce((acc, s) => acc + Number(s.total_amount || 0), 0);
+      const collectedSuppliesHTG = validSupplies.reduce((acc, s: any) => {
+        if (s.payments && s.payments.length > 0) {
+          return acc + (s.payments.filter((p: any) => !p.currency || p.currency === 'HTG').reduce((pSum: number, p: any) => pSum + Number(p.amount || 0), 0) || 0);
+        }
+        return acc + (!s.currency || s.currency === 'HTG' ? Number(s.total_amount || 0) : 0);
+      }, 0);
+      const collectedSuppliesUSD = validSupplies.reduce((acc, s: any) => {
+        if (s.payments && s.payments.length > 0) {
+          return acc + (s.payments.filter((p: any) => p.currency === 'USD').reduce((pSum: number, p: any) => pSum + Number(p.amount || 0), 0) || 0);
+        }
+        return acc + (s.currency === 'USD' ? Number(s.total_amount || 0) : 0);
+      }, 0);
       
       const collectedTuition = validPayments.reduce((acc, p) => {
          let amt = Number(p.amount_htg_equivalent);

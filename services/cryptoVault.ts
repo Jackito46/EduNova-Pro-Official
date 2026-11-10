@@ -22,11 +22,16 @@ function getMasterKey(): Buffer {
   const baseSeed = 
     process.env.ENCRYPTION_KEY || 
     process.env.APP_ENCRYPTION_KEY || 
-    process.env.SUPABASE_SERVICE_ROLE_KEY || 
-    process.env.VITE_SUPABASE_ANON_KEY || 
-    'edunova-pro-system-vault-master-key-seed-2026';
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SESSION_SECRET ||
+    process.env.JWT_SECRET ||
+    (process.env.NODE_ENV === 'production' ? '' : 'edunova-dev-local-seed-salt');
+
+  if (!baseSeed && process.env.NODE_ENV === 'production') {
+    throw new Error('SÉCURITÉ CRITIQUE : La variable ENCRYPTION_KEY doit être obligatoirement définie en environnement de production.');
+  }
   
-  return crypto.createHash('sha256').update(`${baseSeed}:edunova:vault:salt`).digest();
+  return crypto.createHash('sha256').update(`${baseSeed || 'dev-fallback'}:edunova:vault:salt:v2`).digest();
 }
 
 /**
