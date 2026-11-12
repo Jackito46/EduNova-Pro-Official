@@ -49,6 +49,10 @@
   --color-blue-600: #2563eb;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   font-family: var(--font-sans);
   background-color: #f8fafc;

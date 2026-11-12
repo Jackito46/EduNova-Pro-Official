@@ -128,6 +128,7 @@ const OfflineDashboard = lazyWithRetry(() => import('./components/OfflineDashboa
 const SuperAdminDashboard = lazyWithRetry(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
 const SystemHealthView = lazyWithRetry(() => import('./components/SystemHealthView').then(m => ({ default: m.SystemHealthView })));
 const PublicReceiptVerificationView = lazyWithRetry(() => import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView })));
+const PublicLandingPage = lazyWithRetry(() => import('./components/PublicLandingPage'));
 const EmailModule = lazyWithRetry(() => import('./components/EmailModule'));
 const SmsModule = lazyWithRetry(() => import('./components/SmsModule'));
 const PushModule = lazyWithRetry(() => import('./components/PushModule'));
@@ -575,6 +576,33 @@ const App: React.FC = () => {
   useEffect(() => {
     try { window.localStorage.setItem('edunova_session_timeout', sessionTimeoutMinutes.toString()); } catch(e){}
   }, [sessionTimeoutMinutes]);
+
+  // State to toggle between the public vitrine/landing page and the member login screen
+  const [showLogin, setShowLogin] = useState<boolean>(() => {
+    try {
+      const h = typeof window !== 'undefined' ? window.location.hash || '' : '';
+      return h.startsWith('#/login') || h.startsWith('#/auth') || h.startsWith('#/reset-password');
+    } catch (e) {
+      return false;
+    }
+  });
+
+  useEffect(() => {
+    const syncHashToView = () => {
+      try {
+        const h = window.location.hash || '';
+        if (h.startsWith('#/login') || h.startsWith('#/auth') || h.startsWith('#/reset-password')) {
+          setShowLogin(true);
+        } else if (h === '#/' || h === '' || h.startsWith('#/presentation') || h.startsWith('#/vitrine') || h.startsWith('#/demo')) {
+          if (!user) {
+            setShowLogin(false);
+          }
+        }
+      } catch (e) {}
+    };
+    window.addEventListener('hashchange', syncHashToView);
+    return () => window.removeEventListener('hashchange', syncHashToView);
+  }, [user]);
   
   // Inactivity Warning States
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
@@ -758,6 +786,7 @@ const App: React.FC = () => {
     setUser(null);
     setLoading(false);
     setIsExiting(false);
+    setShowLogin(true);
 
     // 5. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
     (async () => {
@@ -1470,18 +1499,41 @@ const App: React.FC = () => {
   }
 
   if (!user) {
+    if (!showLogin) {
+      console.log("App.tsx: Rendering PublicLandingPage (Vitrine)");
+      return (
+        <ErrorBoundary>
+          <React.Suspense fallback={<ModernDashboardSkeleton />}>
+            <PublicLandingPage
+              onOpenLogin={() => {
+                window.location.hash = '#/login';
+                setShowLogin(true);
+              }}
+            />
+          </React.Suspense>
+        </ErrorBoundary>
+      );
+    }
+
     console.log("App.tsx: Rendering Login component");
     return (
       <ErrorBoundary>
         <HashRouter>
-          <Login onLogin={(u) => {
-            try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-            setUser(u);
-            // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
-            if (window.location.hash !== '#/') {
+          <Login
+            onLogin={(u) => {
+              try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
+              setUser(u);
+              // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
+              if (window.location.hash !== '#/') {
+                window.location.hash = '#/';
+              }
+            }}
+            onReset={purgeSystemState}
+            onBackToLanding={() => {
               window.location.hash = '#/';
-            }
-          }} onReset={purgeSystemState} />
+              setShowLogin(false);
+            }}
+          />
         </HashRouter>
       </ErrorBoundary>
     );

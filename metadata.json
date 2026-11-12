@@ -1,6 +1,6 @@
 {
   "name": "EduNova Pro - Système de Gestion Scolaire",
-  "description": "Une plateforme SaaS complète pour la gestion des écoles maternelles, fondamentales et secondaires, intégrant la gestion académique, financière et une IA d'analyse pédagogique.",
+  "description": "Plateforme de gestion scolaire et universitaire d'excellence pour Haïti : gestion académique, économat bidevise HTG/USD, paiements MonCash et continuité garantie hors-ligne.",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

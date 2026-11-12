@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 interface LoginProps {
   onLogin: (user: UserProfile) => void;
   onReset: () => void;
+  onBackToLanding?: () => void;
 }
 
 const AUTH_STEPS = [
@@ -20,7 +21,7 @@ const AUTH_STEPS = [
   { id: 3, title: "Préparation de l'espace", desc: "Chargement de votre session de travail EduNova Pro" }
 ];
 
-const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
+const Login: React.FC<LoginProps> = ({ onLogin, onReset, onBackToLanding }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -553,6 +554,21 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset }) => {
         <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(30,58,138,0.12),0_10px_25px_-10px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100/90 transition-all duration-500">
           <div className="p-6 sm:p-8 md:p-9">
             
+            {/* Lien retour vers la présentation vitrine EduNova Pro */}
+            {onBackToLanding && (
+              <div className="mb-4 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={onBackToLanding}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors group cursor-pointer"
+                >
+                  <ChevronLeft size={15} className="group-hover:-translate-x-0.5 transition-transform" />
+                  <span>Présentation EduNova Pro</span>
+                </button>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accès Établissement</span>
+              </div>
+            )}
+
             {/* Header Section */}
             <motion.div 
               initial={{ opacity: 0, scale: 0.95 }}
