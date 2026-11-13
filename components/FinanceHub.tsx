@@ -42,7 +42,6 @@ import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { ReevaluationModal, ReevaluatedStudentItem } from './ReevaluationModal';
 import { GatewayWebhookSimulatorModal } from './GatewayWebhookSimulatorModal';
 import { GatewayDiagnosticModal } from './GatewayDiagnosticModal';
-import { StudentCurrencyDiagnosticModal } from './StudentCurrencyDiagnosticModal';
 import { ApiVaultService } from '../services/apiVaultService';
 
 const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
@@ -67,8 +66,6 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [totalReductionsUSD, setTotalReductionsUSD] = useState(0);
   const [reevaluatedStudents, setReevaluatedStudents] = useState<ReevaluatedStudentItem[]>([]);
   const [isReevaluationModalOpen, setIsReevaluationModalOpen] = useState(false);
-  const [isDiagnosticModalOpen, setIsDiagnosticModalOpen] = useState(false);
-  const isMultiCurrency = Boolean(school?.global_settings?.multi_currency_enabled);
   const [isTargetReevaluated, setIsTargetReevaluated] = useState<boolean>(() => {
     try {
       const saved = localStorage.getItem(`edunova_target_reevaluated_${user?.school_id || 'default'}`);
@@ -1193,20 +1190,18 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <span className="text-indigo-100 tracking-tight">Réévaluer</span>
               </button>
 
-              {/* Action 5: Diagnostic Barème USD */}
-              {isMultiCurrency && (
-                <button
-                  type="button"
-                  onClick={() => setIsDiagnosticModalOpen(true)}
-                  className="h-10 sm:h-10.5 px-3 sm:px-3.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 hover:text-white font-bold text-xs rounded-xl sm:rounded-2xl transition-all shadow-md shadow-cyan-950/40 flex items-center justify-center gap-2 active:scale-95 border border-cyan-400/40 whitespace-nowrap cursor-pointer shrink-0 backdrop-blur-md"
-                  title="Diagnostic comparatif du Total Dû théorique (barème USD) vs montant réellement enregistré dans l'engagement"
-                >
-                  <div className="w-5.5 h-5.5 rounded-lg bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center shrink-0 text-cyan-300">
-                    <Activity size={14} className="shrink-0 text-cyan-300" />
-                  </div>
-                  <span className="text-cyan-100 tracking-tight">Barème USD</span>
-                </button>
-              )}
+              {/* Action 5: Diagnostic Barème & Devises */}
+              <button
+                type="button"
+                onClick={() => navigate('/economat/diagnostic')}
+                className="h-10 sm:h-10.5 px-3 sm:px-3.5 bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 hover:text-white font-bold text-xs rounded-xl sm:rounded-2xl transition-all shadow-md shadow-cyan-950/40 flex items-center justify-center gap-2 active:scale-95 border border-cyan-400/40 whitespace-nowrap cursor-pointer shrink-0 backdrop-blur-md"
+                title="Diagnostic Barème & Devises — Audit consolidé de l'établissement"
+              >
+                <div className="w-5.5 h-5.5 rounded-lg bg-cyan-400/20 border border-cyan-400/30 flex items-center justify-center shrink-0 text-cyan-300">
+                  <Activity size={14} className="shrink-0 text-cyan-300" />
+                </div>
+                <span className="text-cyan-100 tracking-tight">Barème & Devises</span>
+              </button>
 
               {/* Action 6: Rafraîchir instantané */}
               <button
@@ -1788,17 +1783,6 @@ const FinanceHub: React.FC<{ user: UserProfile }> = ({ user }) => {
         user={user}
         onClosureUpdated={fetchFinanceData}
       />
-
-      {isDiagnosticModalOpen && (
-        <StudentCurrencyDiagnosticModal
-          isOpen={isDiagnosticModalOpen}
-          onClose={() => setIsDiagnosticModalOpen(false)}
-          studentId="c3b12a55-d5d1-460b-8a7d-c8eed32a727c"
-          studentName="AUGUSTIN Djenny"
-          studentClass="NS II"
-          currentExchangeRate={148}
-        />
-      )}
 
       <GatewayDiagnosticModal
         isOpen={isGatewayDiagnosticOpen}

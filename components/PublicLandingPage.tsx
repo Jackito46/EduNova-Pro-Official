@@ -50,6 +50,7 @@ import {
   DemoFormField,
   DemoFormValues
 } from '../utils/validation';
+import { signDemoRequestOnClient } from '../utils/demoRequestCrypto';
 import heroLeadershipImg from '../src/assets/images/edunova_hero_leadership_1794531327538.jpg';
 import bursarMobileImg from '../src/assets/images/edunova_bursar_mobile_1794531328203.jpg';
 import classroomExcellenceImg from '../src/assets/images/edunova_classroom_excellence_1794531328252.jpg';
@@ -523,9 +524,20 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
     setIsSubmitting(true);
     try {
+      const signedHeaders = await signDemoRequestOnClient({
+        schoolName: schoolName.trim(),
+        phone: phone.trim(),
+        email: email.trim()
+      });
+
       const response = await fetch('/api/demo-request', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Demo-Signature': signedHeaders.signature,
+          'X-Demo-Timestamp': signedHeaders.timestamp,
+          'X-Demo-Nonce': signedHeaders.nonce
+        },
         body: JSON.stringify({
           schoolName: schoolName.trim(),
           contactName: contactName.trim(),
@@ -542,6 +554,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
       const data = await response.json().catch(() => null);
       if (!response.ok || !data?.success) {
+        if (data?.fieldErrors && typeof data.fieldErrors === 'object') {
+          setFieldErrors((prev) => ({ ...prev, ...data.fieldErrors }));
+        }
         throw new Error(data?.error || `Erreur serveur (${response.status})`);
       }
 

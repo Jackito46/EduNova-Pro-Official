@@ -27,6 +27,11 @@ import {
   cleanText,
   DemoRequestStatus
 } from './services/demoContactService.ts';
+import {
+  issueDemoRequestChallenge,
+  demoRequestSecurityMiddleware,
+  DemoProtectedRequest
+} from './services/demoRequestSecurityMiddleware.ts';
 
 dotenv.config();
 
@@ -135,7 +140,10 @@ async function startServer() {
     }
 
     res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma');
+    res.setHeader(
+      'Access-Control-Allow-Headers',
+      'Origin, X-Requested-With, Content-Type, Accept, Authorization, Cache-Control, Pragma, X-Demo-Signature, X-Demo-Timestamp, X-Demo-Nonce, X-Signature, X-Timestamp, X-Nonce'
+    );
     res.setHeader('Access-Control-Max-Age', '86400');
 
     // En-têtes de durcissement défensif (Anti-MIME Sniffing, Anti-XSS, Isolation)
@@ -6292,57 +6300,45 @@ async function startServer() {
     }
   });
 
-  const handleDemoRequestSubmission = async (req: express.Request, res: express.Response) => {
+  app.get('/api/demo-request/challenge', apiGeneralLimiter, (_req, res) => {
     try {
-      const body = req.body || {};
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      return res.json(issueDemoRequestChallenge());
+    } catch (err: any) {
+      console.error('Error in /api/demo-request/challenge:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'Impossible de générer le jeton de sécurité.'
+      });
+    }
+  });
+  app.get('/api/public/demo-challenge', apiGeneralLimiter, (_req, res) => {
+    try {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      return res.json(issueDemoRequestChallenge());
+    } catch (err: any) {
+      console.error('Error in /api/public/demo-challenge:', err);
+      return res.status(500).json({
+        success: false,
+        error: 'Impossible de générer le jeton de sécurité.'
+      });
+    }
+  });
 
-      // Champ honeypot anti-robot (silencieux si rempli)
-      if (typeof body.website === 'string' && body.website.trim().length > 0) {
-        return res.json({
-          success: true,
-          referenceCode: 'DEMO-FILTERED',
-          delivery: { savedToInbox: false, emailSent: false, whatsappAutoSent: false }
-        });
-      }
-
-      const schoolName = cleanText(body.schoolName ?? body.school ?? body.ecole, 160);
-      const contactName = cleanText(body.contactName ?? body.name ?? body.nom, 120);
-      const phone = cleanText(body.phone ?? body.telephone ?? body.tel, 50);
-      const email = cleanText(body.email, 160);
-
-      if (!schoolName || !contactName || !phone) {
+  const handleDemoRequestSubmission = async (req: DemoProtectedRequest, res: express.Response) => {
+    try {
+      const validated = req.validatedDemoRequest;
+      if (!validated) {
         return res.status(400).json({
           success: false,
-          error: 'Veuillez renseigner le nom de l’établissement, votre nom et votre numéro WhatsApp / téléphone.'
+          code: 'DEMO_VALIDATION_FAILED',
+          error: 'Données de demande de démo invalides ou non validées.'
         });
       }
 
-      if (email && !isValidEmail(email)) {
-        return res.status(400).json({
-          success: false,
-          error: 'Le format de l’adresse email renseignée semble invalide.'
-        });
-      }
-
-      const preferredChannel =
-        body.preferredChannel === 'whatsapp' || body.preferredChannel === 'email'
-          ? body.preferredChannel
-          : 'both';
-
-      const result = await submitPublicDemoRequest(
-        {
-          schoolName,
-          contactName,
-          phone,
-          email,
-          city: body.city,
-          schoolType: body.schoolType,
-          studentBracket: body.studentBracket,
-          preferredChannel,
-          notes: body.notes
-        },
-        supabase
-      );
+      const result = await submitPublicDemoRequest(validated, supabase);
 
       return res.json({
         success: true,
@@ -6363,8 +6359,8 @@ async function startServer() {
     }
   };
 
-  app.post('/api/demo-request', demoRequestLimiter, handleDemoRequestSubmission);
-  app.post('/api/public/demo-request', demoRequestLimiter, handleDemoRequestSubmission);
+  app.post('/api/demo-request', demoRequestLimiter, ...demoRequestSecurityMiddleware, handleDemoRequestSubmission);
+  app.post('/api/public/demo-request', demoRequestLimiter, ...demoRequestSecurityMiddleware, handleDemoRequestSubmission);
 
   // =========================================================================
   // ROUTES SUPER ADMIN : BOÎTE DE RÉCEPTION DÉMOS & ROUTAGE EMAIL / WHATSAPP

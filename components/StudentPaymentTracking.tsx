@@ -1601,9 +1601,9 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                                 type="button"
                                 onClick={() => setShowDiagnosticModal(true)}
                                 className="text-[10px] bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 px-1.5 py-0.5 rounded font-black flex items-center gap-1 cursor-pointer transition-colors shadow-2xs"
-                                title="Diagnostic Barème $200 USD vs Engagement"
+                                title="Diagnostic Barème & Devises vs Engagement Réel"
                               >
-                                <Activity size={10} className="text-indigo-600" /> Diagnostic Barème
+                                <Activity size={10} className="text-indigo-600" /> Barème & Devises
                               </button>
                             </div>
                           </div>
@@ -2247,9 +2247,9 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
                   type="button"
                   onClick={() => setShowDiagnosticModal(true)}
                   className="w-full py-2.5 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-200 text-indigo-700 font-bold rounded-lg hover:bg-indigo-100/70 transition-colors flex items-center justify-center gap-2 text-sm cursor-pointer shadow-2xs"
-                  title="Comparer le Total Dû théorique (barème $200 USD) avec l'engagement réel enregistré"
+                  title="Diagnostic Barème & Devises vs Engagement Réel enregistré"
                 >
-                  <Activity size={16} className="text-indigo-600" /> Diagnostic Barème vs Engagement
+                  <Activity size={16} className="text-indigo-600" /> Diagnostic Barème & Devises
                 </button>
               </div>
             </div>
@@ -3125,16 +3125,31 @@ const StudentPaymentTracking: React.FC<{ user: UserProfile }> = ({ user }) => {
           </div>
         </div>
       )}
-      {/* Modal Diagnostic Barème USD vs Engagement */}
+      {/* Modal Diagnostic Barème & Devises */}
       {showDiagnosticModal && selectedStudent && (
         <StudentCurrencyDiagnosticModal
           isOpen={showDiagnosticModal}
           onClose={() => setShowDiagnosticModal(false)}
           studentId={selectedStudent.id}
           studentName={selectedStudent.fullName}
-          studentClass={selectedStudent.classe || selectedStudent.class?.name || selectedStudent.class_name || 'NS II'}
-          academicYearLabel={academicYears.find(y => y.id === selectedYearId)?.label || '2025-2026'}
-          currentExchangeRate={selectedStudent.exchangeRate || 148}
+          studentClass={selectedStudent.classe || selectedStudent.class?.name || selectedStudent.class_name || 'Classe active'}
+          academicYearLabel={academicYears.find(y => y.id === selectedYearId)?.label || 'Session active'}
+          currentExchangeRate={selectedStudent.exchangeRate || 135}
+          plannedHTG={
+            Number(selectedStudent.admissionNativeHTG || 0) +
+            Number(selectedStudent.tuitionNativeHTG || 0) +
+            Number(selectedStudent.tuitionAddition || 0) +
+            Number(selectedStudent.miscNativeHTG || 0) +
+            Number(selectedStudent.campaignsNativeHTG || 0)
+          }
+          plannedUSD={
+            Number(selectedStudent.admissionNativeUSD || 0) +
+            Number(selectedStudent.tuitionNativeUSD || 0) +
+            Number(selectedStudent.miscNativeUSD || 0) +
+            Number(selectedStudent.campaignsNativeUSD || 0)
+          }
+          totalDiscountHTG={Number(selectedStudent.totalDiscount || 0)}
+          payments={studentHistory}
         />
       )}
     </div>

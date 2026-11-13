@@ -645,6 +645,31 @@ export async function submitPublicDemoRequest(
   existing.unshift(record);
   await persistRequests(existing, supabaseClient);
 
+  // 4. Insertion optionnelle dans la table relationnelle Supabase `demo_requests` (si déployée)
+  if (supabaseClient) {
+    try {
+      const { error: dbErr } = await supabaseClient.from('demo_requests').insert({
+        id: record.id,
+        reference_code: record.referenceCode,
+        school_name: record.schoolName,
+        contact_name: record.contactName,
+        phone: record.phone,
+        email: record.email || null,
+        city: record.city || null,
+        school_type: record.schoolType || null,
+        student_bracket: record.studentBracket || null,
+        preferred_channel: record.preferredChannel,
+        notes: record.notes || null,
+        status: record.status
+      });
+      if (dbErr && !String(dbErr.message || '').includes('does not exist')) {
+        console.warn('[DemoContact] Avertissement insertion table demo_requests:', dbErr.message);
+      }
+    } catch (tableErr: any) {
+      console.warn('[DemoContact] Exception table demo_requests ignorée:', tableErr?.message || tableErr);
+    }
+  }
+
   return {
     record,
     displayEmail: resolved.publicEmail,
