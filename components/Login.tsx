@@ -13,6 +13,9 @@ interface LoginProps {
   onLogin: (user: UserProfile) => void;
   onReset: () => void;
   onBackToLanding?: () => void;
+  onPreloadLanding?: () => void;
+  onLoginStart?: () => void;
+  isReturningToLanding?: boolean;
 }
 
 const AUTH_STEPS = [
@@ -21,7 +24,23 @@ const AUTH_STEPS = [
   { id: 3, title: "Préparation de l'espace", desc: "Chargement de votre session de travail EduNova Pro" }
 ];
 
-const Login: React.FC<LoginProps> = ({ onLogin, onReset, onBackToLanding }) => {
+const LOGIN_PARTICLES = [
+  { left: '14%', top: '24%', dx: 12, duration: 6.5, delay: 0 },
+  { left: '28%', top: '62%', dx: -15, duration: 7.5, delay: 1.5 },
+  { left: '46%', top: '34%', dx: 10, duration: 8.2, delay: 3 },
+  { left: '64%', top: '70%', dx: -12, duration: 6.8, delay: 4.5 },
+  { left: '78%', top: '28%', dx: 16, duration: 9, delay: 2 },
+  { left: '86%', top: '56%', dx: -10, duration: 7.2, delay: 3.5 }
+];
+
+const Login: React.FC<LoginProps> = ({
+  onLogin,
+  onReset,
+  onBackToLanding,
+  onPreloadLanding,
+  onLoginStart,
+  isReturningToLanding = false
+}) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -258,6 +277,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset, onBackToLanding }) => {
     }
 
     setIsSubmitting(true);
+    onLoginStart?.();
 
     const targetEmail = normalizeIdentifier(email);
     const sessionId = Math.random().toString(36).substring(2) + Date.now().toString(36);
@@ -520,7 +540,7 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset, onBackToLanding }) => {
         />
         
         {/* Floating Particles */}
-        {[...Array(6)].map((_, i) => (
+        {LOGIN_PARTICLES.map((particle, i) => (
           <motion.div
             key={i}
             initial={{ opacity: 0, scale: 0 }}
@@ -528,18 +548,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset, onBackToLanding }) => {
               opacity: [0, 0.2, 0],
               scale: [0, 1, 0],
               y: [-20, -100],
-              x: Math.random() * 40 - 20
+              x: particle.dx
             }}
             transition={{ 
-              duration: 5 + Math.random() * 5, 
+              duration: particle.duration, 
               repeat: Infinity, 
-              delay: i * 2,
+              delay: particle.delay,
               ease: "easeInOut"
             }}
             className="absolute w-1 h-1 bg-indigo-400 rounded-full blur-[1px]"
             style={{ 
-              left: `${10 + Math.random() * 80}%`, 
-              top: `${20 + Math.random() * 60}%` 
+              left: particle.left, 
+              top: particle.top 
             }}
           />
         ))}
@@ -560,10 +580,18 @@ const Login: React.FC<LoginProps> = ({ onLogin, onReset, onBackToLanding }) => {
                 <button
                   type="button"
                   onClick={onBackToLanding}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors group cursor-pointer"
+                  onMouseEnter={onPreloadLanding}
+                  onFocus={onPreloadLanding}
+                  onTouchStart={onPreloadLanding}
+                  disabled={isReturningToLanding}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500 hover:text-indigo-600 transition-colors group cursor-pointer disabled:opacity-70"
                 >
-                  <ChevronLeft size={15} className="group-hover:-translate-x-0.5 transition-transform" />
-                  <span>Présentation EduNova Pro</span>
+                  {isReturningToLanding ? (
+                    <Loader2 size={14} className="animate-spin text-indigo-600" />
+                  ) : (
+                    <ChevronLeft size={15} className="group-hover:-translate-x-0.5 transition-transform" />
+                  )}
+                  <span>{isReturningToLanding ? 'Retour en cours...' : 'Présentation EduNova Pro'}</span>
                 </button>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Accès Établissement</span>
               </div>

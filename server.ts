@@ -15,6 +15,18 @@ import AdmZip from 'adm-zip';
 import { handleMonCashWebhook, isWalletDeposit } from './utils/payment.ts';
 import { sendMonCashPaymentPushNotification } from './services/moncashPushService.ts';
 import { encryptSecret, decryptSecret, maskSecret, isEncrypted } from './services/cryptoVault.ts';
+import {
+  getPublicContactConfig,
+  submitPublicDemoRequest,
+  getAdminDemoState,
+  saveAdminDemoRouting,
+  updateDemoRequestStatus,
+  deleteDemoRequest,
+  sendDemoRoutingTestEmail,
+  isValidEmail,
+  cleanText,
+  DemoRequestStatus
+} from './services/demoContactService.ts';
 
 dotenv.config();
 
@@ -211,6 +223,13 @@ async function startServer() {
     windowMs: 60 * 1000,
     max: 35,
     message: 'Limite de requêtes IA atteinte pour cette minute. Veuillez patienter un instant.'
+  });
+
+  // 4. Limiteur anti-spam pour les demandes publiques de démonstration (8 demandes / 15 minutes par IP)
+  const demoRequestLimiter = createRateLimiter({
+    windowMs: 15 * 60 * 1000,
+    max: 8,
+    message: 'Trop de demandes envoyées récemment. Veuillez patienter quelques minutes ou nous joindre directement sur WhatsApp (+509 3604-5639).'
   });
 
   // Application du rate limiter global sur l'ensemble des routes API
@@ -6246,6 +6265,189 @@ async function startServer() {
     } catch (error: any) {
       console.error('Error in /api/send-whatsapp:', error);
       res.status(500).json({ error: error.message });
+    }
+  });
+
+  // =========================================================================
+  // ROUTES PUBLIQUES DE RÉCEPTION DÉMO & CONTACT (PAGE D'ACCUEIL)
+  // =========================================================================
+  app.get('/api/public/contact-config', async (_req, res) => {
+    try {
+      const config = await getPublicContactConfig(supabase);
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.json({ success: true, config });
+    } catch (err: any) {
+      console.error('Error in /api/public/contact-config:', err);
+      res.json({
+        success: true,
+        config: {
+          displayEmail: 'contact@edunova-pro.tech',
+          whatsappNumber: '50936045639',
+          whatsappDisplay: '+509 3604-5639',
+          secondaryPhoneDisplay: '3350-8416',
+          smtpReady: false,
+          whatsappAutoReady: false
+        }
+      });
+    }
+  });
+
+  const handleDemoRequestSubmission = async (req: express.Request, res: express.Response) => {
+    try {
+      const body = req.body || {};
+
+      // Champ honeypot anti-robot (silencieux si rempli)
+      if (typeof body.website === 'string' && body.website.trim().length > 0) {
+        return res.json({
+          success: true,
+          referenceCode: 'DEMO-FILTERED',
+          delivery: { savedToInbox: false, emailSent: false, whatsappAutoSent: false }
+        });
+      }
+
+      const schoolName = cleanText(body.schoolName ?? body.school ?? body.ecole, 160);
+      const contactName = cleanText(body.contactName ?? body.name ?? body.nom, 120);
+      const phone = cleanText(body.phone ?? body.telephone ?? body.tel, 50);
+      const email = cleanText(body.email, 160);
+
+      if (!schoolName || !contactName || !phone) {
+        return res.status(400).json({
+          success: false,
+          error: 'Veuillez renseigner le nom de l’établissement, votre nom et votre numéro WhatsApp / téléphone.'
+        });
+      }
+
+      if (email && !isValidEmail(email)) {
+        return res.status(400).json({
+          success: false,
+          error: 'Le format de l’adresse email renseignée semble invalide.'
+        });
+      }
+
+      const preferredChannel =
+        body.preferredChannel === 'whatsapp' || body.preferredChannel === 'email'
+          ? body.preferredChannel
+          : 'both';
+
+      const result = await submitPublicDemoRequest(
+        {
+          schoolName,
+          contactName,
+          phone,
+          email,
+          city: body.city,
+          schoolType: body.schoolType,
+          studentBracket: body.studentBracket,
+          preferredChannel,
+          notes: body.notes
+        },
+        supabase
+      );
+
+      return res.json({
+        success: true,
+        referenceCode: result.record.referenceCode,
+        displayEmail: result.displayEmail,
+        whatsappDisplay: result.whatsappDisplay,
+        whatsappUrl: result.whatsappUrl,
+        mailtoUrl: result.mailtoUrl,
+        formattedMessage: result.formattedMessage,
+        delivery: result.record.delivery
+      });
+    } catch (error: any) {
+      console.error('Error in /api/demo-request:', error);
+      return res.status(500).json({
+        success: false,
+        error: error?.message || 'Erreur lors de l’enregistrement de la demande.'
+      });
+    }
+  };
+
+  app.post('/api/demo-request', demoRequestLimiter, handleDemoRequestSubmission);
+  app.post('/api/public/demo-request', demoRequestLimiter, handleDemoRequestSubmission);
+
+  // =========================================================================
+  // ROUTES SUPER ADMIN : BOÎTE DE RÉCEPTION DÉMOS & ROUTAGE EMAIL / WHATSAPP
+  // =========================================================================
+  app.get('/api/admin/demo-requests', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
+    try {
+      const state = await getAdminDemoState(supabase);
+      return res.json({ success: true, ...state });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Erreur lecture demandes démo' });
+    }
+  });
+
+  app.patch('/api/admin/demo-requests/:id', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
+    const { status, adminNotes } = req.body || {};
+    const validStatuses: DemoRequestStatus[] = ['NEW', 'CONTACTED', 'SCHEDULED', 'ARCHIVED'];
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({ success: false, error: 'Statut de demande invalide.' });
+    }
+
+    try {
+      const updated = await updateDemoRequestStatus(req.params.id, status, adminNotes, supabase);
+      if (!updated) {
+        return res.status(404).json({ success: false, error: 'Demande introuvable.' });
+      }
+      return res.json({ success: true, request: updated });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Erreur mise à jour demande' });
+    }
+  });
+
+  app.delete('/api/admin/demo-requests/:id', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
+    try {
+      const deleted = await deleteDemoRequest(req.params.id, supabase);
+      if (!deleted) {
+        return res.status(404).json({ success: false, error: 'Demande introuvable.' });
+      }
+      return res.json({ success: true });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Erreur suppression demande' });
+    }
+  });
+
+  app.post('/api/admin/demo-routing', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
+    try {
+      const nextState = await saveAdminDemoRouting(req.body || {}, supabase);
+      return res.json({ success: true, ...nextState });
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Erreur sauvegarde routage démo' });
+    }
+  });
+
+  app.post('/api/admin/demo-routing/test-email', async (req, res) => {
+    const auth = await authorizeSuperAdmin(req);
+    if (!auth.authorized) {
+      return res.status(auth.status).json({ success: false, error: auth.error });
+    }
+
+    try {
+      const testRes = await sendDemoRoutingTestEmail(supabase);
+      return res.json({ success: true, ...testRes });
+    } catch (err: any) {
+      return res.status(400).json({ success: false, error: err?.message || 'Échec du test SMTP' });
     }
   });
 

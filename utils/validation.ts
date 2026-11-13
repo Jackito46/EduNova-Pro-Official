@@ -92,3 +92,167 @@ export const userSchema = z.object({
   expires_at: z.string().optional().nullable(),
   access_duration_label: z.string().optional().nullable()
 });
+
+export interface DemoFormValues {
+  schoolName: string;
+  contactName: string;
+  phone: string;
+  email: string;
+  preferredChannel: 'both' | 'whatsapp' | 'email';
+  notes: string;
+}
+
+export type DemoFormField = keyof DemoFormValues;
+export type DemoFormErrors = Partial<Record<DemoFormField, string>>;
+
+const STRICT_EMAIL_REGEX =
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,}$/;
+
+const LETTER_REGEX = /[A-Za-zÀ-ÖØ-öø-ÿ]/g;
+
+export function validateDemoPhone(rawPhone: string): string | null {
+  const trimmed = rawPhone.trim();
+  if (!trimmed) {
+    return 'Le numéro WhatsApp ou téléphone est obligatoire.';
+  }
+  if (trimmed.length > 50) {
+    return 'Le numéro de téléphone est trop long (50 caractères max).';
+  }
+  if (!/^\+?[\d\s().-]+$/.test(trimmed) || trimmed.indexOf('+', 1) !== -1) {
+    return 'Format invalide : utilisez uniquement des chiffres, espaces, tirets ou un indicatif (+509...).';
+  }
+
+  const digits = trimmed.replace(/\D/g, '');
+  if (digits.length < 8) {
+    return 'Numéro incomplet : saisissez au moins 8 chiffres (ex: +509 3604-5639).';
+  }
+  if (digits.length > 15) {
+    return 'Numéro trop long : maximum 15 chiffres selon le format international.';
+  }
+  if (/^(\d)\1+$/.test(digits)) {
+    return 'Veuillez saisir un numéro de téléphone valide.';
+  }
+  if ((trimmed.startsWith('+509') || (digits.startsWith('509') && digits.length > 8)) && digits.length !== 11) {
+    return 'Un numéro haïtien (+509) doit comporter exactement 8 chiffres après +509.';
+  }
+  return null;
+}
+
+export function validateDemoEmail(rawEmail: string, isRequired = false): string | null {
+  const trimmed = rawEmail.trim();
+  if (!trimmed) {
+    return isRequired
+      ? 'Votre adresse email est requise pour recevoir une réponse par email.'
+      : null;
+  }
+  if (trimmed.length > 160) {
+    return 'L’adresse email ne doit pas dépasser 160 caractères.';
+  }
+  if (trimmed.includes('..') || !STRICT_EMAIL_REGEX.test(trimmed)) {
+    return 'Format d’adresse email invalide (ex: direction@ecole.edu.ht).';
+  }
+  return null;
+}
+
+export function validateDemoSchoolName(rawSchoolName: string): string | null {
+  const trimmed = rawSchoolName.trim();
+  if (!trimmed) {
+    return 'Le nom de l’établissement est obligatoire.';
+  }
+  if (trimmed.length < 3) {
+    return 'Le nom de l’établissement doit contenir au moins 3 caractères.';
+  }
+  if (trimmed.length > 160) {
+    return 'Le nom de l’établissement ne doit pas dépasser 160 caractères.';
+  }
+  const letters = trimmed.match(LETTER_REGEX) || [];
+  if (letters.length < 2) {
+    return 'Veuillez saisir un nom d’établissement valide (lettres requises).';
+  }
+  return null;
+}
+
+export function validateDemoContactName(rawContactName: string): string | null {
+  const trimmed = rawContactName.trim();
+  if (!trimmed) {
+    return 'Votre nom et votre fonction sont obligatoires.';
+  }
+  if (trimmed.length < 2) {
+    return 'Votre nom doit contenir au moins 2 caractères.';
+  }
+  if (trimmed.length > 120) {
+    return 'Votre nom ne doit pas dépasser 120 caractères.';
+  }
+  const letters = trimmed.match(LETTER_REGEX) || [];
+  if (letters.length < 2) {
+    return 'Veuillez saisir un nom valide (au moins 2 lettres).';
+  }
+  return null;
+}
+
+export function validateDemoNotes(rawNotes: string): string | null {
+  const trimmed = rawNotes.trim();
+  if (trimmed.length > 800) {
+    return 'Votre message ne doit pas dépasser 800 caractères.';
+  }
+  return null;
+}
+
+export const demoRequestSchema = z
+  .object({
+    schoolName: z.string().superRefine((val, ctx) => {
+      const err = validateDemoSchoolName(val);
+      if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err });
+    }),
+    contactName: z.string().superRefine((val, ctx) => {
+      const err = validateDemoContactName(val);
+      if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err });
+    }),
+    phone: z.string().superRefine((val, ctx) => {
+      const err = validateDemoPhone(val);
+      if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err });
+    }),
+    email: z.string(),
+    preferredChannel: z.enum(['both', 'whatsapp', 'email']),
+    notes: z.string().superRefine((val, ctx) => {
+      const err = validateDemoNotes(val);
+      if (err) ctx.addIssue({ code: z.ZodIssueCode.custom, message: err });
+    })
+  })
+  .superRefine((data, ctx) => {
+    const emailErr = validateDemoEmail(data.email, data.preferredChannel === 'email');
+    if (emailErr) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['email'], message: emailErr });
+    }
+  });
+
+export function validateDemoField(field: DemoFormField, values: DemoFormValues): string | null {
+  switch (field) {
+    case 'schoolName':
+      return validateDemoSchoolName(values.schoolName);
+    case 'contactName':
+      return validateDemoContactName(values.contactName);
+    case 'phone':
+      return validateDemoPhone(values.phone);
+    case 'email':
+      return validateDemoEmail(values.email, values.preferredChannel === 'email');
+    case 'notes':
+      return validateDemoNotes(values.notes);
+    default:
+      return null;
+  }
+}
+
+export function validateDemoForm(values: DemoFormValues): DemoFormErrors {
+  const result = demoRequestSchema.safeParse(values);
+  if (result.success) return {};
+  const errors: DemoFormErrors = {};
+  for (const issue of result.error.issues) {
+    const key = issue.path[0] as DemoFormField | undefined;
+    if (key && !errors[key]) {
+      errors[key] = issue.message;
+    }
+  }
+  return errors;
+}
+

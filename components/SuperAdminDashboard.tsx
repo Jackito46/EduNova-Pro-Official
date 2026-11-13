@@ -20,6 +20,7 @@ import { ConnectionRetryFallback as RetryableError } from './ConnectionRetryFall
 import { SystemAlertsView } from './SystemAlertsView';
 import { BackupManagementView } from './BackupManagementView';
 import { SystemHealthView } from './SystemHealthView';
+import { SuperAdminDemoInbox } from './SuperAdminDemoInbox';
 
 interface SuperAdminDashboardProps {
   user: UserProfile;
@@ -187,7 +188,8 @@ const [editSchoolModal, setEditSchoolModal] = useState<{
   }>({ isOpen: false, schoolId: '', name: '', email: '', director_name: '', phone: '', address: '', has_multi_campus: false, has_api_gateways: false });
 
   // View State
-  const [activeView, setActiveView] = useState<'schools' | 'health' | 'users' | 'logs' | 'alerts' | 'config' | 'system' | 'sessions' | 'backups'>('schools');
+  const [activeView, setActiveView] = useState<'schools' | 'demos' | 'health' | 'users' | 'logs' | 'alerts' | 'config' | 'system' | 'sessions' | 'backups'>('schools');
+  const [newDemoCount, setNewDemoCount] = useState<number>(0);
   const [filterExpired, setFilterExpired] = useState(false);
   const [schoolFilterTab, setSchoolFilterTab] = useState<'ALL' | 'ACTIVE' | 'EXPIRED' | 'MULTI_CAMPUS' | 'PROTECTED'>('ALL');
   const [schoolViewMode, setSchoolViewMode] = useState<'table' | 'grid'>('table');
@@ -2178,6 +2180,7 @@ const handleDeleteSchool = async () => {
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-max lg:min-w-0 lg:flex-wrap">
             {[
               { id: 'schools', label: 'Établissements', icon: Building2, badge: stats.totalSchools },
+              { id: 'demos', label: 'Demandes Démo', icon: Mail, badge: newDemoCount > 0 ? newDemoCount : undefined },
               { id: 'health', label: 'Santé Système & Diagnostic BD', icon: Activity },
               { id: 'backups', label: 'Sauvegardes & Restauration', icon: Archive },
               { id: 'sessions', label: 'Sessions & Sécurité', icon: KeyRound, actionExtra: fetchSecuritySessions },
@@ -2603,6 +2606,7 @@ const handleDeleteSchool = async () => {
 
       {/* Main Content Area */}
       <div className="space-y-6">
+        {activeView === 'demos' && <SuperAdminDemoInbox onNewCountChange={setNewDemoCount} />}
         {activeView === 'health' && <SystemHealthView user={user} />}
         {activeView === 'backups' && <BackupManagementView user={user} schools={schools} />}
         {activeView === 'alerts' && <SystemAlertsView user={user} />}

@@ -36,19 +36,35 @@ import {
   WifiOff,
   RefreshCw,
   Award,
-  UserCheck
+  UserCheck,
+  Copy,
+  Check,
+  AlertCircle
 } from 'lucide-react';
 import Logo from './Logo';
 import { toast } from 'sonner';
+import {
+  validateDemoField,
+  validateDemoForm,
+  DemoFormErrors,
+  DemoFormField,
+  DemoFormValues
+} from '../utils/validation';
 import heroLeadershipImg from '../src/assets/images/edunova_hero_leadership_1794531327538.jpg';
 import bursarMobileImg from '../src/assets/images/edunova_bursar_mobile_1794531328203.jpg';
 import classroomExcellenceImg from '../src/assets/images/edunova_classroom_excellence_1794531328252.jpg';
 
 interface PublicLandingPageProps {
   onOpenLogin: () => void;
+  onPreloadLogin?: () => void;
+  isOpeningLogin?: boolean;
 }
 
-export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogin }) => {
+export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
+  onOpenLogin,
+  onPreloadLogin,
+  isOpeningLogin = false
+}) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openNavGroup, setOpenNavGroup] = useState<'academic' | 'finance' | 'admin' | null>(null);
   const navRef = useRef<HTMLElement | null>(null);
@@ -64,15 +80,78 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
   const [avgTuition, setAvgTuition] = useState<number>(25000); // HTG
   const [unpaidRate, setUnpaidRate] = useState<number>(20); // 20%
 
+  // Configuration publique des canaux de réception (Email & WhatsApp)
+  const [contactConfig, setContactConfig] = useState({
+    displayEmail: 'contact@edunova-pro.tech',
+    whatsappNumber: '50936045639',
+    whatsappDisplay: '+509 3604-5639',
+    secondaryPhoneDisplay: '3350-8416',
+    smtpReady: false,
+    whatsappAutoReady: false
+  });
+
   // Formulaire Démo Optimisé
   const [contactName, setContactName] = useState('');
   const [schoolName, setSchoolName] = useState('');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [city, setCity] = useState('Port-au-Prince');
   const [schoolType, setSchoolType] = useState('Fondamentale & Secondaire');
   const [studentBracket, setStudentBracket] = useState('150-350');
+  const [preferredChannel, setPreferredChannel] = useState<'both' | 'whatsapp' | 'email'>('both');
+  const [notes, setNotes] = useState('');
+  const [honeypotWebsite, setHoneypotWebsite] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demoSubmitted, setDemoSubmitted] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<DemoFormErrors>({});
+  const [touchedFields, setTouchedFields] = useState<Partial<Record<DemoFormField, boolean>>>({});
+  const [copiedDemoMessage, setCopiedDemoMessage] = useState(false);
+  const demoCardRef = useRef<HTMLDivElement | null>(null);
+  const schoolInputRef = useRef<HTMLInputElement | null>(null);
+  const contactInputRef = useRef<HTMLInputElement | null>(null);
+  const phoneInputRef = useRef<HTMLInputElement | null>(null);
+  const emailInputRef = useRef<HTMLInputElement | null>(null);
+  const notesInputRef = useRef<HTMLTextAreaElement | null>(null);
+  const [submissionResult, setSubmissionResult] = useState<{
+    referenceCode: string;
+    schoolName: string;
+    contactName: string;
+    phone: string;
+    email: string;
+    city: string;
+    schoolType: string;
+    studentBracket: string;
+    displayEmail: string;
+    whatsappDisplay: string;
+    whatsappUrl: string;
+    mailtoUrl: string;
+    formattedMessage: string;
+    delivery: {
+      savedToInbox: boolean;
+      emailSent: boolean;
+      emailReason?: string;
+      whatsappAutoSent: boolean;
+      whatsappReason?: string;
+    };
+  } | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    fetch('/api/public/contact-config')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (active && data?.success && data?.config) {
+          setContactConfig((prev) => ({ ...prev, ...data.config }));
+        }
+      })
+      .catch(() => {
+        // Fallback silencieux sur les coordonnées institutionnelles par défaut
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -102,24 +181,176 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
     };
   }, []);
 
+  useEffect(() => {
+    if (!onPreloadLogin) return;
+    const conn = typeof navigator !== 'undefined' ? (navigator as any).connection : null;
+    if (conn?.saveData || conn?.effectiveType === 'slow-2g' || conn?.effectiveType === '2g') {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      onPreloadLogin();
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [onPreloadLogin]);
+
   const totalBudget = studentCount * avgTuition;
   const currentUnpaidAmount = Math.round(totalBudget * (unpaidRate / 100));
   const estimatedRecoveredAmount = Math.round(currentUnpaidAmount * 0.45);
   const hoursSavedPerMonth = Math.round(studentCount * 0.25);
 
-  const handleDemoSubmit = (e: React.FormEvent) => {
+  const getDemoFormValues = (overrides?: Partial<DemoFormValues>): DemoFormValues => ({
+    schoolName,
+    contactName,
+    phone,
+    email,
+    preferredChannel,
+    notes,
+    ...overrides
+  });
+
+  const handleDemoFieldBlur = (field: DemoFormField, overrides?: Partial<DemoFormValues>) => {
+    const nextValues = getDemoFormValues(overrides);
+    setTouchedFields((prev) => ({ ...prev, [field]: true }));
+    const err = validateDemoField(field, nextValues);
+    setFieldErrors((prev) => {
+      const next = { ...prev };
+      if (err) {
+        next[field] = err;
+      } else {
+        delete next[field];
+      }
+      return next;
+    });
+  };
+
+  const handleDemoFieldChange = (field: DemoFormField, value: string) => {
+    const nextValues = getDemoFormValues({ [field]: value } as Partial<DemoFormValues>);
+    if (touchedFields[field] || fieldErrors[field]) {
+      const err = validateDemoField(field, nextValues);
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        if (err) {
+          next[field] = err;
+        } else {
+          delete next[field];
+        }
+        return next;
+      });
+    }
+    if (submitError) {
+      setSubmitError(null);
+    }
+  };
+
+  const handleDemoSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!schoolName.trim() || !contactName.trim() || !phone.trim()) {
-      toast.error('Veuillez renseigner le nom de l’école, votre nom et votre numéro WhatsApp / Téléphone.');
+    setSubmitError(null);
+
+    const currentValues = getDemoFormValues();
+    const validationErrors = validateDemoForm(currentValues);
+    setTouchedFields({
+      schoolName: true,
+      contactName: true,
+      phone: true,
+      email: true,
+      notes: true
+    });
+    setFieldErrors(validationErrors);
+
+    const errorOrder: DemoFormField[] = ['schoolName', 'contactName', 'phone', 'email', 'notes'];
+    const firstInvalidField = errorOrder.find((key) => Boolean(validationErrors[key]));
+
+    if (firstInvalidField) {
+      const firstErrorMsg = validationErrors[firstInvalidField] || 'Veuillez vérifier les informations saisies.';
+      setSubmitError(firstErrorMsg);
+      toast.error(firstErrorMsg);
+
+      const refMap: Partial<Record<DemoFormField, React.RefObject<HTMLInputElement | HTMLTextAreaElement | null>>> = {
+        schoolName: schoolInputRef,
+        contactName: contactInputRef,
+        phone: phoneInputRef,
+        email: emailInputRef,
+        notes: notesInputRef
+      };
+      refMap[firstInvalidField]?.current?.focus();
       return;
     }
 
     setIsSubmitting(true);
-    setTimeout(() => {
-      setIsSubmitting(false);
+    try {
+      const response = await fetch('/api/demo-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          schoolName: schoolName.trim(),
+          contactName: contactName.trim(),
+          phone: phone.trim(),
+          email: email.trim(),
+          city,
+          schoolType,
+          studentBracket,
+          preferredChannel,
+          notes: notes.trim(),
+          website: honeypotWebsite
+        })
+      });
+
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.error || `Erreur serveur (${response.status})`);
+      }
+
+      setSubmissionResult({
+        referenceCode: data.referenceCode,
+        schoolName: schoolName.trim(),
+        contactName: contactName.trim(),
+        phone: phone.trim(),
+        email: email.trim(),
+        city,
+        schoolType,
+        studentBracket,
+        displayEmail: data.displayEmail || contactConfig.displayEmail,
+        whatsappDisplay: data.whatsappDisplay || contactConfig.whatsappDisplay,
+        whatsappUrl: data.whatsappUrl,
+        mailtoUrl: data.mailtoUrl,
+        formattedMessage: data.formattedMessage,
+        delivery: data.delivery || {
+          savedToInbox: true,
+          emailSent: false,
+          whatsappAutoSent: false
+        }
+      });
       setDemoSubmitted(true);
-      toast.success('Demande enregistrée avec succès ! Notre équipe vous contactera sous 24h.');
-    }, 450);
+      setSubmitError(null);
+
+      window.setTimeout(() => {
+        demoCardRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 60);
+
+      if (data.delivery?.emailSent) {
+        toast.success(`Demande confirmée (${data.referenceCode}) ! Notification transmise à notre équipe.`);
+      } else {
+        toast.success(`Demande confirmée (${data.referenceCode}) ! Notre équipe vous recontacte sous 24h.`);
+      }
+    } catch (err: any) {
+      const msg = err?.message || 'Impossible d’enregistrer la demande pour le moment. Contactez-nous sur WhatsApp.';
+      setSubmitError(msg);
+      toast.error(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleCopyDemoSummary = async () => {
+    if (!submissionResult?.formattedMessage) return;
+    try {
+      await navigator.clipboard.writeText(submissionResult.formattedMessage);
+      setCopiedDemoMessage(true);
+      toast.success('Message complet copié dans le presse-papiers !');
+      window.setTimeout(() => setCopiedDemoMessage(false), 2500);
+    } catch {
+      toast.error('Copie automatique refusée par le navigateur.');
+    }
   };
 
   const handleNavigate = (
@@ -180,26 +411,26 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
               <div className="flex items-center gap-1.5 shrink-0">
                 <Phone size={12} className="text-amber-400 shrink-0" />
                 <a
-                  href="https://wa.me/50936045639"
+                  href={`https://wa.me/${contactConfig.whatsappNumber}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="font-semibold text-white hover:text-amber-300 transition-colors font-mono tabular-nums"
                 >
-                  +509 3604-5639
+                  {contactConfig.whatsappDisplay}
                 </a>
                 <span className="text-slate-600">/</span>
                 <a
                   href="tel:+50933508416"
                   className="font-semibold text-white hover:text-amber-300 transition-colors font-mono tabular-nums"
                 >
-                  3350-8416
+                  {contactConfig.secondaryPhoneDisplay}
                 </a>
               </div>
 
               <div className="hidden xl:flex items-center gap-1.5 text-slate-300 shrink-0">
                 <Mail size={12} className="text-amber-400 shrink-0" />
-                <a href="mailto:contact@edunova-pro.tech" className="hover:text-amber-300 transition-colors">
-                  contact@edunova-pro.tech
+                <a href={`mailto:${contactConfig.displayEmail}`} className="hover:text-amber-300 transition-colors">
+                  {contactConfig.displayEmail}
                 </a>
               </div>
             </div>
@@ -462,10 +693,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
             <button
               type="button"
               onClick={onOpenLogin}
-              className="px-4 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] rounded-lg transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 shadow-xs"
+              onMouseEnter={onPreloadLogin}
+              onFocus={onPreloadLogin}
+              onTouchStart={onPreloadLogin}
+              disabled={isOpeningLogin}
+              className="px-4 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] disabled:opacity-80 rounded-lg transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 shadow-xs"
             >
               <Lock size={13} className="text-slate-900 shrink-0" />
-              <span>Connexion</span>
+              <span>{isOpeningLogin ? 'Ouverture...' : 'Connexion'}</span>
             </button>
           </div>
 
@@ -474,9 +709,13 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
             <button
               type="button"
               onClick={onOpenLogin}
-              className="px-3 py-1.5 text-xs font-bold text-slate-950 bg-amber-400 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+              onMouseEnter={onPreloadLogin}
+              onFocus={onPreloadLogin}
+              onTouchStart={onPreloadLogin}
+              disabled={isOpeningLogin}
+              className="px-3 py-1.5 text-xs font-bold text-slate-950 bg-amber-400 disabled:opacity-80 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
             >
-              Connexion
+              {isOpeningLogin ? 'Ouverture...' : 'Connexion'}
             </button>
             <button
               type="button"
@@ -501,11 +740,18 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
             >
               <button
                 type="button"
-                onClick={onOpenLogin}
-                className="w-full py-2.5 px-4 bg-amber-400 hover:bg-amber-300 text-slate-950 rounded-lg font-bold text-center flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  onOpenLogin();
+                }}
+                onMouseEnter={onPreloadLogin}
+                onFocus={onPreloadLogin}
+                onTouchStart={onPreloadLogin}
+                disabled={isOpeningLogin}
+                className="w-full py-2.5 px-4 bg-amber-400 hover:bg-amber-300 disabled:opacity-80 text-slate-950 rounded-lg font-bold text-center flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
                 <Lock size={14} />
-                <span>Accéder à l&apos;Espace Établissement</span>
+                <span>{isOpeningLogin ? 'Ouverture de la connexion...' : 'Accéder à l’Espace Établissement'}</span>
               </button>
 
               <div className="space-y-3 pt-1">
@@ -683,13 +929,13 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
                   </button>
 
                   <a
-                    href="https://wa.me/50936045639?text=Bonjour%20EduNova%20Pro%2C%20je%20souhaite%20planifier%20une%20d%C3%A9monstration%20pour%20notre%20%C3%A9tablissement."
+                    href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite planifier une démonstration pour notre établissement.')}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="px-5 py-3 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <MessageCircle size={16} className="text-emerald-600 shrink-0" />
-                    <span>WhatsApp Direct (+509 3604-5639)</span>
+                    <span>WhatsApp Direct ({contactConfig.whatsappDisplay})</span>
                   </a>
                 </div>
 
@@ -1680,90 +1926,328 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
                   </ul>
                 </div>
 
-                <div className="pt-4 border-t border-slate-800 space-y-2 text-xs">
-                  <div className="text-slate-400">Accueil direct secrétariat Port-au-Prince :</div>
-                  <div className="font-mono font-bold text-white">+509 3604-5639 · 3350-8416</div>
+                <div className="pt-4 border-t border-slate-800 space-y-3 text-xs">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                    Canaux Officiels de Réception
+                  </div>
+                  <div className="space-y-2">
+                    <a
+                      href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite planifier une démonstration pour notre établissement.')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-emerald-500/50 transition-colors group"
+                    >
+                      <span className="flex items-center gap-2 text-slate-300">
+                        <MessageCircle size={14} className="text-emerald-400 shrink-0" />
+                        <span>WhatsApp Direct</span>
+                      </span>
+                      <span className="font-mono font-bold text-white group-hover:text-emerald-300">
+                        {contactConfig.whatsappDisplay}
+                      </span>
+                    </a>
+
+                    <a
+                      href={`mailto:${contactConfig.displayEmail}?subject=${encodeURIComponent('Demande de Démonstration EduNova Pro')}`}
+                      className="flex items-center justify-between p-2.5 rounded-lg bg-slate-900/90 border border-slate-800 hover:border-amber-400/50 transition-colors group gap-2"
+                    >
+                      <span className="flex items-center gap-2 text-slate-300 shrink-0">
+                        <Mail size={14} className="text-amber-400 shrink-0" />
+                        <span>Email Officiel</span>
+                      </span>
+                      <span className="font-mono font-bold text-white group-hover:text-amber-300 truncate">
+                        {contactConfig.displayEmail}
+                      </span>
+                    </a>
+
+                    <div className="flex items-center justify-between px-2.5 py-1 text-[11px] text-slate-400">
+                      <span>Ligne Secrétariat Port-au-Prince</span>
+                      <span className="font-mono text-slate-200 font-semibold">+509 {contactConfig.secondaryPhoneDisplay}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {/* Colonne Formulaire */}
-              <div className="lg:col-span-7 flex flex-col justify-center">
-                {demoSubmitted ? (
-                  <div className="text-center py-8 space-y-4 bg-emerald-50/50 rounded-xl border border-emerald-200 p-6">
-                    <div className="w-11 h-11 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto">
-                      <CheckCircle2 size={24} />
-                    </div>
-                    <div className="space-y-1">
-                      <h3 className="text-lg font-bold text-slate-950">Demande Enregistrée</h3>
-                      <p className="text-slate-600 text-xs sm:text-sm max-w-md mx-auto">
-                        Merci pour votre confiance. Notre équipe vous contacte sous 24h ouvrées pour organiser votre présentation personnalisée.
+              <div ref={demoCardRef} className="lg:col-span-7 flex flex-col justify-center">
+                {demoSubmitted && submissionResult ? (
+                  <div
+                    role="status"
+                    aria-live="polite"
+                    className="py-6 sm:py-7 px-5 sm:px-6 space-y-5 bg-emerald-50/70 rounded-xl border-2 border-emerald-300 shadow-xs"
+                  >
+                    <div className="text-center space-y-2.5">
+                      <div className="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center mx-auto shadow-sm">
+                        <CheckCircle2 size={26} />
+                      </div>
+                      <div className="inline-block px-3 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-mono font-bold text-emerald-800 uppercase tracking-wider">
+                        Demande Confirmée · Réf. {submissionResult.referenceCode}
+                      </div>
+                      <h3 className="text-xl font-extrabold text-slate-950">
+                        Merci {submissionResult.contactName} ! Votre demande de démo est confirmée.
+                      </h3>
+                      <p className="text-slate-700 text-xs sm:text-sm max-w-lg mx-auto leading-relaxed">
+                        Votre demande pour <strong className="text-slate-950">{submissionResult.schoolName}</strong> ({submissionResult.city}) a bien été enregistrée par l&apos;équipe EduNova Pro. Un conseiller vous contactera sous <strong className="text-emerald-800">24h ouvrées</strong> au <strong className="font-mono text-slate-950">{submissionResult.phone}</strong>{submissionResult.email ? ` ou à l'adresse ${submissionResult.email}` : ''}.
                       </p>
                     </div>
-                    <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-2.5">
-                      <a
-                        href={`https://wa.me/50936045639?text=${encodeURIComponent(`Bonjour EduNova Pro ! J'ai soumis une demande de démo pour l'établissement ${schoolName}.`)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-1.5"
-                      >
-                        <Smartphone size={14} />
-                        <span>Échanger Directement sur WhatsApp</span>
-                      </a>
+
+                    {/* Détail transparent des canaux de réception */}
+                    <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5 text-xs">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="flex items-center gap-2 font-semibold text-slate-800">
+                          <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+                          <span>Secrétariat EduNova Pro (Dossier enregistré)</span>
+                        </span>
+                        <span className="font-bold text-emerald-700">Confirmé</span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <span className="flex items-center gap-2 font-semibold text-slate-800">
+                          <CheckCircle2
+                            size={14}
+                            className={submissionResult.delivery.emailSent ? 'text-emerald-600 shrink-0' : 'text-indigo-600 shrink-0'}
+                          />
+                          <span>Notification Email ({submissionResult.displayEmail})</span>
+                        </span>
+                        <span className={`font-bold ${submissionResult.delivery.emailSent ? 'text-emerald-700' : 'text-indigo-700'}`}>
+                          {submissionResult.delivery.emailSent ? 'Email transmis' : 'Prêt pour envoi direct'}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+                        <span className="flex items-center gap-2 font-semibold text-slate-800">
+                          <MessageCircle size={14} className="text-emerald-600 shrink-0" />
+                          <span>WhatsApp Direction ({submissionResult.whatsappDisplay})</span>
+                        </span>
+                        <span className="font-bold text-emerald-700">
+                          {submissionResult.delivery.whatsappAutoSent ? 'Message envoyé' : 'Lien direct pré-rempli'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Actions directes pré-remplies avec TOUTES les infos */}
+                    <div className="space-y-2">
+                      <p className="text-[11px] text-center font-medium text-slate-500">
+                        Souhaitez-vous démarrer la conversation immédiatement avec notre équipe ?
+                      </p>
+                      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-center gap-2.5">
+                        <a
+                          href={submissionResult.whatsappUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 shadow-xs"
+                        >
+                          <MessageCircle size={15} />
+                          <span>Confirmer aussi sur WhatsApp</span>
+                        </a>
+
+                        <a
+                          href={submissionResult.mailtoUrl}
+                          className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold text-xs flex items-center justify-center gap-2 shadow-xs"
+                        >
+                          <Mail size={15} />
+                          <span>Écrire par Email ({submissionResult.displayEmail})</span>
+                        </a>
+
+                        <button
+                          type="button"
+                          onClick={handleCopyDemoSummary}
+                          className="px-3.5 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg font-bold text-xs cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          {copiedDemoMessage ? <Check size={14} className="text-emerald-600" /> : <Copy size={14} />}
+                          <span>{copiedDemoMessage ? 'Copié' : 'Copier'}</span>
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="text-center pt-1">
                       <button
                         type="button"
-                        onClick={() => setDemoSubmitted(false)}
-                        className="px-4 py-2.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg font-bold text-xs cursor-pointer"
+                        onClick={() => {
+                          setDemoSubmitted(false);
+                          setSubmissionResult(null);
+                          setSubmitError(null);
+                          setFieldErrors({});
+                          setTouchedFields({});
+                          setSchoolName('');
+                          setContactName('');
+                          setPhone('');
+                          setEmail('');
+                          setNotes('');
+                        }}
+                        className="text-xs font-semibold text-slate-600 hover:text-slate-950 underline cursor-pointer"
                       >
-                        Nouvelle demande
+                        Soumettre une autre demande de démonstration
                       </button>
                     </div>
                   </div>
                 ) : (
-                  <form onSubmit={handleDemoSubmit} className="space-y-4">
+                  <form onSubmit={handleDemoSubmit} noValidate className="space-y-4">
+                    {submitError && (
+                      <div
+                        role="alert"
+                        className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold flex items-start gap-2"
+                      >
+                        <AlertCircle size={15} className="text-rose-600 shrink-0 mt-0.5" />
+                        <span>{submitError}</span>
+                      </div>
+                    )}
+                    {/* Honeypot anti-spam invisible */}
+                    <input
+                      type="text"
+                      name="website"
+                      value={honeypotWebsite}
+                      onChange={(e) => setHoneypotWebsite(e.target.value)}
+                      tabIndex={-1}
+                      autoComplete="off"
+                      aria-hidden="true"
+                      className="hidden"
+                    />
+
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <label htmlFor="demo-school-name" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <Building2 size={13} className="text-indigo-600" />
                           <span>Nom de l&apos;Établissement *</span>
                         </label>
                         <input
+                          ref={schoolInputRef}
+                          id="demo-school-name"
                           type="text"
                           required
+                          minLength={3}
+                          maxLength={160}
                           placeholder="Ex: Collège Sainte-Thérèse"
                           value={schoolName}
-                          onChange={(e) => setSchoolName(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors"
+                          aria-invalid={Boolean(fieldErrors.schoolName)}
+                          aria-describedby={fieldErrors.schoolName ? 'demo-school-name-error' : undefined}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setSchoolName(val);
+                            handleDemoFieldChange('schoolName', val);
+                          }}
+                          onBlur={() => handleDemoFieldBlur('schoolName')}
+                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                            fieldErrors.schoolName
+                              ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
+                          }`}
                         />
+                        {fieldErrors.schoolName && (
+                          <p id="demo-school-name-error" className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pt-0.5">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span>{fieldErrors.schoolName}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <label htmlFor="demo-contact-name" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <Users size={13} className="text-indigo-600" />
                           <span>Votre Nom &amp; Fonction *</span>
                         </label>
                         <input
+                          ref={contactInputRef}
+                          id="demo-contact-name"
                           type="text"
                           required
+                          minLength={2}
+                          maxLength={120}
                           placeholder="Ex: M. Jean (Directeur)"
                           value={contactName}
-                          onChange={(e) => setContactName(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors"
+                          aria-invalid={Boolean(fieldErrors.contactName)}
+                          aria-describedby={fieldErrors.contactName ? 'demo-contact-name-error' : undefined}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setContactName(val);
+                            handleDemoFieldChange('contactName', val);
+                          }}
+                          onBlur={() => handleDemoFieldBlur('contactName')}
+                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                            fieldErrors.contactName
+                              ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
+                          }`}
                         />
+                        {fieldErrors.contactName && (
+                          <p id="demo-contact-name-error" className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pt-0.5">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span>{fieldErrors.contactName}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                        <label htmlFor="demo-phone" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                           <Phone size={13} className="text-emerald-600" />
                           <span>WhatsApp / Téléphone *</span>
                         </label>
                         <input
+                          ref={phoneInputRef}
+                          id="demo-phone"
                           type="tel"
+                          inputMode="tel"
                           required
+                          maxLength={50}
                           placeholder="+509 3604-5639"
                           value={phone}
-                          onChange={(e) => setPhone(e.target.value)}
-                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors"
+                          aria-invalid={Boolean(fieldErrors.phone)}
+                          aria-describedby={fieldErrors.phone ? 'demo-phone-error' : undefined}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setPhone(val);
+                            handleDemoFieldChange('phone', val);
+                          }}
+                          onBlur={() => handleDemoFieldBlur('phone')}
+                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                            fieldErrors.phone
+                              ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
+                          }`}
                         />
+                        {fieldErrors.phone && (
+                          <p id="demo-phone-error" className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pt-0.5">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span>{fieldErrors.phone}</span>
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="space-y-1">
+                        <label htmlFor="demo-email" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <Mail size={13} className="text-indigo-600" />
+                          <span>
+                            Votre Email {preferredChannel === 'email' ? '*' : '(pour réponse écrite)'}
+                          </span>
+                        </label>
+                        <input
+                          ref={emailInputRef}
+                          id="demo-email"
+                          type="email"
+                          inputMode="email"
+                          required={preferredChannel === 'email'}
+                          maxLength={160}
+                          placeholder="direction@ecole.edu.ht"
+                          value={email}
+                          aria-invalid={Boolean(fieldErrors.email)}
+                          aria-describedby={fieldErrors.email ? 'demo-email-error' : undefined}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setEmail(val);
+                            handleDemoFieldChange('email', val);
+                          }}
+                          onBlur={() => handleDemoFieldBlur('email')}
+                          className={`w-full px-3.5 py-2.5 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors ${
+                            fieldErrors.email
+                              ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                              : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
+                          }`}
+                        />
+                        {fieldErrors.email && (
+                          <p id="demo-email-error" className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pt-0.5">
+                            <AlertCircle size={12} className="shrink-0" />
+                            <span>{fieldErrors.email}</span>
+                          </p>
+                        )}
                       </div>
 
                       <div className="space-y-1">
@@ -1825,6 +2309,81 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
                           <option value="Plus de 1500">Plus de 1 500 élèves</option>
                         </select>
                       </div>
+
+                      <div className="space-y-1">
+                        <label htmlFor="demo-preferred-channel" className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
+                          <MessageCircle size={13} className="text-emerald-600" />
+                          <span>Canal de Suivi Préféré</span>
+                        </label>
+                        <select
+                          id="demo-preferred-channel"
+                          value={preferredChannel}
+                          onChange={(e) => {
+                            const nextChannel = e.target.value as 'both' | 'whatsapp' | 'email';
+                            setPreferredChannel(nextChannel);
+                            if (touchedFields.email || fieldErrors.email || nextChannel === 'email') {
+                              const emailErr = validateDemoField(
+                                'email',
+                                getDemoFormValues({ preferredChannel: nextChannel })
+                              );
+                              setFieldErrors((prev) => {
+                                const next = { ...prev };
+                                if (emailErr && (touchedFields.email || nextChannel !== 'email' ? Boolean(emailErr) : false)) {
+                                  next.email = emailErr;
+                                } else if (!emailErr) {
+                                  delete next.email;
+                                }
+                                return next;
+                              });
+                            }
+                          }}
+                          className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-600 transition-colors cursor-pointer"
+                        >
+                          <option value="both">Email &amp; WhatsApp (Recommandé)</option>
+                          <option value="whatsapp">WhatsApp Direct ({contactConfig.whatsappDisplay})</option>
+                          <option value="email">Email ({contactConfig.displayEmail})</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between">
+                        <label htmlFor="demo-notes" className="text-xs font-bold text-slate-700">
+                          Message ou besoins particuliers (optionnel)
+                        </label>
+                        {notes.length > 600 && (
+                          <span className={`text-[11px] font-mono ${notes.trim().length > 800 ? 'text-rose-600 font-bold' : 'text-slate-400'}`}>
+                            {notes.trim().length}/800
+                          </span>
+                        )}
+                      </div>
+                      <textarea
+                        ref={notesInputRef}
+                        id="demo-notes"
+                        rows={2}
+                        maxLength={850}
+                        placeholder="Ex: Reprise de 450 élèves sur Excel, activation des paiements MonCash/NatCash, multi-campus..."
+                        value={notes}
+                        aria-invalid={Boolean(fieldErrors.notes)}
+                        aria-describedby={fieldErrors.notes ? 'demo-notes-error' : undefined}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setNotes(val);
+                          handleDemoFieldChange('notes', val);
+                        }}
+                        onBlur={() => handleDemoFieldBlur('notes')}
+                        className={`w-full px-3.5 py-2 bg-white border rounded-lg text-slate-900 text-xs focus:outline-none focus:ring-2 transition-colors resize-none ${
+                          fieldErrors.notes
+                            ? 'border-rose-400 focus:ring-rose-500/20 focus:border-rose-500'
+                            : 'border-slate-300 focus:ring-indigo-500/30 focus:border-indigo-600'
+                        }`}
+                      />
+                      {fieldErrors.notes && (
+                        <p id="demo-notes-error" className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 pt-0.5">
+                          <AlertCircle size={12} className="shrink-0" />
+                          <span>{fieldErrors.notes}</span>
+                        </p>
+                      )}
                     </div>
 
                     <button
@@ -1833,7 +2392,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
                       className="w-full py-3 px-5 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 shadow-sm"
                     >
                       {isSubmitting ? (
-                        <span>Envoi de votre demande...</span>
+                        <span>Transmission de votre demande...</span>
                       ) : (
                         <>
                           <span>Envoyer ma Demande de Démonstration</span>
@@ -1843,15 +2402,17 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
                     </button>
 
                     <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs">
-                      <span className="text-slate-500">Vous préférez un échange immédiat ?</span>
+                      <span className="text-slate-500">
+                        Réception sur <strong className="text-slate-700">{contactConfig.displayEmail}</strong> ou WhatsApp :
+                      </span>
                       <a
-                        href="https://wa.me/50936045639?text=Bonjour%20EduNova%20Pro%2C%20je%20souhaite%20des%20renseignements%20pour%20notre%20%C3%A9tablissement."
+                        href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite des renseignements pour notre établissement.')}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-emerald-700 hover:text-emerald-800 font-bold flex items-center gap-1.5 cursor-pointer"
                       >
                         <MessageCircle size={14} />
-                        <span>Échanger directement sur WhatsApp (+509 3604-5639)</span>
+                        <span>Écrire sur WhatsApp ({contactConfig.whatsappDisplay})</span>
                       </a>
                     </div>
                   </form>
@@ -2045,26 +2606,26 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
                   <Phone size={15} className="text-amber-400 shrink-0 mt-0.5" />
                   <div className="font-mono tabular-nums space-y-0.5">
                     <a
-                      href="https://wa.me/50936045639"
+                      href={`https://wa.me/${contactConfig.whatsappNumber}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-bold text-white hover:text-amber-300 transition-colors block"
                     >
-                      +509 3604-5639
+                      {contactConfig.whatsappDisplay}
                     </a>
                     <a
                       href="tel:+50933508416"
                       className="font-bold text-white hover:text-amber-300 transition-colors block"
                     >
-                      +509 3350-8416
+                      +509 {contactConfig.secondaryPhoneDisplay}
                     </a>
                   </div>
                 </div>
 
                 <div className="flex items-start gap-2.5">
                   <Mail size={15} className="text-amber-400 shrink-0 mt-0.5" />
-                  <a href="mailto:contact@edunova-pro.tech" className="font-semibold text-white hover:text-amber-300">
-                    contact@edunova-pro.tech
+                  <a href={`mailto:${contactConfig.displayEmail}`} className="font-semibold text-white hover:text-amber-300">
+                    {contactConfig.displayEmail}
                   </a>
                 </div>
               </div>
@@ -2091,10 +2652,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
               <button
                 type="button"
                 onClick={onOpenLogin}
-                className="text-amber-400 hover:text-amber-300 font-bold transition-colors cursor-pointer flex items-center gap-1"
+                onMouseEnter={onPreloadLogin}
+                onFocus={onPreloadLogin}
+                onTouchStart={onPreloadLogin}
+                disabled={isOpeningLogin}
+                className="text-amber-400 hover:text-amber-300 disabled:opacity-80 font-bold transition-colors cursor-pointer flex items-center gap-1"
               >
                 <Lock size={12} />
-                <span>Portail Établissement</span>
+                <span>{isOpeningLogin ? 'Ouverture...' : 'Portail Établissement'}</span>
               </button>
             </div>
           </div>
@@ -2121,12 +2686,12 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({ onOpenLogi
         </AnimatePresence>
 
         <a
-          href="https://wa.me/50936045639?text=Bonjour%20EduNova%20Pro%2C%20je%20souhaite%20des%20informations%20pour%20notre%20%C3%A9tablissement."
+          href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite des informations pour notre établissement.')}`}
           target="_blank"
           rel="noopener noreferrer"
           className="w-12 h-12 rounded-full bg-[#25D366] hover:bg-[#20bd5a] text-white shadow-lg flex items-center justify-center transition-transform cursor-pointer hover:scale-105"
           aria-label="Discuter sur WhatsApp"
-          title="Assistance WhatsApp directe (+509 3604-5639)"
+          title={`Assistance WhatsApp directe (${contactConfig.whatsappDisplay})`}
         >
           <MessageCircle size={24} />
         </a>

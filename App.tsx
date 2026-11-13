@@ -1,7 +1,8 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useTransition } from 'react';
 import { HashRouter } from 'react-router-dom';
 import { ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
+import { AnimatePresence, motion } from 'framer-motion';
 import { UserProfile, UserRole } from './types';
 import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
@@ -11,12 +12,28 @@ import Logo from './components/Logo';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 
-const PublicLandingPage = lazyWithRetry(() => import('./components/PublicLandingPage'));
-const Login = lazyWithRetry(() => import('./components/Login'));
-const PublicReceiptVerificationView = lazyWithRetry(() =>
-  import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView }))
-);
-const AuthenticatedShell = lazyWithRetry(() => import('./components/AuthenticatedShell'));
+const loadPublicLandingPage = () => import('./components/PublicLandingPage');
+const loadLogin = () => import('./components/Login');
+const loadPublicReceiptVerificationView = () =>
+  import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView }));
+const loadAuthenticatedShell = () => import('./components/AuthenticatedShell');
+
+const PublicLandingPage = lazyWithRetry(loadPublicLandingPage);
+const Login = lazyWithRetry(loadLogin);
+const PublicReceiptVerificationView = lazyWithRetry(loadPublicReceiptVerificationView);
+const AuthenticatedShell = lazyWithRetry(loadAuthenticatedShell);
+
+type PublicView = 'landing' | 'login';
+
+const parsePublicViewFromHash = (hash?: string): PublicView => {
+  const h = typeof hash === 'string'
+    ? hash
+    : (typeof window !== 'undefined' ? window.location.hash || '' : '');
+  if (h.startsWith('#/login') || h.startsWith('#/auth') || h.startsWith('#/reset-password')) {
+    return 'login';
+  }
+  return 'landing';
+};
 
 const PublicRouteFallback: React.FC<{ target: 'landing' | 'login' | 'verify' | 'app' }> = ({ target }) => {
   const label =
@@ -156,40 +173,86 @@ const App: React.FC = () => {
     try { window.localStorage.setItem('edunova_session_timeout', sessionTimeoutMinutes.toString()); } catch(e){}
   }, [sessionTimeoutMinutes]);
 
-  // State to toggle between the public vitrine/landing page and the member login screen
-  const [showLogin, setShowLogin] = useState<boolean>(() => {
+  // Explicit state management between public landing page and member login screen
+  const [publicView, setPublicView] = useState<PublicView>(() => {
     try {
       const forced = typeof window !== 'undefined' ? (window as any).__edunovaForcedPublicView : null;
-      if (forced === 'login') return true;
-      if (forced === 'landing') return false;
-      const h = typeof window !== 'undefined' ? window.location.hash || '' : '';
-      return h.startsWith('#/login') || h.startsWith('#/auth') || h.startsWith('#/reset-password');
+      if (forced === 'login' || forced === 'landing') return forced;
+      return parsePublicViewFromHash();
     } catch (e) {
-      return false;
+      return 'landing';
     }
   });
+  const [pendingPublicView, setPendingPublicView] = useState<PublicView | null>(null);
+  const [isViewTransitionPending, startViewTransition] = useTransition();
+  const suppressHashSyncRef = useRef(false);
+
+  const switchPublicView = useCallback((target: PublicView, options?: { skipScrollReset?: boolean }) => {
+    if (target === 'login') {
+      void loadLogin();
+    } else {
+      void loadPublicLandingPage();
+    }
+
+    const targetHash = target === 'login' ? '#/login' : '#/';
+    if (typeof window !== 'undefined') {
+      if (window.location.hash !== targetHash) {
+        suppressHashSyncRef.current = true;
+        window.location.hash = targetHash;
+        setTimeout(() => {
+          suppressHashSyncRef.current = false;
+        }, 0);
+      }
+      if (!options?.skipScrollReset && window.scrollY > 0) {
+        window.scrollTo({ top: 0, behavior: 'auto' });
+      }
+    }
+
+    setPendingPublicView(target);
+    startViewTransition(() => {
+      setPublicView(target);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isViewTransitionPending && pendingPublicView !== null) {
+      setPendingPublicView(null);
+    }
+  }, [isViewTransitionPending, pendingPublicView]);
 
   useEffect(() => {
     const syncHashToView = () => {
+      if (suppressHashSyncRef.current) return;
       try {
         const h = window.location.hash || '';
-        if (h.startsWith('#/login') || h.startsWith('#/auth') || h.startsWith('#/reset-password')) {
-          setShowLogin(true);
-        } else if (h === '#/' || h === '' || h.startsWith('#/presentation') || h.startsWith('#/vitrine') || h.startsWith('#/demo')) {
+        const parsed = parsePublicViewFromHash(h);
+        if (parsed === 'login') {
+          void loadLogin();
+          startViewTransition(() => {
+            setPublicView('login');
+          });
+        } else if (
+          h === '#/' ||
+          h === '' ||
+          h.startsWith('#/presentation') ||
+          h.startsWith('#/vitrine') ||
+          h.startsWith('#/demo')
+        ) {
           if (!user) {
-            setShowLogin(false);
+            void loadPublicLandingPage();
+            startViewTransition(() => {
+              setPublicView('landing');
+            });
           }
         }
       } catch (e) {}
     };
     const handleForcedPublicView = (e: Event) => {
-      const view = (e as CustomEvent)?.detail?.view;
+      const view = (e as CustomEvent)?.detail?.view as PublicView | undefined;
       setLoading(false);
       setUser(null);
-      if (view === 'login') {
-        setShowLogin(true);
-      } else if (view === 'landing') {
-        setShowLogin(false);
+      if (view === 'login' || view === 'landing') {
+        switchPublicView(view, { skipScrollReset: true });
       }
     };
     window.addEventListener('hashchange', syncHashToView);
@@ -198,7 +261,7 @@ const App: React.FC = () => {
       window.removeEventListener('hashchange', syncHashToView);
       window.removeEventListener('edunova_force_public_view', handleForcedPublicView);
     };
-  }, [user]);
+  }, [user, switchPublicView]);
   
   // Inactivity Warning States
   const [showInactivityWarning, setShowInactivityWarning] = useState(false);
@@ -382,7 +445,7 @@ const App: React.FC = () => {
     setUser(null);
     setLoading(false);
     setIsExiting(false);
-    setShowLogin(true);
+    switchPublicView('login');
 
     // 5. Nettoyage asynchrone en arrière-plan sans bloquer l'UI
     (async () => {
@@ -556,15 +619,15 @@ const App: React.FC = () => {
     const handleCustomAuthError = (e: any) => {
       console.warn("App.tsx: Received edunova_auth_error event, logging out...");
       if (mounted) {
+         const hasCachedProfile = !!window.localStorage.getItem('edunova_user_profile');
          setUser(null);
          setLoading(false);
-         // Only show toast if we were previously logged in or have cached profile
-         const hasCachedProfile = !!window.localStorage.getItem('edunova_user_profile');
          if (hasCachedProfile) {
            toast.error("Session expirée", {
              description: "Votre session de sécurité a expiré. Veuillez vous reconnecter.",
              duration: 5000,
            });
+           switchPublicView('login');
          }
          try { window.localStorage.removeItem('edunova_user_profile'); } catch (err) {}
       }
@@ -1085,53 +1148,77 @@ const App: React.FC = () => {
 
   if (isPublicReceiptVerification) {
     return (
-      <React.Suspense fallback={<PublicRouteFallback target="verify" />}>
-        <PublicReceiptVerificationView
-          onBackToApp={() => {
-            window.location.hash = '#/';
-            window.location.reload();
-          }}
-        />
-      </React.Suspense>
+      <>
+        <Toaster position="top-center" richColors closeButton expand={false} />
+        <React.Suspense fallback={<PublicRouteFallback target="verify" />}>
+          <PublicReceiptVerificationView
+            onBackToApp={() => {
+              window.location.hash = '#/';
+              window.location.reload();
+            }}
+          />
+        </React.Suspense>
+      </>
     );
   }
 
   if (!user) {
-    if (!showLogin) {
-      return (
-        <ErrorBoundary>
-          <React.Suspense fallback={<PublicRouteFallback target="landing" />}>
-            <PublicLandingPage
-              onOpenLogin={() => {
-                window.location.hash = '#/login';
-                setShowLogin(true);
-              }}
-            />
-          </React.Suspense>
-        </ErrorBoundary>
-      );
-    }
-
     return (
       <ErrorBoundary>
-        <HashRouter>
-          <React.Suspense fallback={<PublicRouteFallback target="login" />}>
-            <Login
-              onLogin={(u) => {
-                try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-                setUser(u);
-                if (window.location.hash !== '#/') {
-                  window.location.hash = '#/';
-                }
-              }}
-              onReset={purgeSystemState}
-              onBackToLanding={() => {
-                window.location.hash = '#/';
-                setShowLogin(false);
-              }}
-            />
-          </React.Suspense>
-        </HashRouter>
+        <Toaster position="top-center" richColors closeButton expand={false} />
+        <React.Suspense fallback={<PublicRouteFallback target={publicView} />}>
+          <AnimatePresence mode="wait" initial={false}>
+            {publicView === 'landing' ? (
+              <motion.div
+                key="public-landing"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+              >
+                <PublicLandingPage
+                  onOpenLogin={() => switchPublicView('login')}
+                  onPreloadLogin={() => { void loadLogin(); }}
+                  isOpeningLogin={isViewTransitionPending && pendingPublicView === 'login'}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="public-login"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.14, ease: 'easeOut' }}
+              >
+                <HashRouter>
+                  <Login
+                    onLogin={(u) => {
+                      try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
+                      void loadAuthenticatedShell();
+                      if (window.location.hash !== '#/') {
+                        suppressHashSyncRef.current = true;
+                        window.location.hash = '#/';
+                        setTimeout(() => {
+                          suppressHashSyncRef.current = false;
+                        }, 0);
+                      }
+                      window.scrollTo({ top: 0, behavior: 'auto' });
+                      startViewTransition(() => {
+                        setUser(u);
+                        setLoading(false);
+                      });
+                    }}
+                    onReset={purgeSystemState}
+                    onBackToLanding={() => switchPublicView('landing')}
+                    onPreloadLanding={() => { void loadPublicLandingPage(); }}
+                    onLoginStart={() => { void loadAuthenticatedShell(); }}
+                    isReturningToLanding={isViewTransitionPending && pendingPublicView === 'landing'}
+                  />
+                </HashRouter>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </React.Suspense>
       </ErrorBoundary>
     );
   }
@@ -1159,16 +1246,14 @@ const App: React.FC = () => {
           }
         }}
         onSkipToHome={() => {
-          window.location.hash = '#/';
           setLoading(false);
           setUser(null);
-          setShowLogin(false);
+          switchPublicView('landing');
         }}
         onSkipToLogin={() => {
-          window.location.hash = '#/login';
           setLoading(false);
           setUser(null);
-          setShowLogin(true);
+          switchPublicView('login');
         }}
       />
     );
