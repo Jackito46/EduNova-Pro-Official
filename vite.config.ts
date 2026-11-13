@@ -94,9 +94,21 @@ export default defineConfig(({ mode }) => {
         outDir: 'dist',
         emptyOutDir: true,
         chunkSizeWarningLimit: 2500,
+        modulePreload: {
+          resolveDependencies: (_filename, deps) =>
+            deps.filter(
+              (d) =>
+                !d.includes('vendor-pdf') &&
+                !d.includes('vendor-charts') &&
+                !d.includes('vendor-xlsx')
+            )
+        },
         rollupOptions: {
           output: {
             manualChunks(id) {
+              if (id.includes('vite/preload-helper')) {
+                return 'vite-preload';
+              }
               if (id.includes('node_modules')) {
                 if (id.includes('react/') || id.includes('react-dom/') || id.includes('react-router-dom')) {
                   return 'vendor-react';

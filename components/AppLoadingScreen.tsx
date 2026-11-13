@@ -19,6 +19,7 @@ import Logo from './Logo';
 import { checkSupabaseConnection } from '../supabase';
 
 export interface AppLoadingScreenProps {
+  onSkipToHome?: () => void;
   onSkipToLogin?: () => void;
   onContinueOffline?: () => void;
   currentStage?: 1 | 2 | 3;
@@ -62,6 +63,7 @@ const STEPS = [
 ];
 
 export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({ 
+  onSkipToHome,
   onSkipToLogin,
   onContinueOffline,
   currentStage,
@@ -434,6 +436,17 @@ export const AppLoadingScreen: React.FC<AppLoadingScreenProps> = ({
                   >
                     <Zap size={13} />
                     <span>Mode Hors-ligne</span>
+                  </button>
+                )}
+
+                {onSkipToHome && (
+                  <button
+                    type="button"
+                    onClick={onSkipToHome}
+                    className="flex-1 py-2 px-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 shadow-sm cursor-pointer"
+                  >
+                    <span>Page d&apos;Accueil</span>
+                    <ArrowRight size={13} />
                   </button>
                 )}
 

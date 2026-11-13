@@ -1,138 +1,52 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { ShieldAlert, RefreshCw, Loader2, Clock } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { HashRouter } from 'react-router-dom';
+import { ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
-import Sidebar from './components/Sidebar';
-import ConnectivityBanner from './components/ConnectivityBanner';
-import Login from './components/Login';
-import { SuperAdminRoute } from './components/SuperAdminRoute';
-import { SubscriptionGuard } from './components/SubscriptionGuard';
 import { UserProfile, UserRole } from './types';
 import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
 import { ErrorBoundary } from './components/ErrorBoundary';
-
-import { SessionGuard } from './components/SessionGuard';
-import { RoleGuard } from './components/RoleGuard';
-import { ModuleGuard } from './components/ModuleGuard';
-import { DesktopDeviceGuard } from './components/DesktopDeviceGuard';
 import { useSecurity } from './components/SecurityGuard';
-import { SchoolProvider } from './contexts/SchoolContext';
 import Logo from './components/Logo';
-import AppFooter from './components/AppFooter';
-
-import { NotificationBanner } from './components/NotificationBanner';
-import { AiQuotaAlertBanner } from './components/AiQuotaAlertBanner';
-import { AutonomousAdminWarningBanner } from './components/AutonomousAdminWarningBanner';
-import { PayrollSensitiveNotificationListener } from './components/PayrollSensitiveNotificationListener';
-import { GlobalShortcuts } from './components/GlobalShortcuts';
-import { ModernDashboardSkeleton } from './components/SkeletonLoader';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
+import { lazyWithRetry } from './utils/lazyWithRetry';
 
-// Robust dynamic import wrapper with automated retry against chunk fetch failures and network drops
-const lazyWithRetry = <T extends React.ComponentType<any>>(
-  factory: () => Promise<{ default: T } | any>
-) =>
-  React.lazy(async () => {
-    try {
-      return await factory();
-    } catch (error: any) {
-      console.warn('Erreur de chargement dynamique du module, nouvelle tentative...', error);
-      try {
-        await new Promise(resolve => setTimeout(resolve, 350));
-        return await factory();
-      } catch (retryError: any) {
-        console.warn('Deuxième tentative de chargement dynamique...', retryError);
-        try {
-          await new Promise(resolve => setTimeout(resolve, 750));
-          return await factory();
-        } catch (finalError: any) {
-          console.error('Échec définitif du chargement dynamique:', finalError);
-          const errorMsg = String(finalError?.message || finalError || '').toLowerCase();
-          if (
-            errorMsg.includes('failed to fetch dynamically imported module') ||
-            errorMsg.includes('importing a module script failed') ||
-            errorMsg.includes('error loading dynamically imported module')
-          ) {
-            const reloadKey = 'vite_chunk_auto_reload';
-            const lastReload = typeof window !== 'undefined' ? sessionStorage.getItem(reloadKey) : null;
-            const now = Date.now();
-            if (!lastReload || now - Number(lastReload) > 20000) {
-              if (typeof window !== 'undefined') {
-                sessionStorage.setItem(reloadKey, String(now));
-                window.location.reload();
-              }
-            }
-          }
-          throw finalError;
-        }
-      }
-    }
-  });
-
-// Lazy-loaded route components with retry resilience for slow / low-bandwidth mobile networks & iframe reconnects
-const Dashboard = lazyWithRetry(() => import('./components/Dashboard'));
-const StudentForm = lazyWithRetry(() => import('./components/StudentForm'));
-const StudentList = lazyWithRetry(() => import('./components/StudentList'));
-const StudentDetailView = lazyWithRetry(() => import('./components/StudentDetailView'));
-const StudentProfileView = lazyWithRetry(() => import('./components/StudentProfileView').then(m => ({ default: m.StudentProfileView })));
-const StudentCoursesView = lazyWithRetry(() => import('./components/StudentCoursesView').then(m => ({ default: m.StudentCoursesView })));
-const StudentGradesView = lazyWithRetry(() => import('./components/StudentGradesView').then(m => ({ default: m.StudentGradesView })));
-const StudentFinanceView = lazyWithRetry(() => import('./components/StudentFinanceView').then(m => ({ default: m.StudentFinanceView })));
-const StudentScheduleView = lazyWithRetry(() => import('./components/StudentScheduleView').then(m => ({ default: m.StudentScheduleView })));
-const StudentHeader = lazyWithRetry(() => import('./components/StudentHeader').then(m => ({ default: m.StudentHeader })));
-const ClassManagement = lazyWithRetry(() => import('./components/ClassManagement'));
-const ClassForm = lazyWithRetry(() => import('./components/ClassForm'));
-const SubjectForm = lazyWithRetry(() => import('./components/SubjectForm'));
-const ClassSubjectManager = lazyWithRetry(() => import('./components/ClassSubjectManager'));
-const GradesView = lazyWithRetry(() => import('./components/GradesView'));
-const SyllabusHub = lazyWithRetry(() => import('./components/SyllabusHub'));
-const HomeworkManager = lazyWithRetry(() => import('./components/HomeworkManager').then(m => ({ default: m.HomeworkManager })));
-const ReportCardsView = lazyWithRetry(() => import('./components/ReportCardsView'));
-const ScheduleView = lazyWithRetry(() => import('./components/ScheduleView'));
-const CourseSignatureView = lazyWithRetry(() => import('./components/CourseSignatureView'));
-const AttendanceView = lazyWithRetry(() => import('./components/AttendanceView'));
-const SettingsView = lazyWithRetry(() => import('./components/SettingsView'));
-const TuitionPaymentForm = lazyWithRetry(() => import('./components/TuitionPaymentForm'));
-const FeePlanningView = lazyWithRetry(() => import('./components/FeePlanningView'));
-const ReceiptManagementView = lazyWithRetry(() => import('./components/ReceiptManagementView'));
-const StudentPaymentTracking = lazyWithRetry(() => import('./components/StudentPaymentTracking'));
-const AccountStatementView = lazyWithRetry(() => import('./components/AccountStatementView'));
-const PaymentHistoryList = lazyWithRetry(() => import('./components/PaymentHistoryList'));
-const FinanceHub = lazyWithRetry(() => import('./components/FinanceHub'));
-const ExpensesView = lazyWithRetry(() => import('./components/ExpensesView'));
-const ExpenseForm = lazyWithRetry(() => import('./components/ExpenseForm'));
-const SuppliesView = lazyWithRetry(() => import('./components/SuppliesView'));
-const PayrollManagementView = lazyWithRetry(() => import('./components/PayrollManagementView'));
-const DiscountManagementView = lazyWithRetry(() => import('./components/DiscountManagementView'));
-const ReductionReportView = lazyWithRetry(() => import('./components/ReductionReportView'));
-const AdHocCampaignsView = lazyWithRetry(() => import('./components/AdHocCampaignsView'));
-const StaffManagement = lazyWithRetry(() => import('./components/StaffManagement')); 
-const StaffForm = lazyWithRetry(() => import('./components/StaffForm'));
-const StaffAssignmentView = lazyWithRetry(() => import('./components/StaffAssignmentView')); 
-const StaffAttendanceView = lazyWithRetry(() => import('./components/StaffAttendanceView'));
-const DisciplinaryView = lazyWithRetry(() => import('./components/DisciplinaryView'));
-const FinancialAuditView = lazyWithRetry(() => import('./components/FinancialAuditView'));
-const StudentCurrencyDiagnosticView = lazyWithRetry(() => import('./components/StudentCurrencyDiagnosticView'));
-const BudgetPlanningView = lazyWithRetry(() => import('./components/BudgetPlanningView'));
-const DebtorsListView = lazyWithRetry(() => import('./components/DebtorsListView'));
-const UserManagementView = lazyWithRetry(() => import('./components/UserManagementView'));
-const ReportsView = lazyWithRetry(() => import('./components/ReportsView'));
-const MultiCampusDashboardView = lazyWithRetry(() => import('./components/MultiCampusDashboardView').then(m => ({ default: m.MultiCampusDashboardView })));
-const AuditLogsView = lazyWithRetry(() => import('./components/AuditLogsView').then(m => ({ default: m.AuditLogsView })));
-const ValidationList = lazyWithRetry(() => import('./components/ValidationList'));
-const ForcePasswordChange = lazyWithRetry(() => import('./components/ForcePasswordChange').then(m => ({ default: m.ForcePasswordChange })));
-const PwaInstallModal = lazyWithRetry(() => import('./components/PwaInstallModal').then(m => ({ default: m.PwaInstallModal })));
-const OfflineDashboard = lazyWithRetry(() => import('./components/OfflineDashboard').then(m => ({ default: m.OfflineDashboard })));
-const SuperAdminDashboard = lazyWithRetry(() => import('./components/SuperAdminDashboard').then(m => ({ default: m.SuperAdminDashboard })));
-const SystemHealthView = lazyWithRetry(() => import('./components/SystemHealthView').then(m => ({ default: m.SystemHealthView })));
-const PublicReceiptVerificationView = lazyWithRetry(() => import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView })));
 const PublicLandingPage = lazyWithRetry(() => import('./components/PublicLandingPage'));
-const EmailModule = lazyWithRetry(() => import('./components/EmailModule'));
-const SmsModule = lazyWithRetry(() => import('./components/SmsModule'));
-const PushModule = lazyWithRetry(() => import('./components/PushModule'));
-const WhatsAppModule = lazyWithRetry(() => import('./components/WhatsAppModule'));
+const Login = lazyWithRetry(() => import('./components/Login'));
+const PublicReceiptVerificationView = lazyWithRetry(() =>
+  import('./components/PublicReceiptVerificationView').then(m => ({ default: m.PublicReceiptVerificationView }))
+);
+const AuthenticatedShell = lazyWithRetry(() => import('./components/AuthenticatedShell'));
+
+const PublicRouteFallback: React.FC<{ target: 'landing' | 'login' | 'verify' | 'app' }> = ({ target }) => {
+  const label =
+    target === 'login'
+      ? 'Ouverture de la page de connexion...'
+      : target === 'verify'
+      ? 'Chargement de la vérification...'
+      : target === 'app'
+      ? 'Préparation de votre espace...'
+      : 'Chargement de la page d’accueil...';
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col items-center justify-center p-6">
+      <div className="flex flex-col items-center gap-4 max-w-xs w-full text-center">
+        <div className="w-16 h-16 rounded-2xl bg-white border border-slate-200 shadow-sm flex items-center justify-center p-2.5">
+          <Logo src="/logo.webp" size="lg" className="w-full h-full object-contain" alt="EduNova Pro" />
+        </div>
+        <div className="space-y-1">
+          <div className="text-xl font-extrabold tracking-tight text-slate-900">
+            EduNova <span className="text-blue-600">Pro</span>
+          </div>
+          <p className="text-xs font-medium text-slate-500">{label}</p>
+        </div>
+        <div className="w-36 h-1 bg-slate-200 rounded-full overflow-hidden">
+          <div className="h-full w-1/2 bg-blue-600 rounded-full animate-pulse" />
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // Intercept toast.error globally to prevent scary technical auth errors from showing to the user
 const originalToastError = toast.error;
@@ -187,341 +101,6 @@ declare global {
 }
 
 
-
-const AnimatedRoutes: React.FC<{ user: UserProfile, purgeSystemState: (options?: any) => void, maintenanceMode: boolean }> = ({ user, purgeSystemState, maintenanceMode }) => {
-  const location = useLocation();
-
-  // Détection du mode PWA / Autonome pour masquer les éléments superflus
-  const isPwaStandalone = useMemo(() => {
-    if (typeof window === 'undefined') return false;
-    return (
-      window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone === true ||
-      document.referrer.includes('android-app://')
-    );
-  }, []);
-
-  // Détection et réacheminement automatique des retours de passerelle de paiement (Tranzak MonCash / NatCash)
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const searchStr = window.location.search || '';
-    const hashStr = window.location.hash || '';
-    const fullUrl = searchStr + hashStr;
-
-    if (fullUrl.includes('payment=success') || fullUrl.includes('payment=cancel') || searchStr.includes('redirect_to=')) {
-      const searchParams = new URLSearchParams(searchStr.replace(/^\?/, ''));
-      const hashQueryPart = hashStr.includes('?') ? hashStr.split('?')[1] : '';
-      const hashParams = new URLSearchParams(hashQueryPart);
-
-      const ref = searchParams.get('ref') || hashParams.get('ref') || '';
-      const amount = searchParams.get('amount') || hashParams.get('amount') || '';
-      const studentId = searchParams.get('student_id') || hashParams.get('student_id') || '';
-      const operator = searchParams.get('operator') || hashParams.get('operator') || 'moncash';
-      const redirectTo = searchParams.get('redirect_to') || hashParams.get('redirect_to') || '';
-      const isSuccess = fullUrl.includes('payment=success');
-
-      const isStudentOrParent = 
-        user.role === UserRole.STUDENT || 
-        user.role === UserRole.PARENT || 
-        Boolean(studentId) || 
-        redirectTo === 'mon-economat';
-
-      if (isStudentOrParent) {
-        const targetQuery = isSuccess
-          ? `payment=success&ref=${encodeURIComponent(ref)}&amount=${encodeURIComponent(amount)}&student_id=${encodeURIComponent(studentId)}&operator=${encodeURIComponent(operator)}`
-          : `payment=cancel&ref=${encodeURIComponent(ref)}`;
-
-        const targetHashUrl = `#/mon-economat?${targetQuery}`;
-        
-        // Si les paramètres sont dans window.location.search, nettoyer search et mettre dans le hash
-        if (searchStr || !window.location.hash.includes('mon-economat')) {
-          window.history.replaceState({}, document.title, `${window.location.pathname}${targetHashUrl}`);
-          if (window.location.hash !== `#/mon-economat?${targetQuery}`) {
-            window.location.hash = `#/mon-economat?${targetQuery}`;
-          }
-        }
-      }
-    }
-  }, [user.role]);
-
-  const isDashboard = location.pathname === '/' || location.pathname === '/dashboard';
-  
-  // Define role groups for easier management
-  const adminRoles = [UserRole.SCHOOL_ADMIN, UserRole.DIRECTOR];
-  const financeRoles = [...adminRoles, UserRole.ACCOUNTANT];
-  const cashierRoles = [...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY, UserRole.SUPERVISOR];
-  const hrRoles = [...adminRoles]; // Removed SECRETARY from hrRoles
-  const studentMgmtRoles = [...adminRoles, UserRole.SECRETARY];
-  const academicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.TEACHER, UserRole.SUPERVISOR];
-  const restrictedAcademicRoles = [...adminRoles, UserRole.SECRETARY, UserRole.SUPERVISOR];
-  const allStaffRoles = [...academicRoles, UserRole.ACCOUNTANT, UserRole.LIBRARIAN];
-
-  // Listener scroll sur '#main-content-scroll' pour calculer dynamiquement une couleur de fond
-  // (ex: transition fluide entre slate-50 et slate-100 en fonction de la position du défilement)
-  const [mainContentBg, setMainContentBg] = useState<string>('rgb(248, 250, 252)'); // slate-50 au repos
-
-  useEffect(() => {
-    const scrollContainer = document.getElementById('main-content-scroll');
-    if (!scrollContainer) return;
-
-    let rafId: number | null = null;
-    const handleScroll = () => {
-      if (rafId !== null) return;
-      rafId = requestAnimationFrame(() => {
-        rafId = null;
-        const scrollTop = scrollContainer.scrollTop || 0;
-        // Progression linéaire calculée sur les 200 premiers pixels de défilement (0 -> 1)
-        const progress = Math.min(1, Math.max(0, scrollTop / 200));
-        // Interpolation exacte RGB :
-        // slate-50 : rgb(248, 250, 252) -> slate-100 : rgb(241, 245, 249)
-        const r = Math.round(248 - (248 - 241) * progress);
-        const g = Math.round(250 - (250 - 245) * progress);
-        const b = Math.round(252 - (252 - 249) * progress);
-        setMainContentBg(`rgb(${r}, ${g}, ${b})`);
-      });
-    };
-
-    scrollContainer.addEventListener('scroll', handleScroll, { passive: true });
-    handleScroll();
-
-    return () => {
-      scrollContainer.removeEventListener('scroll', handleScroll);
-      if (rafId !== null) cancelAnimationFrame(rafId);
-    };
-  }, [location.pathname]);
-
-  if (maintenanceMode && user.role !== 'SUPER_ADMIN') {
-    return (
-      <div className="flex h-screen items-center justify-center bg-slate-50 p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-2xl p-10 text-center space-y-6 border border-slate-100 animate-in fade-in zoom-in duration-300">
-          <div className="w-24 h-24 bg-amber-100 text-amber-600 rounded-3xl flex items-center justify-center mx-auto shadow-inner">
-            <ShieldAlert size={48} />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-3xl font-black text-slate-900 tracking-tighter">Maintenance en cours</h1>
-            <p className="text-slate-500 font-medium leading-relaxed text-sm">
-              La plateforme EduNova Pro est actuellement en maintenance pour des améliorations techniques. 
-              Vos données restent en toute sécurité.
-            </p>
-          </div>
-          <div className="pt-2 space-y-3">
-            <button 
-              onClick={() => window.location.reload()}
-              className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-bold text-sm hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-200 active:scale-95 flex items-center justify-center gap-2"
-            >
-              <RefreshCw size={18} /> Vérifier la disponibilité
-            </button>
-            <button 
-              onClick={() => purgeSystemState()}
-              className="w-full py-3 bg-slate-100 text-slate-700 rounded-2xl font-bold text-sm hover:bg-slate-200 transition-all active:scale-95"
-            >
-              Se déconnecter
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (user.force_password_change) {
-    return (
-      <React.Suspense fallback={<ModernDashboardSkeleton />}>
-        <ForcePasswordChange user={user} onPasswordChanged={(updated) => purgeSystemState()} />
-      </React.Suspense>
-    );
-  }
-
-  return (
-    <SchoolProvider user={user} schoolId={user.school_id}>
-      <SessionGuard user={user}>
-        {Boolean(
-          user &&
-          user.role !== UserRole.PARENT &&
-          (user.role as any) !== 'PARENT' &&
-          (user.role as any) !== 'parent' &&
-          (
-            user.is_super_admin ||
-            user.role === UserRole.SUPER_ADMIN ||
-            (user.role as any) === 'SUPER_ADMIN' ||
-            user.role === UserRole.DIRECTOR ||
-            (user.role as any) === 'DIRECTOR' ||
-            user.role === UserRole.SCHOOL_ADMIN ||
-            (user.role as any) === 'SCHOOL_ADMIN' ||
-            (user.role as any) === 'admin'
-          )
-        ) && (
-          <GlobalShortcuts user={user} />
-        )}
-        <div className="flex h-screen bg-[#f3f4f6] overflow-hidden font-sans">
-        <ErrorBoundary>
-          <Sidebar user={user} onLogout={purgeSystemState} />
-        </ErrorBoundary>
-        <main 
-          id="main-content-scroll"
-          style={{ backgroundColor: mainContentBg }}
-          className={`flex-1 min-w-0 overflow-y-auto custom-scrollbar relative print:p-0 print:overflow-visible transition-colors duration-150 ease-out ${
-            isDashboard ? 'p-0' : 'p-4 pt-16 sm:p-5 lg:p-6 2xl:p-8'
-          }`}
-        >
-          {user.role === UserRole.STUDENT && !isDashboard && (
-            <React.Suspense fallback={<div className="h-16 animate-pulse bg-white/70 rounded-xl mb-4" />}>
-              <StudentHeader user={user} />
-            </React.Suspense>
-          )}
-          {!isDashboard && (
-            <>
-              <ConnectivityBanner />
-              <NotificationBanner userId={user.id} schoolId={user.school_id || ''} />
-              <AutonomousAdminWarningBanner user={user} />
-              <PayrollSensitiveNotificationListener user={user} />
-              <AiQuotaAlertBanner user={user} />
-            </>
-          )}
-          <ErrorBoundary key={location.pathname}>
-            <AnimatePresence mode="wait" initial={false}>
-              <motion.div
-                key={location.pathname}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12, ease: 'easeOut' }}
-                className="w-full min-w-0"
-              >
-                <React.Suspense fallback={<ModernDashboardSkeleton />}>
-                  <Routes location={location}>
-              <Route path="/" element={<Dashboard user={user} />} />
-              <Route path="/dashboard" element={<Navigate to="/" replace />} />
-              <Route path="/offline" element={<RoleGuard user={user} allowedRoles={allStaffRoles}><OfflineDashboard user={user} /></RoleGuard>} />
-              <Route path="/super-admin" element={
-                <SuperAdminRoute user={user}>
-                  <SuperAdminDashboard user={user} />
-                </SuperAdminRoute>
-              } />
-              <Route path="/super-admin/system-health" element={
-                <SuperAdminRoute user={user}>
-                  <SystemHealthView user={user} />
-                </SuperAdminRoute>
-              } />
-              <Route path="/super-admin/sante-systeme" element={
-                <SuperAdminRoute user={user}>
-                  <SystemHealthView user={user} />
-                </SuperAdminRoute>
-              } />
-              <Route path="/system-health" element={
-                <SuperAdminRoute user={user}>
-                  <SystemHealthView user={user} />
-                </SuperAdminRoute>
-              } />
-
-              {/* Student & Parent Portal Routes */}
-              <Route path="/profil" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentProfileView user={user} /></RoleGuard>} />
-              <Route path="/mes-cours" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentCoursesView user={user} /></RoleGuard>} />
-              <Route path="/mes-devoirs" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...academicRoles]}><HomeworkManager user={user} defaultTab="student" /></RoleGuard>} />
-              <Route path="/mes-notes" element={<ModuleGuard moduleId="exams" moduleName="Mes Notes" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentGradesView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/mon-economat" element={<ModuleGuard moduleId="finance" moduleName="Mon Économat" user={user}><RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles, UserRole.ACCOUNTANT]}><StudentFinanceView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/mon-horaire" element={<RoleGuard user={user} allowedRoles={[UserRole.STUDENT, UserRole.PARENT, ...adminRoles]}><StudentScheduleView user={user} /></RoleGuard>} />
-              
-              {/* Academic Routes */}
-              <Route path="/eleves" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentList user={user} /></RoleGuard>} />
-              <Route path="/eleves/liste" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentList user={user} /></RoleGuard>} />
-              <Route path="/eleves/validation" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><ValidationList user={user} /></RoleGuard>} />
-              <Route path="/eleves/detail/:id" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><StudentDetailView user={user} /></RoleGuard>} />
-              <Route path="/eleves/ajouter" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
-              <Route path="/eleves/inscrire" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
-              <Route path="/eleves/modifier/:id" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
-              <Route path="/eleves/reinscrire/:id" element={<RoleGuard user={user} allowedRoles={studentMgmtRoles}><StudentForm user={user} /></RoleGuard>} />
-              <Route path="/classes" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><ClassManagement user={user} /></RoleGuard>} />
-              <Route path="/classes/ajouter" element={<RoleGuard user={user} allowedRoles={adminRoles}><ClassForm user={user} /></RoleGuard>} />
-              <Route path="/classes/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><ClassForm user={user} /></RoleGuard>} />
-              <Route path="/classes/:id/matieres" element={<RoleGuard user={user} allowedRoles={adminRoles}><ClassSubjectManager user={user} /></RoleGuard>} />
-              <Route path="/matieres" element={<RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><ClassManagement user={user} /></RoleGuard>} />
-              <Route path="/matieres/ajouter" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
-              <Route path="/matieres/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><SubjectForm user={user} /></RoleGuard>} />
-              <Route path="/notes" element={<ModuleGuard moduleId="exams" moduleName="Saisie des Notes" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><GradesView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/devoirs" element={<RoleGuard user={user} allowedRoles={academicRoles}><HomeworkManager user={user} defaultTab="teacher" /></RoleGuard>} />
-              <Route path="/enseignant/syllabus" element={<RoleGuard user={user} allowedRoles={academicRoles}><SyllabusHub user={user} /></RoleGuard>} />
-              <Route path="/presences" element={<ModuleGuard moduleId="attendance" moduleName="Suivi des Présences" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><AttendanceView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/bulletins" element={<ModuleGuard moduleId="exams" moduleName="Édition & Clôture des Bulletins Scolaires" user={user}><RoleGuard user={user} allowedRoles={restrictedAcademicRoles}><DesktopDeviceGuard user={user} moduleTitle="Édition & Clôture des Bulletins Scolaires"><ReportCardsView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
-              <Route path="/discipline" element={<ModuleGuard moduleId="discipline" moduleName="Discipline & Vie Scolaire" user={user}><RoleGuard user={user} allowedRoles={academicRoles}><DisciplinaryView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/horaire" element={<RoleGuard user={user} allowedRoles={academicRoles}><ScheduleView user={user} /></RoleGuard>} />
-              <Route path="/enseignant/pointage" element={<RoleGuard user={user} allowedRoles={[UserRole.TEACHER, ...adminRoles, UserRole.SECRETARY]}><CourseSignatureView user={user} /></RoleGuard>} />
-              
-              {/* HR Routes */}
-              <Route path="/personnel" element={<RoleGuard user={user} allowedRoles={hrRoles}><StaffManagement user={user} /></RoleGuard>} />
-              <Route path="/personnel/embaucher" element={<RoleGuard user={user} allowedRoles={adminRoles}><StaffForm user={user} /></RoleGuard>} />
-              <Route path="/personnel/modifier/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><StaffForm user={user} /></RoleGuard>} />
-              <Route path="/personnel/affectation/:id" element={<RoleGuard user={user} allowedRoles={adminRoles}><StaffAssignmentView user={user} /></RoleGuard>} />
-              <Route path="/personnel/pointage" element={<RoleGuard user={user} allowedRoles={hrRoles}><StaffAttendanceView user={user} /></RoleGuard>} />
-              
-              {/* Finance Routes */}
-              <Route path="/fees" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat" element={<ModuleGuard moduleId="finance" moduleName="Direction Économat" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><FinanceHub user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/frais" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/paiement" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/paiements" element={<ModuleGuard moduleId="finance" moduleName="Guichet d'Encaissement" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><TuitionPaymentForm user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/factures" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/facture/:id" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/recus" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/recu/:id" element={<ModuleGuard moduleId="finance" moduleName="Factures & Reçus" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><ReceiptManagementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/releves" element={<ModuleGuard moduleId="finance" moduleName="Relevé de Compte" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/releve-compte" element={<ModuleGuard moduleId="finance" moduleName="Relevé de Compte" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><AccountStatementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/suivi" element={<ModuleGuard moduleId="finance" moduleName="Suivi des Paiements" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><StudentPaymentTracking user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/debiteurs" element={<ModuleGuard moduleId="finance" moduleName="Liste des Débiteurs" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><DebtorsListView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/liste" element={<ModuleGuard moduleId="finance" moduleName="Registre des Paiements" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/historique" element={<ModuleGuard moduleId="finance" moduleName="Registre des Paiements" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><PaymentHistoryList user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/depenses" element={<ModuleGuard moduleId="finance" moduleName="Registre des Dépenses" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpensesView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/depenses/ajouter" element={<ModuleGuard moduleId="finance" moduleName="Ajouter une Dépense" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/depenses/modifier/:id" element={<ModuleGuard moduleId="finance" moduleName="Modifier une Dépense" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><ExpenseForm user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/fournitures" element={<ModuleGuard moduleId="inventory" moduleName="Fournitures & Stocks (Inventaire)" user={user}><RoleGuard user={user} allowedRoles={cashierRoles}><SuppliesView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/planification" element={<ModuleGuard moduleId="finance" moduleName="Planification Frais" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/planning" element={<ModuleGuard moduleId="finance" moduleName="Planification Frais" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><FeePlanningView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/frais-occasionnels" element={<ModuleGuard moduleId="finance" moduleName="Campagnes & Événements" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><AdHocCampaignsView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/derogations" element={<ModuleGuard moduleId="finance" moduleName="Dérogations & Réévaluations" user={user}><RoleGuard user={user} allowedRoles={adminRoles}><DiscountManagementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/rapport-reductions" element={<ModuleGuard moduleId="finance" moduleName="Rapports Réductions" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><ReductionReportView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/paie" element={<ModuleGuard moduleId="finance" moduleName="Gestion Payroll" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><PayrollManagementView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/budget" element={<ModuleGuard moduleId="finance" moduleName="Planification Budgétaire" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Planification Budgétaire & Arbitrages"><BudgetPlanningView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/audit" element={<ModuleGuard moduleId="finance" moduleName="Audit Financier" user={user}><RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT]}><DesktopDeviceGuard user={user} moduleTitle="Audit Financier & Clôtures"><FinancialAuditView user={user} /></DesktopDeviceGuard></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/diagnostic" element={<ModuleGuard moduleId="finance" moduleName="Diagnostic Barème vs Engagement" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><StudentCurrencyDiagnosticView user={user} /></RoleGuard></ModuleGuard>} />
-              <Route path="/economat/diagnostic-bareme" element={<ModuleGuard moduleId="finance" moduleName="Diagnostic Barème vs Engagement" user={user}><RoleGuard user={user} allowedRoles={financeRoles}><StudentCurrencyDiagnosticView user={user} /></RoleGuard></ModuleGuard>} />
-              
-              {/* Reports Routes */}
-              <Route path="/rapports" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.SECRETARY]}><ReportsView user={user} /></RoleGuard>} />
-              <Route path="/supervision-annexes" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.DIRECTOR]}><DesktopDeviceGuard user={user} moduleTitle="Supervision Multi-Campus Institutionnelle"><MultiCampusDashboardView user={user} /></DesktopDeviceGuard></RoleGuard>} />
-              <Route path="/direction/supervision-annexes" element={<RoleGuard user={user} allowedRoles={[...adminRoles, UserRole.ACCOUNTANT, UserRole.DIRECTOR]}><DesktopDeviceGuard user={user} moduleTitle="Supervision Multi-Campus Institutionnelle"><MultiCampusDashboardView user={user} /></DesktopDeviceGuard></RoleGuard>} />
-              
-              {/* Guide Route */}
-              {/* <Route path="/guide" element={<GuideView />} /> */}
-              
-              {/* Communication Routes */}
-              <Route path="/communication" element={<Navigate to="/communication/whatsapp" replace />} />
-              <Route path="/communication/whatsapp" element={<RoleGuard user={user} allowedRoles={adminRoles}><WhatsAppModule user={user} /></RoleGuard>} />
-              <Route path="/communication/email" element={<RoleGuard user={user} allowedRoles={adminRoles}><EmailModule user={user} /></RoleGuard>} />
-              <Route path="/communication/sms" element={<RoleGuard user={user} allowedRoles={adminRoles}><SmsModule user={user} /></RoleGuard>} />
-              <Route path="/communication/push" element={<RoleGuard user={user} allowedRoles={adminRoles}><PushModule user={user} /></RoleGuard>} />
-              
-              {/* Settings Routes */}
-              <Route path="/settings" element={<Navigate to="/settings/ecole" replace />} />
-              <Route path="/parametres" element={<Navigate to="/settings/ecole" replace />} />
-              <Route path="/settings/ecole" element={<RoleGuard user={user} allowedRoles={adminRoles}><SettingsView user={user} /></RoleGuard>} />
-              <Route path="/settings/utilisateurs" element={<RoleGuard user={user} allowedRoles={adminRoles}><UserManagementView currentUser={user} /></RoleGuard>} />
-              <Route path="/settings/audit" element={<RoleGuard user={user} allowedRoles={adminRoles}><AuditLogsView user={user} /></RoleGuard>} />
-              
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-                </React.Suspense>
-          </motion.div>
-        </AnimatePresence>
-      </ErrorBoundary>
-
-          {/* Application Footer - Version Internationale & Moderne */}
-          {!isPwaStandalone && <AppFooter />}
-        </main>
-      </div>
-    </SessionGuard>
-  </SchoolProvider>
-  );
-};
 
 const App: React.FC = () => {
   const { isInOfficeHours, isAllowedLocation } = useSecurity();
@@ -580,6 +159,9 @@ const App: React.FC = () => {
   // State to toggle between the public vitrine/landing page and the member login screen
   const [showLogin, setShowLogin] = useState<boolean>(() => {
     try {
+      const forced = typeof window !== 'undefined' ? (window as any).__edunovaForcedPublicView : null;
+      if (forced === 'login') return true;
+      if (forced === 'landing') return false;
       const h = typeof window !== 'undefined' ? window.location.hash || '' : '';
       return h.startsWith('#/login') || h.startsWith('#/auth') || h.startsWith('#/reset-password');
     } catch (e) {
@@ -600,8 +182,22 @@ const App: React.FC = () => {
         }
       } catch (e) {}
     };
+    const handleForcedPublicView = (e: Event) => {
+      const view = (e as CustomEvent)?.detail?.view;
+      setLoading(false);
+      setUser(null);
+      if (view === 'login') {
+        setShowLogin(true);
+      } else if (view === 'landing') {
+        setShowLogin(false);
+      }
+    };
     window.addEventListener('hashchange', syncHashToView);
-    return () => window.removeEventListener('hashchange', syncHashToView);
+    window.addEventListener('edunova_force_public_view', handleForcedPublicView);
+    return () => {
+      window.removeEventListener('hashchange', syncHashToView);
+      window.removeEventListener('edunova_force_public_view', handleForcedPublicView);
+    };
   }, [user]);
   
   // Inactivity Warning States
@@ -1043,7 +639,9 @@ const App: React.FC = () => {
       }
     };
 
-    fetchGlobalSettings();
+    if (hasStoredAuthToken() && window.localStorage.getItem('edunova_logged_out') !== 'true') {
+      fetchGlobalSettings();
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("App.tsx: Auth state change event:", event);
@@ -1487,7 +1085,7 @@ const App: React.FC = () => {
 
   if (isPublicReceiptVerification) {
     return (
-      <React.Suspense fallback={<ModernDashboardSkeleton />}>
+      <React.Suspense fallback={<PublicRouteFallback target="verify" />}>
         <PublicReceiptVerificationView
           onBackToApp={() => {
             window.location.hash = '#/';
@@ -1500,10 +1098,9 @@ const App: React.FC = () => {
 
   if (!user) {
     if (!showLogin) {
-      console.log("App.tsx: Rendering PublicLandingPage (Vitrine)");
       return (
         <ErrorBoundary>
-          <React.Suspense fallback={<ModernDashboardSkeleton />}>
+          <React.Suspense fallback={<PublicRouteFallback target="landing" />}>
             <PublicLandingPage
               onOpenLogin={() => {
                 window.location.hash = '#/login';
@@ -1515,32 +1112,31 @@ const App: React.FC = () => {
       );
     }
 
-    console.log("App.tsx: Rendering Login component");
     return (
       <ErrorBoundary>
         <HashRouter>
-          <Login
-            onLogin={(u) => {
-              try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-              setUser(u);
-              // Force redirection to dashboard on login to avoid landing on a deep link from a previous session
-              if (window.location.hash !== '#/') {
+          <React.Suspense fallback={<PublicRouteFallback target="login" />}>
+            <Login
+              onLogin={(u) => {
+                try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
+                setUser(u);
+                if (window.location.hash !== '#/') {
+                  window.location.hash = '#/';
+                }
+              }}
+              onReset={purgeSystemState}
+              onBackToLanding={() => {
                 window.location.hash = '#/';
-              }
-            }}
-            onReset={purgeSystemState}
-            onBackToLanding={() => {
-              window.location.hash = '#/';
-              setShowLogin(false);
-            }}
-          />
+                setShowLogin(false);
+              }}
+            />
+          </React.Suspense>
         </HashRouter>
       </ErrorBoundary>
     );
   }
 
   if (loading) {
-    console.log("App.tsx: Rendering AppLoadingScreen with dynamic stages and session hydration");
     const cachedProfile = (() => {
       try {
         const raw = window.localStorage.getItem('edunova_user_profile');
@@ -1562,9 +1158,17 @@ const App: React.FC = () => {
             setLoading(false);
           }
         }}
-        onSkipToLogin={() => {
+        onSkipToHome={() => {
+          window.location.hash = '#/';
           setLoading(false);
           setUser(null);
+          setShowLogin(false);
+        }}
+        onSkipToLogin={() => {
+          window.location.hash = '#/login';
+          setLoading(false);
+          setUser(null);
+          setShowLogin(true);
         }}
       />
     );
@@ -1696,11 +1300,12 @@ const App: React.FC = () => {
           </div>
         </div>
       )}
-      <SubscriptionGuard user={user} onLogout={purgeSystemState}>
-        <AnimatedRoutes user={user} purgeSystemState={purgeSystemState} maintenanceMode={maintenanceMode} />
-      </SubscriptionGuard>
-      <React.Suspense fallback={null}>
-        <PwaInstallModal />
+      <React.Suspense fallback={<PublicRouteFallback target="app" />}>
+        <AuthenticatedShell
+          user={user}
+          purgeSystemState={purgeSystemState}
+          maintenanceMode={maintenanceMode}
+        />
       </React.Suspense>
     </HashRouter>
     </ErrorBoundary>
