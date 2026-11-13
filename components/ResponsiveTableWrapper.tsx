@@ -39,7 +39,7 @@ export const ResponsiveTableWrapper: React.FC<ResponsiveTableWrapperProps> = ({
     checkScroll();
     const handleResize = () => checkScroll();
     window.addEventListener('resize', handleResize);
-
+    
     const el = containerRef.current;
     let observer: ResizeObserver | null = null;
     if (el && typeof ResizeObserver !== 'undefined') {

@@ -51,7 +51,6 @@ L'un des vecteurs d'attaque les plus fréquents en développement web moderne r�
 Sur l'interface Coolify de votre serveur (ex: `coolify.collegeisaacnewton.com`) :
 
 ### Option 1 : Via le mode « Developer View » (Recommandé - En 1 clic)
-
 1. Connectez-vous à votre tableau de bord Coolify.
 2. Cliquez sur votre projet, puis sur votre application (**college-isaac-newton**).
 3. Dans le menu de gauche, rendez-vous sur **Environment Variables**.
@@ -80,9 +79,7 @@ ENCRYPTION_KEY=votre_cle_aleatoire_hex_32_octets_ici
 ---
 
 ### Option 2 : Via le formulaire « + Add »
-
 Si vous préférez ajouter les variables une par une dans la fenêtre modale :
-
 1. Cliquez sur le bouton bleu **`+ Add`**.
 2. Remplissez pour la première variable :
    * **Name** : `TRANZAK_API_KEY`
@@ -102,12 +99,10 @@ Si vous préférez ajouter les variables une par une dans la fenêtre modale :
 Si vous déployez votre application directement avec `docker compose` sur votre VPS :
 
 ### 1. Fichier `.env` sur le serveur (à placer dans le même dossier que `docker-compose.yml`)
-
 Créez le fichier `.env` sur le serveur :
 ```bash
 nano .env
 ```
-
 Y insérer :
 ```env
 NODE_ENV=production
@@ -131,10 +126,8 @@ TRANZAK_TEST_KEY=tk_test_votre_cle_sandbox
 ```
 
 ### 2. Extrait du `docker-compose.yml`
-
 ```yaml
 version: '3.8'
-
 services:
   edunova-app:
     build:
@@ -156,7 +149,6 @@ services:
       - TRANZAK_MODE=${TRANZAK_MODE}
       - ENCRYPTION_KEY=${ENCRYPTION_KEY}
 ```
-
 Pour lancer ou mettre à jour les conteneurs :
 ```bash
 docker compose pull
@@ -168,7 +160,6 @@ docker compose up -d --build
 ## 5. Configuration du Webhook sur le Portail Tranzak
 
 Pour que les recharges de portefeuille et les règlements de scolarité via MonCash & NatCash soient validés automatiquement en temps réel :
-
 1. Connectez-vous sur votre espace développeur **Tranzak Business Portal** : `https://tranzak.co` ou `https://business.tranzak.co`.
 2. Allez dans **Settings** > **Webhooks & API**.
 3. Renseignez l'URL de votre endpoint Webhook EduNova Pro :
@@ -187,7 +178,6 @@ Pour que les recharges de portefeuille et les règlements de scolarité via MonC
 ## 6. Vérification & Diagnostic depuis l'Interface EduNova Pro
 
 Une fois l'application redéployée, vous pouvez valider le bon fonctionnement sans quitter le logiciel :
-
 1. Connectez-vous en tant qu'Administrateur ou Économe sur EduNova Pro.
 2. Allez dans le menu latéral : **Finance** > **Direction Économat**.
 3. Cliquez sur le bouton violet en en-tête : **Passerelles & API**.

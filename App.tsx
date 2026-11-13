@@ -119,6 +119,8 @@ declare global {
 
 
 
+
+
 const App: React.FC = () => {
   const { isInOfficeHours, isAllowedLocation } = useSecurity();
   const [user, setUser] = useState<UserProfile | null>(() => {

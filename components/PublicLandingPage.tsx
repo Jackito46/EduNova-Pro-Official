@@ -60,6 +60,251 @@ interface PublicLandingPageProps {
   isOpeningLogin?: boolean;
 }
 
+interface PartnerSchoolItem {
+  id: string;
+  name: string;
+  city: string;
+  cycle: string;
+  initials: string;
+  accentColor: string;
+  crestVariant: 'shield' | 'columns' | 'compass' | 'book' | 'hexagon' | 'arch';
+}
+
+const ACTIVE_ESTABLISHMENTS_TARGET = 48;
+
+const PARTNER_SCHOOLS: PartnerSchoolItem[] = [
+  {
+    id: 'college-innovations',
+    name: 'Collège des Innovations',
+    city: 'Port-au-Prince',
+    cycle: 'Fondamental & Secondaire',
+    initials: 'CI',
+    accentColor: '#1E40AF',
+    crestVariant: 'shield'
+  },
+  {
+    id: 'im-saint-michel',
+    name: 'Inst. Mixte Saint-Michel',
+    city: 'Pétion-Ville',
+    cycle: 'Cycle Complet',
+    initials: 'SM',
+    accentColor: '#0F766E',
+    crestVariant: 'columns'
+  },
+  {
+    id: 'lycee-horizon',
+    name: 'Lycée Tech. Horizon',
+    city: 'Cap-Haïtien',
+    cycle: 'Secondaire & Pro',
+    initials: 'LH',
+    accentColor: '#B45309',
+    crestVariant: 'compass'
+  },
+  {
+    id: 'academie-lumiere',
+    name: 'Académie Bilingue Lumière',
+    city: 'Delmas',
+    cycle: 'Maternelle – Philo',
+    initials: 'AL',
+    accentColor: '#4338CA',
+    crestVariant: 'book'
+  },
+  {
+    id: 'institut-jean-price',
+    name: 'Institut Jean-Price Mars',
+    city: 'Les Cayes',
+    cycle: 'Enseignement Supérieur',
+    initials: 'JP',
+    accentColor: '#0369A1',
+    crestVariant: 'hexagon'
+  },
+  {
+    id: 'ecole-esperance',
+    name: 'École Moderne Espérance',
+    city: 'Gonaïves',
+    cycle: 'Primaire & Collège',
+    initials: 'EE',
+    accentColor: '#047857',
+    crestVariant: 'arch'
+  }
+];
+
+const PartnerSchoolEmblem: React.FC<{ school: PartnerSchoolItem }> = ({ school }) => {
+  return (
+    <svg
+      viewBox="0 0 48 48"
+      className="w-11 h-11 shrink-0"
+      role="img"
+      aria-label={`Emblème ${school.name}`}
+    >
+      <rect width="48" height="48" rx="12" fill="#0B132B" />
+      {school.crestVariant === 'shield' && (
+        <path
+          d="M24 8L37 13V23.5C37 31.2 31.4 37.3 24 40C16.6 37.3 11 31.2 11 23.5V13L24 8Z"
+          fill="none"
+          stroke={school.accentColor}
+          strokeWidth="2.2"
+        />
+      )}
+      {school.crestVariant === 'columns' && (
+        <g stroke={school.accentColor} strokeWidth="2.2" strokeLinecap="round">
+          <path d="M12 15H36" />
+          <path d="M16 19V33M24 19V33M32 19V33" />
+          <path d="M11 36H37" />
+        </g>
+      )}
+      {school.crestVariant === 'compass' && (
+        <g fill="none" stroke={school.accentColor} strokeWidth="2.2">
+          <circle cx="24" cy="24" r="13" />
+          <path d="M24 13L28.5 24L24 35L19.5 24L24 13Z" />
+        </g>
+      )}
+      {school.crestVariant === 'book' && (
+        <g fill="none" stroke={school.accentColor} strokeWidth="2.2" strokeLinejoin="round">
+          <path d="M11 14C16 14 20.5 15.5 24 18C27.5 15.5 32 14 37 14V34C32 34 27.5 35.2 24 37.5C20.5 35.2 16 34 11 34V14Z" />
+          <path d="M24 18V37.5" />
+        </g>
+      )}
+      {school.crestVariant === 'hexagon' && (
+        <polygon
+          points="24,9 37,16.5 37,31.5 24,39 11,31.5 11,16.5"
+          fill="none"
+          stroke={school.accentColor}
+          strokeWidth="2.2"
+        />
+      )}
+      {school.crestVariant === 'arch' && (
+        <g fill="none" stroke={school.accentColor} strokeWidth="2.2">
+          <path d="M13 36V23C13 16.9 17.9 12 24 12C30.1 12 35 16.9 35 23V36" />
+          <path d="M10 36H38" strokeLinecap="round" />
+        </g>
+      )}
+      <text
+        x="24"
+        y="27"
+        textAnchor="middle"
+        fill="#FFFFFF"
+        fontSize="11"
+        fontWeight="800"
+        fontFamily="ui-sans-serif, system-ui, sans-serif"
+        letterSpacing="0.5"
+      >
+        {school.initials}
+      </text>
+    </svg>
+  );
+};
+
+export const SocialProofSection: React.FC = () => {
+  const sectionRef = useRef<HTMLElement | null>(null);
+  const [displayedCount, setDisplayedCount] = useState<number>(ACTIVE_ESTABLISHMENTS_TARGET);
+  const hasAnimatedRef = useRef(false);
+
+  useEffect(() => {
+    const el = sectionRef.current;
+    if (!el || typeof window === 'undefined') return;
+
+    const prefersReducedMotion =
+      typeof window.matchMedia === 'function' &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    if (prefersReducedMotion || typeof IntersectionObserver === 'undefined') {
+      setDisplayedCount(ACTIVE_ESTABLISHMENTS_TARGET);
+      return;
+    }
+
+    let rafId: number | null = null;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        if (!entry?.isIntersecting || hasAnimatedRef.current) return;
+        hasAnimatedRef.current = true;
+        observer.disconnect();
+
+        const startVal = 12;
+        const duration = 650;
+        const startTime = performance.now();
+
+        const step = (now: number) => {
+          const progress = Math.min(1, (now - startTime) / duration);
+          const eased = 1 - Math.pow(1 - progress, 3);
+          setDisplayedCount(Math.round(startVal + (ACTIVE_ESTABLISHMENTS_TARGET - startVal) * eased));
+          if (progress < 1) {
+            rafId = requestAnimationFrame(step);
+          }
+        };
+
+        rafId = requestAnimationFrame(step);
+      },
+      { threshold: 0.25 }
+    );
+
+    observer.observe(el);
+
+    return () => {
+      observer.disconnect();
+      if (rafId !== null) cancelAnimationFrame(rafId);
+    };
+  }, []);
+
+  return (
+    <section
+      ref={sectionRef}
+      aria-labelledby="social-proof-heading"
+      className="py-12 sm:py-16 bg-white border-t border-slate-200/80"
+    >
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
+          <div className="space-y-2 max-w-2xl">
+            <div className="text-xs font-bold uppercase tracking-wider text-indigo-600">
+              Réseau d&apos;Établissements Partenaires
+            </div>
+            <h2
+              id="social-proof-heading"
+              className="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight [text-wrap:balance]"
+            >
+              Ils structurent leur économat et leur scolarité avec EduNova Pro
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500 leading-relaxed">
+              Port-au-Prince <span aria-hidden="true">·</span> Pétion-Ville <span aria-hidden="true">·</span> Cap-Haïtien <span aria-hidden="true">·</span> Les Cayes <span aria-hidden="true">·</span> Gonaïves
+            </p>
+          </div>
+
+          <div className="shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-6 py-4 flex items-center gap-5">
+            <div className="text-3xl sm:text-4xl font-extrabold text-[#0B132B] tabular-nums tracking-tight">
+              {displayedCount}
+            </div>
+            <div className="h-9 w-px bg-slate-200" aria-hidden="true" />
+            <div className="space-y-0.5">
+              <div className="text-sm font-bold text-slate-900">Établissements actifs</div>
+              <div className="text-xs text-slate-500 tabular-nums">
+                18 400+ élèves gérés <span aria-hidden="true">·</span> Données de démonstration
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {PARTNER_SCHOOLS.map((school) => (
+            <div
+              key={school.id}
+              className="flex items-center gap-3.5 rounded-xl border border-slate-200 bg-white p-4 hover:border-slate-300 transition-colors"
+            >
+              <PartnerSchoolEmblem school={school} />
+              <div className="min-w-0">
+                <div className="text-sm font-bold text-slate-900 truncate">{school.name}</div>
+                <div className="text-xs text-slate-500 truncate">
+                  {school.city} <span aria-hidden="true">·</span> {school.cycle}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+};
+
 export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
   onOpenLogin,
   onPreloadLogin,
@@ -2421,6 +2666,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             </div>
           </div>
         </section>
+
+        {/* 8. PREUVE SOCIALE & ÉTABLISSEMENTS PARTENAIRES */}
+        <SocialProofSection />
       </main>
 
       {/* =========================================================================
