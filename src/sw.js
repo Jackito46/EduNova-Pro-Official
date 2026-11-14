@@ -3,7 +3,6 @@ import { precacheAndRoute, cleanupOutdatedCaches, matchPrecache } from 'workbox-
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, NetworkFirst, NetworkOnly, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
-import { BackgroundSyncPlugin } from 'workbox-background-sync';
 
 // Versioning des caches d'exécution pour garantir la purge immédiate lors d'une montée de version
 const CACHE_VERSION = 'v3.2';
@@ -192,33 +191,14 @@ registerRoute(
   })
 );
 
-// 8. Background Sync pour requêtes hors-ligne
-const bgSyncPlugin = new BackgroundSyncPlugin('edunova-offline-queue', {
-  maxRetentionTime: 24 * 60 // 24 heures
-});
-
+// 8. Mutations Supabase REST : gérées par la file applicative chiffrée IndexedDB (offlineSyncEngine.ts)
+// afin d'éviter la limite de 24h et l'échec JWT 401 du replay Workbox brut.
 registerRoute(
-  /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-  new NetworkOnly({
-    plugins: [bgSyncPlugin]
-  }),
-  'POST'
-);
-
-registerRoute(
-  /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-  new NetworkOnly({
-    plugins: [bgSyncPlugin]
-  }),
-  'PATCH'
-);
-
-registerRoute(
-  /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-  new NetworkOnly({
-    plugins: [bgSyncPlugin]
-  }),
-  'DELETE'
+  ({ url, request }) =>
+    url.origin.includes('supabase.co') &&
+    url.pathname.includes('/rest/v1/') &&
+    ['POST', 'PATCH', 'DELETE'].includes(request.method),
+  new NetworkOnly()
 );
 
 // 9. Écouteur de messages (Skip waiting, purge sélective, vérification du hash et nettoyage forcé)

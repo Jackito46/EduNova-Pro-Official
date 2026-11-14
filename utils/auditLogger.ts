@@ -37,7 +37,8 @@ export type AuditAction =
   | 'PAYROLL_CREATE'
   | 'PAYROLL_DELETE'
   | 'PAYROLL_PAYMENT'
-  | 'PAYROLL_SENSITIVE_UPDATE';
+  | 'PAYROLL_SENSITIVE_UPDATE'
+  | 'OFFLINE_RECEIPT_SYNCED';
 
 export type EntityType = 
   | 'auth' 

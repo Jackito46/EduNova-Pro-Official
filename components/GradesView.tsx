@@ -53,6 +53,7 @@ import { AuditLogger } from "../utils/auditLogger";
 import { getExamsListForClass } from "../lib/evaluations";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { enqueueOfflineGradesBatch, isTransientNetworkError } from "../services/offlineSyncEngine";
 import { useSecurity } from "./SecurityGuard";
 import { addSecurityWatermark } from "../utils/pdfWatermark";
 import { appendSecuritySheet } from "../utils/excelWatermark";
@@ -858,11 +859,34 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
   // ENREGISTREMENT ET SCELLAGE MASSIF
   const handleSaveGrades = async () => {
     setSaving(true);
+    const offlineGradesBuffer: Array<{
+      gradeId: string;
+      schoolId: string;
+      studentId: string;
+      studentName?: string;
+      subjectId: string;
+      subjectName?: string;
+      courseEvaluationId?: string | null;
+      academicYearId?: string | null;
+      className?: string;
+      term: string;
+      score: number;
+      maxScore: number;
+      isSealed: boolean;
+      baseUpdatedAt?: string | null;
+    }> = [];
+    let pendingDeletionsForOffline: string[] = [];
+
     try {
       const recordsToUpsert: any[] = [];
       const recordsToDelete: string[] = [];
 
       Object.entries(gridData).forEach(([studentId, scores]) => {
+        const studentObj = students.find((s) => s.id === studentId);
+        const studentFullName = studentObj
+          ? `${studentObj.last_name || ""} ${studentObj.first_name || ""}`.trim()
+          : undefined;
+
         Object.entries(scores).forEach(([colId, score]) => {
           const colDef = columns.find((c) => c.id === colId);
           if (!colDef) return;
@@ -891,6 +915,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     return v.toString(16);
                   }));
 
+            const parsedScore = parseFloat(score);
             const record: any = {
               id: gradeId,
               school_id: user.school_id,
@@ -898,18 +923,60 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
               subject_id: colDef.subjectId,
               course_evaluation_id: colDef.courseEvaluationId || null,
               term: selectedTerm,
-              score: parseFloat(score),
+              score: parsedScore,
               is_sealed: true,
             };
             if (selectedYearId) {
               record.academic_year_id = selectedYearId;
             }
             recordsToUpsert.push(record);
+
+            offlineGradesBuffer.push({
+              gradeId,
+              schoolId: user.school_id,
+              studentId,
+              studentName: studentFullName,
+              subjectId: colDef.subjectId,
+              subjectName: colDef.label || colDef.name,
+              courseEvaluationId: colDef.courseEvaluationId || null,
+              academicYearId: selectedYearId || null,
+              className: selectedClassObj?.name,
+              term: selectedTerm,
+              score: parsedScore,
+              maxScore: colDef.maxScore || 100,
+              isSealed: true,
+              baseUpdatedAt: existingGrade?.updated_at || null,
+            });
           } else if (existingGrade) {
             recordsToDelete.push(existingGrade.id);
           }
         });
       });
+
+      pendingDeletionsForOffline = recordsToDelete;
+
+      if (recordsToUpsert.length === 0 && recordsToDelete.length === 0) {
+        toast.info("Aucune modification à enregistrer.");
+        setSaving(false);
+        return;
+      }
+
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await enqueueOfflineGradesBatch({
+          schoolId: user.school_id,
+          userId: user.id,
+          classId: selectedClassObj?.id || selectedClassId,
+          className: selectedClassObj?.name || "Classe",
+          term: selectedTerm,
+          academicYearId: selectedYearId || null,
+          grades: offlineGradesBuffer,
+          deletions: pendingDeletionsForOffline,
+        });
+        toast.success(
+          `Mode hors-ligne : ${offlineGradesBuffer.length} note(s) chiffrée(s) localement. Synchronisation automatique au retour du signal.`
+        );
+        return;
+      }
 
       if (recordsToUpsert.length > 0) {
         // Sanitize records to ensure only valid grades table columns are sent
@@ -971,6 +1038,26 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
       toast.success("✨ Journal des évaluations synchronisé et scellé avec succès !");
       loadGradeContext();
     } catch (err: any) {
+      if (isTransientNetworkError(err) && offlineGradesBuffer.length > 0) {
+        try {
+          await enqueueOfflineGradesBatch({
+            schoolId: user.school_id,
+            userId: user.id,
+            classId: selectedClassObj?.id || selectedClassId,
+            className: selectedClassObj?.name || "Classe",
+            term: selectedTerm,
+            academicYearId: selectedYearId || null,
+            grades: offlineGradesBuffer,
+            deletions: pendingDeletionsForOffline,
+          });
+          toast.success(
+            `Connexion interrompue : ${offlineGradesBuffer.length} note(s) sécurisée(s) hors-ligne pour synchronisation automatique.`
+          );
+          return;
+        } catch (offlineErr: any) {
+          console.error("Erreur file hors-ligne notes:", offlineErr);
+        }
+      }
       console.error("Save error:", err);
       toast.error("Erreur de sauvegarde : " + err.message);
     } finally {

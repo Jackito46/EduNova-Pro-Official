@@ -10,6 +10,8 @@ import { useSecurity } from './components/SecurityGuard';
 import Logo from './components/Logo';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
 import { lazyWithRetry } from './utils/lazyWithRetry';
+import { ensureOfflineVaultUnlocked, lockOfflineVault } from './services/offlineEncryptedStore';
+import { initOfflineSyncAutoFlush } from './services/offlineSyncEngine';
 
 const loadPublicLandingPage = () => import('./components/PublicLandingPage');
 const loadLogin = () => import('./components/Login');
@@ -441,7 +443,8 @@ const App: React.FC = () => {
       } catch (e) {}
     }
 
-    // 4. Déconnexion locale instantanée et réinitialisation de l'état (0ms de latence pour l'utilisateur)
+    // 4. Verrouillage immédiat du coffre hors-ligne en RAM & déconnexion locale instantanée
+    lockOfflineVault();
     try { window.localStorage.setItem('edunova_logged_out', 'true'); } catch (e) {}
     setUser(null);
     setLoading(false);
@@ -498,6 +501,13 @@ const App: React.FC = () => {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!user?.id) return;
+    void ensureOfflineVaultUnlocked(user.id, user.school_id || 'global');
+    const stopAutoFlush = initOfflineSyncAutoFlush(user.school_id || undefined);
+    return () => stopAutoFlush();
+  }, [user?.id, user?.school_id]);
 
   useEffect(() => {
     // Retrait immédiat et garanti du splashscreen dès que le composant React racine est actif

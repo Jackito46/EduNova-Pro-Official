@@ -35,6 +35,18 @@ import {
 
 dotenv.config();
 
+// Gardes globales anti-crash : éviter qu'un rejet asynchrone transitoire ne tue le serveur en développement
+process.on('unhandledRejection', (reason) => {
+  console.error('[Server] Rejet de promesse non intercepté :', reason);
+});
+
+process.on('uncaughtException', (err: any) => {
+  console.error('[Server] Exception non interceptée :', err);
+  if (err?.code === 'EADDRINUSE' || err?.code === 'EACCES') {
+    process.exit(1);
+  }
+});
+
 const supabaseUrl = process.env.VITE_SUPABASE_URL || 'https://iymzthjkucvhyjnxpslg.supabase.co';
 const supabaseServiceKey = (
   process.env.SUPABASE_SERVICE_ROLE_KEY ||
@@ -7184,7 +7196,7 @@ async function startServer() {
   // AUTOMATED BACKUP SCHEDULER (Runs every 10 minutes)
   // ----------------------------------------------------
   let lastCheckedDate = '';
-  setInterval(async () => {
+  const autoBackupTimer = setInterval(async () => {
     try {
       const settings = await backupService.getSettings();
       if (!settings.is_auto_backup_enabled) return;
@@ -7274,6 +7286,9 @@ async function startServer() {
       } catch (e) {}
     }
   }, 10 * 60 * 1000); // Check every 10 minutes
+  if (typeof autoBackupTimer.unref === 'function') {
+    autoBackupTimer.unref();
+  }
 
   // API Endpoint for Exporting Project to GitHub with Real-time Progress Streaming
   app.post('/api/export-github', async (req, res) => {
@@ -7533,10 +7548,6 @@ async function startServer() {
     serveStaticPwaAsset(req, res, fileName, 'image/png');
   });
 
-  app.get('/favicon.ico', (req, res) => {
-    serveStaticPwaAsset(req, res, 'favicon.ico', 'image/x-icon');
-  });
-
   // Service Worker endpoint with Service-Worker-Allowed header
   app.get(/^\/(sw\.js|registerSW\.js)$/, (req, res) => {
     res.setHeader('Service-Worker-Allowed', '/');
@@ -7549,7 +7560,7 @@ async function startServer() {
     const vite = await createViteServer({
       server: { 
         middlewareMode: true,
-        hmr: process.env.DISABLE_HMR === 'true' ? false : undefined,
+        hmr: process.env.ENABLE_HMR === 'true' ? undefined : false,
         allowedHosts: true,
       },
       appType: 'spa',
@@ -7657,7 +7668,7 @@ async function startServer() {
   // En production (Cloud Run, conteneur), écouter sur le port fourni par Cloud Run ($PORT, ex: 8080 ou 3000).
   const primaryPort = isProduction && process.env.PORT ? parseInt(process.env.PORT, 10) : PORT;
 
-  app.listen(primaryPort, '0.0.0.0', () => {
+  const primaryServer = app.listen(primaryPort, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${primaryPort}`);
 
     // Si déployé en production sur Cloud Run avec un PORT différent de 3000 (ex: 8080),
@@ -7679,7 +7690,7 @@ async function startServer() {
     // Render met le service en veille après 15 minutes d'inactivité sur le plan gratuit.
     // Ce ping vers l'URL externe réinitialise le décompte Render.
     const PING_INTERVAL_MS = 9 * 60 * 1000; // 9 minutes
-    setInterval(async () => {
+    const keepAliveTimer = setInterval(async () => {
       const target = appExternalUrl || process.env.RENDER_EXTERNAL_URL || process.env.APP_URL;
       if (!target) return;
 
@@ -7697,7 +7708,20 @@ async function startServer() {
         // En cas d'indisponibilité momentanée, on réessaie au tour suivant
       }
     }, PING_INTERVAL_MS);
+    if (typeof keepAliveTimer.unref === 'function') {
+      keepAliveTimer.unref();
+    }
+  });
+
+  primaryServer.on('error', (err: any) => {
+    console.error(`[Server Listen Error on port ${primaryPort}]:`, err?.message || err);
+    if (err?.code === 'EADDRINUSE') {
+      process.exit(1);
+    }
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('[Server Fatal Startup Error]:', err);
+  process.exit(1);
+});

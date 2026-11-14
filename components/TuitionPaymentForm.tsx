@@ -58,6 +58,7 @@ import { isRestrictedBankDate, getLocalTodayString } from '../utils/dateUtils';
 import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
+import { enqueueOfflineReceipt, isTransientNetworkError } from '../services/offlineSyncEngine';
 import { MonCashSummaryModal } from './MonCashSummaryModal';
 import { PaymentConfirmationModal } from './PaymentConfirmationModal';
 import { MonCashTransactionCard, MonCashTransactionInfo } from './MonCashTransactionCard';
@@ -2316,6 +2317,70 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         paymentPayload.academic_year_id = targetYearId;
       }
 
+      const saveOfflineReceiptFallback = async () => {
+        const offlineRec = await enqueueOfflineReceipt({
+          schoolId: user.school_id,
+          userId: user.id,
+          studentId: selectedStudent.id,
+          studentName: selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim(),
+          campusId: selectedStudent.campus_id || currentCampusId || null,
+          academicYearId: targetYearId || null,
+          amount,
+          currency: currency === 'USD' ? 'USD' : 'HTG',
+          paymentMethod: finalPaymentMethod,
+          feeType: isAdHoc ? 'DIVERS' : feeType,
+          mappedType,
+          description: descriptionNote,
+          referenceNumber: paymentPayload.reference_number,
+          exchangeRate: currentExchangeRate || 140,
+          amountHtgEquivalent: paymentPayload.amount_htg_equivalent,
+          amountUsdEquivalent: paymentPayload.amount_usd_equivalent,
+          cashierName: cashierName || user?.full_name || 'Comptabilité',
+        });
+
+        setTransactionRef(offlineRec.provisionalNumber);
+        const studentWalletBefore = currency === 'USD' ? (selectedStudent.wallet_balance_usd || 0) : (selectedStudent.wallet_balance_htg || 0);
+        setSealedReceiptData({
+          receiptNumber: offlineRec.provisionalNumber,
+          amount,
+          currency,
+          feeType,
+          feeTypeLabel: `${mappedType} (Provisoire Hors-ligne)`,
+          paymentMethod: finalPaymentMethod,
+          bankName: (paymentMethod === 'Chèque' || paymentMethod === 'Dépôt Bancaire') ? bankName : null,
+          depositDate: (paymentMethod === 'Dépôt Bancaire' && depositDate) ? depositDate : getLocalTodayString(),
+          paymentDateTime: `${new Date().toLocaleDateString('fr-FR')} ${new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`,
+          cashierName: cashierName || user?.full_name || 'Comptabilité',
+          student: {
+            id: selectedStudent.id,
+            fullName: offlineRec.studentName,
+            classe: selectedStudent.classe || selectedStudent.class?.name || 'Non assignée',
+            reference_number: selectedStudent.reference_number || null,
+            campus_id: selectedStudent.campus_id || currentCampusId,
+            campus_name: selectedStudent.campus_name
+          },
+          financialSnapshot: {
+            dueText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'due'),
+            paidText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'paid'),
+            resteText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'reste', montantReel, currency, paymentLogic),
+            soldeText: getReceiptFeeText(feeType, selectedStudent, currentExchangeRate, 'solde', montantReel, currency),
+            plannedUSD: (feeType === 'DIVERS' ? selectedStudent?.miscUSD : feeType === 'SCOLARITE' ? selectedStudent?.scolariteUSD : feeType === 'INSCRIPTION' ? selectedStudent?.inscriptionUSD : 0) || 0,
+            walletBalanceBefore: studentWalletBefore,
+            walletBalanceAfter: studentWalletBefore
+          },
+          exchangeRate: currentExchangeRate,
+          moncashTransactionData: null
+        });
+        setShowReceipt(true);
+        toast.success(`Reçu provisoire ${offlineRec.provisionalNumber} chiffré localement. Synchronisation automatique dès le retour d’Internet.`);
+      };
+
+      // Mode hors-ligne explicite : enregistrement local chiffré immédiat sans attente réseau
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        await saveOfflineReceiptFallback();
+        return;
+      }
+
       console.log("Tentative de scellage transaction...", paymentPayload);
 
       let paymentRecord: any = null;
@@ -2324,6 +2389,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (!initialError && initialData && initialData.length > 0) {
         paymentRecord = initialData[0];
       } else if (initialError) {
+        if (isTransientNetworkError(initialError)) {
+          await saveOfflineReceiptFallback();
+          return;
+        }
         console.warn("Désynchronisation détectée sur l'insertion principale. Tentative de fallback...", initialError);
 
         // Fallback 1: On garde les colonnes usuelles et on supprime les colonnes récentes optionnelles qui peuvent différer
@@ -2510,6 +2579,37 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         setAuthorizedSuperiorName(null);
       }
     } catch (err: any) {
+      const offlineAmount = parseFloat(montantReel);
+      if (isTransientNetworkError(err) && Number.isFinite(offlineAmount) && offlineAmount > 0) {
+        try {
+          const isAdHocErr = feeType.startsWith('ADHOC_');
+          const offlineRec = await enqueueOfflineReceipt({
+            schoolId: user.school_id,
+            userId: user.id,
+            studentId: selectedStudent.id,
+            studentName: selectedStudent.fullName || `${selectedStudent.first_name || ''} ${selectedStudent.last_name || ''}`.trim(),
+            campusId: selectedStudent.campus_id || currentCampusId || null,
+            academicYearId: targetYearId || null,
+            amount: offlineAmount,
+            currency: currency === 'USD' ? 'USD' : 'HTG',
+            paymentMethod,
+            feeType: isAdHocErr ? 'DIVERS' : feeType,
+            mappedType: feeType,
+            description: `Encaissement hors-ligne (${feeType})`,
+            referenceNumber: referenceNumber || null,
+            exchangeRate: currentExchangeRate || 140,
+            amountHtgEquivalent: currency === 'USD' ? Math.round(offlineAmount * (currentExchangeRate || 140) * 100) / 100 : offlineAmount,
+            amountUsdEquivalent: currency === 'USD' ? offlineAmount : Math.round((offlineAmount / (currentExchangeRate || 140)) * 100) / 100,
+            cashierName: cashierName || user?.full_name || 'Comptabilité',
+          });
+          setTransactionRef(offlineRec.provisionalNumber);
+          setShowReceipt(true);
+          toast.success(`Connexion coupée — reçu provisoire ${offlineRec.provisionalNumber} chiffré localement pour synchronisation.`);
+          return;
+        } catch (offlineErr: any) {
+          console.error("Erreur sauvegarde hors-ligne:", offlineErr);
+        }
+      }
       console.error("Critique Scellage:", err);
       setApiError("ÉCHEC DE SCELLAGE : " + (err.message || "Erreur Cloud."));
     } finally {

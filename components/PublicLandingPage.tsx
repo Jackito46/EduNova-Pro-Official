@@ -622,7 +622,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
     setTimeout(() => {
       const element = document.getElementById(targetId);
       if (element) {
-        const headerOffset = 76;
+        const headerOffset = 88;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
         window.scrollTo({
@@ -646,34 +646,36 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       style={{ fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
     >
       {/* =========================================================================
-          1. EN-TÊTE INSTITUTIONNEL & BARRE DE NAVIGATION ÉPURÉE (1 LIGNE · 3 ZONES)
+          1. EN-TÊTE INSTITUTIONNEL GLASSMORPHISM (1 LIGNE · 3 ZONES)
          ========================================================================= */}
-      <header
-        className={`fixed top-0 inset-x-0 z-50 transition-all duration-200 border-b ${
-          scrolled
-            ? 'bg-white/95 backdrop-blur-md border-slate-200/90 shadow-sm shadow-slate-900/5'
-            : 'bg-white/85 backdrop-blur-md border-slate-200/60'
-        }`}
-      >
-        {/* Barre Principale de Navigation — Contrat Strict 3 Zones */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-6">
+      <header className="fixed top-0 inset-x-0 z-50 px-3 sm:px-6 lg:px-8 pt-2.5 sm:pt-3 pointer-events-none">
+        {/* Barre Principale Glassmorphism — Contrat Strict 3 Zones */}
+        <div
+          className={`pointer-events-auto max-w-7xl mx-auto px-3.5 sm:px-5 h-14 sm:h-15 flex items-center justify-between gap-4 sm:gap-6 rounded-2xl border transition-all duration-300 backdrop-blur-xl backdrop-saturate-150 ${
+            scrolled
+              ? 'bg-white/82 border-indigo-200/70 ring-1 ring-slate-900/[0.05] shadow-[0_14px_38px_-8px_rgba(15,23,42,0.14),0_4px_14px_-2px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)]'
+              : 'bg-white/70 border-white/80 ring-1 ring-slate-900/[0.05] shadow-[0_8px_28px_-6px_rgba(15,23,42,0.09),0_2px_8px_-2px_rgba(67,56,202,0.06),inset_0_1px_0_rgba(255,255,255,0.9)]'
+          }`}
+        >
           {/* ZONE 1 : Marque seule sur une ligne (sans badges ni sous-titres parasites) */}
           <button
             type="button"
             onClick={scrollToTop}
             className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0 text-left"
           >
-            <Logo size="sm" className="w-8 h-8 transition-transform duration-200 group-hover:scale-105 shrink-0" />
+            <div className="p-1 rounded-xl bg-white/85 border border-indigo-100/80 shadow-2xs transition-transform duration-200 group-hover:scale-105 shrink-0">
+              <Logo size="sm" className="w-7 h-7 block" />
+            </div>
             <span className="text-lg font-extrabold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
               EduNova <span className="text-indigo-700">Pro</span>
             </span>
           </button>
 
-          {/* ZONE 2 : Navigation Regroupée par Domaines (Palette Unifiée & Lisible) */}
+          {/* ZONE 2 : Navigation Regroupée dans une Capsule Verre Dépoli */}
           <nav
             ref={navRef}
             aria-label="Navigation principale par domaines"
-            className="hidden lg:flex items-center gap-1 xl:gap-2 text-[13px] font-semibold text-slate-600"
+            className="hidden lg:flex items-center gap-1 text-[13px] font-semibold text-slate-600 bg-slate-900/[0.035] backdrop-blur-md border border-slate-200/70 rounded-xl p-1 shadow-[inset_0_1px_2px_rgba(15,23,42,0.03)]"
           >
             {/* Domaine 1 : Académique */}
             <div
@@ -686,10 +688,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'academic'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'academic' ? null : 'academic')}
-                className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'academic'
-                    ? 'text-indigo-700 bg-indigo-50/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    ? 'text-indigo-700 bg-white/95 shadow-xs ring-1 ring-indigo-950/[0.06]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/75'
                 }`}
               >
                 <span>Académique</span>
@@ -702,17 +704,17 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </button>
 
               {openNavGroup === 'academic' && (
-                <div className="absolute left-0 top-full pt-2 w-76 z-50">
-                  <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 p-2 space-y-1">
+                <div className="absolute left-0 top-full pt-3 w-76 z-50">
+                  <div className="bg-white/88 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] p-2 space-y-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Pôle Académique &amp; Pédagogie
                     </div>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'academic')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50/90 border border-indigo-100/80 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
                         <GraduationCap size={16} />
                       </div>
                       <div>
@@ -723,9 +725,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigate('specialites')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50/90 border border-indigo-100/80 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
                         <BookOpen size={16} />
                       </div>
                       <div>
@@ -736,9 +738,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'parents')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50/90 border border-indigo-100/80 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
                         <UserCheck size={16} />
                       </div>
                       <div>
@@ -762,10 +764,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'finance'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'finance' ? null : 'finance')}
-                className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'finance'
-                    ? 'text-indigo-700 bg-indigo-50/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    ? 'text-indigo-700 bg-white/95 shadow-xs ring-1 ring-indigo-950/[0.06]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/75'
                 }`}
               >
                 <span>Économat</span>
@@ -778,17 +780,17 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </button>
 
               {openNavGroup === 'finance' && (
-                <div className="absolute left-0 top-full pt-2 w-76 z-50">
-                  <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 p-2 space-y-1">
+                <div className="absolute left-0 top-full pt-3 w-76 z-50">
+                  <div className="bg-white/88 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] p-2 space-y-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Pôle Économat &amp; Trésorerie
                     </div>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'finance')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50/90 border border-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
                         <Wallet size={16} />
                       </div>
                       <div>
@@ -799,9 +801,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'finance')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50/90 border border-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
                         <Smartphone size={16} />
                       </div>
                       <div>
@@ -812,9 +814,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigate('roi')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50/90 border border-emerald-100/80 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
                         <Calculator size={16} />
                       </div>
                       <div>
@@ -838,10 +840,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'admin'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'admin' ? null : 'admin')}
-                className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'admin'
-                    ? 'text-indigo-700 bg-indigo-50/80'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
+                    ? 'text-indigo-700 bg-white/95 shadow-xs ring-1 ring-indigo-950/[0.06]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-white/75'
                 }`}
               >
                 <span>Administration</span>
@@ -854,17 +856,17 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               </button>
 
               {openNavGroup === 'admin' && (
-                <div className="absolute left-0 top-full pt-2 w-76 z-50">
-                  <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 p-2 space-y-1">
+                <div className="absolute left-0 top-full pt-3 w-76 z-50">
+                  <div className="bg-white/88 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] rounded-2xl shadow-[0_20px_50px_-12px_rgba(15,23,42,0.18),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] p-2 space-y-1">
                     <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Direction, RH &amp; Déploiement
                     </div>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'payroll')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100/90 border border-slate-200/70 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:border-indigo-100 group-hover:text-indigo-700 transition-colors">
                         <Users size={16} />
                       </div>
                       <div>
@@ -875,9 +877,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigate('specialites')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100/90 border border-slate-200/70 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:border-indigo-100 group-hover:text-indigo-700 transition-colors">
                         <WifiOff size={16} />
                       </div>
                       <div>
@@ -888,9 +890,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     <button
                       type="button"
                       onClick={() => handleNavigate('demo')}
-                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-indigo-50/70 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                      <div className="w-8 h-8 rounded-lg bg-slate-100/90 border border-slate-200/70 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:border-indigo-100 group-hover:text-indigo-700 transition-colors">
                         <Building2 size={16} />
                       </div>
                       <div>
@@ -906,7 +908,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('roi')}
-              className="px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/75 transition-all whitespace-nowrap shrink-0 cursor-pointer"
             >
               Simulateur
             </button>
@@ -914,7 +916,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('testimonials')}
-              className="px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-white/75 transition-all whitespace-nowrap shrink-0 cursor-pointer"
             >
               Témoignages
             </button>
@@ -929,9 +931,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               onFocus={onPreloadLogin}
               onTouchStart={onPreloadLogin}
               disabled={isOpeningLogin}
-              className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-80 rounded-lg transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 shadow-xs"
+              className="px-4 py-2 text-xs font-bold text-white bg-gradient-to-r from-slate-900 to-indigo-900 hover:from-indigo-700 hover:to-indigo-600 active:scale-[0.98] disabled:opacity-80 rounded-xl border border-white/15 shadow-[0_6px_18px_-4px_rgba(49,46,129,0.4)] transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
             >
-              <Lock size={13} className="text-indigo-300 shrink-0" />
+              <Lock size={13} className="text-indigo-200 shrink-0" />
               <span>{isOpeningLogin ? 'Ouverture...' : 'Connexion'}</span>
             </button>
           </div>
@@ -945,14 +947,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               onFocus={onPreloadLogin}
               onTouchStart={onPreloadLogin}
               disabled={isOpeningLogin}
-              className="px-3 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-indigo-700 disabled:opacity-80 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-1.5 text-xs font-bold text-white bg-gradient-to-r from-slate-900 to-indigo-900 hover:from-indigo-700 hover:to-indigo-600 disabled:opacity-80 rounded-xl border border-white/15 shadow-xs whitespace-nowrap shrink-0 cursor-pointer"
             >
               {isOpeningLogin ? 'Ouverture...' : 'Connexion'}
             </button>
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
+              className="p-2 text-slate-700 hover:text-slate-950 hover:bg-white/80 border border-transparent hover:border-slate-200/80 rounded-xl cursor-pointer transition-colors"
               aria-label="Ouvrir le menu de navigation"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -960,10 +962,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
           </div>
         </div>
 
-        {/* Tiroir de Navigation Mobile */}
+        {/* Tiroir de Navigation Mobile Glassmorphism */}
         {mobileMenuOpen && (
           <div
-            className="lg:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-4 text-xs text-slate-700 shadow-xl overflow-y-auto max-h-[calc(100vh-4rem)] edunova-fade-in"
+            className="pointer-events-auto lg:hidden mt-2 max-w-7xl mx-auto rounded-2xl bg-white/90 backdrop-blur-2xl backdrop-saturate-150 border border-white/85 ring-1 ring-slate-900/[0.07] shadow-[0_22px_48px_-10px_rgba(15,23,42,0.20),0_4px_16px_-4px_rgba(67,56,202,0.10),inset_0_1px_0_rgba(255,255,255,0.95)] px-4 py-4 space-y-4 text-xs text-slate-700 overflow-y-auto max-h-[calc(100vh-5.5rem)] edunova-fade-in"
           >
               <button
                 type="button"
@@ -975,9 +977,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 onFocus={onPreloadLogin}
                 onTouchStart={onPreloadLogin}
                 disabled={isOpeningLogin}
-                className="w-full py-3 px-4 bg-slate-900 hover:bg-indigo-700 disabled:opacity-80 text-white rounded-xl font-bold text-center flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                className="w-full py-3 px-4 bg-gradient-to-r from-slate-900 to-indigo-900 hover:from-indigo-700 hover:to-indigo-600 disabled:opacity-80 text-white rounded-xl border border-white/15 shadow-md shadow-indigo-950/20 font-bold text-center flex items-center justify-center gap-2 cursor-pointer transition-all"
               >
-                <Lock size={14} className="text-indigo-300" />
+                <Lock size={14} className="text-indigo-200" />
                 <span>{isOpeningLogin ? 'Ouverture de la connexion...' : 'Accéder à l’Espace Établissement'}</span>
               </button>
 
@@ -990,7 +992,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'academic')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <GraduationCap size={15} className="text-indigo-600" />
@@ -1001,7 +1003,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'parents')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <UserCheck size={15} className="text-indigo-600" />
@@ -1012,14 +1014,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
 
                 {/* Domaine 2 : Économat */}
-                <div className="space-y-1 pt-2 border-t border-slate-100">
+                <div className="space-y-1 pt-2 border-t border-slate-200/70">
                   <div className="px-2.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
                     Économat
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'finance')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <Wallet size={15} className="text-emerald-600" />
@@ -1030,7 +1032,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate('roi')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <TrendingUp size={15} className="text-emerald-600" />
@@ -1041,14 +1043,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
 
                 {/* Domaine 3 : Administration */}
-                <div className="space-y-1 pt-2 border-t border-slate-100">
+                <div className="space-y-1 pt-2 border-t border-slate-200/70">
                   <div className="px-2.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                     Administration
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'payroll')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <Users size={15} className="text-indigo-600" />
@@ -1059,7 +1061,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate('specialites')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <WifiOff size={15} className="text-indigo-600" />
@@ -1070,7 +1072,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate('testimonials')}
-                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-indigo-50/70 rounded-xl font-semibold flex items-center justify-between cursor-pointer transition-colors"
                   >
                     <span className="flex items-center gap-2.5">
                       <Star size={15} className="text-indigo-600" />
@@ -1081,7 +1083,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-200 space-y-2.5 text-[11px]">
+              <div className="pt-3 border-t border-slate-200/80 space-y-2.5 text-[11px]">
                 <div className="text-slate-500 flex items-center gap-1.5">
                   <MapPin size={12} className="text-indigo-600 shrink-0" />
                   <span>5, Christ-Roi, rue Acacia, prolongée, Port-au-Prince, Haïti</span>
@@ -1091,14 +1093,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     href={`https://wa.me/${contactConfig.whatsappNumber}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2.5 px-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold flex items-center justify-center gap-1.5 text-xs"
+                    className="py-2.5 px-3 rounded-xl bg-emerald-50/80 text-emerald-800 border border-emerald-200/80 font-bold flex items-center justify-center gap-1.5 text-xs"
                   >
                     <MessageCircle size={13} className="text-emerald-600" />
                     <span>WhatsApp</span>
                   </a>
                   <a
                     href="tel:+50933508416"
-                    className="py-2.5 px-3 rounded-lg bg-slate-100 text-slate-800 border border-slate-200 font-bold flex items-center justify-center gap-1.5 text-xs"
+                    className="py-2.5 px-3 rounded-xl bg-slate-100/80 text-slate-800 border border-slate-200/80 font-bold flex items-center justify-center gap-1.5 text-xs"
                   >
                     <Phone size={13} className="text-indigo-600" />
                     <span>3350-8416</span>
@@ -1112,10 +1114,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       {/* =========================================================================
           2. CORPS PRINCIPAL — ARCHITECTURE ÉDITORIALE & VITRINE INTERACTIVE
          ========================================================================= */}
-      <main className="pt-16 flex-grow">
+      <main className="pt-20 sm:pt-24 flex-grow">
         {/* HERO SECTION — SANS COUPURE DE TITRE + PHOTOGRAPHIE INSTITUTIONNELLE */}
-        <section className="relative pt-10 pb-14 sm:pt-14 sm:pb-16 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-b border-slate-200/80 overflow-hidden">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 lg:space-y-12">
+        <section className="relative pt-8 pb-14 sm:pt-10 sm:pb-16 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-b border-slate-200/80 overflow-hidden">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -top-24 right-0 w-[34rem] h-[22rem] bg-[radial-gradient(ellipse_at_center,_rgba(79,70,229,0.08),_transparent_70%)]"
+          />
+          <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 lg:space-y-12">
             {/* Grille Principale 12 Colonnes : Proposition & Photographie */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
               {/* Colonne Texte (7 cols) */}
