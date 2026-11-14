@@ -59,6 +59,65 @@ body {
   color: #0f172a;
 }
 
+@keyframes edunovaFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes edunovaFadeSlideUp {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes edunovaAuraDriftA {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate3d(40px, 24px, 0) scale(1.14) rotate(45deg); }
+}
+
+@keyframes edunovaAuraDriftB {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  50% { transform: translate3d(-40px, -24px, 0) scale(1.18) rotate(-45deg); }
+}
+
+@keyframes edunovaParticleFloat {
+  0% { opacity: 0; transform: translate3d(0, 0, 0) scale(0.4); }
+  45% { opacity: 0.22; transform: translate3d(var(--dx, 10px), -45px, 0) scale(1); }
+  100% { opacity: 0; transform: translate3d(var(--dx, 10px), -95px, 0) scale(0.4); }
+}
+
+.edunova-fade-in {
+  animation: edunovaFadeIn 160ms ease-out both;
+}
+
+.edunova-fade-slide-up {
+  animation: edunovaFadeSlideUp 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.edunova-aura-a {
+  animation: edunovaAuraDriftA 22s linear infinite;
+  will-change: transform;
+}
+
+.edunova-aura-b {
+  animation: edunovaAuraDriftB 26s linear infinite;
+  will-change: transform;
+}
+
+.edunova-particle {
+  animation: edunovaParticleFloat var(--dur, 7s) ease-in-out var(--delay, 0s) infinite;
+  will-change: transform, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edunova-fade-in,
+  .edunova-fade-slide-up,
+  .edunova-aura-a,
+  .edunova-aura-b,
+  .edunova-particle {
+    animation: none !important;
+  }
+}
+
 /* Ensure all select and option elements have dark high-contrast text on solid background */
 select, option {
   color: #0f172a !important;

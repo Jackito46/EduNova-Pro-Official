@@ -7557,15 +7557,66 @@ async function startServer() {
     app.use(vite.middlewares);
   } else {
     const distPath = path.join(process.cwd(), 'dist');
+
+    // Service direct des fichiers pré-compressés Brotli (.br) / Gzip (.gz) sur les assets statiques
+    const mimeByExt: Record<string, string> = {
+      '.js': 'application/javascript; charset=utf-8',
+      '.mjs': 'application/javascript; charset=utf-8',
+      '.css': 'text/css; charset=utf-8',
+      '.svg': 'image/svg+xml',
+      '.html': 'text/html; charset=utf-8',
+      '.json': 'application/json; charset=utf-8',
+      '.webmanifest': 'application/manifest+json; charset=utf-8'
+    };
+
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+      const reqPath = req.path === '/' ? '/index.html' : req.path;
+      const ext = path.extname(reqPath).toLowerCase();
+      if (!mimeByExt[ext] || reqPath.endsWith('/sw.js') || reqPath.endsWith('sw.js')) return next();
+
+      const safeRel = path.normalize(reqPath).replace(/^(\.\.(\/|\\|$))+/, '');
+      const baseFile = path.join(distPath, safeRel);
+      const acceptEncoding = String(req.headers['accept-encoding'] || '');
+
+      let encodedPath: string | null = null;
+      let encoding: 'br' | 'gzip' | null = null;
+      if (acceptEncoding.includes('br') && fs.existsSync(`${baseFile}.br`)) {
+        encodedPath = `${baseFile}.br`;
+        encoding = 'br';
+      } else if (acceptEncoding.includes('gzip') && fs.existsSync(`${baseFile}.gz`)) {
+        encodedPath = `${baseFile}.gz`;
+        encoding = 'gzip';
+      }
+
+      if (encodedPath && encoding) {
+        res.setHeader('Content-Encoding', encoding);
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Content-Type', mimeByExt[ext]);
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        if (reqPath.startsWith('/assets/') || reqPath.startsWith('/optimized/')) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        } else if (ext === '.html') {
+          res.setHeader('Cache-Control', 'no-cache, must-revalidate, max-age=0');
+        }
+        return res.sendFile(encodedPath);
+      }
+
+      // Compression dynamique Gzip/Brotli à la volée pour les fichiers HTML si non pré-compressés
+      return next();
+    });
+
     app.use(express.static(distPath, { 
       dotfiles: 'allow',
       setHeaders: (res, filePath) => {
         res.setHeader('Access-Control-Allow-Origin', '*');
-        if (filePath.endsWith('.html') || filePath.endsWith('sw.js') || filePath.endsWith('.webmanifest') || filePath.endsWith('.json') || filePath.includes('workbox')) {
+        if (filePath.endsWith('sw.js') || filePath.endsWith('.webmanifest') || filePath.endsWith('.json') || filePath.includes('workbox')) {
           res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
           res.setHeader('Pragma', 'no-cache');
           res.setHeader('Expires', '0');
-        } else if (filePath.includes('/assets/')) {
+        } else if (filePath.endsWith('.html')) {
+          res.setHeader('Cache-Control', 'no-cache, must-revalidate, max-age=0');
+        } else if (filePath.includes('/assets/') || filePath.includes('/optimized/')) {
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
       }
@@ -7582,10 +7633,22 @@ async function startServer() {
 
     app.get('*all', (req, res) => {
       res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate, max-age=0');
-      res.setHeader('Pragma', 'no-cache');
-      res.setHeader('Expires', '0');
-      res.sendFile(path.join(distPath, 'index.html'));
+      res.setHeader('Cache-Control', 'no-cache, must-revalidate, max-age=0');
+      const indexHtmlPath = path.join(distPath, 'index.html');
+      const acceptEncoding = String(req.headers['accept-encoding'] || '');
+      if (acceptEncoding.includes('br') && fs.existsSync(`${indexHtmlPath}.br`)) {
+        res.setHeader('Content-Encoding', 'br');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.sendFile(`${indexHtmlPath}.br`);
+      }
+      if (acceptEncoding.includes('gzip') && fs.existsSync(`${indexHtmlPath}.gz`)) {
+        res.setHeader('Content-Encoding', 'gzip');
+        res.setHeader('Vary', 'Accept-Encoding');
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.sendFile(`${indexHtmlPath}.gz`);
+      }
+      return res.sendFile(indexHtmlPath);
     });
   }
 

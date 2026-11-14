@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback, useRef, useTransition } from '
 import { HashRouter } from 'react-router-dom';
 import { ShieldAlert, RefreshCw, Clock } from 'lucide-react';
 import { Toaster, toast } from 'sonner';
-import { AnimatePresence, motion } from 'framer-motion';
 import { UserProfile, UserRole } from './types';
 import { supabase, clearAuthStorage, isRefreshTokenError, hasStoredAuthToken, purgeSelectiveSessionStorage, isUiPreferenceStorageKey } from './supabase';
 import { AuditLogger } from './utils/auditLogger';
@@ -1169,57 +1168,43 @@ const App: React.FC = () => {
       <ErrorBoundary>
         <Toaster position="top-center" richColors closeButton expand={false} />
         <React.Suspense fallback={<PublicRouteFallback target={publicView} />}>
-          <AnimatePresence mode="wait" initial={false}>
-            {publicView === 'landing' ? (
-              <motion.div
-                key="public-landing"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.14, ease: 'easeOut' }}
-              >
-                <PublicLandingPage
-                  onOpenLogin={() => switchPublicView('login')}
-                  onPreloadLogin={() => { void loadLogin(); }}
-                  isOpeningLogin={isViewTransitionPending && pendingPublicView === 'login'}
+          {publicView === 'landing' ? (
+            <div key="public-landing" className="edunova-fade-in">
+              <PublicLandingPage
+                onOpenLogin={() => switchPublicView('login')}
+                onPreloadLogin={() => { void loadLogin(); }}
+                isOpeningLogin={isViewTransitionPending && pendingPublicView === 'login'}
+              />
+            </div>
+          ) : (
+            <div key="public-login" className="edunova-fade-in">
+              <HashRouter>
+                <Login
+                  onLogin={(u) => {
+                    try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
+                    void loadAuthenticatedShell();
+                    if (window.location.hash !== '#/') {
+                      suppressHashSyncRef.current = true;
+                      window.location.hash = '#/';
+                      setTimeout(() => {
+                        suppressHashSyncRef.current = false;
+                      }, 0);
+                    }
+                    window.scrollTo({ top: 0, behavior: 'auto' });
+                    startViewTransition(() => {
+                      setUser(u);
+                      setLoading(false);
+                    });
+                  }}
+                  onReset={purgeSystemState}
+                  onBackToLanding={() => switchPublicView('landing')}
+                  onPreloadLanding={() => { void loadPublicLandingPage(); }}
+                  onLoginStart={() => { void loadAuthenticatedShell(); }}
+                  isReturningToLanding={isViewTransitionPending && pendingPublicView === 'landing'}
                 />
-              </motion.div>
-            ) : (
-              <motion.div
-                key="public-login"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.14, ease: 'easeOut' }}
-              >
-                <HashRouter>
-                  <Login
-                    onLogin={(u) => {
-                      try { window.sessionStorage.removeItem('edunova_login_in_progress'); } catch(e){}
-                      void loadAuthenticatedShell();
-                      if (window.location.hash !== '#/') {
-                        suppressHashSyncRef.current = true;
-                        window.location.hash = '#/';
-                        setTimeout(() => {
-                          suppressHashSyncRef.current = false;
-                        }, 0);
-                      }
-                      window.scrollTo({ top: 0, behavior: 'auto' });
-                      startViewTransition(() => {
-                        setUser(u);
-                        setLoading(false);
-                      });
-                    }}
-                    onReset={purgeSystemState}
-                    onBackToLanding={() => switchPublicView('landing')}
-                    onPreloadLanding={() => { void loadPublicLandingPage(); }}
-                    onLoginStart={() => { void loadAuthenticatedShell(); }}
-                    isReturningToLanding={isViewTransitionPending && pendingPublicView === 'landing'}
-                  />
-                </HashRouter>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              </HashRouter>
+            </div>
+          )}
         </React.Suspense>
       </ErrorBoundary>
     );

@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldCheck,
   Zap,
@@ -51,9 +50,6 @@ import {
   DemoFormValues
 } from '../utils/validation';
 import { signDemoRequestOnClient } from '../utils/demoRequestCrypto';
-import heroLeadershipImg from '../src/assets/images/edunova_hero_leadership_1794531327538.jpg';
-import bursarMobileImg from '../src/assets/images/edunova_bursar_mobile_1794531328203.jpg';
-import classroomExcellenceImg from '../src/assets/images/edunova_classroom_excellence_1794531328252.jpg';
 
 interface PublicLandingPageProps {
   onOpenLogin: () => void;
@@ -989,15 +985,10 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         </div>
 
         {/* Tiroir de Navigation Mobile */}
-        <AnimatePresence>
-          {mobileMenuOpen && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: 'auto' }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="lg:hidden bg-[#0A0F1D] border-b border-slate-800 px-4 py-4 space-y-4 text-xs text-slate-300 shadow-xl overflow-y-auto max-h-[calc(100vh-4rem)]"
-            >
+        {mobileMenuOpen && (
+          <div
+            className="lg:hidden bg-[#0A0F1D] border-b border-slate-800 px-4 py-4 space-y-4 text-xs text-slate-300 shadow-xl overflow-y-auto max-h-[calc(100vh-4rem)] edunova-fade-in"
+          >
               <button
                 type="button"
                 onClick={() => {
@@ -1138,9 +1129,8 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   </a>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        )}
       </header>
 
       {/* =========================================================================
@@ -1213,15 +1203,32 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               <div className="lg:col-span-5">
                 <div className="relative h-64 sm:h-80 lg:h-full min-h-[280px] rounded-2xl overflow-hidden border border-slate-200/90 shadow-md bg-slate-900">
                   {!heroImgFailed ? (
-                    <img
-                      src={heroLeadershipImg}
-                      alt="Direction et économat d'un établissement scolaire haïtien pilotant EduNova Pro"
-                      referrerPolicy="no-referrer"
-                      loading="eager"
-                      decoding="async"
-                      onError={() => setHeroImgFailed(true)}
-                      className="w-full h-full object-cover"
-                    />
+                    <picture className="block w-full h-full">
+                      <source
+                        type="image/avif"
+                        srcSet="/optimized/hero-leadership-480.avif 480w, /optimized/hero-leadership-960.avif 960w, /optimized/hero-leadership-1280.avif 1280w"
+                        sizes="(max-width: 1024px) 100vw, 42vw"
+                      />
+                      <source
+                        type="image/webp"
+                        srcSet="/optimized/hero-leadership-480.webp 480w, /optimized/hero-leadership-960.webp 960w, /optimized/hero-leadership-1280.webp 1280w"
+                        sizes="(max-width: 1024px) 100vw, 42vw"
+                      />
+                      <img
+                        src="/optimized/hero-leadership-960.jpg"
+                        srcSet="/optimized/hero-leadership-480.jpg 480w, /optimized/hero-leadership-960.jpg 960w, /optimized/hero-leadership-1280.jpg 1280w"
+                        sizes="(max-width: 1024px) 100vw, 42vw"
+                        alt="Direction et économat d'un établissement scolaire haïtien pilotant EduNova Pro"
+                        width={960}
+                        height={640}
+                        referrerPolicy="no-referrer"
+                        loading="eager"
+                        decoding="sync"
+                        fetchPriority="high"
+                        onError={() => setHeroImgFailed(true)}
+                        className="w-full h-full object-cover"
+                      />
+                    </picture>
                   ) : (
                     <div className="w-full h-full bg-gradient-to-br from-slate-800 via-indigo-950 to-slate-900 flex flex-col items-center justify-center p-6 text-center text-slate-300">
                       <Building2 size={36} className="text-amber-400 mb-3" />
@@ -1538,14 +1545,32 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
                 <div className="md:col-span-5 relative min-h-[220px] bg-slate-100">
                   {!bursarImgFailed ? (
-                    <img
-                      src={bursarMobileImg}
-                      alt="Confirmation de paiement scolaire mobile et reçu imprimé au guichet"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      onError={() => setBursarImgFailed(true)}
-                      className="w-full h-full object-cover"
-                    />
+                    <picture className="block w-full h-full">
+                      <source
+                        type="image/avif"
+                        srcSet="/optimized/bursar-mobile-480.avif 480w, /optimized/bursar-mobile-960.avif 960w"
+                        sizes="(max-width: 768px) 100vw, 32vw"
+                      />
+                      <source
+                        type="image/webp"
+                        srcSet="/optimized/bursar-mobile-480.webp 480w, /optimized/bursar-mobile-960.webp 960w"
+                        sizes="(max-width: 768px) 100vw, 32vw"
+                      />
+                      <img
+                        src="/optimized/bursar-mobile-960.jpg"
+                        srcSet="/optimized/bursar-mobile-480.jpg 480w, /optimized/bursar-mobile-960.jpg 960w"
+                        sizes="(max-width: 768px) 100vw, 32vw"
+                        alt="Confirmation de paiement scolaire mobile et reçu imprimé au guichet"
+                        width={640}
+                        height={427}
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
+                        onError={() => setBursarImgFailed(true)}
+                        className="w-full h-full object-cover"
+                      />
+                    </picture>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-700 p-6">
                       <Wallet size={36} />
@@ -1614,14 +1639,32 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs grid grid-cols-1 md:grid-cols-12">
                 <div className="md:col-span-5 relative min-h-[220px] bg-slate-100 order-2 md:order-1">
                   {!classroomImgFailed ? (
-                    <img
-                      src={classroomExcellenceImg}
-                      alt="Élèves et enseignante en classe travaillant sur les programmes académiques"
-                      referrerPolicy="no-referrer"
-                      loading="lazy"
-                      onError={() => setClassroomImgFailed(true)}
-                      className="w-full h-full object-cover"
-                    />
+                    <picture className="block w-full h-full">
+                      <source
+                        type="image/avif"
+                        srcSet="/optimized/classroom-excellence-480.avif 480w, /optimized/classroom-excellence-960.avif 960w"
+                        sizes="(max-width: 768px) 100vw, 32vw"
+                      />
+                      <source
+                        type="image/webp"
+                        srcSet="/optimized/classroom-excellence-480.webp 480w, /optimized/classroom-excellence-960.webp 960w"
+                        sizes="(max-width: 768px) 100vw, 32vw"
+                      />
+                      <img
+                        src="/optimized/classroom-excellence-960.jpg"
+                        srcSet="/optimized/classroom-excellence-480.jpg 480w, /optimized/classroom-excellence-960.jpg 960w"
+                        sizes="(max-width: 768px) 100vw, 32vw"
+                        alt="Élèves et enseignante en classe travaillant sur les programmes académiques"
+                        width={640}
+                        height={427}
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
+                        onError={() => setClassroomImgFailed(true)}
+                        className="w-full h-full object-cover"
+                      />
+                    </picture>
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-indigo-50 text-indigo-700 p-6">
                       <GraduationCap size={36} />
@@ -2931,22 +2974,17 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
 
       {/* Boutons Flottants Sobres (WhatsApp & Retour en Haut) */}
       <div className="fixed bottom-5 right-5 z-40 flex flex-col items-center gap-2.5">
-        <AnimatePresence>
-          {scrolled && (
-            <motion.button
-              type="button"
-              initial={{ opacity: 0, scale: 0.85, y: 8 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.85, y: 8 }}
-              onClick={scrollToTop}
-              className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 shadow-lg flex items-center justify-center transition-transform cursor-pointer hover:scale-105"
-              aria-label="Retour en haut de la page"
-              title="Retour en haut"
-            >
-              <ArrowUp size={17} />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        {scrolled && (
+          <button
+            type="button"
+            onClick={scrollToTop}
+            className="w-10 h-10 rounded-full bg-slate-900 hover:bg-slate-800 text-white border border-slate-700 shadow-lg flex items-center justify-center transition-transform cursor-pointer hover:scale-105 edunova-fade-in"
+            aria-label="Retour en haut de la page"
+            title="Retour en haut"
+          >
+            <ArrowUp size={17} />
+          </button>
+        )}
 
         <a
           href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite des informations pour notre établissement.')}`}

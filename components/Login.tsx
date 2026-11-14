@@ -4,7 +4,6 @@ import { supabase, checkSupabaseConnection, isRefreshTokenError, clearAuthStorag
 import { AuditLogger } from '../utils/auditLogger';
 import { normalizeIdentifier, containsSuspiciousPattern, validateCredentialsSanity } from '../utils/authHelpers';
 import { Wifi, WifiOff, Loader2, RefreshCw, Mail, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, AlertCircle, ChevronLeft, CheckCircle2, ShieldAlert, Sparkles, Clock, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
 import Logo from './Logo';
 import FormFooter from './FormFooter';
 import { toast } from 'sonner';
@@ -122,26 +121,51 @@ const Login: React.FC<LoginProps> = ({
       }
     } catch (e) {}
 
-    // Load security settings & maintenance mode
+    // Lecture immédiate depuis cache session (5 min) puis rafraîchissement non-bloquant
+    const POLICY_CACHE_KEY = 'edunova_login_policy_cache';
+    try {
+      const cachedRaw = window.sessionStorage.getItem(POLICY_CACHE_KEY);
+      if (cachedRaw) {
+        const parsed = JSON.parse(cachedRaw);
+        if (parsed && typeof parsed.expiresAt === 'number' && Date.now() < parsed.expiresAt) {
+          if (parsed.securitySettings) setSecuritySettings(parsed.securitySettings);
+          if (typeof parsed.maintenanceMode === 'boolean') setMaintenanceMode(parsed.maintenanceMode);
+          return;
+        }
+      }
+    } catch {}
+
     const loadSettings = async () => {
       try {
         const { data } = await supabase.from('global_settings').select('key, value').in('key', ['security_policy', 'system_status']);
         if (data) {
+          let nextSec = { maxFailedAttempts: 3, lockoutDurationMinutes: 10 };
+          let nextMaint = false;
           const sec = data.find(i => i.key === 'security_policy');
           if (sec && sec.value) {
-            setSecuritySettings({
+            nextSec = {
               maxFailedAttempts: sec.value.max_failed_attempts || 3,
               lockoutDurationMinutes: sec.value.lockout_duration_minutes || 10
-            });
+            };
+            setSecuritySettings(nextSec);
           }
           const status = data.find(i => i.key === 'system_status');
           if (status && status.value && status.value.maintenance_mode) {
+            nextMaint = true;
             setMaintenanceMode(true);
           }
+          try {
+            window.sessionStorage.setItem(POLICY_CACHE_KEY, JSON.stringify({
+              expiresAt: Date.now() + 5 * 60 * 1000,
+              securitySettings: nextSec,
+              maintenanceMode: nextMaint
+            }));
+          } catch {}
         }
       } catch (e) {}
     };
-    loadSettings();
+    const timer = window.setTimeout(loadSettings, 200);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const testConnection = async () => {
@@ -516,61 +540,32 @@ const Login: React.FC<LoginProps> = ({
 
   return (
     <div className="min-h-screen bg-white flex items-center justify-center p-4 relative overflow-y-auto font-sans">
-      {/* Magical Animated Background */}
+      {/* Lightweight CSS Animated Background (GPU-composited) */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden bg-slate-50">
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.2, 1],
-            rotate: [0, 90, 0],
-            x: [0, 100, 0],
-            y: [0, 50, 0]
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-          className="absolute -top-[20%] -left-[10%] w-[80%] h-[80%] bg-indigo-500/5 rounded-full blur-[120px]"
+        <div
+          className="edunova-aura-a absolute -top-[20%] -left-[10%] w-[80%] h-[80%] bg-indigo-500/5 rounded-full blur-[120px]"
         />
-        <motion.div 
-          animate={{ 
-            scale: [1, 1.3, 1],
-            rotate: [0, -90, 0],
-            x: [0, -100, 0],
-            y: [0, -50, 0]
-          }}
-          transition={{ duration: 25, repeat: Infinity, ease: "linear" }}
-          className="absolute -bottom-[20%] -right-[10%] w-[80%] h-[80%] bg-blue-500/5 rounded-full blur-[120px]"
+        <div
+          className="edunova-aura-b absolute -bottom-[20%] -right-[10%] w-[80%] h-[80%] bg-blue-500/5 rounded-full blur-[120px]"
         />
-        
+
         {/* Floating Particles */}
         {LOGIN_PARTICLES.map((particle, i) => (
-          <motion.div
+          <div
             key={i}
-            initial={{ opacity: 0, scale: 0 }}
-            animate={{ 
-              opacity: [0, 0.2, 0],
-              scale: [0, 1, 0],
-              y: [-20, -100],
-              x: particle.dx
-            }}
-            transition={{ 
-              duration: particle.duration, 
-              repeat: Infinity, 
-              delay: particle.delay,
-              ease: "easeInOut"
-            }}
-            className="absolute w-1 h-1 bg-indigo-400 rounded-full blur-[1px]"
-            style={{ 
-              left: particle.left, 
-              top: particle.top 
+            className="edunova-particle absolute w-1 h-1 bg-indigo-400 rounded-full blur-[1px]"
+            style={{
+              left: particle.left,
+              top: particle.top,
+              ['--dx' as any]: `${particle.dx}px`,
+              ['--dur' as any]: `${particle.duration}s`,
+              ['--delay' as any]: `${particle.delay}s`
             }}
           />
         ))}
       </div>
 
-      <motion.div 
-        initial={{ opacity: 0, y: 30 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ type: "spring", damping: 25, stiffness: 100 }}
-        className="max-w-md w-full relative z-10"
-      >
+      <div className="max-w-md w-full relative z-10 edunova-fade-slide-up">
         <div className="bg-white/90 backdrop-blur-2xl rounded-3xl shadow-[0_20px_60px_-15px_rgba(30,58,138,0.12),0_10px_25px_-10px_rgba(0,0,0,0.05)] overflow-hidden border border-slate-100/90 transition-all duration-500">
           <div className="p-6 sm:p-8 md:p-9">
             
@@ -598,17 +593,10 @@ const Login: React.FC<LoginProps> = ({
             )}
 
             {/* Header Section */}
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.1, type: "spring" }}
-              className="flex flex-col items-center mb-6"
-            >
+            <div className="flex flex-col items-center mb-6 edunova-fade-in">
               <div className="mb-3 relative group">
-                <motion.div 
-                  animate={{ scale: [1, 1.12, 1], opacity: [0.25, 0.5, 0.25] }}
-                  transition={{ duration: 4, repeat: Infinity }}
-                  className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-2xl" 
+                <div
+                  className="absolute inset-0 bg-blue-500/20 blur-2xl rounded-2xl animate-pulse"
                 />
                 <Logo 
                   src="/logo.webp" 
@@ -623,17 +611,11 @@ const Login: React.FC<LoginProps> = ({
               <p className="text-slate-500 text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.25em] text-center">
                 {isForgotPassword ? "Réinitialisation" : "Gestion Académique & Universitaire"}
               </p>
-            </motion.div>
-
-
+            </div>
 
             {/* Maintenance Mode Banner */}
             {maintenanceMode && (
-              <motion.div 
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-5 p-3.5 bg-amber-50 border border-amber-200/70 rounded-xl flex items-center gap-3 shadow-sm"
-              >
+              <div className="mb-5 p-3.5 bg-amber-50 border border-amber-200/70 rounded-xl flex items-center gap-3 shadow-sm edunova-fade-in">
                 <div className="w-8 h-8 bg-amber-100 text-amber-600 rounded-lg flex items-center justify-center shrink-0">
                   <ShieldCheck size={18} />
                 </div>
@@ -643,18 +625,12 @@ const Login: React.FC<LoginProps> = ({
                     Seuls les Super Administrateurs peuvent se connecter. Les accès standards sont temporairement suspendus.
                   </p>
                 </div>
-              </motion.div>
+              </div>
             )}
 
             {/* Reassuring Session Inactivity / Security Notice */}
-            <AnimatePresence mode="wait">
-              {sessionNotice && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-5"
-                >
+            {sessionNotice && (
+              <div className="mb-5 edunova-fade-in">
                   <div className="p-3.5 bg-blue-50/90 border border-blue-200/90 rounded-xl flex items-start gap-3 shadow-2xs">
                     <div className="p-1.5 rounded-lg bg-blue-100 text-blue-700 shrink-0 mt-0.5">
                       <Clock size={16} className="stroke-[2.2]" />
@@ -681,19 +657,12 @@ const Login: React.FC<LoginProps> = ({
                       </p>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+              </div>
+            )}
 
             {/* Error Message */}
-            <AnimatePresence mode="wait">
-              {error && (
-                <motion.div 
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: 'auto' }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mb-5"
-                >
+            {error && (
+              <div className="mb-5 edunova-fade-in">
                   <div className="p-3.5 bg-rose-50 border border-rose-200/90 rounded-xl flex flex-col gap-2">
                     <div className="flex items-start gap-2.5">
                       <AlertCircle className="text-rose-600 shrink-0 mt-0.5" size={16} />
@@ -776,16 +745,13 @@ const Login: React.FC<LoginProps> = ({
                       </div>
                     </div>
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+              </div>
+            )}
 
             {isForgotPassword ? (
-              <motion.form 
-                initial={{ opacity: 0, x: 20 }}
-                animate={{ opacity: 1, x: 0 }}
-                onSubmit={handleResetPassword} 
-                className="space-y-4"
+              <form
+                onSubmit={handleResetPassword}
+                className="space-y-4 edunova-fade-in"
               >
                 {resetSent ? (
                   <div className="bg-emerald-50 p-5 rounded-2xl border border-emerald-100 text-center">
@@ -848,13 +814,11 @@ const Login: React.FC<LoginProps> = ({
                     </button>
                   </>
                 )}
-              </motion.form>
+              </form>
             ) : (
-              <motion.form 
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                onSubmit={handleSubmit} 
-                className="space-y-4"
+              <form
+                onSubmit={handleSubmit}
+                className="space-y-4 edunova-fade-in"
               >
                 <div className="space-y-1.5">
                   <label className="text-xs font-bold text-slate-700 ml-1">Identifiant ou Email</label>
@@ -923,15 +887,10 @@ const Login: React.FC<LoginProps> = ({
                   </button>
 
                   {/* Explicit Progression & Live Memo during Submission */}
-                  <AnimatePresence>
-                    {isSubmitting && (
-                      <motion.div
-                        initial={{ opacity: 0, y: 8, scale: 0.98 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: -8, scale: 0.98 }}
-                        transition={{ duration: 0.25 }}
-                        className="p-4 rounded-2xl bg-blue-50/90 border border-blue-200/80 shadow-xs space-y-3"
-                      >
+                  {isSubmitting && (
+                    <div
+                      className="p-4 rounded-2xl bg-blue-50/90 border border-blue-200/80 shadow-xs space-y-3 edunova-fade-in"
+                    >
                         <div className="flex items-center justify-between">
                           <span className="text-[11px] font-bold text-blue-900 uppercase tracking-wider flex items-center gap-1.5">
                             <span className="w-2 h-2 rounded-full bg-blue-600 animate-ping" />
@@ -976,18 +935,17 @@ const Login: React.FC<LoginProps> = ({
                             Annuler
                           </button>
                         </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
+                    </div>
+                  )}
                 </div>
-              </motion.form>
+              </form>
             )}
 
           </div>
         </div>
         
         <FormFooter className="mt-3" />
-      </motion.div>
+      </div>
     </div>
   );
 };

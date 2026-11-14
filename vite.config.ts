@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -34,6 +35,34 @@ function renderServiceWorkerHashPlugin(deployHash: string, buildTimestamp: strin
         }
       }
 
+      // Pré-compression statique Brotli (.br) et Gzip (.gz) des assets textuels compilés (> 1 Ko)
+      try {
+        const compressibleExts = new Set(['.js', '.css', '.html', '.svg', '.json', '.webmanifest']);
+        const walkCompress = (dir: string) => {
+          if (!fs.existsSync(dir)) return;
+          for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+            const fullPath = path.join(dir, entry.name);
+            if (entry.isDirectory()) {
+              walkCompress(fullPath);
+            } else if (entry.isFile()) {
+              const ext = path.extname(entry.name).toLowerCase();
+              if (!compressibleExts.has(ext) || entry.name === 'sw.js') continue;
+              const buf = fs.readFileSync(fullPath);
+              if (buf.length < 1024) continue;
+              const br = zlib.brotliCompressSync(buf, {
+                params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 6 }
+              });
+              const gz = zlib.gzipSync(buf, { level: 7 });
+              if (br.length < buf.length) fs.writeFileSync(`${fullPath}.br`, br);
+              if (gz.length < buf.length) fs.writeFileSync(`${fullPath}.gz`, gz);
+            }
+          }
+        };
+        walkCompress(distDir);
+      } catch (compErr) {
+        console.warn('⚠️ [Vite Build] Pré-compression .br/.gz ignorée:', compErr);
+      }
+
       // Synchronisation universelle des artefacts (dist -> build & .output/public)
       try {
         const buildDir = path.resolve(__dirname, 'build');
@@ -42,7 +71,7 @@ function renderServiceWorkerHashPlugin(deployHash: string, buildTimestamp: strin
           fs.cpSync(distDir, buildDir, { recursive: true });
           fs.mkdirSync(outputPublicDir, { recursive: true });
           fs.cpSync(distDir, outputPublicDir, { recursive: true });
-          console.log('✅ [Vite Build] Artefacts synchronisés vers dist/, build/ et .output/public');
+          console.log('✅ [Vite Build] Artefacts synchronisés (avec .br/.gz) vers dist/, build/ et .output/public');
         }
       } catch (err) {
         console.warn('⚠️ [Vite Build] Notice synchronisation artefacts:', err);
@@ -100,7 +129,8 @@ export default defineConfig(({ mode }) => {
               (d) =>
                 !d.includes('vendor-pdf') &&
                 !d.includes('vendor-charts') &&
-                !d.includes('vendor-xlsx')
+                !d.includes('vendor-xlsx') &&
+                !d.includes('vendor-motion')
             )
         },
         rollupOptions: {
@@ -384,8 +414,9 @@ export default defineConfig(({ mode }) => {
             ]
           },
           injectManifest: {
-            maximumFileSizeToCacheInBytes: 25000000,
-            globPatterns: ['**/*.{js,css,html,ico,png,svg,webp}']
+            maximumFileSizeToCacheInBytes: 3000000,
+            globPatterns: ['**/*.{js,css,html,ico,svg,webp}', 'pwa-*.png', 'apple-touch-icon.png', 'favicon*.png', 'logo.png'],
+            globIgnores: ['**/assets/aistudio/**', '**/optimized/**', '**/*.mp4', '**/*.br', '**/*.gz']
           },
           devOptions: {
             enabled: false,
