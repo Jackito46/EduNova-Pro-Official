@@ -622,7 +622,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
     setTimeout(() => {
       const element = document.getElementById(targetId);
       if (element) {
-        const headerOffset = 92;
+        const headerOffset = 76;
         const elementPosition = element.getBoundingClientRect().top;
         const offsetPosition = elementPosition + window.pageYOffset - headerOffset;
         window.scrollTo({
@@ -646,59 +646,17 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       style={{ fontFamily: "'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" }}
     >
       {/* =========================================================================
-          1. EN-TÊTE INSTITUTIONNEL & BARRE DE NAVIGATION ÉPURÉE (3 ZONES)
+          1. EN-TÊTE INSTITUTIONNEL & BARRE DE NAVIGATION ÉPURÉE (1 LIGNE · 3 ZONES)
          ========================================================================= */}
       <header
-        className={`fixed top-0 inset-x-0 z-50 bg-[#0B132B]/95 backdrop-blur-md text-slate-100 border-b border-slate-800/90 transition-shadow duration-200 ${
-          scrolled ? 'shadow-xl shadow-black/25' : 'shadow-sm'
+        className={`fixed top-0 inset-x-0 z-50 transition-all duration-200 border-b ${
+          scrolled
+            ? 'bg-white/95 backdrop-blur-md border-slate-200/90 shadow-sm shadow-slate-900/5'
+            : 'bg-white/85 backdrop-blur-md border-slate-200/60'
         }`}
       >
-        {/* Bandeau Supérieur d'Informations (masqué sur mobile pour respecter la hauteur max) */}
-        <div className="hidden md:block bg-[#060B18] text-slate-300 border-b border-slate-800/80 py-1.5 px-6 lg:px-8 text-[11px]">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-6">
-            <div className="flex items-center gap-5">
-              <div className="flex items-center gap-1.5 text-slate-300">
-                <MapPin size={12} className="text-amber-400 shrink-0" />
-                <span className="font-medium whitespace-nowrap">
-                  5, Christ-Roi, rue Acacia, prolongée, Port-au-Prince, Haïti
-                </span>
-              </div>
-
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Phone size={12} className="text-amber-400 shrink-0" />
-                <a
-                  href={`https://wa.me/${contactConfig.whatsappNumber}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-semibold text-white hover:text-amber-300 transition-colors font-mono tabular-nums"
-                >
-                  {contactConfig.whatsappDisplay}
-                </a>
-                <span className="text-slate-600">/</span>
-                <a
-                  href="tel:+50933508416"
-                  className="font-semibold text-white hover:text-amber-300 transition-colors font-mono tabular-nums"
-                >
-                  {contactConfig.secondaryPhoneDisplay}
-                </a>
-              </div>
-
-              <div className="hidden xl:flex items-center gap-1.5 text-slate-300 shrink-0">
-                <Mail size={12} className="text-amber-400 shrink-0" />
-                <a href={`mailto:${contactConfig.displayEmail}`} className="hover:text-amber-300 transition-colors">
-                  {contactConfig.displayEmail}
-                </a>
-              </div>
-            </div>
-
-            <div className="text-amber-300 font-semibold italic select-none text-[11px] tracking-wide shrink-0">
-              « L&apos;Excellence Académique à votre Portée »
-            </div>
-          </div>
-        </div>
-
         {/* Barre Principale de Navigation — Contrat Strict 3 Zones */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-14 sm:h-16 flex items-center justify-between gap-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-6">
           {/* ZONE 1 : Marque seule sur une ligne (sans badges ni sous-titres parasites) */}
           <button
             type="button"
@@ -706,16 +664,16 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             className="flex items-center gap-2.5 cursor-pointer select-none group shrink-0 text-left"
           >
             <Logo size="sm" className="w-8 h-8 transition-transform duration-200 group-hover:scale-105 shrink-0" />
-            <span className="text-lg font-extrabold tracking-tight text-white whitespace-nowrap shrink-0">
-              EduNova <span className="text-amber-400">Pro</span>
+            <span className="text-lg font-extrabold tracking-tight text-slate-900 whitespace-nowrap shrink-0">
+              EduNova <span className="text-indigo-700">Pro</span>
             </span>
           </button>
 
-          {/* ZONE 2 : Navigation Regroupée par Domaines (Académique, Économat, Administration) */}
+          {/* ZONE 2 : Navigation Regroupée par Domaines (Palette Unifiée & Lisible) */}
           <nav
             ref={navRef}
             aria-label="Navigation principale par domaines"
-            className="hidden lg:flex items-center gap-5 xl:gap-7 text-[13px] font-medium text-slate-300"
+            className="hidden lg:flex items-center gap-1 xl:gap-2 text-[13px] font-semibold text-slate-600"
           >
             {/* Domaine 1 : Académique */}
             <div
@@ -728,58 +686,64 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'academic'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'academic' ? null : 'academic')}
-                className={`py-1.5 flex items-center gap-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'academic'
-                    ? 'text-white border-indigo-400'
-                    : 'text-slate-300 hover:text-white border-transparent hover:border-indigo-400'
+                    ? 'text-indigo-700 bg-indigo-50/80'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                 }`}
               >
                 <span>Académique</span>
                 <ChevronDown
-                  size={13}
+                  size={14}
                   className={`transition-transform duration-150 ${
-                    openNavGroup === 'academic' ? 'rotate-180 text-indigo-400' : 'text-slate-400'
+                    openNavGroup === 'academic' ? 'rotate-180 text-indigo-600' : 'text-slate-400'
                   }`}
                 />
               </button>
 
               {openNavGroup === 'academic' && (
-                <div className="absolute left-0 top-full pt-2 w-72 z-50">
-                  <div className="bg-[#0B132B] border border-slate-700/80 rounded-xl shadow-2xl p-2 space-y-1">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                <div className="absolute left-0 top-full pt-2 w-76 z-50">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 p-2 space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Pôle Académique &amp; Pédagogie
                     </div>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'academic')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <GraduationCap size={15} className="text-indigo-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                        <GraduationCap size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Bulletins &amp; Palmarès</div>
-                        <div className="text-[11px] text-slate-400">Notes, moyennes, rangs &amp; relevés LMD</div>
+                        <div className="text-xs font-bold text-slate-900">Bulletins &amp; Palmarès</div>
+                        <div className="text-[11px] text-slate-500">Notes, moyennes, rangs &amp; relevés LMD</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleNavigate('specialites')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <BookOpen size={15} className="text-indigo-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                        <BookOpen size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Cycles Scolaires &amp; Universitaires</div>
-                        <div className="text-[11px] text-slate-400">De la maternelle aux facultés (MENFP &amp; LMD)</div>
+                        <div className="text-xs font-bold text-slate-900">Cycles Scolaires &amp; Universitaires</div>
+                        <div className="text-[11px] text-slate-500">De la maternelle aux facultés (MENFP &amp; LMD)</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'parents')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <UserCheck size={15} className="text-indigo-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-100 transition-colors">
+                        <UserCheck size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Portail Parents &amp; Étudiants</div>
-                        <div className="text-[11px] text-slate-400">Suivi des résultats, absences &amp; échéances</div>
+                        <div className="text-xs font-bold text-slate-900">Portail Parents &amp; Étudiants</div>
+                        <div className="text-[11px] text-slate-500">Suivi des résultats, absences &amp; échéances</div>
                       </div>
                     </button>
                   </div>
@@ -798,58 +762,64 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'finance'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'finance' ? null : 'finance')}
-                className={`py-1.5 flex items-center gap-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'finance'
-                    ? 'text-white border-emerald-400'
-                    : 'text-slate-300 hover:text-white border-transparent hover:border-emerald-400'
+                    ? 'text-indigo-700 bg-indigo-50/80'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                 }`}
               >
                 <span>Économat</span>
                 <ChevronDown
-                  size={13}
+                  size={14}
                   className={`transition-transform duration-150 ${
-                    openNavGroup === 'finance' ? 'rotate-180 text-emerald-400' : 'text-slate-400'
+                    openNavGroup === 'finance' ? 'rotate-180 text-indigo-600' : 'text-slate-400'
                   }`}
                 />
               </button>
 
               {openNavGroup === 'finance' && (
-                <div className="absolute left-0 top-full pt-2 w-72 z-50">
-                  <div className="bg-[#0B132B] border border-slate-700/80 rounded-xl shadow-2xl p-2 space-y-1">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                <div className="absolute left-0 top-full pt-2 w-76 z-50">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 p-2 space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Pôle Économat &amp; Trésorerie
                     </div>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'finance')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <Wallet size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                        <Wallet size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Caisses Bidevises (HTG &amp; USD)</div>
-                        <div className="text-[11px] text-slate-400">Scolarité, soldes individuels &amp; clôtures PDF</div>
+                        <div className="text-xs font-bold text-slate-900">Caisses Bidevises (HTG &amp; USD)</div>
+                        <div className="text-[11px] text-slate-500">Scolarité, soldes individuels &amp; clôtures PDF</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'finance')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <Smartphone size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                        <Smartphone size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Encaissements Mobiles &amp; Guichet</div>
-                        <div className="text-[11px] text-slate-400">Règlements numériques directs &amp; reçus certifiés</div>
+                        <div className="text-xs font-bold text-slate-900">Encaissements Mobiles &amp; Guichet</div>
+                        <div className="text-[11px] text-slate-500">Règlements numériques directs &amp; reçus certifiés</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleNavigate('roi')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <Calculator size={15} className="text-emerald-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 group-hover:bg-emerald-100 transition-colors">
+                        <Calculator size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Simulateur de Recouvrement</div>
-                        <div className="text-[11px] text-slate-400">Estimez vos économies et créances récupérées</div>
+                        <div className="text-xs font-bold text-slate-900">Simulateur de Recouvrement</div>
+                        <div className="text-[11px] text-slate-500">Estimez vos économies et créances récupérées</div>
                       </div>
                     </button>
                   </div>
@@ -868,58 +838,64 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 aria-expanded={openNavGroup === 'admin'}
                 aria-haspopup="true"
                 onClick={() => setOpenNavGroup(openNavGroup === 'admin' ? null : 'admin')}
-                className={`py-1.5 flex items-center gap-1 border-b-2 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                className={`px-3 py-2 rounded-lg flex items-center gap-1.5 transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                   openNavGroup === 'admin'
-                    ? 'text-white border-amber-400'
-                    : 'text-slate-300 hover:text-white border-transparent hover:border-amber-400'
+                    ? 'text-indigo-700 bg-indigo-50/80'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
                 }`}
               >
                 <span>Administration</span>
                 <ChevronDown
-                  size={13}
+                  size={14}
                   className={`transition-transform duration-150 ${
-                    openNavGroup === 'admin' ? 'rotate-180 text-amber-400' : 'text-slate-400'
+                    openNavGroup === 'admin' ? 'rotate-180 text-indigo-600' : 'text-slate-400'
                   }`}
                 />
               </button>
 
               {openNavGroup === 'admin' && (
-                <div className="absolute left-0 top-full pt-2 w-72 z-50">
-                  <div className="bg-[#0B132B] border border-slate-700/80 rounded-xl shadow-2xl p-2 space-y-1">
-                    <div className="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                <div className="absolute left-0 top-full pt-2 w-76 z-50">
+                  <div className="bg-white border border-slate-200/90 rounded-2xl shadow-xl shadow-slate-900/10 p-2 space-y-1">
+                    <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                       Direction, RH &amp; Déploiement
                     </div>
                     <button
                       type="button"
                       onClick={() => handleNavigate('modules', 'payroll')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <Users size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                        <Users size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Salaires, Vacataires &amp; RH</div>
-                        <div className="text-[11px] text-slate-400">Heures de cours, avances &amp; fiches de paie</div>
+                        <div className="text-xs font-bold text-slate-900">Salaires, Vacataires &amp; RH</div>
+                        <div className="text-[11px] text-slate-500">Heures de cours, avances &amp; fiches de paie</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleNavigate('specialites')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <WifiOff size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                        <WifiOff size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Continuité Hors-Ligne &amp; Sécurité</div>
-                        <div className="text-[11px] text-slate-400">Tolérance aux coupures &amp; isolation des données</div>
+                        <div className="text-xs font-bold text-slate-900">Continuité Hors-Ligne &amp; Sécurité</div>
+                        <div className="text-[11px] text-slate-500">Tolérance aux coupures &amp; isolation des données</div>
                       </div>
                     </button>
                     <button
                       type="button"
                       onClick={() => handleNavigate('demo')}
-                      className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-800/80 transition-colors flex items-start gap-2.5 cursor-pointer"
+                      className="w-full text-left px-3 py-2.5 rounded-xl hover:bg-slate-50 transition-colors flex items-start gap-3 cursor-pointer group"
                     >
-                      <Building2 size={15} className="text-amber-400 shrink-0 mt-0.5" />
+                      <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 flex items-center justify-center shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-700 transition-colors">
+                        <Building2 size={16} />
+                      </div>
                       <div>
-                        <div className="text-xs font-bold text-white">Migration Excel &amp; Démo</div>
-                        <div className="text-[11px] text-slate-400">Mise en service accompagnée en 48h</div>
+                        <div className="text-xs font-bold text-slate-900">Migration Excel &amp; Démo</div>
+                        <div className="text-[11px] text-slate-500">Mise en service accompagnée en 48h</div>
                       </div>
                     </button>
                   </div>
@@ -930,7 +906,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('roi')}
-              className="py-1.5 text-slate-300 hover:text-white border-b-2 border-transparent hover:border-amber-400 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               Simulateur
             </button>
@@ -938,7 +914,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
             <button
               type="button"
               onClick={() => handleNavigate('testimonials')}
-              className="py-1.5 text-slate-300 hover:text-white border-b-2 border-transparent hover:border-amber-400 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-2 rounded-lg text-slate-600 hover:text-slate-900 hover:bg-slate-100/70 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
             >
               Témoignages
             </button>
@@ -953,9 +929,9 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               onFocus={onPreloadLogin}
               onTouchStart={onPreloadLogin}
               disabled={isOpeningLogin}
-              className="px-4 py-2 text-xs font-bold text-slate-950 bg-amber-400 hover:bg-amber-300 active:scale-[0.98] disabled:opacity-80 rounded-lg transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 shadow-xs"
+              className="px-4 py-2 text-xs font-bold text-white bg-slate-900 hover:bg-indigo-700 active:scale-[0.98] disabled:opacity-80 rounded-lg transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0 shadow-xs"
             >
-              <Lock size={13} className="text-slate-900 shrink-0" />
+              <Lock size={13} className="text-indigo-300 shrink-0" />
               <span>{isOpeningLogin ? 'Ouverture...' : 'Connexion'}</span>
             </button>
           </div>
@@ -969,14 +945,14 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
               onFocus={onPreloadLogin}
               onTouchStart={onPreloadLogin}
               disabled={isOpeningLogin}
-              className="px-3 py-1.5 text-xs font-bold text-slate-950 bg-amber-400 disabled:opacity-80 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
+              className="px-3 py-1.5 text-xs font-bold text-white bg-slate-900 hover:bg-indigo-700 disabled:opacity-80 rounded-lg whitespace-nowrap shrink-0 cursor-pointer"
             >
               {isOpeningLogin ? 'Ouverture...' : 'Connexion'}
             </button>
             <button
               type="button"
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="p-2 text-slate-300 hover:text-white hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+              className="p-2 text-slate-700 hover:text-slate-950 hover:bg-slate-100 rounded-lg cursor-pointer transition-colors"
               aria-label="Ouvrir le menu de navigation"
             >
               {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -987,7 +963,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
         {/* Tiroir de Navigation Mobile */}
         {mobileMenuOpen && (
           <div
-            className="lg:hidden bg-[#0A0F1D] border-b border-slate-800 px-4 py-4 space-y-4 text-xs text-slate-300 shadow-xl overflow-y-auto max-h-[calc(100vh-4rem)] edunova-fade-in"
+            className="lg:hidden bg-white border-b border-slate-200 px-4 py-4 space-y-4 text-xs text-slate-700 shadow-xl overflow-y-auto max-h-[calc(100vh-4rem)] edunova-fade-in"
           >
               <button
                 type="button"
@@ -999,132 +975,132 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 onFocus={onPreloadLogin}
                 onTouchStart={onPreloadLogin}
                 disabled={isOpeningLogin}
-                className="w-full py-2.5 px-4 bg-amber-400 hover:bg-amber-300 disabled:opacity-80 text-slate-950 rounded-lg font-bold text-center flex items-center justify-center gap-2 cursor-pointer transition-colors"
+                className="w-full py-3 px-4 bg-slate-900 hover:bg-indigo-700 disabled:opacity-80 text-white rounded-xl font-bold text-center flex items-center justify-center gap-2 cursor-pointer transition-colors"
               >
-                <Lock size={14} />
+                <Lock size={14} className="text-indigo-300" />
                 <span>{isOpeningLogin ? 'Ouverture de la connexion...' : 'Accéder à l’Espace Établissement'}</span>
               </button>
 
               <div className="space-y-3 pt-1">
                 {/* Domaine 1 : Académique */}
                 <div className="space-y-1">
-                  <div className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-indigo-400">
+                  <div className="px-2.5 text-[10px] font-bold uppercase tracking-wider text-indigo-700">
                     Académique
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'academic')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <GraduationCap size={14} className="text-indigo-400" />
+                    <span className="flex items-center gap-2.5">
+                      <GraduationCap size={15} className="text-indigo-600" />
                       <span>Bulletins, Notes &amp; Palmarès</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'parents')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <UserCheck size={14} className="text-indigo-400" />
+                    <span className="flex items-center gap-2.5">
+                      <UserCheck size={15} className="text-indigo-600" />
                       <span>Portail Parents &amp; Étudiants</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                 </div>
 
                 {/* Domaine 2 : Économat */}
-                <div className="space-y-1 pt-1 border-t border-slate-800/70">
-                  <div className="px-2.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-400">
+                <div className="space-y-1 pt-2 border-t border-slate-100">
+                  <div className="px-2.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700">
                     Économat
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'finance')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <Wallet size={14} className="text-emerald-400" />
+                    <span className="flex items-center gap-2.5">
+                      <Wallet size={15} className="text-emerald-600" />
                       <span>Caisses Bidevises &amp; Encaissements Mobiles</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleNavigate('roi')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <TrendingUp size={14} className="text-emerald-400" />
+                    <span className="flex items-center gap-2.5">
+                      <TrendingUp size={15} className="text-emerald-600" />
                       <span>Simulateur d&apos;Économies Annuelles</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                 </div>
 
                 {/* Domaine 3 : Administration */}
-                <div className="space-y-1 pt-1 border-t border-slate-800/70">
-                  <div className="px-2.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-amber-400">
+                <div className="space-y-1 pt-2 border-t border-slate-100">
+                  <div className="px-2.5 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-600">
                     Administration
                   </div>
                   <button
                     type="button"
                     onClick={() => handleNavigate('modules', 'payroll')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <Users size={14} className="text-amber-400" />
+                    <span className="flex items-center gap-2.5">
+                      <Users size={15} className="text-indigo-600" />
                       <span>Salaires, Vacataires &amp; RH</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleNavigate('specialites')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <WifiOff size={14} className="text-amber-400" />
+                    <span className="flex items-center gap-2.5">
+                      <WifiOff size={15} className="text-indigo-600" />
                       <span>Spécialités &amp; Continuité Hors-Ligne</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                   <button
                     type="button"
                     onClick={() => handleNavigate('testimonials')}
-                    className="w-full text-left py-2 px-2.5 text-slate-200 hover:bg-slate-800/70 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
+                    className="w-full text-left py-2.5 px-2.5 text-slate-800 hover:bg-slate-100/80 rounded-lg font-semibold flex items-center justify-between cursor-pointer"
                   >
-                    <span className="flex items-center gap-2">
-                      <Star size={14} className="text-amber-400" />
+                    <span className="flex items-center gap-2.5">
+                      <Star size={15} className="text-indigo-600" />
                       <span>Témoignages des Établissements</span>
                     </span>
-                    <ChevronRight size={14} className="text-slate-500" />
+                    <ChevronRight size={14} className="text-slate-400" />
                   </button>
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800 space-y-2 text-[11px]">
-                <div className="text-slate-400 flex items-center gap-1.5">
-                  <MapPin size={12} className="text-amber-400 shrink-0" />
+              <div className="pt-3 border-t border-slate-200 space-y-2.5 text-[11px]">
+                <div className="text-slate-500 flex items-center gap-1.5">
+                  <MapPin size={12} className="text-indigo-600 shrink-0" />
                   <span>5, Christ-Roi, rue Acacia, prolongée, Port-au-Prince, Haïti</span>
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <a
-                    href="https://wa.me/50936045639"
+                    href={`https://wa.me/${contactConfig.whatsappNumber}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="py-2 px-3 rounded-lg bg-emerald-950/90 text-emerald-300 border border-emerald-800/60 font-bold flex items-center justify-center gap-1.5 text-xs"
+                    className="py-2.5 px-3 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold flex items-center justify-center gap-1.5 text-xs"
                   >
-                    <MessageCircle size={13} />
+                    <MessageCircle size={13} className="text-emerald-600" />
                     <span>WhatsApp</span>
                   </a>
                   <a
                     href="tel:+50933508416"
-                    className="py-2 px-3 rounded-lg bg-slate-800 text-slate-200 border border-slate-700 font-bold flex items-center justify-center gap-1.5 text-xs"
+                    className="py-2.5 px-3 rounded-lg bg-slate-100 text-slate-800 border border-slate-200 font-bold flex items-center justify-center gap-1.5 text-xs"
                   >
-                    <Phone size={13} className="text-amber-400" />
+                    <Phone size={13} className="text-indigo-600" />
                     <span>3350-8416</span>
                   </a>
                 </div>
@@ -1136,35 +1112,37 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
       {/* =========================================================================
           2. CORPS PRINCIPAL — ARCHITECTURE ÉDITORIALE & VITRINE INTERACTIVE
          ========================================================================= */}
-      <main className="pt-16 md:pt-24 flex-grow">
+      <main className="pt-16 flex-grow">
         {/* HERO SECTION — SANS COUPURE DE TITRE + PHOTOGRAPHIE INSTITUTIONNELLE */}
-        <section className="relative pt-8 pb-12 sm:pt-12 sm:pb-16 bg-gradient-to-b from-white via-slate-50 to-slate-100/70 border-b border-slate-200/80 overflow-hidden">
+        <section className="relative pt-10 pb-14 sm:pt-14 sm:pb-16 bg-gradient-to-b from-white via-slate-50/80 to-slate-100/60 border-b border-slate-200/80 overflow-hidden">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-10 lg:space-y-12">
             {/* Grille Principale 12 Colonnes : Proposition & Photographie */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-stretch">
               {/* Colonne Texte (7 cols) */}
               <div className="lg:col-span-7 flex flex-col justify-center space-y-5">
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold text-indigo-700">
-                  <span>République d&apos;Haïti</span>
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs font-semibold text-slate-500">
+                  <span className="text-indigo-700">République d&apos;Haïti</span>
                   <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span className="text-slate-600">Écoles, Collèges &amp; Universités</span>
-                  <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span className="text-amber-700 italic">« L&apos;Excellence Académique à votre Portée »</span>
+                  <span>Écoles, Collèges &amp; Universités</span>
                 </div>
 
-                <div className="space-y-2.5">
-                  <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-950 tracking-tight leading-[1.08] [text-wrap:balance]">
-                    EduNova <span className="text-indigo-600">Pro</span>
+                <div className="space-y-3">
+                  <h1 className="text-4xl sm:text-5xl lg:text-[3.5rem] font-extrabold text-slate-900 tracking-tight leading-[1.06] [text-wrap:balance]">
+                    EduNova <span className="text-indigo-700">Pro</span>
                   </h1>
 
-                  {/* Intitulé complet de la spécialité — Jamais tronqué sur aucun écran */}
-                  <p className="text-xl sm:text-2xl lg:text-[1.75rem] font-extrabold text-amber-600 tracking-tight leading-snug [text-wrap:balance]">
+                  {/* Intitulé de spécialité & Slogan — Contraste apaisant (WCAG AA/AAA) sans agression visuelle */}
+                  <p className="text-xl sm:text-2xl lg:text-[1.65rem] font-bold text-slate-700 tracking-tight leading-snug [text-wrap:balance]">
                     Spécialiste de la Gestion Scolaire, Universitaire et Financière
+                  </p>
+
+                  <p className="border-l-2 border-indigo-600 pl-3.5 text-sm sm:text-[15px] font-semibold text-indigo-950/90 tracking-tight">
+                    « L&apos;Excellence Académique à votre Portée »
                   </p>
                 </div>
 
                 <p className="text-sm sm:text-base text-slate-600 leading-relaxed max-w-2xl">
-                  Pilotez sereinement votre établissement grâce à une plateforme conçue pour les réalités du terrain haïtien : encaissements directs <strong className="text-slate-900 font-semibold">MonCash &amp; NatCash</strong>, comptabilité bidevise <strong className="text-slate-900 font-semibold">HTG / USD</strong>, édition instantanée des bulletins et <strong className="text-emerald-700 font-semibold">continuité garantie hors-ligne</strong> face aux coupures de courant et d&apos;Internet.
+                  Pilotez sereinement votre établissement grâce à une plateforme conçue pour les réalités du terrain haïtien : encaissements directs <strong className="text-slate-900 font-semibold">MonCash &amp; NatCash</strong>, comptabilité bidevise <strong className="text-slate-900 font-semibold">HTG / USD</strong>, édition instantanée des bulletins et <strong className="text-slate-900 font-semibold">continuité garantie hors-ligne</strong> face aux coupures de courant et d&apos;Internet.
                 </p>
 
                 {/* Hiérarchie CTA claire : 1 Action Dominante + 1 Action Secondaire Sobre */}
@@ -1172,7 +1150,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                   <button
                     type="button"
                     onClick={() => handleNavigate('demo')}
-                    className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-600/15 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                    className="px-6 py-3 bg-indigo-700 hover:bg-indigo-800 active:scale-[0.99] text-white rounded-xl font-bold text-sm transition-all shadow-md shadow-indigo-700/15 cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <span>Planifier une Démo Gratuite</span>
                     <ArrowRight size={16} />
@@ -1182,7 +1160,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                     href={`https://wa.me/${contactConfig.whatsappNumber}?text=${encodeURIComponent('Bonjour EduNova Pro, je souhaite planifier une démonstration pour notre établissement.')}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="px-5 py-3 bg-white hover:bg-emerald-50 text-emerald-800 border border-emerald-300 rounded-xl font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
+                    className="px-5 py-3 bg-white hover:bg-slate-50 text-slate-800 border border-slate-300 rounded-xl font-bold text-sm transition-colors cursor-pointer flex items-center justify-center gap-2 whitespace-nowrap shrink-0"
                   >
                     <MessageCircle size={16} className="text-emerald-600 shrink-0" />
                     <span>WhatsApp Direct ({contactConfig.whatsappDisplay})</span>
@@ -1190,7 +1168,7 @@ export const PublicLandingPage: React.FC<PublicLandingPageProps> = ({
                 </div>
 
                 {/* Métadonnées de confiance sans capsules */}
-                <div className="pt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-medium text-slate-600">
+                <div className="pt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs font-medium text-slate-500">
                   <span>Double Monnaie HTG &amp; USD</span>
                   <span className="text-slate-300" aria-hidden="true">·</span>
                   <span>Reçus Certifiés MonCash &amp; NatCash</span>
