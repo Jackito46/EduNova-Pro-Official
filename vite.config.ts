@@ -433,6 +433,8 @@ export default defineConfig(({ mode }) => {
         },
         dedupe: [
           'react',
+          'react/jsx-runtime',
+          'react/jsx-dev-runtime',
           'react-dom',
           'react-dom/client',
           'react-router-dom',
@@ -446,6 +448,8 @@ export default defineConfig(({ mode }) => {
       optimizeDeps: {
         include: [
           'react',
+          'react/jsx-runtime',
+          'react/jsx-dev-runtime',
           'react-dom',
           'react-dom/client',
           'react-router-dom',
@@ -456,7 +460,16 @@ export default defineConfig(({ mode }) => {
           'sonner',
           '@supabase/supabase-js',
           'clsx',
-          'tailwind-merge'
+          'tailwind-merge',
+          'date-fns',
+          'date-fns/locale',
+          'html2canvas',
+          'jspdf',
+          'jspdf-autotable',
+          'qrcode',
+          'react-markdown',
+          'xlsx',
+          'zod'
         ],
       }
     };

@@ -29,6 +29,7 @@ import { useAdaptiveLightMode } from '../hooks/useAdaptiveLightMode';
 import {
   ensureOfflineVaultUnlocked,
   ensureStorageQuotaHealth,
+  getRefCacheStatus,
   hasOfflineVaultPin,
   isOfflineVaultUnlocked,
   lockOfflineVault,
@@ -44,6 +45,7 @@ import {
   importPortableOperationsBundle,
   listOfflineQueueEnvelopes,
   OfflineSyncSummary,
+  prefetchSchoolReferenceCache,
   resolveGradesConflict,
   subscribeOfflineSyncState,
   SyncQueueEnvelope,
@@ -83,8 +85,13 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
   const [quotaHealth, setQuotaHealth] = useState<StorageQuotaHealth | null>(null);
   const [vaultUnlocked, setVaultUnlocked] = useState<boolean>(isOfflineVaultUnlocked());
   const [hasPin, setHasPin] = useState<boolean>(false);
+  const [refCacheStatus, setRefCacheStatus] = useState<{ datasets: number; lastUpdatedAtMs: number | null }>({
+    datasets: 0,
+    lastUpdatedAtMs: null,
+  });
 
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isPrefetching, setIsPrefetching] = useState(false);
   const [resolvingId, setResolvingId] = useState<string | null>(null);
 
   // PIN management inline UI
@@ -110,16 +117,18 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
 
   const refreshAll = useCallback(async () => {
     try {
-      const [sum, list, quota, pinSet] = await Promise.all([
+      const [sum, list, quota, pinSet, refStat] = await Promise.all([
         getOfflineSyncSummary(user.school_id),
         listOfflineQueueEnvelopes(user.school_id),
         ensureStorageQuotaHealth(),
         hasOfflineVaultPin(user.id),
+        getRefCacheStatus(user.school_id),
       ]);
       setSummary(sum);
       setEnvelopes(list);
       setQuotaHealth(quota);
       setHasPin(pinSet);
+      setRefCacheStatus(refStat);
       setVaultUnlocked(isOfflineVaultUnlocked());
     } catch (err) {
       console.error('Erreur actualisation tableau hors-ligne:', err);
@@ -206,6 +215,29 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
       toast.error(err?.message || 'Erreur lors de la synchronisation.');
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleManualPrefetch = async () => {
+    if (!isOnline) {
+      toast.warning('Connectez-vous brièvement à Internet pour télécharger et chiffrer le référentiel local.');
+      return;
+    }
+    if (!vaultUnlocked) {
+      toast.error('Déverrouillez d’abord votre coffre avec votre code PIN.');
+      return;
+    }
+    setIsPrefetching(true);
+    try {
+      const res = await prefetchSchoolReferenceCache(user.school_id, user.id, true);
+      await refreshAll();
+      toast.success(
+        `Référentiel chiffré prêt (${res.cachedDatasets} tables) : ${res.studentCount} élève(s) et ${res.classCount} classe(s) disponibles hors-ligne.`
+      );
+    } catch (err: any) {
+      toast.error(err?.message || 'Erreur lors du préchargement local.');
+    } finally {
+      setIsPrefetching(false);
     }
   };
 
@@ -371,6 +403,16 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
           </div>
 
           <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleManualPrefetch}
+              disabled={!isOnline || isPrefetching || !vaultUnlocked}
+              className="h-9 px-3.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-45 text-slate-100 text-xs font-semibold border border-slate-700 flex items-center gap-1.5 transition-colors"
+            >
+              <Database size={14} className={isPrefetching ? 'animate-spin' : ''} />
+              <span>{isPrefetching ? 'Préchargement...' : 'Précharger pour le hors-ligne'}</span>
+            </button>
+
             <button
               type="button"
               onClick={handleManualSync}
@@ -851,15 +893,54 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
               <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 shrink-0">
                 <Database size={16} />
               </div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-800">Données en Cache</h2>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-800">Référentiel Chiffré &amp; Cache</h2>
+                <p className="text-[11px] text-slate-500">
+                  {refCacheStatus.datasets} table(s) AES-256 prêtes
+                  {refCacheStatus.lastUpdatedAtMs
+                    ? ` • MàJ ${new Date(refCacheStatus.lastUpdatedAtMs).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`
+                    : ''}
+                </p>
+              </div>
             </div>
-            <span className="bg-slate-100 text-slate-600 px-2 py-0.5 rounded-full text-[11px] font-medium">
-              Dernière session
-            </span>
+            <button
+              type="button"
+              onClick={handleManualPrefetch}
+              disabled={!isOnline || isPrefetching || !vaultUnlocked}
+              className="h-7 px-2.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 disabled:opacity-45 text-indigo-700 text-[11px] font-semibold border border-indigo-200 flex items-center gap-1"
+            >
+              <RefreshCw size={12} className={isPrefetching ? 'animate-spin' : ''} />
+              <span>Actualiser</span>
+            </button>
           </div>
 
           <div className="space-y-2">
-            {cacheItems.length > 0 ? (
+            <div className="flex items-center justify-between p-3 rounded-lg border border-indigo-100 bg-indigo-50/40">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <ShieldCheck size={15} className="text-indigo-600 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="font-semibold text-slate-800 text-xs sm:text-sm truncate">
+                    Base Locale Chiffrée (Élèves, Notes &amp; Barèmes)
+                  </h3>
+                  <p className="text-[11px] text-slate-500 font-mono">
+                    {refCacheStatus.datasets > 0
+                      ? `${refCacheStatus.datasets} table(s) synchronisée(s) dans IndexedDB`
+                      : 'Cliquez sur « Précharger pour le hors-ligne » en étant connecté'}
+                  </p>
+                </div>
+              </div>
+              <span
+                className={`text-[10px] font-bold px-2 py-0.5 rounded-md shrink-0 border ${
+                  refCacheStatus.datasets > 0
+                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                    : 'bg-amber-50 text-amber-700 border-amber-200'
+                }`}
+              >
+                {refCacheStatus.datasets > 0 ? 'PRÊT' : 'VIDE'}
+              </span>
+            </div>
+
+            {cacheItems.length > 0 &&
               cacheItems.map((item, idx) => (
                 <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-slate-100 bg-slate-50/60">
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -873,13 +954,7 @@ export const OfflineDashboard: React.FC<OfflineDashboardProps> = ({ user }) => {
                     {item.size}
                   </span>
                 </div>
-              ))
-            ) : (
-              <div className="text-center py-6">
-                <AlertTriangle size={20} className="text-amber-400 mx-auto mb-2" />
-                <p className="text-slate-500 text-xs font-medium">Le cache local est actuellement vide.</p>
-              </div>
-            )}
+              ))}
           </div>
 
           <div className="mt-3.5 bg-blue-50/60 border border-blue-100 p-2.5 rounded-lg flex items-center gap-2.5">

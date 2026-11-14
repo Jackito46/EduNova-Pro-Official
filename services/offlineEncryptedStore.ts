@@ -528,3 +528,105 @@ export async function unsealPortableBundle(bundleText: string, transferPassphras
   );
   return new TextDecoder().decode(decrypted);
 }
+
+export interface RefCacheEnvelope {
+  cacheKey: string;
+  schoolId: string;
+  iv: string;
+  cipher: string;
+  updatedAtMs: number;
+}
+
+/** Chiffre et stocke un jeu de données de référence (élèves, classes, barèmes, notes) dans IndexedDB ref_cache */
+export async function saveEncryptedRefCache<T>(
+  cacheKey: string,
+  data: T,
+  userId: string,
+  schoolId: string
+): Promise<void> {
+  if (!userId || !schoolId) return;
+  try {
+    const unlocked = await ensureOfflineVaultUnlocked(userId, schoolId);
+    if (!unlocked) return;
+    const updatedAtMs = Date.now();
+    const { iv, cipher } = await encryptPayloadWithActiveKey(
+      { data, updatedAtMs },
+      `REF_CACHE:${schoolId}:${cacheKey}`,
+      userId,
+      schoolId
+    );
+    const db = await openOfflineVaultDb();
+    await new Promise<void>((resolve, reject) => {
+      const tx = db.transaction('ref_cache', 'readwrite');
+      tx.objectStore('ref_cache').put({
+        cacheKey,
+        schoolId,
+        iv,
+        cipher,
+        updatedAtMs,
+      } satisfies RefCacheEnvelope);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch (err) {
+    console.warn('[OfflineRefCache] Écriture cache ignorée:', err);
+  }
+}
+
+/** Déchiffre et lit un jeu de données de référence depuis IndexedDB ref_cache */
+export async function loadEncryptedRefCache<T>(
+  cacheKey: string,
+  userId: string,
+  schoolId: string
+): Promise<{ data: T; updatedAtMs: number } | null> {
+  if (!userId || !schoolId) return null;
+  try {
+    const db = await openOfflineVaultDb();
+    const row = await new Promise<RefCacheEnvelope | undefined>((resolve, reject) => {
+      const tx = db.transaction('ref_cache', 'readonly');
+      const req = tx.objectStore('ref_cache').get(cacheKey);
+      req.onsuccess = () => resolve(req.result as RefCacheEnvelope | undefined);
+      req.onerror = () => reject(req.error);
+    });
+    if (!row || !row.iv || !row.cipher) return null;
+
+    const unlocked = await ensureOfflineVaultUnlocked(userId, schoolId);
+    if (!unlocked) return null;
+
+    const decrypted = await decryptPayloadWithActiveKey<{ data: T; updatedAtMs: number }>(
+      { iv: row.iv, cipher: row.cipher },
+      `REF_CACHE:${schoolId}:${cacheKey}`,
+      userId,
+      schoolId
+    );
+    return decrypted;
+  } catch {
+    return null;
+  }
+}
+
+/** Retourne le nombre de tables en cache hors-ligne et l'horodatage de la dernière mise en cache */
+export async function getRefCacheStatus(
+  schoolId: string
+): Promise<{ datasets: number; lastUpdatedAtMs: number | null }> {
+  try {
+    const db = await openOfflineVaultDb();
+    const all = await new Promise<RefCacheEnvelope[]>((resolve, reject) => {
+      const tx = db.transaction('ref_cache', 'readonly');
+      const req = tx.objectStore('ref_cache').getAll();
+      req.onsuccess = () => resolve((req.result as RefCacheEnvelope[]) || []);
+      req.onerror = () => reject(req.error);
+    });
+    const scoped = all.filter((r) => r.schoolId === schoolId);
+    let lastUpdatedAtMs: number | null = null;
+    for (const r of scoped) {
+      if (!lastUpdatedAtMs || r.updatedAtMs > lastUpdatedAtMs) {
+        lastUpdatedAtMs = r.updatedAtMs;
+      }
+    }
+    return { datasets: scoped.length, lastUpdatedAtMs };
+  } catch {
+    return { datasets: 0, lastUpdatedAtMs: null };
+  }
+}
+

@@ -53,7 +53,12 @@ import { AuditLogger } from "../utils/auditLogger";
 import { getExamsListForClass } from "../lib/evaluations";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { enqueueOfflineGradesBatch, isTransientNetworkError } from "../services/offlineSyncEngine";
+import {
+  enqueueOfflineGradesBatch,
+  getPendingOfflineGradesForClass,
+  isTransientNetworkError,
+} from "../services/offlineSyncEngine";
+import { loadEncryptedRefCache, saveEncryptedRefCache } from "../services/offlineEncryptedStore";
 import { useSecurity } from "./SecurityGuard";
 import { addSecurityWatermark } from "../utils/pdfWatermark";
 import { appendSecuritySheet } from "../utils/excelWatermark";
@@ -301,10 +306,93 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
-  // 1. CHARGEMENT DES RÉFÉRENTIELS (Années, Classes, Établissement) avec isolation Multi-Tenant & Campus
+  // 1. CHARGEMENT DES RÉFÉRENTIELS (Années, Classes, Établissement) avec isolation Multi-Tenant, Campus & Fallback Hors-ligne
   const fetchRefs = useCallback(async () => {
     setLoading(true);
+
+    const hydrateRefs = (
+      ayList: any[],
+      clsList: any[],
+      resolvedSchoolName?: string,
+      teacherAssignments?: any[] | null
+    ) => {
+      if (resolvedSchoolName) {
+        setSchoolName(resolvedSchoolName);
+      } else {
+        try {
+          const cachedSchool = JSON.parse(localStorage.getItem(`edunova_cached_school_${user.school_id}`) || "null");
+          if (cachedSchool?.name) setSchoolName(cachedSchool.name);
+        } catch {}
+      }
+
+      if (ayList && ayList.length > 0) {
+        const filteredYears = ayList.filter(
+          (y) => y.status !== "VIERGE" && y.status !== "FUTURE"
+        );
+        const finalYears =
+          filteredYears.length > 0
+            ? filteredYears
+            : ayList.filter((y) => y.status !== "FUTURE");
+        setAcademicYears(finalYears);
+        if (!selectedYearId || !finalYears.some((y) => y.id === selectedYearId)) {
+          const active =
+            finalYears.find((y) => y.is_active || y.status === "ACTIVE") ||
+            finalYears[0];
+          setSelectedYearId(active?.id || "");
+        }
+      }
+
+      let availableClasses = clsList || [];
+      if (currentCampusId) {
+        availableClasses = availableClasses.filter(
+          (c: any) => !c.campus_id || c.campus_id === currentCampusId
+        );
+      }
+
+      if (user.role === "TEACHER") {
+        if (teacherAssignments && teacherAssignments.length > 0) {
+          const assignedClassNames = teacherAssignments.map((a) => a.class_name).filter(Boolean);
+          const assignedClassIds = teacherAssignments.map((a) => a.class_id).filter(Boolean);
+          availableClasses = availableClasses.filter(
+            (c: any) => assignedClassNames.includes(c.name) || assignedClassIds.includes(c.id)
+          );
+        } else if (teacherAssignments !== undefined) {
+          availableClasses = [];
+        }
+      }
+
+      setClasses(availableClasses);
+      if (availableClasses.length > 0) {
+        if (!selectedClassId || !availableClasses.some((c: any) => c.id === selectedClassId)) {
+          setSelectedClassId(availableClasses[0].id);
+        }
+      } else {
+        setSelectedClassId("");
+      }
+    };
+
+    const loadRefsFromOfflineVault = async () => {
+      const [cachedAy, cachedCls, cachedClsCampus, cachedAssign] = await Promise.all([
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_academic_years`, user.id, user.school_id),
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_classes`, user.id, user.school_id),
+        currentCampusId
+          ? loadEncryptedRefCache<any[]>(`ref_${user.school_id}_classes_${currentCampusId}`, user.id, user.school_id)
+          : Promise.resolve(null),
+        user.role === "TEACHER"
+          ? loadEncryptedRefCache<any[]>(`staff_${user.id}_assignments`, user.id, user.school_id)
+          : Promise.resolve(null),
+      ]);
+      const ayList = cachedAy?.data || [];
+      const clsList = cachedClsCampus?.data || cachedCls?.data || [];
+      hydrateRefs(ayList, clsList, undefined, user.role === "TEACHER" ? cachedAssign?.data ?? null : undefined);
+    };
+
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await loadRefsFromOfflineVault();
+        return;
+      }
+
       const [ayRes, clsRes, schoolRes] = await Promise.all([
         supabase
           .from("academic_years")
@@ -328,116 +416,75 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           .maybeSingle(),
       ]);
 
-      if (schoolRes.data) {
-        setSchoolName(schoolRes.data.name || "Établissement Scolaire");
+      if ((ayRes.error && isTransientNetworkError(ayRes.error)) || (clsRes.error && isTransientNetworkError(clsRes.error))) {
+        await loadRefsFromOfflineVault();
+        return;
       }
 
       if (ayRes.data) {
-        const filteredYears = ayRes.data.filter(
-          (y) => y.status !== "VIERGE" && y.status !== "FUTURE",
-        );
-        const finalYears =
-          filteredYears.length > 0
-            ? filteredYears
-            : ayRes.data.filter((y) => y.status !== "FUTURE");
-        setAcademicYears(finalYears);
-        if (!selectedYearId || !finalYears.some((y) => y.id === selectedYearId)) {
-          const active =
-            finalYears.find((y) => y.is_active || y.status === "ACTIVE") ||
-            finalYears[0];
-          setSelectedYearId(active?.id || "");
-        }
+        void saveEncryptedRefCache(`ref_${user.school_id}_academic_years`, ayRes.data, user.id, user.school_id);
       }
-
-      // Filtrer les classes pour les enseignants
       if (clsRes.data) {
-        let availableClasses = clsRes.data;
+        const clsKey = currentCampusId ? `ref_${user.school_id}_classes_${currentCampusId}` : `ref_${user.school_id}_classes`;
+        void saveEncryptedRefCache(clsKey, clsRes.data, user.id, user.school_id);
+      }
 
-        if (user.role === "TEACHER") {
-          const { data: staffData } = await supabase
-            .from("staff")
-            .select("id")
+      let teacherAssignments: any[] | null | undefined = undefined;
+      if (user.role === "TEACHER") {
+        const { data: staffData } = await supabase
+          .from("staff")
+          .select("id")
+          .eq("school_id", user.school_id)
+          .eq("email", user.email)
+          .maybeSingle();
+
+        if (staffData) {
+          const { data: assignments } = await supabase
+            .from("staff_assignments")
+            .select("class_name, class_id, subject_name, subject_id")
             .eq("school_id", user.school_id)
-            .eq("email", user.email)
-            .maybeSingle();
-
-          if (staffData) {
-            const { data: assignments } = await supabase
-              .from("staff_assignments")
-              .select("class_name, class_id")
-              .eq("school_id", user.school_id)
-              .eq("staff_id", staffData.id);
-
-            const assignedClassNames = assignments?.map((a) => a.class_name).filter(Boolean) || [];
-            const assignedClassIds = assignments?.map((a) => a.class_id).filter(Boolean) || [];
-
-            const filteredClasses = availableClasses.filter(
-              (c) => assignedClassNames.includes(c.name) || assignedClassIds.includes(c.id)
-            );
-            availableClasses = filteredClasses;
-          } else {
-            availableClasses = [];
-          }
-        }
-
-        setClasses(availableClasses);
-        if (availableClasses.length > 0) {
-          if (!selectedClassId || !availableClasses.some((c) => c.id === selectedClassId)) {
-            setSelectedClassId(availableClasses[0].id);
-          }
+            .eq("staff_id", staffData.id);
+          teacherAssignments = assignments || [];
+          void saveEncryptedRefCache(`staff_${user.id}_assignments`, teacherAssignments, user.id, user.school_id);
         } else {
-          setSelectedClassId("");
+          teacherAssignments = [];
         }
       }
+
+      hydrateRefs(ayRes.data || [], clsRes.data || [], schoolRes.data?.name, teacherAssignments);
     } catch (err) {
       console.error("Refs Error:", err);
+      await loadRefsFromOfflineVault();
     } finally {
       setLoading(false);
     }
-  }, [user.school_id, user.role, user.email, selectedYearId, selectedClassId, currentCampusId]);
+  }, [user.id, user.school_id, user.role, user.email, selectedYearId, selectedClassId, currentCampusId]);
 
   useEffect(() => {
     fetchRefs();
   }, [fetchRefs]);
 
-  // 2. CHARGEMENT DU CONTEXTE DE SAISIE (Matières assignées, Élèves, Notes existantes)
+  // 2. CHARGEMENT DU CONTEXTE DE SAISIE (Matières assignées, Élèves, Notes existantes + Fallback Chiffré Hors-ligne)
   const loadGradeContext = useCallback(async () => {
     if (!selectedYearId || !selectedClassId || !selectedTerm) return;
 
     setLoading(true);
-    try {
+
+    const buildAndSetGradeGrid = async (params: {
+      rawClassSubs: any[];
+      schoolSubjects: any[];
+      extraSubs?: any[];
+      teacherAssignments?: any[] | null;
+      stuData: any[];
+      evalData: any[];
+      gradeData: any[];
+    }) => {
       const currentClassObj = classes.find((c) => c.id === selectedClassId);
       const levelKey = getClassLevelKey(currentClassObj);
 
-      // A. CHARGER TOUTES LES MATIÈRES ASSIGNÉES À CETTE CLASSE
-      const [classSubRes, allSchoolSubsRes] = await Promise.all([
-        supabase
-          .from("class_subjects")
-          .select("id, class_id, subject_id, coefficient")
-          .eq("class_id", selectedClassId),
-        supabase
-          .from("subjects")
-          .select("id, name, code, category, description")
-          .eq("school_id", user.school_id)
-          .order("name"),
-      ]);
-
-      const rawClassSubs = classSubRes.data || [];
-      const schoolSubjects = allSchoolSubsRes.data || [];
       const subjectsMap = new Map<string, any>();
-      schoolSubjects.forEach((s) => subjectsMap.set(s.id, s));
-
-      const missingSubjectIds = rawClassSubs
-        .map((cs) => cs.subject_id)
-        .filter((id) => id && !subjectsMap.has(id));
-
-      if (missingSubjectIds.length > 0) {
-        const { data: extraSubs } = await supabase
-          .from("subjects")
-          .select("id, name, code, category, description")
-          .in("id", missingSubjectIds);
-        extraSubs?.forEach((s) => subjectsMap.set(s.id, s));
-      }
+      params.schoolSubjects.forEach((s) => subjectsMap.set(s.id, s));
+      (params.extraSubs || []).forEach((s) => subjectsMap.set(s.id, s));
 
       let mappedSubjects: Array<{
         id: string;
@@ -448,9 +495,8 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         maxScore: number;
       }> = [];
 
-      // 1. Priorité absolue : Les matières explicitement assignées à la classe dans class_subjects
-      if (rawClassSubs.length > 0) {
-        rawClassSubs.forEach((cs) => {
+      if (params.rawClassSubs.length > 0) {
+        params.rawClassSubs.forEach((cs) => {
           const sObj = subjectsMap.get(cs.subject_id);
           if (sObj && sObj.name) {
             const coef = Number(cs.coefficient) || 1;
@@ -467,9 +513,8 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         });
       }
 
-      // 2. Fallback 1 : Matières de l'école adaptées au niveau
-      if (mappedSubjects.length === 0 && schoolSubjects.length > 0) {
-        const levelFiltered = schoolSubjects.filter((s: any) => {
+      if (mappedSubjects.length === 0 && params.schoolSubjects.length > 0) {
+        const levelFiltered = params.schoolSubjects.filter((s: any) => {
           const code = (s.code || "").toUpperCase();
           const name = (s.name || "").toUpperCase();
 
@@ -496,7 +541,7 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
           return true;
         });
 
-        const pool = levelFiltered.length > 0 ? levelFiltered : schoolSubjects;
+        const pool = levelFiltered.length > 0 ? levelFiltered : params.schoolSubjects;
         mappedSubjects = pool.map((s: any) => {
           const coef = 100;
           return {
@@ -510,7 +555,6 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         });
       }
 
-      // 3. Fallback 2 : Programme officiel de secours
       if (mappedSubjects.length === 0) {
         const defaultList = LEVEL_CURRICULUMS[levelKey] || LEVEL_CURRICULUMS.FONDAMENTALE;
         mappedSubjects = defaultList.map((s, idx) => ({
@@ -525,38 +569,20 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       mappedSubjects.sort((a, b) => a.name.localeCompare(b.name, "fr", { sensitivity: "base" }));
 
-      // Filtrer pour l'enseignant si assignations
-      if (user.role === "TEACHER") {
-        const { data: staffData } = await supabase
-          .from("staff")
-          .select("id")
-          .eq("school_id", user.school_id)
-          .eq("email", user.email)
-          .maybeSingle();
+      if (user.role === "TEACHER" && params.teacherAssignments && params.teacherAssignments.length > 0) {
+        const currentClassName = currentClassObj?.name;
+        const scopedAssign = params.teacherAssignments.filter(
+          (a) => !selectedClassId || a.class_id === selectedClassId || (currentClassName && a.class_name === currentClassName)
+        );
+        const assignedSubjectNames = scopedAssign.map((a) => a.subject_name).filter(Boolean);
+        const assignedSubjectIds = scopedAssign.map((a) => a.subject_id).filter(Boolean);
 
-        if (staffData) {
-          const currentClassName = currentClassObj?.name;
-          let filterAssignQuery = supabase
-            .from("staff_assignments")
-            .select("subject_name, subject_id")
-            .eq("school_id", user.school_id)
-            .eq("staff_id", staffData.id);
-
-          if (selectedClassId && currentClassName) {
-            filterAssignQuery = filterAssignQuery.or(`class_id.eq.${selectedClassId},class_name.eq.${currentClassName}`);
-          }
-
-          const { data: assignments } = await filterAssignQuery;
-          const assignedSubjectNames = assignments?.map((a) => a.subject_name).filter(Boolean) || [];
-          const assignedSubjectIds = assignments?.map((a) => a.subject_id).filter(Boolean) || [];
-
-          if (assignedSubjectNames.length > 0 || assignedSubjectIds.length > 0) {
-            const filtered = mappedSubjects.filter(
-              (s) => assignedSubjectNames.includes(s.name) || assignedSubjectIds.includes(s.id)
-            );
-            if (filtered.length > 0) {
-              mappedSubjects = filtered;
-            }
+        if (assignedSubjectNames.length > 0 || assignedSubjectIds.length > 0) {
+          const filtered = mappedSubjects.filter(
+            (s) => assignedSubjectNames.includes(s.name) || assignedSubjectIds.includes(s.id)
+          );
+          if (filtered.length > 0) {
+            mappedSubjects = filtered;
           }
         }
       }
@@ -566,98 +592,21 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         setSelectedSubjectId("ALL");
       }
 
-      // B. CHARGEMENT ROBUSTE DES ÉLÈVES (Multi-Tenant & Annexe)
-      // 1. Récupérer d'abord les IDs d'inscriptions pour cette classe
-      let enrolledStudentIds: string[] = [];
-      const { data: enrollData } = await supabase
-        .from("enrollments")
-        .select("student_id")
-        .eq("school_id", user.school_id)
-        .eq("class_id", selectedClassId)
-        .or(`academic_year_id.eq.${selectedYearId},academic_year_id.is.null`);
-
-      if (enrollData && enrollData.length > 0) {
-        enrolledStudentIds = Array.from(new Set(enrollData.map((e) => e.student_id).filter(Boolean)));
-      }
-
-      // 2. Charger les données des étudiants depuis la table students avec les colonnes vérifiées
-      let stuData: any[] = [];
-
-      // Si nous avons des inscriptions, les requêter
-      if (enrolledStudentIds.length > 0) {
-        let stQuery = supabase
-          .from("students")
-          .select("id, first_name, last_name, status, campus_id, reference_number, gender, class_id")
-          .eq("school_id", user.school_id)
-          .in("id", enrolledStudentIds);
-
-        if (currentCampusId) {
-          stQuery = stQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
-        }
-
-        const { data: fromEnroll } = await stQuery;
-        stuData = (fromEnroll || []).filter(
-          (s: any) => s && (s.status === "Actif" || s.status === "ACTIF" || !s.status)
+      const normalizedStudents = (params.stuData || [])
+        .map((s) => ({
+          ...s,
+          matricule: s.reference_number || s.matricule || "-",
+        }))
+        .sort((a: any, b: any) =>
+          (a.last_name || "").localeCompare(b.last_name || "", "fr", { sensitivity: "base" })
         );
-      }
 
-      // Fallback direct par class_id si aucun élève trouvé via enrollments
-      if (stuData.length === 0) {
-        let directQuery = supabase
-          .from("students")
-          .select("id, first_name, last_name, status, campus_id, reference_number, gender, class_id")
-          .eq("school_id", user.school_id)
-          .eq("class_id", selectedClassId);
+      setStudents(normalizedStudents);
+      setEvaluations(params.evalData || []);
 
-        if (currentCampusId) {
-          directQuery = directQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
-        }
-
-        const { data: directStudents } = await directQuery;
-        stuData = (directStudents || []).filter(
-          (s: any) => s && (s.status === "Actif" || s.status === "ACTIF" || !s.status)
-        );
-      }
-
-      // Normaliser le matricule pour chaque étudiant
-      stuData = stuData.map((s) => ({
-        ...s,
-        matricule: s.reference_number || s.matricule || "-",
-      }));
-
-      // Trier les élèves par Nom puis Prénom
-      stuData.sort((a: any, b: any) =>
-        (a.last_name || "").localeCompare(b.last_name || "", "fr", { sensitivity: "base" })
-      );
-
-      setStudents(stuData);
-
-      // C. CHARGER LES ÉVALUATIONS PARTICULIÈRES (Course evaluations syllabus)
-      const subIds = mappedSubjects.map((s) => s.id);
-      let evalData: any[] = [];
-      if (subIds.length > 0) {
-        let evQuery = supabase
-          .from("course_evaluations")
-          .select("id, name, subject_id, total_marks, weight_percentage")
-          .eq("school_id", user.school_id)
-          .eq("term", selectedTerm)
-          .in("subject_id", subIds);
-
-        if (selectedClassId) {
-          evQuery = evQuery.or(`class_id.eq.${selectedClassId},class_id.is.null`);
-        } else {
-          evQuery = evQuery.is("class_id", null);
-        }
-
-        const { data } = await evQuery;
-        evalData = data || [];
-      }
-      setEvaluations(evalData);
-
-      // D. CONSTRUIRE LES COLONNES DYNAMIQUES DE LA GRILLE
       const columnsList: any[] = [];
       mappedSubjects.forEach((sub) => {
-        const subEvals = evalData.filter((e) => e.subject_id === sub.id);
+        const subEvals = (params.evalData || []).filter((e) => e.subject_id === sub.id);
         if (subEvals.length > 0) {
           subEvals.forEach((ev) => {
             columnsList.push({
@@ -689,6 +638,267 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
       });
       setColumns(columnsList);
+      setExistingGrades(params.gradeData || []);
+
+      const pendingOffline = await getPendingOfflineGradesForClass(user.school_id, selectedClassId, selectedTerm);
+
+      const initialGrid: Record<string, Record<string, string>> = {};
+      normalizedStudents.forEach((s) => {
+        initialGrid[s.id] = {};
+        columnsList.forEach((col) => {
+          const pendingFound = pendingOffline.find(
+            (pg) =>
+              pg.studentId === s.id &&
+              pg.subjectId === col.subjectId &&
+              (col.courseEvaluationId
+                ? pg.courseEvaluationId === col.courseEvaluationId
+                : !pg.courseEvaluationId)
+          );
+          if (pendingFound) {
+            initialGrid[s.id][col.id] = String(pendingFound.score);
+            return;
+          }
+          const found = (params.gradeData || []).find(
+            (g) =>
+              g.student_id === s.id &&
+              g.subject_id === col.subjectId &&
+              (col.courseEvaluationId
+                ? g.course_evaluation_id === col.courseEvaluationId
+                : !g.course_evaluation_id)
+          );
+          initialGrid[s.id][col.id] = found ? found.score.toString() : "";
+        });
+      });
+
+      setGridData(initialGrid);
+      setInitialGridData(JSON.parse(JSON.stringify(initialGrid)));
+    };
+
+    const loadContextFromOfflineVault = async (): Promise<boolean> => {
+      const [csCache, subCache, stCache, enrCache, evCache, grCache, assignCache] = await Promise.all([
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_class_subjects`, user.id, user.school_id),
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_subjects`, user.id, user.school_id),
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_students`, user.id, user.school_id),
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_enrollments`, user.id, user.school_id),
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_evals_${selectedClassId}_${selectedTerm}`, user.id, user.school_id),
+        loadEncryptedRefCache<any[]>(`ref_${user.school_id}_grades_${selectedYearId}_${selectedClassId}_${selectedTerm}`, user.id, user.school_id),
+        user.role === "TEACHER"
+          ? loadEncryptedRefCache<any[]>(`staff_${user.id}_assignments`, user.id, user.school_id)
+          : Promise.resolve(null),
+      ]);
+
+      const rawClassSubs = (csCache?.data || []).filter((cs: any) => cs.class_id === selectedClassId);
+      const schoolSubjects = subCache?.data || [];
+
+      const enrolledIds = new Set(
+        (enrCache?.data || [])
+          .filter(
+            (e: any) =>
+              e.class_id === selectedClassId &&
+              (!e.academic_year_id || e.academic_year_id === selectedYearId)
+          )
+          .map((e: any) => e.student_id)
+          .filter(Boolean)
+      );
+
+      const allStudents = stCache?.data || [];
+      let stuData = allStudents.filter((s: any) => {
+        const matchesCampus = !currentCampusId || !s.campus_id || s.campus_id === currentCampusId;
+        const isActive = s && (s.status === "Actif" || s.status === "ACTIF" || !s.status);
+        return matchesCampus && isActive && (enrolledIds.size > 0 ? enrolledIds.has(s.id) : s.class_id === selectedClassId);
+      });
+
+      if (stuData.length === 0) {
+        stuData = allStudents.filter((s: any) => {
+          const matchesCampus = !currentCampusId || !s.campus_id || s.campus_id === currentCampusId;
+          const isActive = s && (s.status === "Actif" || s.status === "ACTIF" || !s.status);
+          return matchesCampus && isActive && s.class_id === selectedClassId;
+        });
+      }
+
+      await buildAndSetGradeGrid({
+        rawClassSubs,
+        schoolSubjects,
+        teacherAssignments: assignCache?.data || null,
+        stuData,
+        evalData: evCache?.data || [],
+        gradeData: grCache?.data || [],
+      });
+      return allStudents.length > 0 || schoolSubjects.length > 0;
+    };
+
+    try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        const ok = await loadContextFromOfflineVault();
+        if (!ok) {
+          toast.info("Mode hors-ligne : aucun préchargement local trouvé pour cette classe.");
+        }
+        return;
+      }
+
+      const currentClassObj = classes.find((c) => c.id === selectedClassId);
+
+      // A. CHARGER TOUTES LES MATIÈRES ASSIGNÉES À CETTE CLASSE
+      const [classSubRes, allSchoolSubsRes] = await Promise.all([
+        supabase
+          .from("class_subjects")
+          .select("id, class_id, subject_id, coefficient")
+          .eq("class_id", selectedClassId),
+        supabase
+          .from("subjects")
+          .select("id, name, code, category, description")
+          .eq("school_id", user.school_id)
+          .order("name"),
+      ]);
+
+      if (
+        (classSubRes.error && isTransientNetworkError(classSubRes.error)) ||
+        (allSchoolSubsRes.error && isTransientNetworkError(allSchoolSubsRes.error))
+      ) {
+        await loadContextFromOfflineVault();
+        return;
+      }
+
+      const rawClassSubs = classSubRes.data || [];
+      const schoolSubjects = allSchoolSubsRes.data || [];
+      if (schoolSubjects.length > 0) {
+        void saveEncryptedRefCache(`ref_${user.school_id}_subjects`, schoolSubjects, user.id, user.school_id);
+      }
+
+      const subjectsMap = new Map<string, any>();
+      schoolSubjects.forEach((s) => subjectsMap.set(s.id, s));
+
+      const missingSubjectIds = rawClassSubs
+        .map((cs) => cs.subject_id)
+        .filter((id) => id && !subjectsMap.has(id));
+
+      let extraSubs: any[] = [];
+      if (missingSubjectIds.length > 0) {
+        const { data } = await supabase
+          .from("subjects")
+          .select("id, name, code, category, description")
+          .in("id", missingSubjectIds);
+        extraSubs = data || [];
+      }
+
+      let teacherAssignments: any[] | null = null;
+      if (user.role === "TEACHER") {
+        const { data: staffData } = await supabase
+          .from("staff")
+          .select("id")
+          .eq("school_id", user.school_id)
+          .eq("email", user.email)
+          .maybeSingle();
+
+        if (staffData) {
+          const currentClassName = currentClassObj?.name;
+          let filterAssignQuery = supabase
+            .from("staff_assignments")
+            .select("subject_name, subject_id, class_name, class_id")
+            .eq("school_id", user.school_id)
+            .eq("staff_id", staffData.id);
+
+          if (selectedClassId && currentClassName) {
+            filterAssignQuery = filterAssignQuery.or(`class_id.eq.${selectedClassId},class_name.eq.${currentClassName}`);
+          }
+
+          const { data: assignments } = await filterAssignQuery;
+          teacherAssignments = assignments || [];
+        }
+      }
+
+      // B. CHARGEMENT ROBUSTE DES ÉLÈVES (Multi-Tenant & Annexe)
+      let enrolledStudentIds: string[] = [];
+      const { data: enrollData, error: enrollErr } = await supabase
+        .from("enrollments")
+        .select("student_id")
+        .eq("school_id", user.school_id)
+        .eq("class_id", selectedClassId)
+        .or(`academic_year_id.eq.${selectedYearId},academic_year_id.is.null`);
+
+      if (enrollErr && isTransientNetworkError(enrollErr)) {
+        await loadContextFromOfflineVault();
+        return;
+      }
+
+      if (enrollData && enrollData.length > 0) {
+        enrolledStudentIds = Array.from(new Set(enrollData.map((e) => e.student_id).filter(Boolean)));
+      }
+
+      let stuData: any[] = [];
+      if (enrolledStudentIds.length > 0) {
+        let stQuery = supabase
+          .from("students")
+          .select("id, first_name, last_name, status, campus_id, reference_number, gender, class_id")
+          .eq("school_id", user.school_id)
+          .in("id", enrolledStudentIds);
+
+        if (currentCampusId) {
+          stQuery = stQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
+        }
+
+        const { data: fromEnroll, error: stErr } = await stQuery;
+        if (stErr && isTransientNetworkError(stErr)) {
+          await loadContextFromOfflineVault();
+          return;
+        }
+        stuData = (fromEnroll || []).filter(
+          (s: any) => s && (s.status === "Actif" || s.status === "ACTIF" || !s.status)
+        );
+      }
+
+      if (stuData.length === 0) {
+        let directQuery = supabase
+          .from("students")
+          .select("id, first_name, last_name, status, campus_id, reference_number, gender, class_id")
+          .eq("school_id", user.school_id)
+          .eq("class_id", selectedClassId);
+
+        if (currentCampusId) {
+          directQuery = directQuery.or(`campus_id.eq.${currentCampusId},campus_id.is.null`);
+        }
+
+        const { data: directStudents, error: directErr } = await directQuery;
+        if (directErr && isTransientNetworkError(directErr)) {
+          await loadContextFromOfflineVault();
+          return;
+        }
+        stuData = (directStudents || []).filter(
+          (s: any) => s && (s.status === "Actif" || s.status === "ACTIF" || !s.status)
+        );
+      }
+
+      // C. CHARGER LES ÉVALUATIONS PARTICULIÈRES
+      const subIdCandidates = Array.from(
+        new Set([
+          ...rawClassSubs.map((c) => c.subject_id).filter(Boolean),
+          ...schoolSubjects.map((s) => s.id).filter(Boolean),
+        ])
+      );
+      let evalData: any[] = [];
+      if (subIdCandidates.length > 0) {
+        let evQuery = supabase
+          .from("course_evaluations")
+          .select("id, name, subject_id, total_marks, weight_percentage")
+          .eq("school_id", user.school_id)
+          .eq("term", selectedTerm)
+          .in("subject_id", subIdCandidates);
+
+        if (selectedClassId) {
+          evQuery = evQuery.or(`class_id.eq.${selectedClassId},class_id.is.null`);
+        } else {
+          evQuery = evQuery.is("class_id", null);
+        }
+
+        const { data } = await evQuery;
+        evalData = data || [];
+      }
+      void saveEncryptedRefCache(
+        `ref_${user.school_id}_evals_${selectedClassId}_${selectedTerm}`,
+        evalData,
+        user.id,
+        user.school_id
+      );
 
       // E. CHARGER LES NOTES EXISTANTES DANS LA BASE DE DONNÉES
       let gradeData: any[] = [];
@@ -708,39 +918,36 @@ const GradesView: React.FC<{ user: UserProfile }> = ({ user }) => {
         const { data, error } = await query;
         if (!error && data) {
           gradeData = data;
+          void saveEncryptedRefCache(
+            `ref_${user.school_id}_grades_${selectedYearId}_${selectedClassId}_${selectedTerm}`,
+            gradeData,
+            user.id,
+            user.school_id
+          );
         } else if (error) {
           console.warn("Grades fetch error:", error);
         }
       }
 
-      setExistingGrades(gradeData);
-
-      // F. INITIALISER LA GRILLE LOCALE
-      const initialGrid: Record<string, Record<string, string>> = {};
-      stuData.forEach((s) => {
-        initialGrid[s.id] = {};
-        columnsList.forEach((col) => {
-          const found = gradeData.find(
-            (g) =>
-              g.student_id === s.id &&
-              g.subject_id === col.subjectId &&
-              (col.courseEvaluationId
-                ? g.course_evaluation_id === col.courseEvaluationId
-                : !g.course_evaluation_id)
-          );
-          initialGrid[s.id][col.id] = found ? found.score.toString() : "";
-        });
+      await buildAndSetGradeGrid({
+        rawClassSubs,
+        schoolSubjects,
+        extraSubs,
+        teacherAssignments,
+        stuData,
+        evalData,
+        gradeData,
       });
-
-      setGridData(initialGrid);
-      setInitialGridData(JSON.parse(JSON.stringify(initialGrid)));
     } catch (err) {
       console.error("Context Load Error:", err);
-      toast.error("Erreur lors du chargement du journal des évaluations.");
+      const recovered = await loadContextFromOfflineVault();
+      if (!recovered) {
+        toast.error("Erreur lors du chargement du journal des évaluations.");
+      }
     } finally {
       setLoading(false);
     }
-  }, [selectedYearId, selectedClassId, selectedTerm, user.school_id, user.role, user.email, currentCampusId, classes]);
+  }, [selectedYearId, selectedClassId, selectedTerm, user.id, user.school_id, user.role, user.email, currentCampusId, classes]);
 
   useEffect(() => {
     loadGradeContext();

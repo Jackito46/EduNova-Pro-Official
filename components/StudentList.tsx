@@ -26,6 +26,8 @@ import {
   normalizeStudentDocuments, 
   calculateDocumentsCompleteness 
 } from '../utils/documentRequirements';
+import { loadEncryptedRefCache, saveEncryptedRefCache } from '../services/offlineEncryptedStore';
+import { isTransientNetworkError } from '../services/offlineSyncEngine';
 
 const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const navigate = useNavigate();
@@ -40,6 +42,7 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [selectedYearId, setSelectedYearId] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isOfflineData, setIsOfflineData] = useState(false);
   
   const [aiReport, setAiReport] = useState<{id: string, text: string} | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -65,91 +68,217 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!user?.school_id) return;
     setLoading(true);
     setError(null);
-    try {
-      let ayQuery = supabase.from('academic_years').select('*');
-      if (user?.school_id) {
-        ayQuery = ayQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
-      }
-      const { data: years } = await ayQuery.order('label', { ascending: false });
+    const schoolId = user.school_id;
+    const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
 
-      let finalYears = years || [];
+    const applyYearsAndClasses = (rawYears: any[] | null, rawClasses: any[] | null) => {
+      let finalYears = rawYears || [];
       if (finalYears.length === 0) {
         finalYears = [
           { id: 'ay-2025-2026', label: '2025-2026', status: 'ACTIVE', is_active: true },
           { id: 'ay-2024-2025', label: '2024-2025', status: 'PAST', is_active: false },
         ];
       }
-
-      const filtered = finalYears.filter(y => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
+      const filtered = finalYears.filter((y) => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
       const activeYears = filtered.length > 0 ? filtered : finalYears;
       setAcademicYears(activeYears);
-      
+
       const locationState = location.state as { academicYearId?: string; filterYearId?: string } | null;
       const incomingYearId = locationState?.academicYearId || locationState?.filterYearId;
-      const targetYear = incomingYearId 
-        ? activeYears.find(y => y.id === incomingYearId) || activeYears.find(y => y.status === 'ACTIVE' || y.is_active) || activeYears[0]
-        : activeYears.find(y => y.status === 'ACTIVE' || y.is_active) || activeYears[0];
-
+      const targetYear = incomingYearId
+        ? activeYears.find((y) => y.id === incomingYearId) ||
+          activeYears.find((y) => y.status === 'ACTIVE' || y.is_active) ||
+          activeYears[0]
+        : activeYears.find((y) => y.status === 'ACTIVE' || y.is_active) || activeYears[0];
       if (targetYear) setSelectedYearId(targetYear.id);
 
-      let classQuery = supabase.from('classes').select('*');
-      if (user?.school_id) {
-        classQuery = classQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
+      const scopedClasses = (rawClasses || []).filter(
+        (c: any) => !currentCampusId || c.campus_id === currentCampusId || !c.campus_id
+      );
+      setClasses(scopedClasses);
+    };
+
+    try {
+      if (isOfflineNow) {
+        const [cachedYears, cachedClasses] = await Promise.all([
+          loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
+          loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
+        ]);
+        applyYearsAndClasses(cachedYears?.data || null, cachedClasses?.data || null);
+        setIsOfflineData(true);
+        return;
       }
-        
+
+      let ayQuery = supabase.from('academic_years').select('*');
+      ayQuery = ayQuery.or(`school_id.eq.${schoolId},school_id.is.null`);
+      const { data: years, error: ayErr } = await ayQuery.order('label', { ascending: false });
+
+      let classQuery = supabase.from('classes').select('*');
+      classQuery = classQuery.or(`school_id.eq.${schoolId},school_id.is.null`);
       if (currentCampusId) {
         classQuery = classQuery.eq('campus_id', currentCampusId);
       }
-      
-      const { data: classData } = await classQuery.order('name');
-      if (classData) setClasses(classData);
+      const { data: classData, error: clsErr } = await classQuery.order('name');
+
+      if ((ayErr && isTransientNetworkError(ayErr)) || (clsErr && isTransientNetworkError(clsErr))) {
+        const [cachedYears, cachedClasses] = await Promise.all([
+          loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
+          loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
+        ]);
+        applyYearsAndClasses(cachedYears?.data || years || null, cachedClasses?.data || classData || null);
+        setIsOfflineData(true);
+        return;
+      }
+
+      if (years && years.length > 0) {
+        void saveEncryptedRefCache(`ref_${schoolId}_academic_years`, years, user.id, schoolId);
+      }
+      if (classData && !currentCampusId) {
+        void saveEncryptedRefCache(`ref_${schoolId}_classes`, classData, user.id, schoolId);
+      }
+      applyYearsAndClasses(years, classData);
+      setIsOfflineData(false);
     } catch (err: any) {
-      console.warn("Notice loading initial student list filters:", err);
+      console.warn('Notice loading initial student list filters:', err);
+      const [cachedYears, cachedClasses] = await Promise.all([
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_academic_years`, user.id, schoolId),
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_classes`, user.id, schoolId),
+      ]);
+      applyYearsAndClasses(cachedYears?.data || null, cachedClasses?.data || null);
+      setIsOfflineData(true);
     } finally {
       setLoading(false);
     }
-  }, [user.school_id, currentCampusId]);
+  }, [user.id, user.school_id, currentCampusId]);
 
   const fetchStudents = useCallback(async () => {
+    if (!user?.school_id) return;
     setLoading(true);
+    const schoolId = user.school_id;
+    const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
+    const isYearFiltered = Boolean(selectedYearId && selectedYearId !== 'all');
+
+    const enrichAndSetStudents = (rawStudents: any[], rawEnrollments: any[]) => {
+      let filteredStudents = rawStudents || [];
+      if (currentCampusId) {
+        filteredStudents = filteredStudents.filter((s: any) => !s.campus_id || s.campus_id === currentCampusId);
+      }
+
+      const enrollmentMap = new Map<string, string[]>();
+      const statusMap = new Map<string, string>();
+      const yearEnrolledIds = new Set<string>();
+
+      (rawEnrollments || []).forEach((e: any) => {
+        const list = enrollmentMap.get(e.student_id) || [];
+        list.push(e.academic_year_id);
+        enrollmentMap.set(e.student_id, list);
+        if (isYearFiltered && e.academic_year_id === selectedYearId) {
+          statusMap.set(e.student_id, e.status);
+          if (e.student_id) yearEnrolledIds.add(e.student_id);
+        }
+      });
+
+      if (isYearFiltered && (rawEnrollments || []).length > 0) {
+        filteredStudents = filteredStudents.filter((s: any) => yearEnrolledIds.has(s.id));
+      }
+
+      const currentSelectedYear = academicYears.find((y) => y.id === selectedYearId);
+      const isFutureSession = currentSelectedYear?.status === 'FUTURE';
+
+      const enrichedStudents = filteredStudents.map((s) => {
+        const history = enrollmentMap.get(s.id) || [];
+        const isReturning = isYearFiltered
+          ? history.length > 1 && history.includes(selectedYearId)
+          : history.length > 1;
+
+        let age = null;
+        let ageStatus = 'NORMAL';
+        if (s.dob) {
+          const birthDate = new Date(s.dob);
+          const refDate = new Date(new Date().getFullYear(), 8, 1);
+          age = refDate.getFullYear() - birthDate.getFullYear();
+          const m = refDate.getMonth() - birthDate.getMonth();
+          if (m < 0 || (m === 0 && refDate.getDate() < birthDate.getDate())) {
+            age--;
+          }
+          if (s.class) {
+            ageStatus = getStudentAgeStatus(age, s.class.name, s.class.level);
+          }
+        }
+
+        const targetStatus = statusMap.get(s.id) || s.status || 'ACTIVE';
+        const normalizedDocs = normalizeStudentDocuments(
+          s.submitted_documents,
+          school?.school_type,
+          school?.global_settings
+        );
+        const completeness = calculateDocumentsCompleteness(
+          normalizedDocs,
+          school?.school_type,
+          school?.global_settings
+        );
+
+        let displayEnrollmentType = isReturning ? 'Réinscrit' : 'Inscrit';
+        if (isFutureSession) {
+          displayEnrollmentType = isReturning ? 'Réinscrit (Pré-ins)' : 'Pré-inscrit';
+        }
+
+        return {
+          ...s,
+          age,
+          ageStatus,
+          enrollmentType: displayEnrollmentType,
+          enrollmentStatus: targetStatus,
+          normalizedDocs,
+          completeness,
+        };
+      });
+
+      setStudents(enrichedStudents);
+    };
+
     try {
+      if (isOfflineNow) {
+        const [cachedStudents, cachedEnrollments] = await Promise.all([
+          loadEncryptedRefCache<any[]>(`ref_${schoolId}_students`, user.id, schoolId),
+          loadEncryptedRefCache<any[]>(`ref_${schoolId}_enrollments`, user.id, schoolId),
+        ]);
+        enrichAndSetStudents(cachedStudents?.data || [], cachedEnrollments?.data || []);
+        setIsOfflineData(true);
+        return;
+      }
+
       let studentIdsForYear: string[] | null = null;
-      const isYearFiltered = selectedYearId && selectedYearId !== 'all';
 
       if (isYearFiltered) {
         let enrollQuery = supabase
           .from('enrollments')
           .select('student_id, academic_year_id, status, class_id')
-          .eq('academic_year_id', selectedYearId);
+          .eq('academic_year_id', selectedYearId)
+          .or(`school_id.eq.${schoolId},school_id.is.null`);
 
-        if (user?.school_id) {
-          enrollQuery = enrollQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
+        const { data: enrollData, error: enrollErr } = await enrollQuery;
+        if (enrollErr && isTransientNetworkError(enrollErr)) {
+          throw enrollErr;
         }
-
-        const { data: enrollData } = await enrollQuery;
         if (enrollData && enrollData.length > 0) {
           studentIdsForYear = enrollData.map((e: any) => e.student_id).filter(Boolean);
         } else {
-          // No students are enrolled in this academic year yet
           studentIdsForYear = [];
         }
       }
 
-      // If a specific session is selected and there are 0 enrollments for it, display empty list immediately
       if (isYearFiltered && studentIdsForYear && studentIdsForYear.length === 0) {
         setStudents([]);
-        setLoading(false);
+        setIsOfflineData(false);
         return;
       }
 
       let stQuery = supabase
         .from('students')
         .select('*, class:classes(id, name, level)')
+        .or(`school_id.eq.${schoolId},school_id.is.null`)
         .order('last_name');
-
-      if (user?.school_id) {
-        stQuery = stQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
-      }
 
       if (currentCampusId) {
         stQuery = stQuery.eq('campus_id', currentCampusId);
@@ -161,95 +290,55 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       let { data: studentsData, error: studentError } = await stQuery;
 
+      if (studentError && isTransientNetworkError(studentError)) {
+        throw studentError;
+      }
+
       if (studentError || !studentsData) {
         if (isYearFiltered && studentIdsForYear && studentIdsForYear.length === 0) {
           studentsData = [];
         } else {
-          const { data: fallbackStudents } = await supabase
+          const { data: fallbackStudents, error: fbErr } = await supabase
             .from('students')
             .select('*, class:classes(id, name, level)')
             .order('last_name');
+          if (fbErr && isTransientNetworkError(fbErr)) throw fbErr;
           studentsData = fallbackStudents || [];
         }
       }
 
       if (studentsData && studentsData.length > 0) {
-        let enrollQuery = supabase.from('enrollments').select('student_id, academic_year_id, status, class_id');
-        if (user?.school_id) {
-          enrollQuery = enrollQuery.or(`school_id.eq.${user.school_id},school_id.is.null`);
-        }
+        const enrollQuery = supabase
+          .from('enrollments')
+          .select('student_id, academic_year_id, status, class_id')
+          .or(`school_id.eq.${schoolId},school_id.is.null`);
         const { data: allEnrollments } = await enrollQuery;
 
-        const enrollmentMap = new Map<string, string[]>();
-        const statusMap = new Map<string, string>();
-        allEnrollments?.forEach(e => {
-          const list = enrollmentMap.get(e.student_id) || [];
-          list.push(e.academic_year_id);
-          enrollmentMap.set(e.student_id, list);
-          if (isYearFiltered && e.academic_year_id === selectedYearId) {
-            statusMap.set(e.student_id, e.status);
-          }
-        });
+        if (!isYearFiltered && !currentCampusId) {
+          void saveEncryptedRefCache(`ref_${schoolId}_students`, studentsData, user.id, schoolId);
+        }
+        if (allEnrollments && allEnrollments.length > 0) {
+          void saveEncryptedRefCache(`ref_${schoolId}_enrollments`, allEnrollments, user.id, schoolId);
+        }
 
-        // Check if selected session is in preparation (FUTURE)
-        const currentSelectedYear = academicYears.find(y => y.id === selectedYearId);
-        const isFutureSession = currentSelectedYear?.status === 'FUTURE';
-
-        const enrichedStudents = studentsData.map(s => {
-          const history = enrollmentMap.get(s.id) || [];
-          
-          // An enrolled student is returning ("Réinscrit") if they were already enrolled in another session
-          const isReturning = isYearFiltered
-            ? history.length > 1 && history.includes(selectedYearId)
-            : history.length > 1;
-          
-          let age = null;
-          let ageStatus = 'NORMAL';
-          if (s.dob) {
-            const birthDate = new Date(s.dob);
-            const refDate = new Date(new Date().getFullYear(), 8, 1);
-            age = refDate.getFullYear() - birthDate.getFullYear();
-            const m = refDate.getMonth() - birthDate.getMonth();
-            if (m < 0 || (m === 0 && refDate.getDate() < birthDate.getDate())) {
-              age--;
-            }
-            if (s.class) {
-              ageStatus = getStudentAgeStatus(age, s.class.name, s.class.level);
-            }
-          }
-
-          const targetStatus = statusMap.get(s.id) || s.status || 'ACTIVE';
-
-          const normalizedDocs = normalizeStudentDocuments(s.submitted_documents, school?.school_type, school?.global_settings);
-          const completeness = calculateDocumentsCompleteness(normalizedDocs, school?.school_type, school?.global_settings);
-
-          let displayEnrollmentType = isReturning ? 'Réinscrit' : 'Inscrit';
-          if (isFutureSession) {
-            displayEnrollmentType = isReturning ? 'Réinscrit (Pré-ins)' : 'Pré-inscrit';
-          }
-
-          return {
-            ...s,
-            age,
-            ageStatus,
-            enrollmentType: displayEnrollmentType,
-            enrollmentStatus: targetStatus,
-            normalizedDocs,
-            completeness
-          };
-        });
-
-        setStudents(enrichedStudents);
+        enrichAndSetStudents(studentsData, allEnrollments || []);
+        setIsOfflineData(false);
       } else {
         setStudents([]);
+        setIsOfflineData(false);
       }
     } catch (err: any) {
-      console.warn("Notice fetching students:", err);
-      setStudents([]);
+      console.warn('Notice fetching students (fallback cache):', err);
+      const [cachedStudents, cachedEnrollments] = await Promise.all([
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_students`, user.id, schoolId),
+        loadEncryptedRefCache<any[]>(`ref_${schoolId}_enrollments`, user.id, schoolId),
+      ]);
+      enrichAndSetStudents(cachedStudents?.data || [], cachedEnrollments?.data || []);
+      setIsOfflineData(true);
     } finally {
       setLoading(false);
     }
-  }, [user?.school_id, selectedYearId, currentCampusId, academicYears, school?.school_type, school?.global_settings]);
+  }, [user?.id, user?.school_id, selectedYearId, currentCampusId, academicYears, school?.school_type, school?.global_settings]);
 
   useEffect(() => {
     fetchInitialData();
@@ -559,6 +648,15 @@ const StudentList: React.FC<{ user: UserProfile }> = ({ user }) => {
             </div>
 
             <div className="flex items-center gap-2.5 shrink-0 flex-wrap sm:flex-nowrap">
+              {isOfflineData && (
+                <span
+                  className="px-3 py-1.5 rounded-2xl text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 flex items-center gap-1.5"
+                  title="Registre affiché depuis votre coffre chiffré local (AES-256)"
+                >
+                  <AlertCircle size={13} className="text-amber-600" />
+                  <span>Cache hors-ligne actif</span>
+                </span>
+              )}
               {academicYears.some(y => y.status === 'FUTURE') && (
                 <button 
                   onClick={() => {

@@ -59,6 +59,7 @@ import { isCashDateLocked } from '../services/cashClosureService';
 import { DailyCashClosureModal } from './DailyCashClosureModal';
 import { MonCashWaitingModal } from './MonCashWaitingModal';
 import { enqueueOfflineReceipt, isTransientNetworkError } from '../services/offlineSyncEngine';
+import { loadEncryptedRefCache, saveEncryptedRefCache } from '../services/offlineEncryptedStore';
 import { MonCashSummaryModal } from './MonCashSummaryModal';
 import { PaymentConfirmationModal } from './PaymentConfirmationModal';
 import { MonCashTransactionCard, MonCashTransactionInfo } from './MonCashTransactionCard';
@@ -550,6 +551,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       setRefError(null);
       return;
     }
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setRefError(null);
+      return;
+    }
     setIsCheckingRef(true);
     try {
       let paymentsQuery = supabase
@@ -596,8 +601,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
     } catch (e: any) {
       console.error("verifyReference error:", e);
-      // alert if column not found
-      if(e?.message) toast.error("Verif Error: " + e.message);
+      if (e?.message && !isTransientNetworkError(e)) {
+        toast.error("Verif Error: " + e.message);
+      }
     } finally {
       setIsCheckingRef(false);
     }
@@ -661,9 +667,51 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     }
   };
 
-  // 1. CHARGEMENT DU CONTEXTE UTILISATEUR & SESSION
+  // 1. CHARGEMENT DU CONTEXTE UTILISATEUR & SESSION (avec fallback chiffré hors-ligne)
   useEffect(() => {
     const fetchContext = async () => {
+      const applyAcademicYears = (years: any[]) => {
+        if (!years || years.length === 0) return;
+        const filtered = years.filter(y => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
+        const finalYears = filtered.length > 0 ? filtered : years;
+        setAcademicYears(finalYears);
+        const active = finalYears.find(y => y.status === 'ACTIVE' || y.is_active) || finalYears[0];
+        setActiveYear(active);
+
+        const searchParams = new URLSearchParams(location.search);
+        const requestedYearId = location.state?.academicYearId || searchParams.get('academicYearId') || searchParams.get('yearId');
+        if (requestedYearId && finalYears.some(y => y.id === requestedYearId)) {
+          setTargetYearId(requestedYearId);
+        } else if (active) {
+          setTargetYearId(active.id);
+        }
+      };
+
+      const applyExchangeRates = (rateData: any[]) => {
+        if (!rateData || rateData.length === 0) return;
+        const sorted = [...rateData].sort((a, b) => {
+          const dateA = new Date(a.effective_date || a.created_at || 0).getTime();
+          const dateB = new Date(b.effective_date || b.created_at || 0).getTime();
+          return dateB - dateA;
+        });
+        setCurrentExchangeRate(sorted[0].rate_usd_to_htg || sorted[0].rate || 132.50);
+      };
+
+      const loadContextOffline = async () => {
+        try {
+          const cachedSchool = JSON.parse(localStorage.getItem(`edunova_cached_school_${user.school_id}`) || 'null');
+          if (cachedSchool) setSchoolDetails(cachedSchool);
+          else if (school) setSchoolDetails(school);
+        } catch {}
+
+        const [cachedRates, cachedYears] = await Promise.all([
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_exchange_rates`, user.id, user.school_id),
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_academic_years`, user.id, user.school_id),
+        ]);
+        if (cachedRates?.data) applyExchangeRates(cachedRates.data);
+        if (cachedYears?.data) applyAcademicYears(cachedYears.data);
+      };
+
       try {
         setLoading(true);
         if (!user?.school_id) {
@@ -673,7 +721,21 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         setCashierName(user.full_name || '');
 
-        const { data: schoolData } = await supabase.from('schools').select('name, address, phone, logo_url, global_settings').eq('id', user.school_id).single();
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          await loadContextOffline();
+          return;
+        }
+
+        const { data: schoolData, error: schoolError } = await supabase
+          .from('schools')
+          .select('name, address, phone, logo_url, global_settings')
+          .eq('id', user.school_id)
+          .single();
+
+        if (schoolError && isTransientNetworkError(schoolError)) {
+          await loadContextOffline();
+          return;
+        }
         if (schoolData) setSchoolDetails(schoolData);
 
         // Fetch exchange rate
@@ -686,12 +748,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           if (rateError) {
             console.error("Erreur chargement taux de change:", rateError);
           } else if (rateData && rateData.length > 0) {
-            rateData.sort((a, b) => {
-              const dateA = new Date(a.effective_date || a.created_at || 0).getTime();
-              const dateB = new Date(b.effective_date || b.created_at || 0).getTime();
-              return dateB - dateA;
-            });
-            setCurrentExchangeRate(rateData[0].rate_usd_to_htg || rateData[0].rate || 132.50);
+            applyExchangeRates(rateData);
+            void saveEncryptedRefCache(`ref_${user.school_id}_exchange_rates`, rateData, user.id, user.school_id);
           }
         } catch (e) {
           console.error("Exception taux de change:", e);
@@ -706,22 +764,14 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         if (yearsError) console.error("Erreur chargement années académiques:", yearsError);
 
         if (years) {
-          const filtered = years.filter(y => y.status === 'ACTIVE' || y.status === 'FUTURE' || y.is_active);
-          const finalYears = filtered.length > 0 ? filtered : years;
-          setAcademicYears(finalYears);
-          const active = finalYears.find(y => y.status === 'ACTIVE' || y.is_active) || finalYears[0];
-          setActiveYear(active);
-          
-          const searchParams = new URLSearchParams(location.search);
-          const requestedYearId = location.state?.academicYearId || searchParams.get('academicYearId') || searchParams.get('yearId');
-          if (requestedYearId && finalYears.some(y => y.id === requestedYearId)) {
-            setTargetYearId(requestedYearId);
-          } else if (active) {
-            setTargetYearId(active.id);
-          }
+          applyAcademicYears(years);
+          void saveEncryptedRefCache(`ref_${user.school_id}_academic_years`, years, user.id, user.school_id);
+        } else if (yearsError && isTransientNetworkError(yearsError)) {
+          await loadContextOffline();
         }
       } catch (err) {
         console.error("Context load error:", err);
+        await loadContextOffline();
       } finally {
         setLoading(false);
       }
@@ -729,8 +779,34 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     fetchContext();
   }, [user]);
 
-  // 2. MOTEUR DE RECHERCHE ÉTUDIANTS
+  // 2. MOTEUR DE RECHERCHE ÉTUDIANTS (En ligne RPC + Fallback Hors-ligne Chiffré)
   useEffect(() => {
+    const searchOfflineStudents = async () => {
+      const cachedStudents = await loadEncryptedRefCache<any[]>(`ref_${user.school_id}_students`, user.id, user.school_id);
+      const normalize = (s: string) =>
+        (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+      const q = normalize(studentSearch.trim());
+      const activeCampusFilter = user.campus_id || currentCampusId || null;
+
+      let matches = (cachedStudents?.data || []).filter((s: any) => {
+        if (activeCampusFilter && s.campus_id && s.campus_id !== activeCampusFilter) return false;
+        const full = normalize(`${s.last_name || ''} ${s.first_name || ''} ${s.first_name || ''} ${s.last_name || ''} ${s.reference_number || ''} ${s.code || ''} ${s.matricule || ''}`);
+        return full.includes(q);
+      }).slice(0, 15).map((s: any) => {
+        const formatted = formatStudentName(s.last_name, s.first_name);
+        return {
+          ...s,
+          last_name: formatted.lastName,
+          first_name: formatted.firstName,
+          fullName: formatted.fullName,
+          class: s.class?.name ? { name: s.class.name } : (s.class_name ? { name: s.class_name } : null),
+          class_name: s.class?.name || s.class_name || ''
+        };
+      });
+
+      setSearchResults(matches);
+    };
+
     const search = async () => {
       if (studentSearch.length < 2 || !user?.school_id) {
         setSearchResults([]);
@@ -738,6 +814,11 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       setIsSearching(true);
       try {
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          await searchOfflineStudents();
+          return;
+        }
+
         const { data, error } = await supabase.rpc('search_students_accent_insensitive', {
           p_school_id: user.school_id,
           p_query: studentSearch,
@@ -747,6 +828,9 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         if (error) {
           console.error("Search error:", error);
+          if (isTransientNetworkError(error)) {
+            await searchOfflineStudents();
+          }
           return;
         }
 
@@ -785,13 +869,16 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         }
         
         setSearchResults(mappedData || []);
+      } catch (err) {
+        console.error("Search exception:", err);
+        await searchOfflineStudents();
       } finally {
         setIsSearching(false);
       }
     };
     const timer = setTimeout(search, 300);
     return () => clearTimeout(timer);
-  }, [studentSearch, user?.school_id, currentCampusId]);
+  }, [studentSearch, user?.school_id, user?.id, currentCampusId]);
 
   // 3. AUDIT APPROFONDI DU DOSSIER FINANCIER DE L'ÉLÈVE
   const auditStudentDossierInDepth = useCallback(async (
@@ -1099,46 +1186,91 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
     if (!yearId) return;
     setLoadingDebt(true);
     try {
-      // Exécution parallèle haute performance des requêtes nécessaires
-      const [
-        { data: dbData },
-        { data: allEnrollmentsData },
-        { data: pData, error: pErr },
-        { data: campaignsData },
-        { data: assignmentsData }
-      ] = await Promise.all([
-        supabase
-          .from('students')
-          .select('*, class:classes(id, name, level, campus_id)')
-          .eq('school_id', user.school_id)
-          .eq('id', studentId)
-          .single(),
-        supabase
-          .from('enrollments')
-          .select('class_id, academic_year_id, tuition_discount, tuition_addition, class:classes(id, name, level, campus_id), academic_year:academic_years(id, label, status)')
-          .eq('school_id', user.school_id)
-          .eq('student_id', studentId),
-        supabase
-          .from('payments')
-          .select('*, campaign:ad_hoc_campaigns(id, name)')
-          .eq('student_id', studentId)
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('ad_hoc_campaigns')
-          .select('id, name, amount, currency, campus_id, class_id')
-          .eq('school_id', user.school_id)
-          .eq('academic_year_id', yearId),
-        supabase
-          .from('student_ad_hoc_fees')
-          .select('campaign_id, custom_amount')
-          .eq('school_id', user.school_id)
-          .eq('student_id', studentId)
-      ]);
+      const isOfflineNow = typeof navigator !== 'undefined' && !navigator.onLine;
+      let dbData: any = null;
+      let allEnrollmentsData: any[] | null = null;
+      let pData: any[] | null = null;
+      let campaignsData: any[] | null = null;
+      let assignmentsData: any[] | null = null;
+      let offlinePlan: any = null;
+      let usedOfflineFallback = isOfflineNow;
 
-      if (pErr) {
-        console.error("Erreur pErr payments:", pErr);
+      if (!isOfflineNow) {
+        const [
+          { data: dData, error: dErr },
+          { data: eData },
+          { data: payData, error: pErr },
+          { data: cData },
+          { data: aData }
+        ] = await Promise.all([
+          supabase
+            .from('students')
+            .select('*, class:classes(id, name, level, campus_id)')
+            .eq('school_id', user.school_id)
+            .eq('id', studentId)
+            .single(),
+          supabase
+            .from('enrollments')
+            .select('class_id, academic_year_id, tuition_discount, tuition_addition, class:classes(id, name, level, campus_id), academic_year:academic_years(id, label, status)')
+            .eq('school_id', user.school_id)
+            .eq('student_id', studentId),
+          supabase
+            .from('payments')
+            .select('*, campaign:ad_hoc_campaigns(id, name)')
+            .eq('student_id', studentId)
+            .order('created_at', { ascending: false }),
+          supabase
+            .from('ad_hoc_campaigns')
+            .select('id, name, amount, currency, campus_id, class_id')
+            .eq('school_id', user.school_id)
+            .eq('academic_year_id', yearId),
+          supabase
+            .from('student_ad_hoc_fees')
+            .select('campaign_id, custom_amount')
+            .eq('school_id', user.school_id)
+            .eq('student_id', studentId)
+        ]);
+
+        if (dErr && isTransientNetworkError(dErr)) {
+          usedOfflineFallback = true;
+        } else {
+          dbData = dData;
+          allEnrollmentsData = eData;
+          pData = payData;
+          campaignsData = cData;
+          assignmentsData = aData;
+          if (pErr) {
+            console.error("Erreur pErr payments:", pErr);
+          }
+          if (payData) {
+            void saveEncryptedRefCache(`ref_${user.school_id}_student_payments_${studentId}`, payData, user.id, user.school_id);
+          }
+        }
       }
-      
+
+      if (usedOfflineFallback) {
+        const [stCache, enrCache, fpCache, campCache, payCache] = await Promise.all([
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_students`, user.id, user.school_id),
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_enrollments`, user.id, user.school_id),
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_fee_plans`, user.id, user.school_id),
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_ad_hoc_campaigns`, user.id, user.school_id),
+          loadEncryptedRefCache<any[]>(`ref_${user.school_id}_student_payments_${studentId}`, user.id, user.school_id),
+        ]);
+        dbData = (stCache?.data || []).find((s: any) => s.id === studentId) || null;
+        allEnrollmentsData = (enrCache?.data || []).filter((e: any) => e.student_id === studentId);
+        pData = payCache?.data || [];
+        campaignsData = (campCache?.data || []).filter((c: any) => !c.academic_year_id || c.academic_year_id === yearId);
+        assignmentsData = [];
+        const matchedEnr = allEnrollmentsData.find((e: any) => e.academic_year_id === yearId);
+        const effClass = matchedEnr?.class_id || dbData?.class_id;
+        if (effClass && fpCache?.data) {
+          offlinePlan =
+            fpCache.data.find((fp: any) => fp.class_id === effClass && fp.academic_year_id === yearId) ||
+            fpCache.data.find((fp: any) => fp.class_id === effClass) ||
+            null;
+        }
+      }
+
       let data = dbData;
       if (!data && studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c') {
         data = {
@@ -1173,18 +1305,26 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
         let campusName = '';
         if (effectiveCampusId) {
-          try {
-            const { data: campusData } = await supabase
-              .from('school_campuses')
-              .select('name')
-              .eq('id', effectiveCampusId)
-              .maybeSingle();
-            if (campusData) campusName = campusData.name;
-          } catch(e) {}
+          if (usedOfflineFallback) {
+            try {
+              const cachedCampuses = JSON.parse(localStorage.getItem(`edunova_cached_campuses_${user.school_id}`) || '[]');
+              const foundC = cachedCampuses.find((c: any) => c.id === effectiveCampusId);
+              if (foundC?.name) campusName = foundC.name;
+            } catch {}
+          } else {
+            try {
+              const { data: campusData } = await supabase
+                .from('school_campuses')
+                .select('name')
+                .eq('id', effectiveCampusId)
+                .maybeSingle();
+              if (campusData) campusName = campusData.name;
+            } catch(e) {}
+          }
         }
 
-        let plan = null;
-        if (effectiveClassId) {
+        let plan = offlinePlan;
+        if (!usedOfflineFallback && effectiveClassId) {
           try {
             const { data: planData, error: planError } = await supabase
               .from('fee_plans')
@@ -1215,12 +1355,8 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
               plan = latestPlan;
             }
           } catch (e) {
-            const fallback = await supabase.from('fee_plans')
-              .select('*')
-              .eq('school_id', user.school_id)
-              .eq('class_id', effectiveClassId)
-              .maybeSingle();
-            plan = fallback.data;
+            const fpCache = await loadEncryptedRefCache<any[]>(`ref_${user.school_id}_fee_plans`, user.id, user.school_id);
+            plan = fpCache?.data?.find((fp: any) => fp.class_id === effectiveClassId) || null;
           }
         }
 
@@ -1239,28 +1375,31 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           ? Math.max(0, totalCredits - totalDebits)
           : Number(data.wallet_balance_htg || 0);
 
-        // Synchronisation directe avec l'API Tranzak pour garantir la parité instantanée avec le Dossier Élève
-        try {
-          const studentFullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
-          const session = (await supabase.auth.getSession()).data?.session;
-          const token = session?.access_token;
-          const syncRes = await fetch(`/api/tranzak/sync/${studentId}?schoolId=${user.school_id}&studentName=${encodeURIComponent(studentFullName)}`, {
-            headers: {
-              'Content-Type': 'application/json',
-              ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        // Synchronisation directe avec l'API Tranzak pour garantir la parité instantanée avec le Dossier Élève (uniquement en ligne)
+        if (!usedOfflineFallback && (typeof navigator === 'undefined' || navigator.onLine)) {
+          try {
+            const studentFullName = `${data.first_name || ''} ${data.last_name || ''}`.trim();
+            const session = (await supabase.auth.getSession()).data?.session;
+            const token = session?.access_token;
+            const syncRes = await fetch(`/api/tranzak/sync/${studentId}?schoolId=${user.school_id}&studentName=${encodeURIComponent(studentFullName)}`, {
+              headers: {
+                'Content-Type': 'application/json',
+                ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+              }
+            });
+            if (syncRes.ok) {
+              const syncJson = await syncRes.json().catch(() => ({}));
+              if (typeof syncJson?.new_balance === 'number') {
+                certifiedWalletHTG = syncJson.new_balance;
+              }
+              if (Array.isArray(syncJson?.payments) && syncJson.payments.length > 0) {
+                allStudentPayments = syncJson.payments;
+                void saveEncryptedRefCache(`ref_${user.school_id}_student_payments_${studentId}`, allStudentPayments, user.id, user.school_id);
+              }
             }
-          });
-          if (syncRes.ok) {
-            const syncJson = await syncRes.json().catch(() => ({}));
-            if (typeof syncJson?.new_balance === 'number') {
-              certifiedWalletHTG = syncJson.new_balance;
-            }
-            if (Array.isArray(syncJson?.payments) && syncJson.payments.length > 0) {
-              allStudentPayments = syncJson.payments;
-            }
+          } catch (syncErr) {
+            console.warn('Tranzak sync notice in TuitionPaymentForm:', syncErr);
           }
-        } catch (syncErr) {
-          console.warn('Tranzak sync notice in TuitionPaymentForm:', syncErr);
         }
 
         data.wallet_balance_htg = certifiedWalletHTG;

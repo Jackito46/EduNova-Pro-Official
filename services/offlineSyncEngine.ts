@@ -19,6 +19,7 @@ import {
   OfflineGradesBatchRecord,
   OfflineReceiptRecord,
   openOfflineVaultDb,
+  saveEncryptedRefCache,
   sealPortableBundle,
   unsealPortableBundle,
   validateGradeBeforeLocalSave,
@@ -786,3 +787,142 @@ export function initOfflineSyncAutoFlush(schoolId?: string): () => void {
     window.clearInterval(timer);
   };
 }
+
+/**
+ * Précharge et chiffre les tables de référence essentielles (élèves, classes, inscriptions,
+ * matières, barèmes, taux de change) dès que la session est en ligne afin de garantir un
+ * fonctionnement complet sans Internet dans Registre Élèves, Saisie des Notes et Économat.
+ */
+export async function prefetchSchoolReferenceCache(
+  schoolId: string,
+  userId: string,
+  force = false
+): Promise<{ cachedDatasets: number; studentCount: number; classCount: number }> {
+  if (!schoolId || !userId || (typeof navigator !== 'undefined' && !navigator.onLine)) {
+    return { cachedDatasets: 0, studentCount: 0, classCount: 0 };
+  }
+
+  const throttleKey = `edunova_ref_prefetch_${schoolId}`;
+  if (!force) {
+    try {
+      const last = Number(localStorage.getItem(throttleKey) || '0');
+      if (Date.now() - last < 10 * 60 * 1000) {
+        return { cachedDatasets: 0, studentCount: 0, classCount: 0 };
+      }
+    } catch {}
+  }
+
+  const unlocked = await ensureOfflineVaultUnlocked(userId, schoolId);
+  if (!unlocked) {
+    return { cachedDatasets: 0, studentCount: 0, classCount: 0 };
+  }
+
+  let cachedDatasets = 0;
+  let studentCount = 0;
+  let classCount = 0;
+
+  try {
+    const [ayRes, clsRes, stRes, enrRes, subRes, csRes, fpRes, rateRes, campRes] = await Promise.all([
+      supabase.from('academic_years').select('*').eq('school_id', schoolId).order('label', { ascending: false }),
+      supabase.from('classes').select('*').eq('school_id', schoolId).order('name'),
+      supabase.from('students').select('*, class:classes(id, name, level, campus_id)').eq('school_id', schoolId).order('last_name'),
+      supabase
+        .from('enrollments')
+        .select('id, student_id, class_id, academic_year_id, status, tuition_discount, tuition_addition, class:classes(id, name, level, campus_id), academic_year:academic_years(id, label, status)')
+        .eq('school_id', schoolId),
+      supabase.from('subjects').select('id, name, code, category, description').eq('school_id', schoolId).order('name'),
+      supabase.from('class_subjects').select('id, class_id, subject_id, coefficient'),
+      supabase.from('fee_plans').select('*').eq('school_id', schoolId),
+      supabase.from('exchange_rates').select('*').eq('school_id', schoolId),
+      supabase.from('ad_hoc_campaigns').select('id, name, amount, currency, campus_id, class_id, academic_year_id').eq('school_id', schoolId),
+    ]);
+
+    const saves: Array<Promise<void>> = [];
+    if (ayRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_academic_years`, ayRes.data, userId, schoolId));
+    }
+    if (clsRes.data) {
+      cachedDatasets++;
+      classCount = clsRes.data.length;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_classes`, clsRes.data, userId, schoolId));
+    }
+    if (stRes.data) {
+      cachedDatasets++;
+      studentCount = stRes.data.length;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_students`, stRes.data, userId, schoolId));
+    }
+    if (enrRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_enrollments`, enrRes.data, userId, schoolId));
+    }
+    if (subRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_subjects`, subRes.data, userId, schoolId));
+    }
+    if (csRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_class_subjects`, csRes.data, userId, schoolId));
+    }
+    if (fpRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_fee_plans`, fpRes.data, userId, schoolId));
+    }
+    if (rateRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_exchange_rates`, rateRes.data, userId, schoolId));
+    }
+    if (campRes.data) {
+      cachedDatasets++;
+      saves.push(saveEncryptedRefCache(`ref_${schoolId}_ad_hoc_campaigns`, campRes.data, userId, schoolId));
+    }
+
+    await Promise.all(saves);
+    try {
+      localStorage.setItem(throttleKey, String(Date.now()));
+    } catch {}
+  } catch (err) {
+    console.warn('[OfflinePrefetch] Préchargement partiel ou interrompu:', err);
+  }
+
+  return { cachedDatasets, studentCount, classCount };
+}
+
+/** Récupère les notes locales non encore synchronisées pour une classe/période afin de les afficher dans la grille hors-ligne */
+export async function getPendingOfflineGradesForClass(
+  schoolId: string,
+  classId: string,
+  term: string
+): Promise<OfflineGradeRecord[]> {
+  try {
+    const all = await readAllQueueItems();
+    const pendingBatches = all
+      .filter(
+        (i) =>
+          i.schoolId === schoolId &&
+          i.entityType === 'GRADES_BATCH' &&
+          (i.status === 'PENDING' || i.status === 'SYNCING' || i.status === 'CONFLICT')
+      )
+      .sort((a, b) => a.createdAtMs - b.createdAtMs);
+
+    const out: OfflineGradeRecord[] = [];
+    for (const env of pendingBatches) {
+      try {
+        const aad = `${env.schoolId}:${env.entityType}:${env.id}`;
+        const batch = await decryptPayloadWithActiveKey<OfflineGradesBatchRecord>(
+          { iv: env.iv, cipher: env.cipher },
+          aad,
+          env.userId,
+          env.schoolId
+        );
+        if (batch.classId === classId && batch.term === term) {
+          out.push(...batch.grades);
+        }
+      } catch {}
+    }
+    return out;
+  } catch {
+    return [];
+  }
+}
+

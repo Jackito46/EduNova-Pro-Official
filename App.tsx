@@ -11,7 +11,7 @@ import Logo from './components/Logo';
 import { AppLoadingScreen } from './components/AppLoadingScreen';
 import { lazyWithRetry } from './utils/lazyWithRetry';
 import { ensureOfflineVaultUnlocked, lockOfflineVault } from './services/offlineEncryptedStore';
-import { initOfflineSyncAutoFlush } from './services/offlineSyncEngine';
+import { initOfflineSyncAutoFlush, prefetchSchoolReferenceCache } from './services/offlineSyncEngine';
 
 const loadPublicLandingPage = () => import('./components/PublicLandingPage');
 const loadLogin = () => import('./components/Login');
@@ -504,7 +504,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!user?.id) return;
-    void ensureOfflineVaultUnlocked(user.id, user.school_id || 'global');
+    void ensureOfflineVaultUnlocked(user.id, user.school_id || 'global').then((unlocked) => {
+      if (unlocked && user.school_id && typeof navigator !== 'undefined' && navigator.onLine) {
+        void prefetchSchoolReferenceCache(user.school_id, user.id);
+      }
+    });
     const stopAutoFlush = initOfflineSyncAutoFlush(user.school_id || undefined);
     return () => stopAutoFlush();
   }, [user?.id, user?.school_id]);
