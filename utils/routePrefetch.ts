@@ -44,7 +44,6 @@ export const prefetchRouteChunk = (rawPath: string) => {
     : Object.keys(ROUTE_PREFETCHERS).find((key) => key !== '/' && cleanPath.startsWith(`${key}/`));
 
   if (!matchedKey || prefetchedPaths.has(matchedKey)) return;
-
   const loader = ROUTE_PREFETCHERS[matchedKey];
   if (!loader) return;
 

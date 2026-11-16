@@ -384,9 +384,13 @@ const App: React.FC = () => {
           return finalProfile;
         });
         if (profile.current_session_id) {
-          try { 
-            window.localStorage.setItem('edunova_session_id', profile.current_session_id); 
-            window.localStorage.setItem('edunova_session_synced', 'true');
+          try {
+            const existingLocalSessionId = (window.localStorage.getItem('edunova_session_id') || '').trim();
+            const isLocalSessionSynced = window.localStorage.getItem('edunova_session_synced') === 'true';
+            if (!existingLocalSessionId || isLocalSessionSynced || existingLocalSessionId === String(profile.current_session_id).trim()) {
+              window.localStorage.setItem('edunova_session_id', String(profile.current_session_id).trim());
+              window.localStorage.setItem('edunova_session_synced', 'true');
+            }
           } catch (err) {}
         }
         try { window.localStorage.setItem('edunova_user_profile', JSON.stringify(profile)); } catch (err) {}
@@ -891,10 +895,12 @@ const App: React.FC = () => {
   }, [user?.id]);
 
   // Auto-logout & Concurrent Session Check
+  const userId = user?.id;
+  const userRole = user?.role;
   useEffect(() => {
-    if (!user) return;
+    if (!userId) return;
     // Bypass auto-logout and session purging during maintenance mode to let users read the maintenance message
-    if (maintenanceMode && user.role !== 'SUPER_ADMIN') return;
+    if (maintenanceMode && userRole !== 'SUPER_ADMIN') return;
 
     const timeoutMins = Math.max(1, Number(sessionTimeoutMinutes) || 15);
     const INACTIVITY_LIMIT = timeoutMins * 60 * 1000; // e.g. 15 minutes in ms
@@ -965,15 +971,24 @@ const App: React.FC = () => {
       evaluateInactivityState();
     };
 
-    const checkSessionState = async () => {
-      if (maintenanceMode && user.role !== 'SUPER_ADMIN') return;
+    let isCheckInFlight = false;
+    let lastSessionCheckAt = 0;
+
+    const checkSessionState = async (force: boolean = false) => {
+      if (maintenanceMode && userRole !== 'SUPER_ADMIN') return;
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       const isLoginInProgress = window.sessionStorage.getItem('edunova_login_in_progress') === 'true';
       if (isLoginInProgress) return;
+      const nowCheck = Date.now();
+      if (isCheckInFlight || (!force && nowCheck - lastSessionCheckAt < 5000)) return;
+      isCheckInFlight = true;
+      lastSessionCheckAt = nowCheck;
+
       try {
         const { data, error } = await supabase
           .from('profiles')
           .select('current_session_id, role, is_super_admin, is_active, school_id, expires_at')
-          .eq('id', user.id)
+          .eq('id', userId)
           .single();
           
         if (error) {
@@ -985,7 +1000,7 @@ const App: React.FC = () => {
           // Check expiration during active session
           if (data.expires_at && new Date(data.expires_at).getTime() <= Date.now() && data.role !== 'SUPER_ADMIN' && !data.is_super_admin) {
             console.warn("Compte expiré pendant la session active. Déconnexion immédiate.");
-            try { await supabase.from('profiles').update({ is_active: false }).eq('id', user.id); } catch (e) {}
+            try { await supabase.from('profiles').update({ is_active: false }).eq('id', userId); } catch (e) {}
             try { 
               window.sessionStorage.setItem('edunova_login_error', "La durée de validité de votre accès a expiré. Votre session a été verrouillée automatiquement."); 
             } catch(e){}
@@ -1017,34 +1032,40 @@ const App: React.FC = () => {
           }
 
           const isExemptFromConcurrent = isSuper;
-          const localSessionId = window.localStorage.getItem('edunova_session_id');
+          const localSessionId = (window.localStorage.getItem('edunova_session_id') || '').trim();
+          const remoteSessionId = (data.current_session_id || '').trim();
           const isSessionSynced = window.localStorage.getItem('edunova_session_synced') === 'true';
 
           if (!localSessionId) {
-            if (data.current_session_id) {
-              try { 
-                window.localStorage.setItem('edunova_session_id', data.current_session_id); 
+            if (remoteSessionId) {
+              try {
+                window.localStorage.setItem('edunova_session_id', remoteSessionId);
                 window.localStorage.setItem('edunova_session_synced', 'true');
-              } catch(e){}
+              } catch (e) {}
+            }
+          } else if (localSessionId === remoteSessionId) {
+            if (!isSessionSynced) {
+              try { window.localStorage.setItem('edunova_session_synced', 'true'); } catch (e) {}
             }
           } else if (!isExemptFromConcurrent) {
-            if (data.current_session_id && data.current_session_id !== localSessionId) {
-              // Smooth auto-sync localSessionId to DB to prevent disconnection glitches across tabs
+            if (remoteSessionId && isSessionSynced) {
+              // Align localStorage with the already-confirmed remote session ID instead of overwriting DB repeatedly
               try {
-                await supabase
+                window.localStorage.setItem('edunova_session_id', remoteSessionId);
+              } catch (e) {}
+            } else if (!isSessionSynced || !remoteSessionId) {
+              // Pending initial login sync or missing DB session ID: push localSessionId to DB once
+              try {
+                const { error: syncErr } = await supabase
                   .from('profiles')
                   .update({ current_session_id: localSessionId })
-                  .eq('id', user.id);
-                try { window.localStorage.setItem('edunova_session_synced', 'true'); } catch(e){}
+                  .eq('id', userId);
+                if (!syncErr) {
+                  try { window.localStorage.setItem('edunova_session_synced', 'true'); } catch (e) {}
+                }
               } catch (syncCatchErr) {
                 console.warn("App.tsx: Session auto-heal sync notice:", syncCatchErr);
               }
-            } else if (!data.current_session_id && localSessionId) {
-              // Auto-sync missing session ID to database to prevent orphaned state
-              try {
-                await supabase.from('profiles').update({ current_session_id: localSessionId }).eq('id', user.id);
-                window.localStorage.setItem('edunova_session_synced', 'true');
-              } catch (e) {}
             }
           }
         }
@@ -1054,7 +1075,7 @@ const App: React.FC = () => {
             await supabase
               .from('profiles')
               .update({ last_activity_at: new Date().toISOString() })
-              .eq('id', user.id);
+              .eq('id', userId);
             lastDbUpdateTimestamp = Date.now();
           } catch (updateErr) {
             console.error("Error updating activity:", updateErr);
@@ -1062,6 +1083,8 @@ const App: React.FC = () => {
         }
       } catch (err) {
         console.error("Erreur check session:", err);
+      } finally {
+        isCheckInFlight = false;
       }
     };
 
@@ -1108,10 +1131,10 @@ const App: React.FC = () => {
 
     // Ticker running every 3 seconds to guarantee strict inactivity monitoring
     const inactivityCheckTicker = setInterval(evaluateInactivityState, 3000);
-    const updateActivityInterval = setInterval(checkSessionState, 60000);
+    const updateActivityInterval = setInterval(() => checkSessionState(true), 60000);
 
     // Initial session check
-    checkSessionState();
+    checkSessionState(true);
 
     return () => {
       clearInterval(inactivityCheckTicker);
@@ -1123,7 +1146,7 @@ const App: React.FC = () => {
         activityEvents.forEach(event => document.removeEventListener(event, resetInactivityTimer));
       }
     };
-  }, [user, purgeSystemState, sessionTimeoutMinutes, maintenanceMode]);
+  }, [userId, userRole, purgeSystemState, sessionTimeoutMinutes, maintenanceMode]);
 
   useEffect(() => {
     let interval: NodeJS.Timeout;

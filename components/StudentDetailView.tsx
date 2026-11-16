@@ -38,7 +38,7 @@ import {
   calculateDocumentsCompleteness 
 } from '../utils/documentRequirements';
 import { isPaymentCompleted, isWalletDeposit } from '../src/utils/payment';
-import { computeCertifiedStudentArrears } from '../utils/studentDebtAudit';
+import { computeCertifiedStudentArrears, SessionArrearsDetail } from '../utils/studentDebtAudit';
 import { ResponsiveTableWrapper } from './ResponsiveTableWrapper';
 import { StudentDossierSkeleton } from './SkeletonLoader';
 
@@ -49,6 +49,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
   
   const [student, setStudent] = useState<any | null>(null);
   const [studentDebt, setStudentDebt] = useState<number>(0);
+  const [arrearsSessions, setArrearsSessions] = useState<SessionArrearsDetail[]>([]);
   const [solvencyInfo, setSolvencyInfo] = useState<SolvencyData | null>(null);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [payments, setPayments] = useState<any[]>([]);
@@ -101,8 +102,8 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             .maybeSingle()
             .then((r) => r, (err) => ({ data: null, error: err })),
           studentId === 'c3b12a55-d5d1-460b-8a7d-c8eed32a727c'
-            ? Promise.resolve({ totalArrears: 0 })
-            : computeCertifiedStudentArrears({ studentId, schoolId: user.school_id }).catch(() => ({ totalArrears: 0 })),
+            ? Promise.resolve({ totalArrears: 0, sessions: [] as SessionArrearsDetail[] })
+            : computeCertifiedStudentArrears({ studentId, schoolId: user.school_id }).catch(() => ({ totalArrears: 0, sessions: [] as SessionArrearsDetail[] })),
           supabase
             .from('enrollments')
             .select('*, academic_year:academic_years(*), class:classes(*)')
@@ -180,6 +181,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
       }
       setStudent(studentData);
       setStudentDebt(auditRes?.totalArrears ?? 0);
+      setArrearsSessions(Array.isArray((auditRes as any)?.sessions) ? (auditRes as any).sessions : []);
 
       if (payErr) {
         console.error("Erreur chargement des versements de l'élève:", payErr);
@@ -595,12 +597,49 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
     return payments;
   }, [grandLivreFilter, validFeePayments, walletDeposits, payments]);
 
+  const unpaidArrearsSession = useMemo(() => {
+    return arrearsSessions.find(s => Number(s.remainingDebtHTG || 0) > 0) || null;
+  }, [arrearsSessions]);
+
+  const activeOrLatestEnrollment = useMemo(() => {
+    if (!enrollments || enrollments.length === 0) return null;
+    return (
+      enrollments.find((e: any) => e.academic_year?.status === 'ACTIVE' || e.academic_year?.is_active) ||
+      enrollments.find((e: any) => e.academic_year?.status !== 'FUTURE') ||
+      enrollments[0]
+    );
+  }, [enrollments]);
+
+  const preferredPaymentYearId = useMemo(() => {
+    return (
+      unpaidArrearsSession?.academicYearId ||
+      activeOrLatestEnrollment?.academic_year_id ||
+      activeOrLatestEnrollment?.academic_year?.id ||
+      enrollments[0]?.academic_year_id ||
+      enrollments[0]?.academic_year?.id ||
+      student?.academic_year_id ||
+      ''
+    );
+  }, [unpaidArrearsSession, activeOrLatestEnrollment, enrollments, student?.academic_year_id]);
+
+  const preferredStatementYearId = useMemo(() => {
+    return (
+      unpaidArrearsSession?.academicYearId ||
+      activeOrLatestEnrollment?.academic_year_id ||
+      enrollments[0]?.academic_year_id ||
+      student?.academic_year_id ||
+      ''
+    );
+  }, [unpaidArrearsSession, activeOrLatestEnrollment, enrollments, student?.academic_year_id]);
+
   const isDossierSolde = studentDebt <= 0;
 
   const handleSolvencyLoaded = useCallback((solv: SolvencyData) => {
     setSolvencyInfo(solv);
-    setStudentDebt(solv.remainingBalance);
-  }, []);
+    if (arrearsSessions.length === 0) {
+      setStudentDebt(solv.remainingBalance);
+    }
+  }, [arrearsSessions.length]);
 
   const handleNext = () => {
     if (currentIndex < allStudentIds.length - 1) {
@@ -881,7 +920,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button 
               type="button"
               onClick={() => {
-                const targetYear = enrollments[0]?.academic_year_id || student.academic_year_id || '';
+                const targetYear = preferredStatementYearId;
                 navigate(`/economat/releves?studentId=${student.id}&tab=generator${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
                   state: {
                     studentId: student.id,
@@ -1001,7 +1040,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             <button
               type="button"
               onClick={() => {
-                const targetYear = enrollments[0]?.academic_year_id || enrollments[0]?.academic_year?.id || student.academic_year_id || '';
+                const targetYear = preferredPaymentYearId;
                 navigate(`/economat/frais?studentId=${student.id}&studentName=${encodeURIComponent(fullName)}${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
                   state: {
                     studentId: student.id,
@@ -1011,15 +1050,19 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 });
               }}
               className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-              title={`Enregistrer un nouveau paiement pour cet(te) ${terminology.student?.toLowerCase() || 'élève'}`}
+              title={
+                unpaidArrearsSession
+                  ? `Régler l'arriéré de la session ${unpaidArrearsSession.academicYearLabel} (${unpaidArrearsSession.remainingDebtHTG.toLocaleString()} HTG)`
+                  : `Enregistrer un nouveau paiement pour cet(te) ${terminology.student?.toLowerCase() || 'élève'}`
+              }
             >
               <PlusCircle size={14} />
-              <span>Nouveau Règlement</span>
+              <span>{unpaidArrearsSession ? `Régler ${unpaidArrearsSession.academicYearLabel}` : 'Nouveau Règlement'}</span>
             </button>
             <button
               type="button"
               onClick={() => {
-                const targetYear = enrollments[0]?.academic_year_id || student.academic_year_id || '';
+                const targetYear = preferredStatementYearId;
                 navigate(`/economat/releves?studentId=${student.id}&tab=generator${targetYear ? `&academicYearId=${targetYear}` : ''}`);
               }}
               className="px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl text-xs font-black transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
@@ -1760,7 +1803,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    const targetYear = enrollments[0]?.academic_year_id || enrollments[0]?.academic_year?.id || student.academic_year_id || '';
+                    const targetYear = preferredPaymentYearId;
                     navigate(`/economat/frais?studentId=${student.id}&studentName=${encodeURIComponent(fullName)}${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
                       state: {
                         studentId: student.id,
@@ -1770,10 +1813,14 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                     });
                   }}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-xs cursor-pointer"
-                  title="Encaisser un nouveau versement"
+                  title={
+                    unpaidArrearsSession
+                      ? `Régler l'arriéré de la session ${unpaidArrearsSession.academicYearLabel} (${unpaidArrearsSession.remainingDebtHTG.toLocaleString()} HTG)`
+                      : 'Encaisser un nouveau versement'
+                  }
                 >
                   <PlusCircle size={13} />
-                  <span>Nouveau Règlement</span>
+                  <span>{unpaidArrearsSession ? `Régler ${unpaidArrearsSession.academicYearLabel}` : 'Nouveau Règlement'}</span>
                 </button>
               </div>
             </div>
@@ -1977,7 +2024,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
             schoolId={user.school_id}
             classId={student.class_id || student.class?.id}
             studentName={fullName}
-            academicYearId={enrollments[0]?.academic_year_id}
+            academicYearId={preferredPaymentYearId || enrollments[0]?.academic_year_id}
             preloadedPayments={payments}
             preloadedStudent={student}
             preloadedEnrollments={enrollments}
@@ -2006,7 +2053,7 @@ const StudentDetailView: React.FC<{ user: UserProfile }> = ({ user }) => {
                   <button 
                     type="button"
                     onClick={() => {
-                      const targetYear = enrollments[0]?.academic_year_id || student.academic_year_id || '';
+                      const targetYear = preferredStatementYearId;
                       navigate(`/economat/releves?studentId=${student.id}&tab=generator${targetYear ? `&academicYearId=${targetYear}` : ''}`, {
                         state: {
                           studentId: student.id,

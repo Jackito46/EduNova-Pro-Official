@@ -232,6 +232,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
   const [targetYearId, setTargetYearId] = useState<string>('');
   const userSelectedYearRef = useRef(false);
   const lastInitializedNavKeyRef = useRef<string>('');
+  const lastInitializedStudentIdRef = useRef<string>('');
   const dismissedUrlNavKeyRef = useRef<string>('');
   const loadDetailsSeqRef = useRef(0);
   const [globalDebt, setGlobalDebt] = useState<number>(0);
@@ -902,7 +903,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
       // 1. Session courante / ciblée
       const isEnrolledCurrent = Boolean(currentEnrollment);
-      const targetYearObjForPrior = academicYears.find(y => y.id === targetYearId) || activeYear;
+      const targetYearObjForPrior =
+        academicYears.find(y => y.id === targetYearId) ||
+        currentEnrollment?.academic_year ||
+        activeYear;
       const parseStartYr = (lbl?: string) => {
         const m = String(lbl || '').match(/(\d{4})/);
         return m ? parseInt(m[1], 10) : 0;
@@ -1000,7 +1004,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         className: currentClassName,
         level: currentLevel,
         isCurrentSession: true,
-        isFutureSession: false,
+        isFutureSession: targetYearObjForPrior?.status === 'FUTURE',
         isEnrolled: isEnrolledCurrent,
         inscriptionDue: curAdmBal.effectiveDueHTG,
         inscriptionPaid: curAdmBal.paidHTGEquiv,
@@ -1340,9 +1344,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
         let otherEnrollments: any[] = [];
         let allEnrollments: any[] = [];
         if (allEnrollmentsData && allEnrollmentsData.length > 0) {
-          allEnrollments = allEnrollmentsData;
-          enrollment = allEnrollmentsData.find((e: any) => e.academic_year_id === yearId) || null;
-          otherEnrollments = allEnrollmentsData.filter((e: any) => e.academic_year_id !== yearId);
+          const parseEnrStartYear = (e: any) => {
+            const m = String(e?.academic_year?.label || '').match(/(\d{4})/);
+            return m ? parseInt(m[1], 10) : 0;
+          };
+          allEnrollments = [...allEnrollmentsData].sort((a, b) => parseEnrStartYear(a) - parseEnrStartYear(b));
+          enrollment = allEnrollments.find((e: any) => e.academic_year_id === yearId) || null;
+          otherEnrollments = allEnrollments.filter((e: any) => e.academic_year_id !== yearId);
         }
 
         const effectiveClassId = enrollment?.class_id || data.class_id;
@@ -1616,7 +1624,10 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           const m = String(lbl || '').match(/(\d{4})/);
           return m ? parseInt(m[1], 10) : 0;
         };
-        const targetYearObjForReturning = academicYears.find(y => y.id === yearId) || activeYear;
+        const targetYearObjForReturning =
+          academicYears.find(y => y.id === yearId) ||
+          allEnrollments.find((e: any) => e.academic_year_id === yearId)?.academic_year ||
+          activeYear;
         const targetStartYr = parseStartYr(targetYearObjForReturning?.label);
         const strictlyPriorEnrollments = (otherEnrollments || []).filter((e: any) => {
           if (e.academic_year?.status === 'FUTURE') return false;
@@ -1625,28 +1636,31 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           return e.academic_year_id !== yearId;
         });
 
-        // Filtrer les paiements pour cette session académique:
+        // Filtrer les paiements pour cette session académique sans fuite inter-sessions :
         // 1) Si le paiement est explicitement rattaché à yearId: OK
-        // 2) Si le paiement est un paiement d'admission/inscription et n'est pas lié à une autre inscription concurrente: OK
-        // 3) Si le paiement n'a pas d'academic_year_id et est attribuable à la session ciblée: OK
+        // 2) Si le paiement est rattaché à une AUTRE session connue (enrollment concurrent ou autre année académique): EXCLURE
+        // 3) Si le paiement n'a pas d'academic_year_id: attribuer uniquement si aucune autre session antérieure
+        const belongsToKnownOtherYear = (pAcademicYearId?: string | null) => {
+          if (!pAcademicYearId || pAcademicYearId === yearId) return false;
+          if (otherEnrollments.some(e => e.academic_year_id === pAcademicYearId)) return true;
+          if (academicYears.some(y => y.id === pAcademicYearId)) return true;
+          return false;
+        };
+
         const currentPayments = allStudentPayments.filter((p: any) => {
           if (p.academic_year_id === yearId) return true;
-          
+          if (belongsToKnownOtherYear(p.academic_year_id)) return false;
+
           if (isAdmissionPayment(p)) {
             if (!p.academic_year_id) return strictlyPriorEnrollments.length === 0 || !!enrollment;
-            const isEnrolledInOther = otherEnrollments.some(e => e.academic_year_id === p.academic_year_id);
-            if (!isEnrolledInOther && enrollment) return true;
+            return Boolean(enrollment);
           }
 
           if (!p.academic_year_id) {
             return strictlyPriorEnrollments.length === 0;
           }
-          
-          const isEnrolledInOther = otherEnrollments.some(e => e.academic_year_id === p.academic_year_id);
-          if (!isEnrolledInOther && enrollment) {
-            return true;
-          }
-          return false;
+
+          return Boolean(enrollment);
         });
         
         const validPayments = currentPayments?.filter(isPaymentCompleted) || [];
@@ -1927,6 +1941,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           plan: plan,
           adHocCampaigns: campaignsList,
           isNotEnrolledInTargetYear: !enrollment,
+          allEnrollments: allEnrollments,
           otherEnrollments: otherEnrollments,
           isReenrollment: isReturning,
           hasPreviousEnrollment: isReturning,
@@ -1969,6 +1984,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     if (!effectiveStudentId) return;
     if (dismissedUrlNavKeyRef.current === navSig) return;
+    if (userSelectedYearRef.current && lastInitializedStudentIdRef.current === effectiveStudentId) return;
     if (lastInitializedNavKeyRef.current === navSig) return;
 
     if (effectiveStudentName && !selectedStudent) {
@@ -1983,22 +1999,27 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
     if (resolvedYearId) {
       lastInitializedNavKeyRef.current = navSig;
-      userSelectedYearRef.current = false;
+      lastInitializedStudentIdRef.current = effectiveStudentId;
+      userSelectedYearRef.current = Boolean(explicitRouteYearId);
       if (resolvedYearId !== targetYearId) {
         setTargetYearId(resolvedYearId);
       }
       loadStudentDetails(effectiveStudentId, resolvedYearId);
     } else if (!loading) {
       lastInitializedNavKeyRef.current = navSig;
+      lastInitializedStudentIdRef.current = effectiveStudentId;
       (async () => {
         try {
           const { data: enrs } = await supabase
             .from('enrollments')
-            .select('academic_year_id')
+            .select('academic_year_id, academic_year:academic_years(id, label, status, is_active)')
             .eq('student_id', effectiveStudentId)
-            .order('created_at', { ascending: false })
-            .limit(1);
-          const foundYear = enrs?.[0]?.academic_year_id || activeYear?.id;
+            .order('created_at', { ascending: false });
+          const preferredEnr =
+            enrs?.find((e: any) => e.academic_year?.status === 'ACTIVE' || e.academic_year?.is_active) ||
+            enrs?.find((e: any) => e.academic_year?.status !== 'FUTURE') ||
+            enrs?.[0];
+          const foundYear = preferredEnr?.academic_year_id || activeYear?.id;
           if (foundYear) {
             userSelectedYearRef.current = false;
             setTargetYearId(foundYear);
@@ -2050,11 +2071,12 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
 
   const handleSelect = async (student: any) => {
     setStudentSearch('');
+    lastInitializedStudentIdRef.current = student.id;
     try {
-      // Vérifier si l'élève est inscrit dans une session spécifique (ex: session future 2026-2027)
+      // Vérifier les inscriptions réelles de l'élève (priorité absolue à ACTIVE, puis non-FUTURE, puis FUTURE)
       const { data: enrollments } = await supabase
         .from('enrollments')
-        .select('academic_year_id, academic_year:academic_years(id, label, status)')
+        .select('academic_year_id, academic_year:academic_years(id, label, status, is_active)')
         .eq('school_id', user.school_id)
         .eq('student_id', student.id);
 
@@ -2062,10 +2084,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       if (enrollments && enrollments.length > 0) {
         const isEnrolledInCurrent = enrollments.some((e: any) => e.academic_year_id === targetYearId);
         if (!isEnrolledInCurrent) {
-          // Basculer automatiquement vers l'année d'inscription de l'élève (priorité FUTURE ou ACTIVE)
-          const preferred = enrollments.find((e: any) => e.academic_year?.status === 'FUTURE' || e.academic_year?.status === 'ACTIVE') || enrollments[0];
+          const preferred =
+            enrollments.find((e: any) => e.academic_year?.status === 'ACTIVE' || e.academic_year?.is_active) ||
+            enrollments.find((e: any) => e.academic_year?.status !== 'FUTURE') ||
+            enrollments[0];
           if (preferred?.academic_year_id) {
             targetYear = preferred.academic_year_id;
+            userSelectedYearRef.current = true;
             setTargetYearId(preferred.academic_year_id);
           }
         }
@@ -2256,6 +2281,7 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
       dismissedUrlNavKeyRef.current = `${location.key || ''}::${effectiveStudentId}::${explicitRouteYearId}`;
     }
     userSelectedYearRef.current = false;
+    lastInitializedStudentIdRef.current = '';
     loadDetailsSeqRef.current += 1;
 
     setStudentSearch('');
@@ -3697,41 +3723,95 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
                           <span className="px-2 py-0.5 bg-amber-50 border border-amber-100 text-amber-700 text-[9.5px] font-bold rounded">🎓 Niveau: {selectedStudent.level}</span>
                         )}
                       </div>
-                      {selectedStudent.isNotEnrolledInTargetYear && (
-                        <div className="mt-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-2xs">
-                          <div className="flex items-start gap-2">
-                            <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
-                            <div className="flex flex-col">
-                              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
-                                {selectedStudent.otherEnrollments?.length > 0 ? 'Inscription Détectée dans une Autre Session' : "Régularisation d'Inscription"}
-                              </span>
-                              <span className="text-[11px] text-amber-800 mt-0.5">
-                                {selectedStudent.otherEnrollments?.length > 0 ? (
-                                  <>Cet(te) {terminology.student.toLowerCase()} est formellement inscrit(e) pour la session <strong className="text-amber-950 font-bold">{selectedStudent.otherEnrollments[0].academic_year?.label || 'Autre Session'}</strong>.</>
-                                ) : (
-                                  <>Ce(tte) {terminology.student.toLowerCase()} n'a pas d'inscription formelle pour cette session. L'encaissement est débloqué pour régulariser ses frais d'inscription.</>
+                      {selectedStudent.allEnrollments && selectedStudent.allEnrollments.length > 1 && (
+                        <div className="mt-2.5 bg-white/90 border border-slate-200/90 rounded-xl px-2.5 py-2 flex flex-wrap items-center gap-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-500 mr-1">
+                            Sessions inscrites :
+                          </span>
+                          {selectedStudent.allEnrollments.map((enr: any) => {
+                            const yrId = enr.academic_year_id;
+                            const isSelected = yrId === targetYearId;
+                            const isFutureEnr = enr.academic_year?.status === 'FUTURE';
+                            const isActiveEnr = enr.academic_year?.status === 'ACTIVE' || enr.academic_year?.is_active;
+                            const auditSession = dossierAuditSessions.find(s => s.academicYearId === yrId);
+                            const debtAmt = !isFutureEnr && auditSession ? Number(auditSession.remainingDebt || 0) : 0;
+
+                            return (
+                              <button
+                                key={yrId}
+                                type="button"
+                                onClick={() => handleSelectTargetYear(yrId)}
+                                className={`px-2 py-1 rounded-lg text-[10.5px] font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                                  isSelected
+                                    ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                                    : debtAmt > 0
+                                    ? 'bg-rose-50 hover:bg-rose-100 text-rose-800 border-rose-300'
+                                    : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-200'
+                                }`}
+                                title={`Encaisser sur ${enr.academic_year?.label || 'Session'} (${enr.class?.name || 'Classe'})`}
+                              >
+                                <span>{enr.academic_year?.label || 'Session'}</span>
+                                {enr.class?.name && (
+                                  <span className={`text-[9.5px] font-semibold ${isSelected ? 'text-blue-100' : 'text-slate-500'}`}>
+                                    • {enr.class.name}
+                                  </span>
                                 )}
-                              </span>
-                            </div>
-                          </div>
-                          {selectedStudent.otherEnrollments?.length > 0 && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const newYr = selectedStudent.otherEnrollments[0].academic_year_id;
-                                setTargetYearId(newYr);
-                                if (selectedStudent) {
-                                  loadStudentDetails(selectedStudent.id, newYr);
-                                }
-                              }}
-                              className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all shadow-2xs shrink-0 self-end sm:self-center cursor-pointer flex items-center gap-1.5"
-                            >
-                              <Sparkles size={12} />
-                              Basculer sur {selectedStudent.otherEnrollments[0].academic_year?.label}
-                            </button>
-                          )}
+                                {isFutureEnr && (
+                                  <span className={`px-1 py-0.2 rounded text-[8.5px] font-black uppercase ${isSelected ? 'bg-blue-500 text-white' : 'bg-amber-100 text-amber-800'}`}>
+                                    En prép.
+                                  </span>
+                                )}
+                                {isActiveEnr && (
+                                  <span className={`px-1 py-0.2 rounded text-[8.5px] font-black uppercase ${isSelected ? 'bg-blue-500 text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+                                    Active
+                                  </span>
+                                )}
+                                {debtAmt > 0 && (
+                                  <span className={`px-1.5 py-0.2 rounded font-mono text-[9px] font-black ${isSelected ? 'bg-rose-500 text-white' : 'bg-rose-600 text-white'}`}>
+                                    {debtAmt.toLocaleString()} G dû
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
+                      {selectedStudent.isNotEnrolledInTargetYear && (() => {
+                        const preferredOther =
+                          selectedStudent.otherEnrollments?.find((e: any) => e.academic_year?.status === 'ACTIVE' || e.academic_year?.is_active) ||
+                          selectedStudent.otherEnrollments?.find((e: any) => e.academic_year?.status !== 'FUTURE') ||
+                          selectedStudent.otherEnrollments?.[0];
+
+                        return (
+                          <div className="mt-2.5 bg-amber-50 border border-amber-200 text-amber-900 px-3 py-2 rounded-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 shadow-2xs">
+                            <div className="flex items-start gap-2">
+                              <AlertTriangle size={15} className="shrink-0 mt-0.5 text-amber-600" />
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                                  {preferredOther ? 'Inscription Détectée dans une Autre Session' : "Régularisation d'Inscription"}
+                                </span>
+                                <span className="text-[11px] text-amber-800 mt-0.5">
+                                  {preferredOther ? (
+                                    <>Cet(te) {terminology.student.toLowerCase()} est formellement inscrit(e) pour la session <strong className="text-amber-950 font-bold">{preferredOther.academic_year?.label || 'Autre Session'}</strong>.</>
+                                  ) : (
+                                    <>Ce(tte) {terminology.student.toLowerCase()} n'a pas d'inscription formelle pour cette session. L'encaissement est débloqué pour régulariser ses frais d'inscription.</>
+                                  )}
+                                </span>
+                              </div>
+                            </div>
+                            {preferredOther && (
+                              <button
+                                type="button"
+                                onClick={() => handleSelectTargetYear(preferredOther.academic_year_id)}
+                                className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-lg transition-all shadow-2xs shrink-0 self-end sm:self-center cursor-pointer flex items-center gap-1.5"
+                              >
+                                <Sparkles size={12} />
+                                Basculer sur {preferredOther.academic_year?.label}
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                       <div className="mt-2.5 pt-2 border-t border-slate-200/60 flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
                           <ShieldCheck size={13} className={globalDebt === 0 ? "text-emerald-600" : "text-rose-600"} />
@@ -4873,7 +4953,13 @@ const TuitionPaymentForm: React.FC<{ user: UserProfile }> = ({ user }) => {
           payerPhone={payerPhoneCustom || referenceNumber || selectedStudent.parent_phone || selectedStudent.phone}
           onPayerPhoneChange={(newPhone) => setPayerPhoneCustom(newPhone)}
           schoolName={schoolDetails?.name || school?.name}
-          academicYearLabel={(academicYears.find(y => y.id === targetYearId) || activeYear)?.label || (academicYears.find(y => y.id === targetYearId) || activeYear)?.name}
+          academicYearLabel={
+            academicYears.find(y => y.id === targetYearId)?.label ||
+            academicYears.find(y => y.id === targetYearId)?.name ||
+            selectedStudent?.allEnrollments?.find((e: any) => e.academic_year_id === targetYearId)?.academic_year?.label ||
+            activeYear?.label ||
+            activeYear?.name
+          }
           campusName={campuses.find(c => c.id === (selectedStudent.campus_id || currentCampusId))?.name}
           terminology={terminology}
         />
